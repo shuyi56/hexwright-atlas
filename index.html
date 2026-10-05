@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hexwright Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans+SC:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap">
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <span class="eyebrow" id="realmKind">a survey of</span>
+      <h1 id="realmName">The Realm</h1>
+    </div>
+    <form class="seed" id="seedForm" autocomplete="off">
+      <label for="seedInput">seed</label>
+      <input id="seedInput" name="seed" spellcheck="false" maxlength="40">
+      <button type="submit" class="btn">Redraw</button>
+      <button type="button" class="btn btn-brass" id="newRealm">New realm</button>
+    </form>
+  </header>
+  <main class="stage">
+    <div class="map-wrap" id="mapWrap">
+      <canvas id="map" tabindex="0" role="img" aria-label="Hand-drawn hex map of a fantasy realm. Drag to pan, scroll or pinch to zoom, click a hex to survey it."></canvas>
+      <div class="layers">
+        <button class="chip" id="lyLabels" aria-pressed="true">Names</button>
+        <button class="chip" id="lyNums" aria-pressed="false">Hex numbers</button>
+        <button class="chip" id="lyGrid" aria-pressed="true">Grid</button>
+      </div>
+      <div class="zoom">
+        <button class="btn" id="zIn" aria-label="Zoom in">+</button>
+        <button class="btn" id="zOut" aria-label="Zoom out">−</button>
+        <button class="btn fit" id="zFit" aria-label="Fit whole map">fit</button>
+      </div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="veil" id="veil">Surveying the realm…</div>
+      <div class="city" id="city" hidden>
+        <canvas id="cityCanvas" tabindex="0" role="img" aria-label="Isometric district map of the city. Drag to pan, scroll or pinch to zoom, click a district to survey it."></canvas>
+        <div class="city-bar">
+          <button class="btn" id="cityBack">← Realm map</button>
+          <div class="city-title"><span class="eyebrow" id="cityKind">city</span><strong id="cityName">City</strong></div>
+          <div class="city-tools">
+            <button class="chip" id="cityRotL" aria-label="Rotate view left">⟲ Turn</button>
+            <button class="chip" id="cityRotR" aria-label="Rotate view right">Turn ⟳</button>
+            <button class="chip" id="cityLabels" aria-pressed="true">Names</button>
+          </div>
+        </div>
+        <div class="zoom">
+          <button class="btn" id="cIn" aria-label="Zoom in">+</button>
+          <button class="btn" id="cOut" aria-label="Zoom out">−</button>
+          <button class="btn fit" id="cFit" aria-label="Fit whole city">fit</button>
+        </div>
+        <div class="tip" id="cityTip" hidden></div>
+        <div class="veil" id="cityVeil" hidden>Drawing the city…</div>
+      </div>
+    </div>
+    <aside class="ledger" aria-label="Survey ledger">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-survey" aria-selected="true" aria-controls="pane-survey">Survey</button>
+        <button class="tab" role="tab" id="tab-places" aria-selected="false" aria-controls="pane-places">Places</button>
+        <button class="tab" role="tab" id="tab-key" aria-selected="false" aria-controls="pane-key">Key</button>
+      </div>
+      <section class="pane" id="pane-survey" role="tabpanel" aria-labelledby="tab-survey"></section>
+      <section class="pane" id="pane-places" role="tabpanel" aria-labelledby="tab-places" hidden></section>
+      <section class="pane" id="pane-key" role="tabpanel" aria-labelledby="tab-key" hidden></section>
+    </aside>
+  </main>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
