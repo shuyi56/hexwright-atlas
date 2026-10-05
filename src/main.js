@@ -1,4 +1,5 @@
 import './styles/main.css';
+import './ui/input.js';
 import { state } from './ui/state.js';
 import { CX, CY, worldH } from './core/geometry.js';
 import { renderBase } from './render/base.js';
