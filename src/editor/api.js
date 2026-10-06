@@ -35,13 +35,13 @@ function check(schema, value, path) {
   }
   if (t === 'object') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${path} must be an object`);
-    if (schema.properties) checkProps(schema.properties, schema.required, value, path);
+    if (schema.properties) checkProps(schema.properties, schema.required, value, path, schema.additionalProperties === true);
   }
 }
-function checkProps(props, required = [], value, path) {
+function checkProps(props, required = [], value, path, open = false) {
   for (const [k, v] of Object.entries(value)) {
     if (v == null) continue;
-    if (!props[k]) fail(`unknown parameter "${path ? path + '.' : ''}${k}"; known: ${Object.keys(props).join(', ') || '(none)'}`);
+    if (!props[k]) { if (open) continue; fail(`unknown parameter "${path ? path + '.' : ''}${k}"; known: ${Object.keys(props).join(', ') || '(none)'}`); }
     check(props[k], v, path ? `${path}.${k}` : k);
   }
   for (const k of required) if (value[k] == null) fail(`${path ? path + '.' : ''}${k} is required`);

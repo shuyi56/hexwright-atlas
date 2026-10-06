@@ -3,7 +3,7 @@ import { METHODS } from '../src/editor/api-spec.js';
 /* ================= Hexwright bridge: Vite plugin (server side) =================
    Lets anything that can speak HTTP drive the tile editor open in a real browser:
 
-     GET  /__hexwright/pages            connected editor pages
+     GET  /__hexwright/pages            connected editor pages, and the project root served
      GET  /__hexwright/spec             the method list with JSON schemas
      POST /__hexwright/api/<method>     body = params, answer = { ok, result } or { ok: false, error }
      POST /__hexwright/call             { method, params, page?, timeoutMs? }
@@ -40,7 +40,7 @@ export default function hexwrightBridge() {
       server.middlewares.use('/__hexwright', async (req, res) => {
         try {
           const path = (req.url || '/').split('?')[0].replace(/\/+$/, '');
-          if (path === '/pages' && req.method === 'GET') { live().forEach(p => p.client.send('hexwright:ping', {})); return send(res, 200, { pages: live().map(pub) }); }
+          if (path === '/pages' && req.method === 'GET') { live().forEach(p => p.client.send('hexwright:ping', {})); return send(res, 200, { root: server.config.root, pages: live().map(pub) }); }
           if (path === '/spec' && req.method === 'GET') return send(res, 200, { methods: METHODS });
           let method, params, page, timeoutMs;
           if (path.startsWith('/api/') && (req.method === 'POST' || req.method === 'GET')) { method = decodeURIComponent(path.slice(5)); params = req.method === 'POST' ? await body(req) : {}; page = new URL(req.url, 'http://x').searchParams.get('page') || undefined; }
