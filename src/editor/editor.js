@@ -1,4 +1,4 @@
-import { INK_PAD, INK_SIZE, drawFrame, footShadow, frameCanvas, spriteThumb } from '../characters/draw.js';
+import { INK_PAD, INK_SIZE, drawSprite, footShadow, spriteThumb } from '../characters/draw.js';
 import * as library from '../characters/library.js';
 import { openSpriteEditor } from '../characters/sprite-editor.js';
 import { FACES, SIZE as SPRITE_SIZE } from '../characters/sprite.js';
@@ -135,7 +135,7 @@ function drawChar(g, R, v, s, face, frame, key, alpha = 1) {
   if (scratch.width < w || scratch.height < h) { scratch.width = Math.max(scratch.width, w); scratch.height = Math.max(scratch.height, h); }
   sg.setTransform(1, 0, 0, 1, 0, 0); sg.clearRect(0, 0, w, h); sg.setTransform(k, 0, 0, k, dx - ix - b[0] * k, dy - iy - b[1] * k);
   footShadow(sg, px, gy, P);
-  if (s) drawFrame(sg, frameCanvas(s, face, frame), px, py + 1, P);
+  if (s) drawSprite(sg, s, face, frame, px, py + 1, P);
   else { sg.fillStyle = '#b8483a'; sg.strokeStyle = '#2b2116'; sg.lineWidth = 0.6; sg.beginPath(); sg.arc(px, py - 5, 3, 0, Math.PI * 2); sg.fill(); sg.stroke(); }
   const mk = m.mask; sg.globalCompositeOperation = 'destination-out'; sg.imageSmoothingEnabled = true; sg.drawImage(mk.can, mk.x, mk.y, mk.w, mk.h); sg.globalCompositeOperation = 'source-over';
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = alpha; g.drawImage(scratch, 0, 0, w, h, ix, iy, w, h); g.restore();
