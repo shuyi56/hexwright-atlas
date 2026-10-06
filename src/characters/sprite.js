@@ -1,8 +1,8 @@
 /* ================= character sprites: pure data =================
-   A sprite is a 16×16 pixel picture in four facings (as the tile editor turns them: sw se ne nw), each
+   A sprite is a 32×32 pixel picture in four facings (as the tile editor turns them: sw se ne nw), each
    with two frames (standing, mid-stride). Pixels are 0 (clear) or 1 + an index into the sprite's own
    palette. No DOM here, so the sprite editor, the tile editor and the tests all share it. */
-const SIZE = 16, FACES = ['sw', 'se', 'ne', 'nw'], FRAMES = 2, MAX_PAL = 35;
+const SIZE = 32, OLD_SIZE = 16, FACES = ['sw', 'se', 'ne', 'nw'], FRAMES = 2, MAX_PAL = 35;
 const FACE_LABEL = { sw: 'Front left', se: 'Front right', ne: 'Back right', nw: 'Back left' };
 const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 /* the tile set's own colours: ink, skin, timber, thatch, roof tiles, slate, plaster, foliage, stone */
@@ -46,52 +46,114 @@ function spriteToJSON(s) {
   const frames = {}; for (const f of FACES) frames[f] = s.frames[f].map(encodeFrame);
   return { id: s.id, name: s.name, size: SIZE, palette: s.pal.slice(), frames };
 }
+/* a frame from the first, 16×16 release, doubled */
+function grow(fr16) { const fr = blankFrame(); for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) fr[y * SIZE + x] = fr16[(y >> 1) * OLD_SIZE + (x >> 1)]; return fr; }
+function decodeOld(str, palN) { const fr = new Uint8Array(OLD_SIZE * OLD_SIZE); if (typeof str === 'string') for (let u = 0; u < fr.length && u < str.length; u++) { const v = DIGITS.indexOf(str[u]); fr[u] = v > 0 && v <= palN ? v : 0; } return grow(fr); }
 function spriteFromJSON(J) {
-  if (!J || typeof J !== 'object' || J.size !== SIZE || !Array.isArray(J.palette) || !J.frames) throw new Error('Not a Hexwright character');
+  if (!J || typeof J !== 'object' || (J.size !== SIZE && J.size !== OLD_SIZE) || !Array.isArray(J.palette) || !J.frames) throw new Error('Not a Hexwright character');
   const pal = J.palette.filter(c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)).slice(0, MAX_PAL);
   if (pal.length !== J.palette.length) throw new Error('Character palette must be #rrggbb colours');
   const s = blankSprite(String(J.name || 'Character').slice(0, 40), String(J.id || newId()).slice(0, 40)); s.pal = pal;
-  for (const f of FACES) for (let k = 0; k < FRAMES; k++) s.frames[f][k] = decodeFrame(J.frames[f] && J.frames[f][k], pal.length);
+  const dec = J.size === OLD_SIZE ? decodeOld : decodeFrame;
+  for (const f of FACES) for (let k = 0; k < FRAMES; k++) s.frames[f][k] = dec(J.frames[f] && J.frames[f][k], pal.length);
   return s;
 }
 
 /* ---------- starter characters, built from parts ----------
-   The art stays flat: the renderer (draw.js) adds the ink outline, the lit-left/shaded-right
-   rounding and the paper grain that the tile pieces have, so plain areas of colour are what read best. */
-function figure(name, id, c) {
-  const pal = [], K = {}; for (const [k, v] of Object.entries(c.col)) { let i = pal.indexOf(v); if (i < 0) { pal.push(v); i = pal.length - 1; } K[k] = i + 1; }
+   The art stays flat: the renderer (draw.js) adds the ink outline, the lit-left/shaded-right rounding and
+   the paper grain the tile pieces have. Ink lines are drawn only between clearly different colours, so a
+   darker shade of the same cloth reads as a fold, not as a seam. Front views look a little to the right
+   (south-east); the left-facing views are mirror images. */
+const darken = (hex, k) => '#' + [1, 3, 5].map(i => Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
+function figure(name, id, o) {
+  const c = Object.assign({ skin: '#e8c49a', eye: '#2b2116', lip: '#b9735a', boots: '#4a3524', legs: '#8c6d4b', belt: '#5a3f28', buckle: '#c9a24f', inner: '#efe3c4' }, o.col);
+  c.skinD = darken(c.skin, 0.84); c.topD = darken(c.top, 0.82); c.sleeve = c.sleeve || c.top; c.sleeveD = darken(c.sleeve, 0.82); c.legsD = darken(c.legs, 0.84); c.bootsD = darken(c.boots, 0.7); c.hairD = darken(c.hair, 0.8);
+  if (c.hat) c.hatD = darken(c.hat, 0.8); if (c.apron) c.apronD = darken(c.apron, 0.86); if (c.cape) c.capeD = darken(c.cape, 0.8);
+  const pal = [], K = {};
+  for (const [k, v] of Object.entries(c)) { let i = pal.indexOf(v); if (i < 0) { pal.push(v); i = pal.length - 1; } K[k] = i + 1; }
   const s = blankSprite(name, id); s.pal = pal.concat(DEFAULT_PAL.filter(d => !pal.includes(d))).slice(0, MAX_PAL);
+
   const make = (back, step) => {
-    const fr = blankFrame(), r = (x, y, w, h, v) => { if (v) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) fr[j * SIZE + i] = v; };
-    /* legs and feet */
-    if (c.robe) { r(5, 6, 6, 8, K.top); r(4, 12, 8, 2, K.top); if (step) { r(5, 14, 2, 1, K.boots); r(9, 14, 2, 1, K.boots); r(9, 15, 2, 1, K.boots); } else { r(5, 14, 6, 1, K.top); r(6, 15, 2, 1, K.boots); r(8, 15, 2, 1, K.boots); } }
-    else if (step) { r(5, 12, 2, 2, K.legs); r(4, 14, 3, 1, K.boots); r(9, 12, 2, 3, K.legs2); r(9, 15, 2, 1, K.boots); }
-    else { r(6, 12, 2, 3, K.legs); r(8, 12, 2, 3, K.legs2); r(6, 15, 2, 1, K.boots); r(8, 15, 2, 1, K.boots); }
-    /* body, belt, arms swinging opposite the legs */
-    r(5, 6, 6, 6, K.top); r(5, 10, 6, 1, K.belt);
-    const la = step ? 1 : 0, ra = step ? -1 : 0;
-    r(4, 6 + la, 1, 4, K.sleeve); r(4, 10 + la, 1, 1, K.skin); r(11, 6, 1, 4 + ra + 1, K.sleeve); r(11, 10 + ra + 1, 1, 1, K.skin);
-    if (c.cape && back) r(5, 6, 6, 7, K.cape);
-    /* head */
-    r(6, 2, 4, 4, K.skin);
-    if (back) r(5, 1, 6, 4, K.hair), r(6, 5, 4, 1, K.hair); else { r(6, 1, 4, 1, K.hair); r(5, 2, 6, 1, K.hair); r(5, 3, 1, 1, K.hair); r(10, 3, 1, 2, K.hair); r(7, 4, 1, 1, K.eye); r(9, 4, 1, 1, K.eye); }
-    if (c.hair === 'long') r(5, 3, 1, 3, K.hair), r(10, 3, 1, 3, K.hair);
-    if (c.hat === 'straw') { r(6, 0, 4, 2, K.hat); r(3, 2, 10, 1, K.hat); }
-    if (c.hat === 'helm') { r(5, 0, 6, 3, K.hat); if (!back) r(8, 3, 1, 1, K.hat); }
-    if (c.hat === 'hood') { r(5, 0, 6, 2, K.hat); r(5, 2, 1, 4, K.hat); r(10, 2, 1, 4, K.hat); if (back) r(5, 2, 6, 4, K.hat); }
+    const fr = blankFrame();
+    const r = (x, y, w, h, v) => { if (!v) return; for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (i >= 0 && j >= 0 && i < SIZE && j < SIZE) fr[j * SIZE + i] = v; };
+    const p = (x, y, v) => r(x, y, 1, 1, v);
+    /* stride: the viewer-left leg steps forward (down and out), the other lifts; arms swing the other way */
+    const lf = step ? 1 : 0, rl = step ? -2 : 0, la = step ? -1 : 0, ra = step ? 1 : 0;
+
+    /* spear, behind the body */
+    if (o.spear) { const sx = back ? 8 : 23; r(sx, 3, 1, 26, K.belt); r(sx - 1, 1, 3, 2, K.inner); p(sx, 0, K.inner); }
+    /* cape, seen from behind */
+    if (o.cape && back) { r(10, 14, 12, 14, K.cape); r(9, 22, 14, 6, K.cape); r(9, 27, 14, 1, K.capeD); r(15, 15, 2, 12, K.capeD); }
+
+    /* legs and boots */
+    if (o.robe) {
+      r(11 - lf, 28 + lf, 4, 3, K.boots); r(11 - lf, 30 + lf, 4, 1, K.bootsD);
+      r(17, 28 + rl, 4, 3, K.boots); r(17, 30 + rl, 4, 1, K.bootsD);
+    } else {
+      r(12 - lf, 24, 3, 4 + lf, K.legs); r(17, 24, 3, 4 + rl, K.legsD);
+      r(11 - lf, 28 + lf, 4, 3, K.boots); r(11 - lf, 28 + lf, 4, 1, K.bootsD); r(10 - lf, 30 + lf, 5, 1, K.bootsD);
+      r(17, 28 + rl, 4, 3, K.boots); r(17, 28 + rl, 4, 1, K.bootsD); r(17, 30 + rl, 5, 1, K.bootsD);
+    }
+
+    /* arms (behind the torso's edge), with cuffs and hands */
+    const arm = (x, dy) => { r(x, 14 + dy, 2, 8, K.sleeve); r(x, 21 + dy, 2, 1, K.sleeveD); r(x, 22 + dy, 2, 2, K.skin); };
+    arm(9, back ? ra : la); arm(21, back ? la : ra);
+    r(10, 14, 1, 2, K.sleeve); r(21, 14, 1, 2, K.sleeve);
+
+    /* torso, hem, or a robe to the ankles */
+    r(11, 14, 10, 8, K.top); r(10, 22, 12, 2, K.top); r(10, 23, 12, 1, K.topD);
+    if (o.robe) { r(10, 22, 12, 5, K.top); r(9, 26, 14, 3, K.top); r(9, 28, 14, 1, K.trim || K.topD); r(17, 22, 1, 6, K.topD); }
+    if (!back) {
+      r(14, 14, 4, 1, K.inner); r(15, 15, 2, 1, K.inner);                     /* open collar */
+      if (o.vest) { r(11, 14, 3, 7, K.vest); r(18, 14, 3, 7, K.vest); }
+      else { r(16, 16, 1, 4, K.topD); p(17, 16, K.buckle); p(17, 18, K.buckle); } /* placket and buttons */
+      if (o.apron) { r(13, 16, 6, 4, K.apron); r(12, 21, 8, 6, K.apron); r(14, 23, 4, 2, K.apronD); }
+    } else r(15, 15, 2, 6, K.topD);                                              /* back seam */
+    r(11, 20, 10, 1, K.belt); if (!back) r(15, 20, 2, 1, K.buckle);
+    if (o.rope) { r(11, 20, 10, 1, K.rope); if (!back) r(13, 21, 1, 4, K.rope); }
+    /* satchel strap across the chest, bag on the hip */
+    if (o.satchel) {
+      if (!back) for (let k = 0; k < 7; k++) p(12 + k, 14 + k, K.strap);
+      const bx = back ? 10 : 18; r(bx, 20, 4, 4, K.bag); r(bx, 20, 4, 1, K.strap);
+    }
+    if (o.cape && !back) { p(11, 14, K.cape); p(20, 14, K.cape); r(10, 15, 1, 8, K.cape); r(21, 15, 1, 8, K.cape); p(12, 14, K.buckle); p(19, 14, K.buckle); }
+
+    /* neck and head */
+    r(15, 13, 2, 1, K.skinD);
+    r(13, 4, 6, 1, K.skin); r(12, 5, 8, 7, K.skin); r(13, 12, 6, 1, K.skin);
+    if (back) {
+      r(12, 3, 8, 1, K.hair); r(11, 4, 10, 8, K.hair); r(12, 12, 8, 1, K.hair); r(13, 2, 6, 1, K.hair); r(15, 6, 1, 5, K.hairD);
+      if (o.longHair) { r(11, 12, 10, 4, K.hair); r(12, 16, 8, 1, K.hairD); }
+    } else {
+      /* hair: crown, fringe swept to the right, a sideburn on the near (left) side */
+      r(13, 2, 6, 1, K.hair); r(12, 3, 8, 1, K.hair); r(11, 4, 10, 2, K.hair); r(11, 6, 2, 3, K.hair); r(19, 6, 2, 2, K.hair); p(14, 6, K.hair); p(15, 6, K.hairD);
+      if (o.longHair) { r(11, 6, 2, 9, K.hair); r(19, 6, 2, 9, K.hair); r(11, 14, 1, 2, K.hairD); r(20, 14, 1, 2, K.hairD); }
+      p(12, 9, K.skinD);                                                          /* ear */
+      p(15, 7, K.hairD); p(18, 7, K.hairD);                                       /* brows */
+      r(15, 8, 1, 2, K.eye); r(18, 8, 1, 2, K.eye);                               /* eyes */
+      p(17, 10, K.skinD); r(16, 11, 2, 1, K.lip);                                 /* nose and mouth */
+      if (o.beard) { r(13, 10, 7, 3, K.beard); r(14, 13, 5, 1, K.beard); r(16, 11, 2, 1, K.lip); p(17, 10, K.skinD); }
+    }
+    /* headgear */
+    if (o.hat === 'straw') { r(13, 1, 6, 3, K.hat); r(13, 3, 6, 1, K.band); r(8, 4, 16, 1, K.hat); r(9, 5, 14, 1, K.hatD); }
+    if (o.hat === 'helm') { r(12, 1, 8, 1, K.hat); r(11, 2, 10, 4, K.hat); r(10, 6, 12, 1, K.hatD); if (!back) { r(17, 7, 1, 3, K.hat); r(11, 7, 2, 4, K.hat); } else r(11, 7, 10, 4, K.hat); r(15, 2, 1, 4, K.hatD); }
+    if (o.hat === 'hood') {
+      r(12, 1, 8, 1, K.hat); r(11, 2, 10, 3, K.hat); r(10, 5, 2, 9, K.hat); r(20, 5, 2, 9, K.hat); r(10, 13, 12, 3, K.hat); r(11, 15, 10, 1, K.hatD);
+      if (back) { r(10, 2, 12, 14, K.hat); r(15, 4, 2, 10, K.hatD); r(14, 16, 4, 3, K.hat); }
+      else { r(12, 4, 8, 1, K.hatD); }
+    }
     return fr;
   };
   for (let k = 0; k < FRAMES; k++) { s.frames.se[k] = make(false, k); s.frames.ne[k] = make(true, k); s.frames.sw[k] = flipFrame(s.frames.se[k].slice()); s.frames.nw[k] = flipFrame(s.frames.ne[k].slice()); }
   return s;
 }
-const SKIN = '#e8c49a', EYE = '#2b2116';
 const starters = () => [
-  figure('Villager', 'starter-villager', { col: { skin: SKIN, eye: EYE, hair: '#5a3f28', top: '#87a05a', sleeve: '#87a05a', belt: '#7a5a3a', legs: '#8c6d4b', legs2: '#8c6d4b', boots: '#4a3524' } }),
-  figure('Farmer', 'starter-farmer', { hat: 'straw', col: { skin: SKIN, eye: EYE, hair: '#7a5a3a', hat: '#d9b860', top: '#efe3c4', sleeve: '#efe3c4', belt: '#a07a4a', legs: '#7a5a3a', legs2: '#7a5a3a', boots: '#4a3524' } }),
-  figure('Guard', 'starter-guard', { hat: 'helm', cape: true, col: { skin: '#d9b088', eye: EYE, hair: '#3a2a1a', hat: '#9aa3a6', top: '#a6533b', sleeve: '#66727e', belt: '#4a3524', legs: '#48525c', legs2: '#48525c', boots: '#2f271f', cape: '#7c3a2a' } }),
-  figure('Merchant', 'starter-merchant', { robe: true, col: { skin: SKIN, eye: EYE, hair: '#d3c199', top: '#4f6f8f', sleeve: '#4f6f8f', belt: '#c9a24f', boots: '#5a3f28' } }),
-  figure('Monk', 'starter-monk', { robe: true, hat: 'hood', col: { skin: '#d9b088', eye: EYE, hair: '#5a3f28', hat: '#7a5a3a', top: '#7a5a3a', sleeve: '#7a5a3a', belt: '#d3c199', boots: '#4a3524' } }),
-  figure('Healer', 'starter-healer', { hair: 'long', col: { skin: SKIN, eye: EYE, hair: '#bf9850', top: '#7a6a8a', sleeve: '#efe3c4', belt: '#c9a24f', legs: '#5a4a62', legs2: '#5a4a62', boots: '#4a3524' } })
+  figure('Villager', 'starter-villager', { vest: true, col: { hair: '#5a3f28', top: '#efe3c4', vest: '#637d43', sleeve: '#e6d8b6', legs: '#8c6d4b' } }),
+  figure('Farmer', 'starter-farmer', { hat: 'straw', apron: true, col: { hair: '#7a5a3a', hat: '#d9b860', band: '#a6533b', top: '#87a05a', apron: '#d3c199', legs: '#7a5a3a', boots: '#5a3f28' } }),
+  figure('Guard', 'starter-guard', { hat: 'helm', cape: true, spear: true, col: { skin: '#d9b088', hair: '#3a2a1a', hat: '#9aa3a6', top: '#a6533b', sleeve: '#66727e', legs: '#48525c', boots: '#2f271f', cape: '#7c3a2a', inner: '#c9c4b4' } }),
+  figure('Merchant', 'starter-merchant', { robe: true, beard: true, satchel: true, col: { hair: '#d3c199', beard: '#e6dcc6', top: '#4f6f8f', trim: '#c9a24f', strap: '#5a3f28', bag: '#8c6d4b', boots: '#5a3f28' } }),
+  figure('Monk', 'starter-monk', { robe: true, hat: 'hood', rope: true, col: { skin: '#d9b088', hair: '#5a3f28', hat: '#7a5a3a', top: '#8a6a48', rope: '#d3c199', boots: '#4a3524' } }),
+  figure('Healer', 'starter-healer', { longHair: true, satchel: true, col: { hair: '#bf9850', top: '#7a6a8a', sleeve: '#efe3c4', legs: '#5a4a62', strap: '#7a5a3a', bag: '#efe3c4', inner: '#f4eede' } })
 ];
 
 export { DEFAULT_PAL, FACES, FACE_LABEL, FRAMES, MAX_PAL, SIZE, blankFrame, blankSprite, cloneSprite, fillFrame, flipFrame, inFrame, isBlank, newId, setPixel, shiftFrame, spriteFromJSON, spriteToJSON, starters };

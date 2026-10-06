@@ -1,7 +1,7 @@
 import { drawFrame, footShadow, frameCanvas, spriteThumb } from '../characters/draw.js';
 import * as library from '../characters/library.js';
 import { openSpriteEditor } from '../characters/sprite-editor.js';
-import { FACES } from '../characters/sprite.js';
+import { FACES, SIZE as SPRITE_SIZE } from '../characters/sprite.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
@@ -18,8 +18,8 @@ const TOOLS = [
   ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
 ];
 const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), lastT: 0, preview: null };
-/* one sprite pixel in drawing units: a figure stands a little taller than a cottage door */
-const WALK_SPEED = 3.2, SPRITE_PX = 0.55;
+/* one sprite pixel in drawing units: a figure stands about as tall as a cottage's eaves and chimney */
+const WALK_SPEED = 3.2, SPRITE_PX = 0.42, FIG_H = SPRITE_SIZE * SPRITE_PX;
 
 /* ---------- persistence ---------- */
 let saveT = 0;
@@ -110,8 +110,8 @@ function charViews() {
 /* the character whose picture is under a screen point, nearest first */
 function charAtScreen(sx, sy) {
   const R = ED.R; if (!R || !ED.M.chars || !ED.M.chars.length) return -1;
-  const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z, half = Math.max(7, 16 * SPRITE_PX / 2 + 2), views = charViews();
-  for (let i = views.length - 1; i >= 0; i--) { const v = views[i], [px, py] = R.P(v.X, v.Y, v.z); if (wx >= px - half && wx <= px + half && wy >= py - 16 * SPRITE_PX - 3 && wy <= py + 5) return v.k; }
+  const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z, half = FIG_H * 0.3 + 2, views = charViews();
+  for (let i = views.length - 1; i >= 0; i--) { const v = views[i], [px, py] = R.P(v.X, v.Y, v.z); if (wx >= px - half && wx <= px + half && wy >= py - FIG_H - 2 && wy <= py + 5) return v.k; }
   return -1;
 }
 const spriteOf = c => library.get(c.sprite);
@@ -121,7 +121,7 @@ function drawChar(g, R, v) {
   footShadow(g, px, R.P(v.X, v.Y, v.ground)[1], SPRITE_PX);
   if (s) drawFrame(g, frameCanvas(s, v.face, v.frame), px, py + 1, SPRITE_PX);
   else { g.save(); g.fillStyle = '#b8483a'; g.strokeStyle = '#2b2116'; g.beginPath(); g.arc(px, py - 8, 6, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore(); }
-  const box = [px - 8, py - 16 * SPRITE_PX - 4, px + 8, py + 4];
+  const box = [px - FIG_H / 2 - 2, py - FIG_H - 4, px + FIG_H / 2 + 2, py + 4];
   for (const o of R.objs) {
     const [w, d] = footprint(o); if (o.x + w / 2 + o.y + d / 2 <= key) continue;
     const b = pieceBox(R, o); if (b[0] >= box[2] || b[2] <= box[0] || b[1] >= box[3] || b[3] <= box[1]) continue;

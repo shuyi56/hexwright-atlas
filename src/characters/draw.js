@@ -5,9 +5,9 @@ import { SIZE } from './sprite.js';
 /* ================= character sprites: drawing in the tile set's style =================
    A sprite is drawn the way the tile pieces are: smooth shapes, an ink outline round the figure and
    between areas of colour, lit from the left and in shade on the right like the kit's cylinders, and
-   the same faint paper grain. The 16×16 pixels are first rounded off by three Scale2x passes (8×),
+   the same faint paper grain. The 32×32 pixels are first rounded off by two Scale2x passes (4×),
    which keeps the drawing the user made but takes the stair-steps out of its curves and diagonals. */
-const UP = 8, PAD = 6, N = SIZE * UP + PAD * 2;
+const UP = 4, PAD = 5, N = SIZE * UP + PAD * 2;
 const INK_RGB = hexRgb(INK);
 
 /* Scale2x on palette indices: doubles the frame, rounding corners where two sides agree */
@@ -24,6 +24,7 @@ function scale2x(src, n) {
   }
   return out;
 }
+const apart = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) > 64;
 const dark = rgb => rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11 < 60;
 const noise = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
 
@@ -36,7 +37,7 @@ function inkFrame(pal, fr) {
   /* the extent of the figure on each row, for the left-lit, right-shaded rounding */
   const lo = new Int32Array(N).fill(N), hi = new Int32Array(N).fill(-1);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (idx[y * N + x]) { if (x < lo[y]) lo[y] = x; hi[y] = x; }
-  const R = 4.6, RI = Math.ceil(R), LINE = 2.6;
+  const R = 3.3, RI = Math.ceil(R), LINE = 2.2;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const u = y * N + x, v = idx[u], o = u * 4;
     if (!v) {
@@ -48,9 +49,10 @@ function inkFrame(pal, fr) {
     }
     const col = rgb[v - 1] || INK_RGB;
     const span = Math.max(1, hi[y] - lo[y]), t = (x - lo[y]) / span, k = t < 0.45 ? 1.07 - 0.07 * (t / 0.45) : 1 - 0.3 * ((t - 0.45) / 0.55);
-    /* ink line where two areas of colour meet (not round eyes and other dark details, which are ink already) */
+    /* ink line where two clearly different colours meet; a shade of the same cloth is a fold, not a seam,
+       and eyes and other dark details are ink already */
     let line = 0;
-    if (!dark(col)) for (let j = -2; j <= 2 && !line; j++) for (let i = -2; i <= 2; i++) { const w = idx[(y + j) * N + (x + i)]; if (w && w !== v && !dark(rgb[w - 1] || INK_RGB) && Math.hypot(i, j) <= LINE / 2 + 0.3 && (i > 0 || (i === 0 && j > 0))) { line = 1; break; } }
+    if (!dark(col)) for (let j = -2; j <= 2 && !line; j++) for (let i = -2; i <= 2; i++) { const w = idx[(y + j) * N + (x + i)]; if (w && w !== v && !dark(rgb[w - 1] || INK_RGB) && apart(col, rgb[w - 1] || INK_RGB) && Math.hypot(i, j) <= LINE / 2 + 0.3 && (i > 0 || (i === 0 && j > 0))) { line = 1; break; } }
     const gr = 1 - noise(x, y) * 0.06;
     for (let ch = 0; ch < 3; ch++) d[o + ch] = line ? INK_RGB[ch] * 0.9 + col[ch] * 0.1 : Math.min(255, col[ch] * k * gr);
     d[o + 3] = 255;
@@ -79,7 +81,7 @@ function drawFrame(g, can, x, y, px) {
 }
 /* soft ground shadow under a figure, leaning the way the pieces' shadows lean */
 function footShadow(g, x, y, px) {
-  g.save(); g.fillStyle = 'rgba(0,0,0,0.2)'; g.beginPath(); g.ellipse(x + px * 1.2, y - px * 0.3, px * 4.6, px * 2.1, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  const rx = SIZE * px * 0.19; g.save(); g.fillStyle = 'rgba(0,0,0,0.2)'; g.beginPath(); g.ellipse(x + rx * 0.3, y - rx * 0.08, rx, rx * 0.46, 0, 0, Math.PI * 2); g.fill(); g.restore();
 }
 /* a grass tile block like the ones in the tile palette, its top centre at (x, y), half-width w */
 function tileBlock(g, x, y, w) {
@@ -91,7 +93,7 @@ function tileBlock(g, x, y, w) {
 }
 /* a character standing on a grass block, for palettes and previews */
 function standOn(g, s, face, k, x, y, w) {
-  tileBlock(g, x, y, w); const px = w / 9; footShadow(g, x, y + w * 0.06, px); drawFrame(g, frameCanvas(s, face, k), x, y + w * 0.08, px);
+  tileBlock(g, x, y, w); const px = w * 1.55 / SIZE; footShadow(g, x, y + w * 0.06, px); drawFrame(g, frameCanvas(s, face, k), x, y + w * 0.08, px);
 }
 function spriteThumb(s, size = 60, face = 'se', k = 0) {
   const c = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1); c.width = c.height = size * dpr;

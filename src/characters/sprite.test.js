@@ -28,3 +28,9 @@ test('a damaged file is refused', () => {
   assert.throws(() => spriteFromJSON({ size: 8 }), /Not a Hexwright character/);
   assert.throws(() => spriteFromJSON({ size: SIZE, palette: ['red'], frames: {} }), /colours/);
 });
+test('16×16 characters from the first release are doubled to the current size', () => {
+  const old = '1' + '0'.repeat(15) + '0'.repeat(16 * 15), frames = {}; for (const f of FACES) frames[f] = [old, old];
+  const s = spriteFromJSON({ id: 'old', name: 'Old', size: 16, palette: ['#112233'], frames }), fr = s.frames.se[0];
+  assert.equal(SIZE, 32); assert.equal(fr.length, SIZE * SIZE);
+  assert.deepEqual([fr[0], fr[1], fr[SIZE], fr[SIZE + 1], fr[2]], [1, 1, 1, 1, 0]);
+});

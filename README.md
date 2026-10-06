@@ -18,17 +18,20 @@ district** opens just the selected district. The map is autosaved in the browser
 
 ### Characters
 
-The **Characters** tab lists your character library; six starters (villager, farmer, guard, merchant, monk,
-healer) come with it. **Draw new character…** opens the **character editor**: a 16×16 pixel canvas with
+The **Characters** tab lists your character library. Six detailed starters come with it: a villager in a vest, a
+farmer in a straw hat and apron, a guard with helmet, cape and spear, a bearded merchant with a satchel, a hooded
+monk with a rope belt, and a healer. **Draw new character…** opens the **character editor**: a 32×32 pixel canvas with
 pencil, eraser, fill and pick, a symmetry mode, a ghost of the other frame, shift/flip/clear, and a colour
 list that starts from the tile set's own palette. Each character has four facings (front/back,
 left/right), each with a standing frame and a stride frame. **Mirror to other side** copies a facing,
 flipped. Every stroke saves to the library at once, and characters can be exported and imported as
 `.character.json`.
 
-On the map, sprites are not shown as raw pixels. Each frame is smoothed (three Scale2x passes), outlined in
-the same ink as the tiles, given ink lines where colours meet, lit from the left and shaded on the right like
-the pieces, and grained like the paper. A figure stands a little taller than a cottage door. **Inked** in the
+On the map, sprites are not shown as raw pixels. Each frame is smoothed (two Scale2x passes), outlined in
+the same ink as the tiles, given ink lines where clearly different colours meet (a darker shade of the same cloth
+stays a fold), lit from the left and shaded on the right like
+the pieces, and grained like the paper. A figure stands about as tall as a cottage's eaves. Characters
+drawn at 16×16 in an earlier version are doubled to 32×32 when they load. **Inked** in the
 character editor and the **On the map** preview, which shows each facing on a grass block, display that
 finished look while you draw.
 

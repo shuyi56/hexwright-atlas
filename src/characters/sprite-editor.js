@@ -4,7 +4,7 @@ import * as library from './library.js';
 import { FACES, FACE_LABEL, FRAMES, MAX_PAL, SIZE, blankSprite, cloneSprite, fillFrame, flipFrame, setPixel, shiftFrame, spriteFromJSON, spriteToJSON } from './sprite.js';
 
 /* ================= character sprite editor =================
-   A 16×16 pixel workbench. Each character has four facings with two frames each (standing and
+   A 32×32 pixel workbench. Each character has four facings with two frames each (standing and
    mid-stride); the tile editor plays them as the character walks. Every finished stroke is saved to
    the library at once, so there is no save button to forget. */
 const root = $('spriteEditor'), cv = $('spCanvas'), cx = cv.getContext('2d'), pv = $('spPreview'), pvx = pv.getContext('2d');
