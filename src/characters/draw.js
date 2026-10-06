@@ -62,7 +62,23 @@ function paintLabels(pal, L, n) {
 /* the finished frame at UP-fold detail: 1 is the true pixel art; 4 and 8 are Scale2x'd for close zoom */
 function pixelFrame(pal, fr, up = 1) {
   let L = labels(fr), n = N; for (let k = 1; k < up; k *= 2) { L = scale2x(L, n); n *= 2; }
+  if (up > 1) thinOutline(L, n, up >= 8 ? 2.6 : 1.6);
   return paintLabels(pal, L, n);
+}
+/* Scaled up, a one-pixel outline would be four or eight fine pixels wide, heavier than the tiles' ink.
+   Keep only the part within r fine pixels of the figure: about 0.4 of a sprite pixel at 4x, a third at 8x. */
+function thinOutline(L, n, r) {
+  const R = Math.ceil(r), drop = [];
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const u = y * n + x; if (L[u] < OUTLINE) continue;
+    let near = false;
+    for (let j = -R; j <= R && !near; j++) for (let i = -R; i <= R; i++) {
+      const xx = x + i, yy = y + j; if (xx < 0 || yy < 0 || xx >= n || yy >= n || i * i + j * j > r * r) continue;
+      const l = L[yy * n + xx]; if (l && l < OUTLINE) { near = true; break; }
+    }
+    if (!near) drop.push(u);
+  }
+  for (const u of drop) L[u] = 0;
 }
 
 /* the flat pixels of one frame as a SIZE×SIZE canvas, for the pixel grid */
