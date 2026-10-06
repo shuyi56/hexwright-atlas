@@ -84,6 +84,22 @@ buildings correctly, are saved inside the map JSON together with their sprites, 
 stack as every other edit. The automation API has `listSprites`, `listCharacters`, `placeCharacter`,
 `walkCharacter` and `removeCharacter`.
 
+### Test scenes
+
+`scenes/` holds self-contained HTML test pages. Each one is the whole app inlined into a single file that
+opens straight from disk, with no server. It has a tile map preloaded in the editor and a panel of walking
+checks that run on load. `scenes/hillside-tower.html` is the hillside scene: a terrace reached by one ramp
+tile, a three-level tower joined by two flights of stairs, a summit ringed by cliffs, and a two-storey house.
+
+- **Checking routes:** each check walks a character through the automation API and audits the route. Every
+  step must be one tile and at most one height level of climb, and storeys may only change on stairs. The page
+  shows pass or fail, with the route's step count, heights and storey changes. **Re-run** repeats the checks,
+  and clicking a check replays that walk on screen.
+- **Scripted browsers:** results are in `window.__sceneResults`.
+- **Rebuilding:** run `npm run scene -- <map.json> [out.html]` to rebuild a page from a saved map. The checks
+  come from a `<map>.checks.json` beside it, if there is one; see `src/editor/fixtures/hillside-tower.checks.json`
+  for the format. The same scene is replayed by `src/editor/scene.test.js` under `npm test`.
+
 ## Automation API and MCP server
 
 The tile editor can be driven without a mouse or Playwright. Three layers share one method list
@@ -151,6 +167,7 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run build`   | Production build into `dist/`   |
 | `npm run preview` | Serve the production build      |
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
+| `npm run scene -- <map.json>` | Build a self-contained HTML test page for a scene into `scenes/` |
 | `npm test`        | Unit tests (no browser needed)  |
 | `npm run test:e2e`| MCP end-to-end test (Chromium)  |
 | `npm run perf`    | Editor latency budget (Chromium)|

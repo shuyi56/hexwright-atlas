@@ -12,7 +12,8 @@
     "test": "node --test \"src/**/*.test.js\"",
     "test:e2e": "node mcp/e2e.mjs",
     "perf": "node tools/perf.js",
-    "mcp": "node mcp/server.mjs"
+    "mcp": "node mcp/server.mjs",
+    "scene": "node tools/scene-html.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

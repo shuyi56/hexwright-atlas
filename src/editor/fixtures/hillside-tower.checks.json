@@ -1,0 +1,15 @@
+{
+  "title": "Hillside tower: walking across heights and storeys",
+  "about": "Lowland at height 0; a terrace two levels up reached only by a one-level ramp tile at (9, 8); a three-level tower on it (ground, floor 1, roof) joined by two flights of stairs; a summit at height 4 ringed by two-level cliffs; a two-storey house on the lowland. Every route is audited: one tile per step, at most one height level of climb, storeys changing only on stairs.",
+  "checks": [
+    { "name": "Villager: lowland to the tower roof", "who": "starter-villager", "to": { "x": 15, "y": 6, "level": 2 }, "expect": "reach", "storeys": ["0->1", "1->2"], "via": [[9, 8]] },
+    { "name": "Villager: roof back down to the lowland", "who": "starter-villager", "start": { "x": 15, "y": 6, "level": 2 }, "to": { "x": 9, "y": 12, "level": 0 }, "expect": "reach", "storeys": ["2->1", "1->0"], "via": [[9, 8]] },
+    { "name": "Farmer: cliff foot to the terrace tile above, round by the ramp", "who": "starter-farmer", "to": { "x": 11, "y": 9, "level": 0 }, "expect": "reach", "minSteps": 3, "via": [[9, 8]] },
+    { "name": "Guard: the summit is cut off by two-level cliffs", "who": "starter-guard", "to": { "x": 3, "y": 3, "level": 0 }, "expect": "blocked" },
+    { "name": "Guard: summit by steps cut 1, 2, 3", "who": "starter-guard", "edits": [{ "op": "elevation", "mode": "set", "level": 1, "x": 7, "y": 3 }, { "op": "elevation", "mode": "set", "level": 2, "x": 6, "y": 3 }, { "op": "elevation", "mode": "set", "level": 3, "x": 5, "y": 3 }, { "op": "paint", "terrain": "road", "rect": { "x": 5, "y": 3, "w": 3, "h": 1 } }], "to": { "x": 3, "y": 3, "level": 0 }, "expect": "reach", "heights": "012344" },
+    { "name": "Guard: a cut of 1 then 3 is still a two-level jump", "who": "starter-guard", "edits": [{ "op": "elevation", "mode": "set", "level": 1, "x": 6, "y": 3 }, { "op": "elevation", "mode": "set", "level": 3, "x": 5, "y": 3 }], "to": { "x": 3, "y": 3, "level": 0 }, "expect": "blocked" },
+    { "name": "Healer: up the house stairs", "who": "starter-healer", "to": { "x": 4, "y": 13, "level": 1 }, "expect": "reach", "storeys": ["0->1"] },
+    { "name": "Farmer: no floor in the stairwell", "who": "starter-farmer", "to": { "x": 16, "y": 5, "level": 1 }, "expect": "blocked" },
+    { "name": "Farmer: there is no floor 3", "who": "starter-farmer", "to": { "x": 13, "y": 3, "level": 3 }, "expect": "blocked" }
+  ]
+}
