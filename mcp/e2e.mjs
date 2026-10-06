@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 /* End-to-end check of the whole chain: MCP client -> mcp/server.mjs -> dev server -> headless browser
    page -> window.hexwright. Run with `npm run test:e2e` (needs Chromium; see README). */
 const here = dirname(fileURLToPath(import.meta.url)), out = process.env.E2E_OUT;
-const client = new Client({ name: 'e2e', version: '0' }), transport = new StdioClientTransport({ command: process.execPath, args: [join(here, 'server.mjs')], stderr: 'inherit' });
+const client = new Client({ name: 'e2e', version: '0' }), transport = new StdioClientTransport({ command: process.execPath, args: [join(here, 'server.mjs'), '--browser=headless'], stderr: 'inherit' });
 await client.connect(transport);
 
 const run = async (name, args = {}) => { const r = await client.callTool({ name: 'hexwright_' + name, arguments: args }); return r; };
@@ -41,7 +41,11 @@ try {
 
   const b = await json('batch', { ops: [{ op: 'paint', terrain: 'dirt', x: 0, y: 11 }, { op: 'paint', terrain: 'nope', x: 0, y: 10 }] }).catch(e => e);
   const bb = await run('batch', { ops: [{ op: 'paint', terrain: 'dirt', x: 0, y: 11 }, { op: 'paint', terrain: 'nope', x: 0, y: 10 }] }); assert.ok(bb.isError); assert.notEqual((await json('getTile', { x: 0, y: 11 })).terrain, 'dirt', 'atomic batch must roll back');
+  assert.match(bb.content[0].text, /ops\[1\]/, 'batch must reach the bad op, not reject per-op arguments');
   void b;
+  r = await json('batch', { ops: [{ op: 'paint', terrain: 'dirt', x: 0, y: 11 }, { op: 'elevation', mode: 'raise', x: 0, y: 11 }] });
+  assert.equal(r.results.length, 2); assert.equal((await json('getTile', { x: 0, y: 11 })).terrain, 'dirt');
+  await json('undo');
 
   const h = await json('state'); const undo0 = h.history.undo; assert.ok(undo0 >= 5);
   await json('undo', { steps: 1 }); assert.equal((await json('getTile', { x: 10, y: 2 })).piece, null);

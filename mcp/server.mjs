@@ -9,7 +9,7 @@ import { Backend } from './backend.mjs';
    One tool per method in src/editor/api-spec.js, named hexwright_<method>. Each call is relayed to
    the editor page through the dev-server bridge (tools/vite-hexwright.js), so edits appear in the
    same browser the user is looking at, on the same undo stack as the mouse tools. */
-const backend = new Backend();
+let backend; try { backend = new Backend(); } catch (err) { console.error('[hexwright-mcp]', err.message); process.exit(2); }
 const NAME = m => `hexwright_${m}`;
 const tools = [
   ...Object.entries(METHODS).map(([m, s]) => ({ name: NAME(m), description: s.description, inputSchema: { type: 'object', properties: s.input, required: s.required || [], additionalProperties: false } })),

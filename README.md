@@ -34,10 +34,18 @@ The tile editor can be driven without a mouse or Playwright. Three layers share 
    curl -s -XPOST localhost:5173/__hexwright/api/paint -d '{"terrain":"sand","rect":{"x":2,"y":2,"w":4,"h":3}}'
    ```
 3. **MCP server** (`mcp/server.mjs`, registered in `.mcp.json`): one `hexwright_<method>` tool per method.
-   It uses the dev server at `HEXWRIGHT_URL` (default `http://127.0.0.1:5173`) and the page the user
-   already has open. With nothing running it starts Vite on a free port and a headless Chromium to host
-   the page (`HEXWRIGHT_BROWSER=none` disables that, `HEXWRIGHT_HEADED=1` shows the window,
-   `HEXWRIGHT_CHROME` points at a specific binary). The browser only hosts the page; no clicks are scripted.
+   It uses the dev server at `HEXWRIGHT_URL`, else one already on port 5173 (`127.0.0.1` or `[::1]`, preferring
+   the one with an editor page attached), else it starts Vite on a free port. Which browser hosts the page is
+   set by `HEXWRIGHT_BROWSER` (in `.mcp.json` `env`) or a `--browser=<mode>` argument:
+
+   | Mode       | Behaviour |
+   | ---------- | --------- |
+   | `auto`     | Default. Drives the editor tab you have open; with none, starts a headless Chromium. |
+   | `browser`  | Only your own browser: edits appear live in your tab. Never launches Chromium (`none` is an alias). |
+   | `headless` | Always a private headless Chromium; calls go only to its page, never to your tabs. |
+
+   `HEXWRIGHT_HEADED=1` shows the launched window, `HEXWRIGHT_CHROME` points at a specific binary. The browser
+   only hosts the page; no clicks are scripted. Headless needs a Chromium: `npx playwright-core install chromium`.
 
 Methods, all in model tile coordinates (x east, y south):
 
