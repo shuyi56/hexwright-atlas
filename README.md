@@ -25,6 +25,12 @@ autosaved in the browser.
 
 Requires Node 18+.
 
+## CI and hosting
+
+`.github/workflows/ci.yml` lints and builds every pull request and every push to `main`. Pushes to
+`main` also publish `dist/` to GitHub Pages at <https://shuyi56.github.io/hexwright-atlas/>. Pages
+must be set to **Source: GitHub Actions** once, under the repository's Settings → Pages.
+
 ## Layout
 
 ```
