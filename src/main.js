@@ -15,10 +15,6 @@ import { generate } from './world/generate.js';
 /* ================= boot ================= */
 const SEED_WORDS = ['ember', 'thorn', 'gloam', 'rime', 'wyrm', 'lark', 'cinder', 'hallow', 'briar', 'shale', 'raven', 'mist'];
 function randomSeed() { const r = Math.random; return SEED_WORDS[Math.floor(r() * SEED_WORDS.length)] + '-' + Math.floor(r() * 9000 + 1000); }
-function rebuildBase() {
-  if (!state.map) return; veil.hidden = false; veil.textContent = 'Inking the map…';
-  setTimeout(() => { state.baseImg = renderBase(state.map, S, state.showGrid); veil.hidden = true; requestDraw(); }, 30);
-}
 function load(seed) {
   if (typeof closeCity === 'function') closeCity();
   veil.hidden = false; veil.textContent = 'Surveying the realm…'; $('seedInput').value = seed;
@@ -45,4 +41,3 @@ const fontsReady = Promise.race([
 ]).catch(() => {});
 fontsReady.then(() => load('ember-1147'));
 
-export { rebuildBase };
