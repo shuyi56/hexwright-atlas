@@ -16,6 +16,15 @@ water, rivers and roads crossing the same sides as on the map, farmland, and the
 other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter
 district** opens just the selected district. The map is autosaved in the browser.
 
+### Height legend
+
+The bottom-left corner of the tile editor holds a height legend under the status line. It is a scale of the
+seven height levels in hypsometric tints taken from the map's palette, labelled in metres (one level is taken
+as 1.5 m, so a storey is 3 m). The level under the pointer is marked on the scale, and the caption gives that
+spot's height, and on an upper floor its height including the storey. **Tint** (`T`, or
+`setView({ heights: true })` in the API) washes the ground in the same colours so the scale reads directly
+on the map. Water keeps its own colour.
+
 ### Interiors
 
 The **Interior** tab holds room pieces and furniture, and the Terrain tab has a **Floors** group (floorboards,

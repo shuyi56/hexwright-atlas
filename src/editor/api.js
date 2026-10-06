@@ -2,7 +2,7 @@ import { ASSET_BY_ID, ASSETS, TERRAIN, footprint } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { METHODS } from './api-spec.js';
 import * as library from '../characters/library.js';
-import { ED, LEVEL_NAME, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
+import { ED, LEVEL_NAME, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setHeights, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
 import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, MAX_LEVEL, STOREY, TI, blankModel, floorAt, fromJSON, levelOf, objAt, toJSON } from './model.js';
 import { brushTiles, eraseAt, floodFill, inb, paintTiles, placePiece, rectTiles, removeFloor, setElev, shiftElev } from './ops.js';
@@ -196,7 +196,7 @@ function state() {
   return {
     open: ED.open, name: M.name, size: M.S, climate: M.clim, objects: M.objs.length, characters: (M.chars || []).length, selectedCharacter: ED.sel,
     tool: ED.tool, brush: ED.brush, terrain: ED.terrain, asset: ED.asset, sprite: ED.char, face: ED.face, tab: ED.tab,
-    view: { level: ED.level, levelName: LEVEL_NAME(ED.level), rot: ED.rot, zoom: ED.fitZ ? +(ED.z / ED.fitZ).toFixed(3) : null, grid: ED.grid, stage: { width: ED.cw, height: ED.ch } },
+    view: { level: ED.level, levelName: LEVEL_NAME(ED.level), heights: ED.heights, rot: ED.rot, zoom: ED.fitZ ? +(ED.z / ED.fitZ).toFixed(3) : null, grid: ED.grid, stage: { width: ED.cw, height: ED.ch } },
     history: { undo: ED.undo.length, redo: ED.redo.length }, status: $('edStatus').textContent,
     page: { url: location.href, title: document.title }
   };
@@ -207,6 +207,7 @@ const needOpen = () => { if (!ED.open) fail('the editor is closed; call open fir
 function setView(p) {
   needOpen();
   if (p.level != null) setLevel(p.level);
+  if (p.heights != null) setHeights(p.heights);
   if (p.rot != null) setRot(p.rot);
   if (p.grid != null && p.grid !== ED.grid) $('edGrid').click();
   if (p.fit) fitView();
