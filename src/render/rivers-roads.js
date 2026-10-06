@@ -136,7 +136,6 @@ function riverNear(x, y, reach) {
   if (!best) return null; const dx = x - best[0], dy = y - best[1], L = Math.hypot(dx, dy) || 1; return [bd, dx / L, dy / L, best[2]];
 }
 // push a point clear of the water by `gap`
-function clearOfRiver(x, y, gap) { const q = riverNear(x, y, gap); if (!q) return [x, y]; const push = gap - q[0]; return [x + q[1] * push, y + q[2] * push]; }
 function riverOutline(rv, extra) {
   const P = rv.P, L = [], Rr = [];
   for (const q of P) { const w = q[2] + extra; L.push([q[0] - q[4] * w, q[1] + q[3] * w]); Rr.push([q[0] + q[4] * w, q[1] - q[3] * w]); }
@@ -339,9 +338,7 @@ function drawRoads(g, RDS, riverSamples) {
   }
   for (const c of fords) drawFord(g, c.x, c.y, c.dx, c.dy, c.q, c.st);
   for (const c of bridges) drawRealmBridge(g, c.x, c.y, c.dx, c.dy, c.q, c.st);
-  LAST_BRIDGES = bridges.map(c => [c.x, c.y]); LAST_FORDS = fords.map(c => [c.x, c.y]);
 }
-let LAST_BRIDGES = [], LAST_FORDS = [];
 // a ford: the stream runs over the road, with ripples where it breaks on either side
 function drawFord(g, x, y, dx, dy, q, st) {
   const L = Math.hypot(dx, dy) || 1, tx = dx / L, ty = dy / L, rw = (ROAD_STYLE[st] ? ROAD_STYLE[st].o.w : 2) / 2 + 0.4, w = q[2];

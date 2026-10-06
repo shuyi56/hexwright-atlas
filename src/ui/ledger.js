@@ -8,6 +8,11 @@ import { $ } from './state.js';
 import { requestDraw } from './draw.js';
 import { flyTo } from './view.js';
 import { openCity } from './city-view.js';
+import { openEditor } from '../editor/editor.js';
+import { hexToModel } from '../editor/from-hex.js';
+import { cityToModel } from '../editor/from-city.js';
+import { generateCity } from '../city/generate.js';
+import { veil } from './state.js';
 import { BIOME, FLAVOUR, KIND } from '../world/data.js';
 import { INK } from '../render/palette.js';
 import { drawTree } from '../render/trees.js';
@@ -65,11 +70,23 @@ function survey(i) {
     <p class="eyebrow">hex ${hexNo(i)}</p>
     <h2>${esc(title)}</h2>
     <p class="kind">${esc(kind)}</p>
-    ${(s || sub) && ((s || sub).kind === 'capital' || (s || sub).kind === 'city' || (s || sub).kind === 'temple') ? `<button class="btn btn-brass enter-city" id="enterCity">${(s || sub).kind === 'temple' ? 'Visit' : 'Enter'} ${esc((s || sub).name)}</button>` : ''}
+    <div class="enter-row">${(s || sub) && ((s || sub).kind === 'capital' || (s || sub).kind === 'city' || (s || sub).kind === 'temple') ? `<button class="btn btn-brass enter-city" id="enterCity">${(s || sub).kind === 'temple' ? 'Visit' : 'Enter'} ${esc((s || sub).name)}</button>` : ''}<button class="btn enter-city" id="enterHex" title="Open this hex as a tile map in the tile editor">Enter hex</button></div>
     <p class="flavour">${esc(text)}</p>
     <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
     <p class="hint">Click any hex on the map to survey it. Drag to pan, scroll or pinch to zoom.</p>`;
   const ec = $('enterCity'); if (ec) ec.addEventListener('click', () => openCity(s || sub));
+  $('enterHex').addEventListener('click', () => enterHex(i));
+}
+/* a tiled map of one hex in the tile editor; a city or abbey hex brings its own city plan */
+function enterHex(i) {
+  const s = state.map.sAt[i] >= 0 ? state.map.settle[state.map.sAt[i]] : null;
+  veil.hidden = false; veil.textContent = s ? `Surveying ${s.name}…` : 'Surveying the hex…';
+  setTimeout(() => {
+    let M;
+    if (s && ['capital', 'city', 'temple'].includes(s.kind)) { const cities = state.map.cities = state.map.cities || {}; M = cityToModel(cities[s.i] || (cities[s.i] = generateCity(state.map, s))); }
+    else M = hexToModel(state.map, i);
+    veil.hidden = true; openEditor(M, 'Realm map');
+  }, 30);
 }
 function settlementLine(s, r) {
   const L = {

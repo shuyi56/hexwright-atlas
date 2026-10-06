@@ -188,6 +188,110 @@ const barrel = (K, x, y, z, s = 1) => { const c = K.cyl(x, y, 0.07 * s, z, z + 4
 const crate = (K, x, y, z, s = 1) => { const e = 0.09 * s; K.box(x - e, y - e, x + e, y + e, z, z + 4 * s, '#b48a58', { lw: 0.45 }); K.seg([x - e, y + e, z], [x + e, y + e, z + 4 * s], 'rgba(60,40,20,0.6)', 0.4); };
 const stone = (K, x, y, z, rx, h, col = '#bdb39d') => { const [px, py] = K.P(x, y, z), g = K.g; g.beginPath(); g.moveTo(px - rx, py); g.quadraticCurveTo(px - rx, py - h, px - rx * 0.2, py - h); g.quadraticCurveTo(px + rx, py - h * 0.9, px + rx, py); g.quadraticCurveTo(px, py + rx * 0.35, px - rx, py); g.closePath(); g.fillStyle = col; g.fill(); g.save(); g.clip(); g.fillStyle = 'rgba(60,50,35,0.22)'; g.fillRect(px + rx * 0.15, py - h - 2, rx * 2, h + 4); g.restore(); g.strokeStyle = INK; g.lineWidth = 0.6; g.stroke(); };
 
+/* ---------- city pieces: slate-roofed houses, walls and gates, churches ---------- */
+const COPPER = ['#6f9a8c', '#4f7a6c'], ASHLAR = '#e6dece', ASHLAR_D = '#d6ccb6', GLASS = '#4b5a6e';
+/* stone corner quoins up the visible front corner of a block */
+function quoins(K, x0, y0, x1, y1, z0, z1, col = ASHLAR_D) { for (let z = z0 + 0.6, k = 0; z < z1 - 1.6; z += 2.4, k++) { const a = k % 2 ? 0.12 : 0.2; K.onWall('y', y1, x1 - a, x1, z, z + 1.6, col, 0.3); K.onWall('x', x1, y1 - (k % 2 ? 0.2 : 0.12), y1, z, z + 1.6, shade(col, 0.82), 0.3); } }
+
+/* walls: a 1x1 piece joins arms toward the neighbouring wall pieces in o.links = [+x, +y, -x, -y];
+   on its own it runs along its axis */
+const WALL_H = 18, WALL_T = 0.2;
+const wallLinks = o => o.links || (o.axis === 'x' ? [1, 0, 1, 0] : [0, 1, 0, 1]);
+function wallArm(K, o, dir, z, h = WALL_H) {
+  const [cx, cy] = mid(o), t = WALL_T, [bx0, by0, bx1, by1] = dir === 0 ? [cx, cy - t, o.x1, cy + t] : dir === 1 ? [cx - t, cy, cx + t, o.y1] : dir === 2 ? [o.x0, cy - t, cx, cy + t] : dir === 3 ? [cx - t, o.y0, cx + t, cy] : [cx - t, cy - t, cx + t, cy + t];
+  K.box(bx0, by0, bx1, by1, z, z + h, STONE, { top: '#cbc1a8' }); K.courses('y', by1, bx0, bx1, z, z + h); K.courses('x', bx1, by0, by1, z, z + h);
+  const m = (x, y) => K.box(x - 0.06, y - 0.06, x + 0.06, y + 0.06, z + h, z + h + 2.4, STONE, { lw: 0.35 });
+  if (dir === 0 || dir === 2) { for (let x = bx0 + 0.08; x < bx1 - 0.02; x += 0.24) m(x, by0 + 0.05); for (let x = bx0 + 0.08; x < bx1 - 0.02; x += 0.24) m(x, by1 - 0.05); }
+  else if (dir === 1 || dir === 3) { for (let y = by0 + 0.08; y < by1 - 0.02; y += 0.24) m(bx0 + 0.05, y); for (let y = by0 + 0.08; y < by1 - 0.02; y += 0.24) m(bx1 - 0.05, y); }
+}
+/* the arms behind (toward -x, -y), then fn, then the arms in front */
+function withArms(K, o, L, fn) { if (L[3]) wallArm(K, o, 3, o.z); if (L[2]) wallArm(K, o, 2, o.z); fn(); if (L[0]) wallArm(K, o, 0, o.z); if (L[1]) wallArm(K, o, 1, o.z); }
+
+/* a church or cathedral: parts laid out along the long axis (a) and across it (b), drawn back to front.
+   The west front faces +x (face 0) or +y (face 3) toward the viewer, else away. */
+function church(K, o, parts) {
+  const ax = o.axis === 'x', [x0, y0, x1, y1] = inset(o, 0.12), L = ax ? x1 - x0 : y1 - y0, D = ax ? y1 - y0 : x1 - x0;
+  const front = o.face === 0 || o.face === 3, A = a => front ? a : L - a;
+  const rect = (a0, a1, b0, b1) => { const p = Math.min(A(a0), A(a1)), q = Math.max(A(a0), A(a1)); return ax ? [x0 + p, y0 + b0, x0 + q, y0 + b1] : [x0 + b0, y0 + p, x0 + b1, y0 + q]; };
+  const list = parts(L, D).map(p => { const r = p.round ? null : rect(p.a0, p.a1, p.b0, p.b1), c = p.round ? (() => { const a = A(p.a), [px, py] = ax ? [x0 + a, y0 + p.b] : [x0 + p.b, y0 + a]; return [px, py]; })() : null; return Object.assign({}, p, { r, c, key: r ? (r[0] + r[2] + r[1] + r[3]) / 2 : c[0] + c[1] + (p.dk || 0) }); });
+  list.sort((p, q) => p.key - q.key);
+  const z = o.z, longAxis = ax ? 'x' : 'y', crossAxis = ax ? 'y' : 'x';
+  for (const p of list) {
+    if (p.round) { K.cyl(p.c[0], p.c[1], p.rad, z, z + p.h, ASHLAR, { noTop: true }); K.cone(p.c[0], p.c[1], p.rad + 0.06, z + p.h, p.rh, SLATE[0]); continue; }
+    const [bx0, by0, bx1, by1] = p.r;
+    K.box(bx0, by0, bx1, by1, z, z + p.h, ASHLAR, { noTop: !!p.roof || p.flat === false }); K.courses('y', by1, bx0, bx1, z, z + p.h); K.courses('x', bx1, by0, by1, z, z + p.h);
+    if (p.lancets) { const zl = z + p.h * 0.3, hl = p.h * 0.5; K.windows('y', by1, bx0, bx1, zl, Math.max(1, Math.round((bx1 - bx0) / 0.5)), GLASS, hl, 0.12); K.windows('x', bx1, by0, by1, zl, Math.max(1, Math.round((by1 - by0) / 0.5)), GLASS, hl, 0.12); }
+    if (p.buttress) { const n = Math.round((ax ? bx1 - bx0 : by1 - by0) / 0.55); for (let k = 0; k <= n; k++) { const f = k / n; if (ax) { const x = bx0 + (bx1 - bx0) * f; K.box(x - 0.05, by1, x + 0.05, by1 + 0.14, z, z + p.h * 0.8, ASHLAR_D, { lw: 0.35 }); } else { const y = by0 + (by1 - by0) * f; K.box(bx1, y - 0.05, bx1 + 0.14, y + 0.05, z, z + p.h * 0.8, ASHLAR_D, { lw: 0.35 }); } } }
+    if (p.roof === 'gable') K.gable(bx0, by0, bx1, by1, z + p.h, p.rh, p.along === 'cross' ? crossAxis : longAxis, SLATE[0], ASHLAR, { ov: 0.06 });
+    else if (p.roof === 'spire') { K.merlons(bx0, by0, bx1, by1, z + p.h, ASHLAR, 0.22); K.hip(bx0 + 0.06, by0 + 0.06, bx1 - 0.06, by1 - 0.06, z + p.h, p.rh, SLATE[0], { ov: 0 }); const [cx, cy] = [(bx0 + bx1) / 2, (by0 + by1) / 2], [px, py] = K.P(cx, cy, z + p.h + p.rh); const g = K.g; g.strokeStyle = INK; g.lineWidth = 0.8; g.beginPath(); g.moveTo(px, py); g.lineTo(px, py - 6); g.moveTo(px - 2, py - 4); g.lineTo(px + 2, py - 4); g.stroke(); }
+    else if (p.roof === 'lean') K.hip(bx0, by0, bx1, by1, z + p.h, p.rh, SLATE[0], { ov: 0.04 });
+    if (p.front && front) {
+      /* the west front: portal and rose window on the end facing the viewer */
+      const [fc, c, m] = ax ? ['x', bx1, (by0 + by1) / 2] : ['y', by1, (bx0 + bx1) / 2];
+      K.door(fc, c, m, z, '#3a2a1c', 0.4, p.h * 0.4);
+      const [rx, ry] = K.P(...(ax ? [c, m, z + p.h * 0.68] : [m, c, z + p.h * 0.68])), rr = Math.min(5.5, (ax ? by1 - by0 : bx1 - bx0) * 5);
+      const g = K.g; g.save(); g.translate(rx, ry); g.transform(1, ax ? -0.5 : 0.5, 0, 1, 0, 0); g.beginPath(); g.arc(0, 0, rr, 0, TAU); g.fillStyle = GLASS; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.6; g.stroke(); g.strokeStyle = '#d9cdb2'; g.lineWidth = 0.45; g.beginPath(); for (let k = 0; k < 8; k++) { g.moveTo(0, 0); g.lineTo(Math.cos(k / 8 * TAU) * rr, Math.sin(k / 8 * TAU) * rr); } g.stroke(); g.restore();
+    }
+  }
+}
+
+const CIVIC = [
+  { id: 'slatehouse', label: 'Slate-roofed house', w: 1, d: 1, h: 32, draw(K, o) { const [x0, y0, x1, y1] = house(K, o, { wall: pickv([ASHLAR, '#efe7d6', '#ece4d2', '#e2dccb'], o.v), roof: SLATE[0], h: 19, rh: 10, floors: 2, chimney: 1, ins: 0.1 }); quoins(K, x0, y0, x1, y1, o.z, o.z + 19); } },
+  { id: 'stonehouse', label: 'Stone hall house', w: 2, d: 1, h: 38, draw(K, o) { const [x0, y0, x1, y1] = house(K, o, { wall: pickv(['#efe7d6', ASHLAR, '#f2ece0'], o.v), roof: SLATE[0], h: 26, rh: 11, floors: 3, chimney: o.v > 0.4 ? 2 : 1, ins: 0.1 }); quoins(K, x0, y0, x1, y1, o.z, o.z + 26); } },
+  { id: 'mansion', label: 'Mansion', w: 2, d: 2, h: 44, draw(K, o) {
+    const roof = o.v < 0.4 ? SLATE[0] : o.v < 0.7 ? COPPER[0] : ROOFS[0][0], [x0, y0, x1, y1] = house(K, o, { wall: pickv(['#f4eee0', '#ece2cc', '#f2ece0'], o.v), roof, h: 27, rh: 15, floors: 3, hip: true, ins: 0.16 });
+    quoins(K, x0, y0, x1, y1, o.z, o.z + 27);
+    for (const [cx, cy] of [[x0 + 0.35, y0 + 0.4], [x1 - 0.4, y0 + 0.35]]) K.box(cx - 0.08, cy - 0.08, cx + 0.08, cy + 0.08, o.z + 31, o.z + 40, '#cfc4ad', { lw: 0.5 });
+  } },
+  { id: 'wall', label: 'City wall', w: 1, d: 1, h: 22, draw(K, o) { const L = wallLinks(o); if (!L.some(Boolean)) { wallArm(K, o, -1, o.z); return; } withArms(K, o, L, () => wallArm(K, o, -1, o.z)); } },
+  { id: 'walltower', label: 'Wall tower', w: 1, d: 1, h: 40, draw(K, o) {
+    const L = o.links || [0, 0, 0, 0];
+    withArms(K, o, L, () => {
+      const [cx, cy] = mid(o), z = o.z, c = K.cyl(cx, cy, 0.4, z, z + 28, ASHLAR, { noTop: true }), g = K.g;
+      g.fillStyle = '#2f271f'; g.fillRect(c.x - 2.5, c.ty + 8, 1.3, 3.4); g.fillRect(c.x + 2, c.ty + 16, 1.3, 3.4);
+      if (o.v < 0.45) { K.cone(cx, cy, 0.46, z + 28, 20, SLATE[0]); if (o.v < 0.2) K.flag(c.x, c.ty - 20, 8, WAX); return; }
+      g.beginPath(); g.ellipse(c.x, c.ty, c.rx, c.ry, 0, 0, TAU); g.fillStyle = '#cbc0a4'; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.7; g.stroke();
+      for (let k = 0; k < 12; k++) { const a = (k + 0.5) / 12 * TAU, px = c.x + Math.cos(a) * c.rx, py = c.ty + Math.sin(a) * c.ry; g.fillStyle = Math.cos(a) > 0.3 ? '#b9ae94' : '#ddd3bb'; g.fillRect(px - 1.5, py - 3, 3, 3); g.strokeRect(px - 1.5, py - 3, 3, 3); }
+    });
+  } },
+  { id: 'gatehouse', label: 'Gatehouse', w: 3, d: 1, h: 46, draw(K, o) {
+    const ax = o.axis === 'x', z = o.z, t = 0.34, x0 = o.x0, y0 = o.y0;
+    /* two towers astride an arched gate, the road passing through the middle tile */
+    const part = (a0, a1, b0, b1) => ax ? [x0 + a0, y0 + b0, x0 + a1, y0 + b1] : [x0 + b0, y0 + a0, x0 + b1, y0 + a1];
+    const tower = r => { K.box(...r, z, z + 32, ASHLAR); K.courses('y', r[3], r[0], r[2], z, z + 32); K.courses('x', r[2], r[1], r[3], z, z + 32); K.windows('y', r[3], r[0], r[2], z + 20, 1, '#2f271f', 4); K.windows('x', r[2], r[1], r[3], z + 20, 1, '#251d16', 4); K.merlons(...r, z + 32, ASHLAR, 0.24); };
+    tower(part(0.05, 1.1, 0.06, 0.94));
+    const m = part(1.1, 1.9, 0.5 - t, 0.5 + t); K.box(...m, z, z + 24, STONE); K.courses(ax ? 'y' : 'x', ax ? m[3] : m[2], ax ? m[0] : m[1], ax ? m[2] : m[3], z, z + 24);
+    K.door(ax ? 'y' : 'x', ax ? m[3] : m[2], ax ? (m[0] + m[2]) / 2 : (m[1] + m[3]) / 2, z, '#2a2018', 0.6, 13);
+    K.merlons(...m, z + 24, STONE, 0.22);
+    tower(part(1.9, 2.95, 0.06, 0.94));
+    if (o.v < 0.6) { const [fx, fy] = K.P(...(ax ? [x0 + 2.42, y0 + 0.5, z + 32] : [x0 + 0.5, y0 + 2.42, z + 32])); K.flag(fx, fy, 12, WAX); }
+  } },
+  { id: 'church', label: 'Parish church', w: 4, d: 2, h: 64, draw(K, o) {
+    church(K, o, (L, D) => [
+      { round: true, a: 0.55, b: D / 2, rad: 0.5, h: 14, rh: 10, dk: -0.3 },
+      { a0: 0.55, a1: L - 1.05, b0: D * 0.22, b1: D * 0.78, h: 16, roof: 'gable', rh: 11, lancets: true, buttress: true },
+      { a0: L - 1.05, a1: L, b0: D * 0.24, b1: D * 0.76, h: 30, roof: 'spire', rh: 30, lancets: false, front: true }
+    ]);
+  } },
+  { id: 'cathedral', label: 'Cathedral', w: 8, d: 4, h: 90, draw(K, o) {
+    church(K, o, (L, D) => {
+      const tr = L * 0.42, tw = 0.65, tb = D * 0.27, nb0 = D * 0.31, nb1 = D * 0.69;
+      return [
+        { round: true, a: 0.95, b: D / 2, rad: 0.72, h: 20, rh: 13, dk: -0.5 },
+        { a0: 0.9, a1: L - 1.2, b0: 0.12, b1: nb0, h: 12, roof: 'lean', rh: 5, lancets: true },
+        { a0: tr - tw, a1: tr + tw, b0: 0, b1: nb0, h: 26, roof: 'gable', rh: 12, along: 'cross', lancets: true },
+        { a0: 0.9, a1: L - 1.2, b0: nb0, b1: nb1, h: 28, roof: 'gable', rh: 13, lancets: true },
+        { a0: tr - tw + 0.1, a1: tr + tw - 0.1, b0: nb0 + 0.05, b1: nb1 - 0.05, h: 40, roof: 'spire', rh: 40, dk: 0.2 },
+        { a0: L - 1.25, a1: L, b0: 0.05, b1: tb + 0.05, h: 48, roof: 'spire', rh: 26 },
+        { a0: L - 1.2, a1: L, b0: tb + 0.05, b1: D - tb - 0.05, h: 34, roof: 'gable', rh: 12, along: 'cross', front: true },
+        { a0: tr - tw, a1: tr + tw, b0: nb1, b1: D, h: 26, roof: 'gable', rh: 12, along: 'cross', lancets: true },
+        { a0: 0.9, a1: L - 1.2, b0: nb1, b1: D - 0.12, h: 12, roof: 'lean', rh: 5, lancets: true, buttress: true },
+        { a0: L - 1.25, a1: L, b0: D - tb - 0.05, b1: D - 0.05, h: 48, roof: 'spire', rh: 26 }
+      ];
+    });
+  } }
+];
+
 const PROPS = [
   { id: 'haystack', label: 'Haystack', w: 1, d: 1, h: 10, draw(K, o) { const [cx, cy] = mid(o), [px, py] = K.P(cx, cy, o.z), g = K.g; g.beginPath(); g.moveTo(px - 7, py); g.bezierCurveTo(px - 7, py - 9, px - 2, py - 12, px, py - 12); g.bezierCurveTo(px + 2, py - 12, px + 7, py - 9, px + 7, py); g.quadraticCurveTo(px, py + 3, px - 7, py); g.closePath(); g.fillStyle = '#d9b860'; g.fill(); g.save(); g.clip(); g.fillStyle = 'rgba(140,100,40,0.35)'; g.fillRect(px + 1, py - 14, 9, 18); g.strokeStyle = 'rgba(120,85,30,0.6)'; g.lineWidth = 0.5; g.beginPath(); for (let k = -5; k <= 5; k += 2.5) { g.moveTo(px + k, py + 2); g.lineTo(px + k * 0.5, py - 11); } g.stroke(); g.restore(); g.strokeStyle = INK; g.lineWidth = 0.6; g.stroke(); } },
   { id: 'haybales', label: 'Hay bales', w: 1, d: 1, h: 5, draw(K, o) { const [cx, cy] = mid(o); for (const [dx, dy] of [[-0.18, -0.12], [0.15, -0.15], [-0.1, 0.18], [0.2, 0.15]]) { const [px, py] = K.P(cx + dx, cy + dy, o.z), g = K.g; g.beginPath(); g.ellipse(px, py - 2.4, 2.6, 2.4, 0, 0, TAU); g.fillStyle = '#dcc070'; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.5; g.stroke(); g.beginPath(); g.ellipse(px + 1.1, py - 2.4, 1.3, 2.2, 0, 0, TAU); g.fillStyle = '#c9a85a'; g.fill(); g.stroke(); } } },
@@ -254,8 +358,8 @@ const NATURE = [
   { id: 'rocks', label: 'Rocks', w: 1, d: 1, h: 3, draw(K, o) { for (let k = 0; k < 3; k++) stone(K, o.x0 + 0.2 + o.r() * 0.6, o.y0 + 0.2 + o.r() * 0.6, o.z, 1.6 + o.r() * 1.2, 1.8 + o.r(), mixHex('#bdb39d', '#8a8070', o.r() * 0.5)); } }
 ];
 
-const ASSET_GROUPS = [['Buildings', BUILDINGS], ['Props', PROPS], ['Nature', NATURE]];
-const ASSETS = [...BUILDINGS, ...PROPS, ...NATURE];
+const ASSET_GROUPS = [['Buildings', [...BUILDINGS, ...CIVIC]], ['Props', PROPS], ['Nature', NATURE]];
+const ASSETS = ASSET_GROUPS.flatMap(([, list]) => list);
 for (const [grp, list] of ASSET_GROUPS) for (const a of list) a.group = grp;
 const ASSET_BY_ID = Object.fromEntries(ASSETS.map(a => [a.id, a]));
 

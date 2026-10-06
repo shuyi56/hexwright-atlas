@@ -25,10 +25,12 @@ const slug = s => (s || 'tile-map').toLowerCase().replace(/[^a-z0-9]+/g, '-').re
 function checkpoint() { ED.undo.push(cloneModel(ED.M)); if (ED.undo.length > HIST) ED.undo.shift(); ED.redo.length = 0; syncHist(); }
 function undo() { if (!ED.undo.length) return; ED.redo.push(cloneModel(ED.M)); setModel(ED.undo.pop(), true); }
 function redo() { if (!ED.redo.length) return; ED.undo.push(cloneModel(ED.M)); setModel(ED.redo.pop(), true); }
+/* the size picker shows the map's own size, adding it to the list when it is not a preset (a cropped district, say) */
+function showSize(S) { const sel = $('edSize'); if (![...sel.options].some(o => +o.value === S)) { const o = new Option(String(S)); sel.add(o, [...sel.options].find(x => +x.value > S) || null); } sel.value = String(S); }
 function syncHist() { $('edUndo').disabled = !ED.undo.length; $('edRedo').disabled = !ED.redo.length; }
 function setModel(M, keepView) {
   const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.stale = true;
-  $('edName').value = M.name; $('edSize').value = String(M.S);
+  $('edName').value = M.name; showSize(M.S);
   syncHist(); autosave();
   if (resize || !keepView) { rebuild(); fitView(); } else changed();
   status();
@@ -227,11 +229,12 @@ function buildChrome() {
   new ResizeObserver(() => { const had = ED.cw; size(); if (!had && ED.R) fitView(); }).observe(stage);
 }
 
-function openEditor(M) {
+/* back: label of the screen the editor returns to (the one left showing underneath it) */
+function openEditor(M, back = 'Atlas') {
   ensureModel();
-  root.hidden = false; ED.open = true; ED.rot = 0;
+  root.hidden = false; ED.open = true; ED.rot = 0; $('edBack').textContent = `← ${back}`;
   if (M) { if (ED.M) checkpoint(); ED.M = M; autosave(); }
-  $('edName').value = ED.M.name; $('edSize').value = [16, 24, 28, 32, 48, 60].includes(ED.M.S) ? String(ED.M.S) : '32';
+  $('edName').value = ED.M.name; showSize(ED.M.S);
   if (!$('edItems').childElementCount) setTab('Terrain');
   size(); ED.stale = true; rebuild(); fitView(); syncHist(); setTool(ED.tool); syncBrush(); status();
   cv.focus({ preventScroll: true });

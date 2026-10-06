@@ -284,7 +284,6 @@ function renderCity(C, rot, SC) {
     }
   }
   /* ---- houses ---- */
-  const SHUT = ['#5f7b5a', '#4f6f8f', '#9a4a3a', '#6a5a8a', '#7a6a3a'];
   function smokeAt(sx, sy) { g.strokeStyle = 'rgba(150,145,140,0.55)'; g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath(); g.moveTo(sx, sy); g.bezierCurveTo(sx - 3, sy - 4, sx + 3, sy - 7, sx - 1, sy - 11); g.moveTo(sx + 1.5, sy - 3); g.bezierCurveTo(sx + 4, sy - 7, sx + 1, sy - 10, sx + 4, sy - 15); g.stroke(); }
   function bldgDraw(o) {
     const e = 0.06, x0 = o.x + e, y0 = o.y + e, x1 = o.x + o.w - e, y1 = o.y + o.d - e, z0 = o.z0, zt = z0 + o.h;
@@ -481,9 +480,9 @@ function renderCity(C, rot, SC) {
     cx /= n; cy /= n; cz /= n;
     for (const f of o.faces) {
       const pts = f.p, m = pts.length;
-      let nx = 0, ny = 0, nz = 0, fx = 0, fy = 0, fz = 0, rx = 0, ry = 0, rz = 0;
+      let nx = 0, ny = 0, nz = 0, fx = 0, fy = 0, fz = 0, rx = 0, ry = 0;
       for (let i = 0; i < m; i++) { const a = pts[i], b = pts[(i + 1) % m]; nx += (a[1] - b[1]) * (a[2] + b[2]); ny += (a[2] - b[2]) * (a[0] + b[0]); nz += (a[0] - b[0]) * (a[1] + b[1]); rx += (a[1] - b[1]) * (a[2] + b[2]) / 16; ry += (a[2] - b[2]) / 16 * (a[0] + b[0]); fx += a[0]; fy += a[1]; fz += a[2]; }
-      rz = nz; fx /= m; fy /= m; fz /= m;
+      const rz = nz; fx /= m; fy /= m; fz /= m;
       const sgn = (nx * (fx - cx) + ny * (fy - cy) + nz * (fz - cz)) < 0 ? -1 : 1;
       if (sgn * (nx + ny + 16 * nz) <= 1e-6) continue;
       const rl = Math.hypot(rx, ry, rz) || 1, lam = sgn * (rx * LDIR[0] + ry * LDIR[1] + rz * LDIR[2]) / rl;

@@ -91,6 +91,8 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .crumb{background:none;border:0;padding:0 0 10px;color:var(--brass-2);font:500 14px var(--ui);cursor:pointer}
 .crumb:hover{text-decoration:underline}
 .enter-city{margin:2px 0 14px}
+.enter-row{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 14px}
+.enter-row .enter-city{margin:0}
 @media (prefers-reduced-motion:reduce){.city.entering{animation:none}}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 

@@ -155,9 +155,9 @@ function generate(seedStr) {
         const cells = [i]; seenB[i] = 1;
         for (let h = 0; h < cells.length; h++) for (const n of NB[cells[h]]) if (n >= 0 && !land[n] && !ocean[n] && !seenB[n]) { seenB[n] = 1; cells.push(n); }
         const id = basins.length, inL = new Set(cells);
-        let outC = -1, outT = -1, ol = Infinity, lo = Infinity, tsum = 0, dry = 0;
+        let outC = -1, outT = -1, ol = Infinity, lo = Infinity, dry = 0;
         for (const c of cells) {
-          basinOf[c] = id; lo = Math.min(lo, lvl[c]); tsum += temp[c] || 0;
+          basinOf[c] = id; lo = Math.min(lo, lvl[c]);
           for (const n of NB[c]) { if (n < 0 || inL.has(n)) continue; if (land[n] && (B[n] === 'desert' || mR[n] < 0.25)) dry++; }
           const d = down[c]; if (d >= 0 && !inL.has(d)) { const l2 = ocean[d] ? -1 : lvl[d]; if (l2 < ol) { ol = l2; outC = c; outT = d; } }
         }

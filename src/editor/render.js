@@ -1,6 +1,6 @@
 import { mulberry32 } from '../core/random.js';
 import { INK, hexRgb, rgbStr } from '../render/palette.js';
-import { ASSET_BY_ID, TERRAIN, decorateTerrain, drawAsset, footprint, turnAsset } from '../tiles/index.js';
+import { ASSET_BY_ID, TERRAIN, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset } from '../tiles/index.js';
 
 /* ================= tile editor: rendering =================
    Same projection as the city districts (TWH x THH tiles, EL px per height level) so assets
@@ -44,6 +44,7 @@ function renderTiles(M, rot, SC, opts = {}) {
 
   /* asset instances in view space; tiles under a footprint are never repainted over it */
   const objs = M.objs.map((o, k) => Object.assign(rotInst(o, rot, S), { k }));
+  linkWalls(objs);
   const covered = new Uint8Array(NN);
   for (const o of objs) { const [w, d] = footprint(o); let z = 0; for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) { const u = y * S + x; covered[u] = 1; z = Math.max(z, zOf(u)); } o.z = ASSET_BY_ID[o.id].water ? Math.min(...Array.from({ length: w * d }, (_, j) => zOf((o.y + ((j / w) | 0)) * S + o.x + (j % w)))) : z; }
 
