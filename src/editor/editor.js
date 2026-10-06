@@ -103,7 +103,7 @@ function charViews() {
   const out = [];
   (ED.M.chars || []).forEach((c, k) => {
     const w = ED.walk.get(c), p = w ? walkerPos(w) : Object.assign(tilePt(c.x, c.y), { face: c.face }), [X, Y] = viewPt(p.x, p.y), stride = w ? Math.floor(w.d * 2) % 2 : 0;
-    out.push({ c, k, X, Y, ground: p.z, z: p.z + (w ? Math.abs(Math.sin(w.d * Math.PI)) * 0.7 : 0), face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
+    out.push({ c, k, X, Y, ground: p.z, z: p.z + (stride ? SPRITE_PX : 0),  /* the stride frame rides one pixel higher */ face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
   });
   return out.sort((a, b) => a.X + a.Y - (b.X + b.Y));
 }

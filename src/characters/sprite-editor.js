@@ -31,7 +31,7 @@ function paint() {
   for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) { cx.fillStyle = (x + y) % 2 ? '#2a3436' : '#243032'; cx.fillRect(x * cell, y * cell, cell, cell); }
   cx.imageSmoothingEnabled = false;
   if (SP.onion && FRAMES > 1) { cx.globalAlpha = 0.28; cx.drawImage(renderFrame(SP.s, SP.face, 1 - SP.frame), 0, 0, W, W); cx.globalAlpha = 1; }
-  if (SP.inked) { const k = W / (SIZE * INK_UP); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.drawImage(frameCanvas(SP.s, SP.face, SP.frame), -INK_PAD * k, -INK_PAD * k, INK_SIZE * k, INK_SIZE * k); }
+  if (SP.inked) { const k = W / (SIZE * INK_UP); cx.imageSmoothingEnabled = false; cx.drawImage(frameCanvas(SP.s, SP.face, SP.frame), -INK_PAD * k, -INK_PAD * k, INK_SIZE * k, INK_SIZE * k); }
   else cx.drawImage(renderFrame(SP.s, SP.face, SP.frame), 0, 0, W, W);
   cx.strokeStyle = 'rgba(255,240,200,0.13)'; cx.lineWidth = 1; cx.beginPath();
   for (let i = 1; i < SIZE; i++) { cx.moveTo(i * cell, 0); cx.lineTo(i * cell, W); cx.moveTo(0, i * cell); cx.lineTo(W, i * cell); }

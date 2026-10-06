@@ -27,13 +27,12 @@ left/right), each with a standing frame and a stride frame. **Mirror to other si
 flipped. Every stroke saves to the library at once, and characters can be exported and imported as
 `.character.json`.
 
-On the map, sprites are not shown as raw pixels. Each frame is smoothed (two Scale2x passes), outlined in
-the same ink as the tiles, given ink lines where clearly different colours meet (a darker shade of the same cloth
-stays a fold), lit from the left and shaded on the right like
-the pieces, and grained like the paper. A figure stands about as tall as a cottage's eaves. Characters
-drawn at 16×16 in an earlier version are doubled to 32×32 when they load. **Inked** in the
-character editor and the **On the map** preview, which shows each facing on a grass block, display that
-finished look while you draw.
+On the map, characters are crisp pixel art. The renderer adds a one-pixel outline in the tiles' ink colour and
+lights each part from the left in hard pixel steps, the way the pieces are lit. Pixels stay square at every
+zoom where they are large enough to see. A figure stands about as tall as a cottage's eaves. Characters drawn
+at 16×16 in an earlier version are doubled to 32×32 when they load. **Shaded** in the character editor and
+the **On the map** preview, which shows each facing on a grass block, display that finished look while you
+draw.
 
 Movement is by clicking. Pick a sprite and click a free tile with **Person** (`C`) to stand it there (`R`
 turns it). With **Walk** (`W`), click a character, then click a tile. The ground it can reach is tinted, the

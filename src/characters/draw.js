@@ -2,60 +2,33 @@ import { INK, hexRgb } from '../render/palette.js';
 import { TERRAIN_BY_ID } from '../tiles/index.js';
 import { SIZE } from './sprite.js';
 
-/* ================= character sprites: drawing in the tile set's style =================
-   A sprite is drawn the way the tile pieces are: smooth shapes, an ink outline round the figure and
-   between areas of colour, lit from the left and in shade on the right like the kit's cylinders, and
-   the same faint paper grain. The 32×32 pixels are first rounded off by two Scale2x passes (4×),
-   which keeps the drawing the user made but takes the stair-steps out of its curves and diagonals. */
-const UP = 4, PAD = 5, N = SIZE * UP + PAD * 2;
+/* ================= character sprites: pixel art =================
+   Characters are drawn as crisp pixel art in the tile set's colours: a one-pixel outline in the tiles'
+   ink round the figure, and light from the left in hard pixel steps (a highlight band on the lit side,
+   a shadow band on the far side) the way the kit lights its pieces. Nothing is smoothed: the pixels
+   stay square at every zoom where they are big enough to see. */
+const PAD = 1, UP = 1, N = SIZE + PAD * 2;
 const INK_RGB = hexRgb(INK);
+const lum = rgb => rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11, dark = rgb => lum(rgb) < 60;
 
-/* Scale2x on palette indices: doubles the frame, rounding corners where two sides agree */
-function scale2x(src, n) {
-  const out = new Uint8Array(n * n * 4), m = n * 2, at = (x, y) => (x < 0 || y < 0 || x >= n || y >= n ? 0 : src[y * n + x]);
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const P = src[y * n + x], A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1);
-    let e0 = P, e1 = P, e2 = P, e3 = P;
-    if (C === A && C !== D && A !== B) e0 = A;
-    if (A === B && A !== C && B !== D) e1 = B;
-    if (D === C && D !== B && C !== A) e2 = C;
-    if (B === D && B !== A && D !== C) e3 = D;
-    const o = 2 * y * m + 2 * x; out[o] = e0; out[o + 1] = e1; out[o + m] = e2; out[o + m + 1] = e3;
-  }
-  return out;
-}
-const apart = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) > 64;
-const dark = rgb => rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11 < 60;
-const noise = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
-
-/* the inked picture of one frame as an N×N canvas; its feet sit on row PAD + SIZE * UP */
-function inkFrame(pal, fr) {
-  let big = fr, n = SIZE; for (let k = 1; k < UP; k *= 2) { big = scale2x(big, n); n *= 2; }
-  const idx = new Uint8Array(N * N); for (let y = 0; y < n; y++) idx.set(big.subarray(y * n, y * n + n), (y + PAD) * N + PAD);
+/* the shaded, outlined frame as an N×N canvas (one pixel of margin for the outline); feet on row PAD + SIZE */
+function pixelFrame(pal, fr) {
   const rgb = pal.map(hexRgb), c = document.createElement('canvas'); c.width = c.height = N;
-  const g = c.getContext('2d'), im = g.createImageData(N, N), d = im.data;
-  /* the extent of the figure on each row, for the left-lit, right-shaded rounding */
-  const lo = new Int32Array(N).fill(N), hi = new Int32Array(N).fill(-1);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (idx[y * N + x]) { if (x < lo[y]) lo[y] = x; hi[y] = x; }
-  const R = 3.3, RI = Math.ceil(R), LINE = 2.2;
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const u = y * N + x, v = idx[u], o = u * 4;
-    if (!v) {
-      /* ink outline: distance to the nearest filled pixel, softened over its last pixel */
-      let best = 99;
-      for (let j = -RI; j <= RI; j++) { const yy = y + j; if (yy < 0 || yy >= N) continue; for (let i = -RI; i <= RI; i++) { const xx = x + i; if (xx < 0 || xx >= N || !idx[yy * N + xx]) continue; const dd = Math.hypot(i, j); if (dd < best) best = dd; } }
-      if (best <= R) { d[o] = INK_RGB[0]; d[o + 1] = INK_RGB[1]; d[o + 2] = INK_RGB[2]; d[o + 3] = 255 * Math.min(1, R + 0.5 - best); }
-      continue;
-    }
-    const col = rgb[v - 1] || INK_RGB;
-    const span = Math.max(1, hi[y] - lo[y]), t = (x - lo[y]) / span, k = t < 0.45 ? 1.07 - 0.07 * (t / 0.45) : 1 - 0.3 * ((t - 0.45) / 0.55);
-    /* ink line where two clearly different colours meet; a shade of the same cloth is a fold, not a seam,
-       and eyes and other dark details are ink already */
-    let line = 0;
-    if (!dark(col)) for (let j = -2; j <= 2 && !line; j++) for (let i = -2; i <= 2; i++) { const w = idx[(y + j) * N + (x + i)]; if (w && w !== v && !dark(rgb[w - 1] || INK_RGB) && apart(col, rgb[w - 1] || INK_RGB) && Math.hypot(i, j) <= LINE / 2 + 0.3 && (i > 0 || (i === 0 && j > 0))) { line = 1; break; } }
-    const gr = 1 - noise(x, y) * 0.06;
-    for (let ch = 0; ch < 3; ch++) d[o + ch] = line ? INK_RGB[ch] * 0.9 + col[ch] * 0.1 : Math.min(255, col[ch] * k * gr);
-    d[o + 3] = 255;
+  const g = c.getContext('2d'), im = g.createImageData(N, N), d = im.data, at = (x, y) => (x < 0 || y < 0 || x >= SIZE || y >= SIZE ? 0 : fr[y * SIZE + x]);
+  /* each row's extent, so the light bands follow the figure's own width (arms, head, legs alike) */
+  const lo = new Int32Array(SIZE).fill(SIZE), hi = new Int32Array(SIZE).fill(-1);
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (fr[y * SIZE + x]) { if (x < lo[y]) lo[y] = x; hi[y] = x; }
+  const put = (x, y, col, a = 255) => { const o = ((y + PAD) * N + x + PAD) * 4; d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = a; };
+  for (let y = -PAD; y < SIZE + PAD; y++) for (let x = -PAD; x < SIZE + PAD; x++) {
+    const v = at(x, y);
+    if (!v) { if (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1)) put(x, y, INK_RGB); continue; }
+    const col = rgb[v - 1] || INK_RGB; if (dark(col)) { put(x, y, col); continue; }
+    /* a lit run of pixels on the left of each part, shade on the right; the top edge of a part catches light too */
+    const span = hi[y] - lo[y] + 1, t = (x - lo[y]) / Math.max(1, span - 1);
+    const edgeL = !at(x - 1, y) || at(x - 1, y) !== v, edgeR = !at(x + 1, y) || at(x + 1, y) !== v, top = !at(x, y - 1);
+    let k = 1;
+    if (t > 0.72 || (edgeR && t > 0.5)) k = 0.8; else if ((edgeL && t < 0.5) || top) k = 1.12;
+    put(x, y, col.map(ch => Math.min(255, Math.round(ch * k))));
   }
   g.putImageData(im, 0, 0); return c;
 }
@@ -67,17 +40,20 @@ function renderFrame(s, face, k) {
   for (let u = 0; u < fr.length; u++) { const v = fr[u]; if (!v || !s.pal[v - 1]) continue; const [r, gg, b] = hexRgb(s.pal[v - 1]); im.data.set([r, gg, b, 255], u * 4); }
   g.putImageData(im, 0, 0); return c;
 }
-/* inked frames are cached by their content, so the sprite editor's unsaved edits and the library share it */
+/* finished frames are cached by their content, so the sprite editor's unsaved edits and the library share it */
 const cache = new Map();
 function frameCanvas(s, face, k) {
   const fr = s.frames[face][k], key = s.pal.join() + '|' + String.fromCharCode(...fr);
-  let c = cache.get(key); if (!c) { if (cache.size > 300) cache.clear(); c = inkFrame(s.pal, fr); cache.set(key, c); }
+  let c = cache.get(key); if (!c) { if (cache.size > 300) cache.clear(); c = pixelFrame(s.pal, fr); cache.set(key, c); }
   return c;
 }
-/* draw an inked frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units */
+/* draw a frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units.
+   Pixels stay hard-edged while each covers at least about one and a half screen pixels; any smaller and
+   nearest-neighbour sampling would drop detail, so the frame is filtered down instead. */
 function drawFrame(g, can, x, y, px) {
-  const k = px / UP; g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-  g.drawImage(can, x - N / 2 * k, y - (PAD + SIZE * UP) * k, N * k, N * k); g.restore();
+  const m = g.getTransform(), screen = Math.hypot(m.a, m.b) * px;
+  g.save(); g.imageSmoothingEnabled = screen < 1.5; g.imageSmoothingQuality = 'high';
+  g.drawImage(can, x - N / 2 * px, y - (PAD + SIZE) * px, N * px, N * px); g.restore();
 }
 /* soft ground shadow under a figure, leaning the way the pieces' shadows lean */
 function footShadow(g, x, y, px) {
