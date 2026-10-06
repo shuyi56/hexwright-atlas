@@ -31,7 +31,7 @@ dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
 
 ### Storeys
 
-A map has a ground level and up to three floors above it. The **floor** switch over the map (G, 1, 2, 3, or
+A map has a ground level and up to three floors above it. The **floor** switch in the bottom-left corner (a stack of 3, 2, 1 and G, or
 `PgUp`/`PgDn`) chooses the storey you work on. Every tool acts on that storey, and the floors above it are
 hidden so you can always see inside.
 
