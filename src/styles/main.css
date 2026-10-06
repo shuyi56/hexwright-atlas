@@ -110,6 +110,7 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .ed-body{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;min-height:0}
 .ed-stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#1c2627,var(--table) 75%)}
 #edCanvas{display:block;touch-action:none;cursor:crosshair}
+#edOverlay{position:absolute;left:0;top:0;pointer-events:none}
 .ed-view{position:absolute;top:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .ed-status{position:absolute;left:10px;bottom:10px;max-width:calc(100% - 80px);font:500 13px var(--ui);color:var(--vellum);background:rgba(18,24,25,.82);border:1px solid var(--line);border-radius:3px;padding:3px 9px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ed-palette{min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden}

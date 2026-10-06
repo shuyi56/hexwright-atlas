@@ -57,6 +57,12 @@ mean sand?`), unknown parameter names are rejected, and a placement that does no
 (MCP client, server, dev server, headless Chromium) and needs a Chromium: set `PLAYWRIGHT_BROWSERS_PATH`
 or run `npx playwright-core install chromium`. `E2E_OUT=<dir>` saves the screenshots it takes.
 
+`npm run perf` (after `npm run build`) clicks through the tile editor's tools on a 48×48 map in
+headless Chromium and reads the browser's Event Timing entries, the numbers Interaction to Next Paint
+is built from. It fails when an interaction's p75 latency passes 200 ms, or when the map image the
+editor patched in place after those edits differs by a single pixel from a full render. CI runs it on
+every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust it.
+
 ## Scripts
 
 | Command           | What it does                    |
@@ -68,6 +74,7 @@ or run `npx playwright-core install chromium`. `E2E_OUT=<dir>` saves the screens
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
 | `npm test`        | Unit tests (no browser needed)  |
 | `npm run test:e2e`| MCP end-to-end test (Chromium)  |
+| `npm run perf`    | Editor latency budget (Chromium)|
 | `npm run mcp`     | Run the MCP server on stdio     |
 
 Requires Node 18+.
