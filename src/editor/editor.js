@@ -1,4 +1,4 @@
-import { drawFrame, footShadow, frameCanvas, spriteThumb } from '../characters/draw.js';
+import { INK_PAD, INK_SIZE, drawFrame, footShadow, frameCanvas, spriteThumb } from '../characters/draw.js';
 import * as library from '../characters/library.js';
 import { openSpriteEditor } from '../characters/sprite-editor.js';
 import { FACES, SIZE as SPRITE_SIZE } from '../characters/sprite.js';
@@ -7,7 +7,7 @@ import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, setElev, shiftElev } from './ops.js';
-import { EL, THH, TWH, pieceBox, renderTiles, rotInst, thumb, updateTiles } from './render.js';
+import { EL, THH, TWH, frontMask, renderTiles, rotInst, thumb, updateTiles } from './render.js';
 import { blockedBy, charAt, eraseCharAt, findPath, placeChar, reachable, walkChar } from './walk.js';
 
 /* ================= tile editor screen ================= */
@@ -17,7 +17,7 @@ const TOOLS = [
   ['paint', 'Paint', 'B', '▦'], ['fill', 'Fill', 'G', '◩'], ['raise', 'Raise', 'U', '▲'], ['lower', 'Lower', 'J', '▼'], ['level', 'Level', 'L', '▬'],
   ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
 ];
-const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), lastT: 0, preview: null };
+const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), occ: new Map(), lastT: 0, preview: null };
 /* one sprite pixel in drawing units: a figure stands about as tall as a cottage's eaves and chimney */
 const WALK_SPEED = 3.2, SPRITE_PX = 0.42, FIG_H = SPRITE_SIZE * SPRITE_PX;
 
@@ -36,7 +36,7 @@ function redo() { if (!ED.redo.length) return; ED.undo.push(cloneModel(ED.M)); s
 function showSize(S) { const sel = $('edSize'); if (![...sel.options].some(o => +o.value === S)) { const o = new Option(String(S)); sel.add(o, [...sel.options].find(x => +x.value > S) || null); } sel.value = String(S); }
 function syncHist() { $('edUndo').disabled = !ED.undo.length; $('edRedo').disabled = !ED.redo.length; }
 function setModel(M, keepView) {
-  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.walk.clear(); ED.sel = -1; ED.stale = resize || ED.stale === true ? true : 'model';
+  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.walk.clear(); ED.occ.clear(); ED.sel = -1; ED.stale = resize || ED.stale === true ? true : 'model';
   $('edName').value = M.name; showSize(M.S);
   syncHist(); autosave();
   if (resize || !keepView) { rebuild(); fitView(); } else changed();
@@ -115,25 +115,37 @@ function charAtScreen(sx, sy) {
   return -1;
 }
 const spriteOf = c => library.get(c.sprite);
-/* draw one character, then the pieces in front of it again so it can stand behind a house */
-function drawChar(g, R, v) {
-  const [px, py] = R.P(v.X, v.Y, v.z), s = spriteOf(v.c), key = v.X + v.Y;
-  footShadow(g, px, R.P(v.X, v.Y, v.ground)[1], SPRITE_PX);
-  if (s) drawFrame(g, frameCanvas(s, v.face, v.frame), px, py + 1, SPRITE_PX);
-  else { g.save(); g.fillStyle = '#b8483a'; g.strokeStyle = '#2b2116'; g.beginPath(); g.arc(px, py - 8, 6, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore(); }
-  const box = [px - FIG_H / 2 - 2, py - FIG_H - 4, px + FIG_H / 2 + 2, py + 4];
-  for (const o of R.objs) {
-    const [w, d] = footprint(o); if (o.x + w / 2 + o.y + d / 2 <= key) continue;
-    const b = pieceBox(R, o); if (b[0] >= box[2] || b[2] <= box[0] || b[1] >= box[3] || b[3] <= box[1]) continue;
-    drawAsset(g, R.P, o, o.z, R.clim);
+/* Draw one character (with its ground shadow) onto the overlay, cut away wherever the map stands in front of
+   it. The figure is drawn into a scratch canvas at screen resolution, the mask of the pieces and raised
+   tiles in front (render.js frontMask, cached while the character stays inside its box and depth band) is
+   punched out of it, and only what is left is copied to the overlay. Nothing of the map is redrawn. */
+const scratch = document.createElement('canvas'), sg = scratch.getContext('2d');
+function drawChar(g, R, v, s, face, frame, key, alpha = 1) {
+  const P = SPRITE_PX, [px, py] = R.P(v.X, v.Y, v.z), gy = R.P(v.X, v.Y, v.ground)[1], top = py + 1 - (INK_PAD + SPRITE_SIZE) * P;
+  const b = [px - INK_SIZE * P / 2 - 1, top - 1, px + INK_SIZE * P / 2 + 1, Math.max(top + INK_SIZE * P, gy + 3) + 1];
+  const minKey = Math.floor((v.X + v.Y) * 2) / 2 + 0.5;
+  let m = ED.occ.get(key);
+  if (!m || m.R !== R || m.ver !== R.ver || m.minKey !== minKey || b[0] < m.box[0] || b[1] < m.box[1] || b[2] > m.box[2] || b[3] > m.box[3]) {
+    if (ED.occ.size > 64) ED.occ.clear();
+    const box = [b[0] - 20, b[1] - 20, b[2] + 20, b[3] + 20];
+    m = { R, ver: R.ver, minKey, box, mask: frontMask(R, box, minKey) }; ED.occ.set(key, m);
   }
+  const dpr = state.dpr, k = ED.z * dpr, dx = dpr * ED.ox + b[0] * k, dy = dpr * ED.oy + b[1] * k, ix = Math.floor(dx), iy = Math.floor(dy);
+  const w = Math.ceil((b[2] - b[0]) * k) + 2, h = Math.ceil((b[3] - b[1]) * k) + 2;
+  if (scratch.width < w || scratch.height < h) { scratch.width = Math.max(scratch.width, w); scratch.height = Math.max(scratch.height, h); }
+  sg.setTransform(1, 0, 0, 1, 0, 0); sg.clearRect(0, 0, w, h); sg.setTransform(k, 0, 0, k, dx - ix - b[0] * k, dy - iy - b[1] * k);
+  footShadow(sg, px, gy, P);
+  if (s) drawFrame(sg, frameCanvas(s, face, frame), px, py + 1, P);
+  else { sg.fillStyle = '#b8483a'; sg.strokeStyle = '#2b2116'; sg.lineWidth = 0.6; sg.beginPath(); sg.arc(px, py - 5, 3, 0, Math.PI * 2); sg.fill(); sg.stroke(); }
+  const mk = m.mask; sg.globalCompositeOperation = 'destination-out'; sg.imageSmoothingEnabled = true; sg.drawImage(mk.can, mk.x, mk.y, mk.w, mk.h); sg.globalCompositeOperation = 'source-over';
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = alpha; g.drawImage(scratch, 0, 0, w, h, ix, iy, w, h); g.restore();
 }
 function drawChars(g, R) {
   const views = charViews();
   if (ED.sel >= (ED.M.chars || []).length) ED.sel = -1;
   for (const v of views) {
     if (v.k === ED.sel) { const u = [Math.floor(v.X), Math.floor(v.Y)], z = v.z; g.beginPath(); for (const [a, b] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const q = R.P(u[0] + a, u[1] + b, z); a || b ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.closePath(); g.strokeStyle = '#e4c684'; g.lineWidth = 2 / ED.z; g.stroke(); g.fillStyle = 'rgba(228,198,132,0.16)'; g.fill(); }
-    drawChar(g, R, v);
+    drawChar(g, R, v, spriteOf(v.c), v.face, v.frame, v.c);
   }
 }
 /* every tile the selected character can reach, faintly tinted while walking is armed */
@@ -243,7 +255,7 @@ function draw() {
   if (ED.hover && ED.tool === 'character') {
     const { x, y } = ED.hover, ok = isFreeTile(x, y), z = zAt(x, y), [X, Y] = viewPt(x + 0.5, y + 0.5), s = library.get(ED.char);
     outline([[x, y]], ok ? 'rgba(255,240,200,0.9)' : '#b8483a', ok ? 'rgba(255,240,200,0.18)' : 'rgba(184,72,58,0.25)');
-    if (s) { const [px, py] = R.P(X, Y, z); g.globalAlpha = ok ? 0.85 : 0.4; footShadow(g, px, py, SPRITE_PX); drawFrame(g, frameCanvas(s, FACES[faceIn(ED.face)], 0), px, py + 1, SPRITE_PX); g.globalAlpha = 1; }
+    if (s) drawChar(g, R, { X, Y, z, ground: z }, s, FACES[faceIn(ED.face)], 0, 'ghost', ok ? 0.85 : 0.4);
   }
   /* walking: the reachable ground tinted, the route to the hovered tile traced, all beneath the figures */
   if (ED.tool === 'walk') {
