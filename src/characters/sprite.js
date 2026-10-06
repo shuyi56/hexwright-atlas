@@ -5,7 +5,8 @@
 const SIZE = 16, FACES = ['sw', 'se', 'ne', 'nw'], FRAMES = 2, MAX_PAL = 35;
 const FACE_LABEL = { sw: 'Front left', se: 'Front right', ne: 'Back right', nw: 'Back left' };
 const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
-const DEFAULT_PAL = ['#2b2116', '#f2d2b0', '#c99a6e', '#6b4a2b', '#d9b24a', '#9a3b2e', '#d9644a', '#3f6b99', '#6f9bc8', '#4a7a3a', '#8fb35c', '#7a7a80', '#c9c9c9', '#f4eede', '#5b3a6b', '#8b5a2b'];
+/* the tile set's own colours: ink, skin, timber, thatch, roof tiles, slate, plaster, foliage, stone */
+const DEFAULT_PAL = ['#2b2116', '#e8c49a', '#c99a6e', '#5a3f28', '#7a5a3a', '#d9b860', '#bf9850', '#a6533b', '#7c3a2a', '#66727e', '#48525c', '#4f6f8f', '#efe3c4', '#d3c199', '#87a05a', '#637d43', '#ddd1b0', '#9aa3a6', '#7a6a8a', '#c9a24f'];
 
 const blankFrame = () => new Uint8Array(SIZE * SIZE);
 function blankSprite(name = 'New character', id = newId()) {
@@ -54,30 +55,43 @@ function spriteFromJSON(J) {
   return s;
 }
 
-/* ---------- starter characters, drawn from rectangles ---------- */
-function person(name, c) {
-  const s = blankSprite(name), pal = [c.outline, c.skin, c.skinShade, c.hair, c.shirt, c.shirtShade, c.pants, c.boots, c.accent];
-  s.pal = pal.concat(DEFAULT_PAL.filter(d => !pal.includes(d))).slice(0, MAX_PAL);
-  const K = { o: 1, skin: 2, sh: 3, hair: 4, shirt: 5, shs: 6, pants: 7, boots: 8, acc: 9 };
+/* ---------- starter characters, built from parts ----------
+   The art stays flat: the renderer (draw.js) adds the ink outline, the lit-left/shaded-right
+   rounding and the paper grain that the tile pieces have, so plain areas of colour are what read best. */
+function figure(name, id, c) {
+  const pal = [], K = {}; for (const [k, v] of Object.entries(c.col)) { let i = pal.indexOf(v); if (i < 0) { pal.push(v); i = pal.length - 1; } K[k] = i + 1; }
+  const s = blankSprite(name, id); s.pal = pal.concat(DEFAULT_PAL.filter(d => !pal.includes(d))).slice(0, MAX_PAL);
   const make = (back, step) => {
-    const fr = blankFrame(), r = (x, y, w, h, v) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) fr[j * SIZE + i] = v; };
-    r(5, 1, 6, 1, K.hair); r(4, 2, 8, 3, K.hair);
-    if (back) r(4, 5, 8, 2, K.hair); else { r(5, 5, 6, 2, K.skin); r(6, 5, 1, 1, K.o); r(9, 5, 1, 1, K.o); }
-    if (!back) r(4, 5, 1, 1, K.hair), r(11, 5, 1, 1, K.hair);
-    r(4, 7, 8, 5, K.shirt); r(4, 7, 8, 1, K.shs); r(3, 8, 1, 3, K.shirt); r(12, 8, 1, 3, K.shirt); r(3, 11, 1, 1, K.skin); r(12, 11, 1, 1, K.skin); r(4, 11, 8, 1, K.acc);
-    if (step) { r(5, 12, 3, 2, K.pants); r(5, 14, 3, 1, K.boots); r(8, 12, 3, 2, K.pants); r(8, 14, 3, 1, K.pants); r(8, 13, 3, 1, K.boots); }
-    else { r(5, 12, 3, 3, K.pants); r(8, 12, 3, 3, K.pants); r(5, 15, 3, 1, K.boots); r(8, 15, 3, 1, K.boots); }
+    const fr = blankFrame(), r = (x, y, w, h, v) => { if (v) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) fr[j * SIZE + i] = v; };
+    /* legs and feet */
+    if (c.robe) { r(5, 6, 6, 8, K.top); r(4, 12, 8, 2, K.top); if (step) { r(5, 14, 2, 1, K.boots); r(9, 14, 2, 1, K.boots); r(9, 15, 2, 1, K.boots); } else { r(5, 14, 6, 1, K.top); r(6, 15, 2, 1, K.boots); r(8, 15, 2, 1, K.boots); } }
+    else if (step) { r(5, 12, 2, 2, K.legs); r(4, 14, 3, 1, K.boots); r(9, 12, 2, 3, K.legs2); r(9, 15, 2, 1, K.boots); }
+    else { r(6, 12, 2, 3, K.legs); r(8, 12, 2, 3, K.legs2); r(6, 15, 2, 1, K.boots); r(8, 15, 2, 1, K.boots); }
+    /* body, belt, arms swinging opposite the legs */
+    r(5, 6, 6, 6, K.top); r(5, 10, 6, 1, K.belt);
+    const la = step ? 1 : 0, ra = step ? -1 : 0;
+    r(4, 6 + la, 1, 4, K.sleeve); r(4, 10 + la, 1, 1, K.skin); r(11, 6, 1, 4 + ra + 1, K.sleeve); r(11, 10 + ra + 1, 1, 1, K.skin);
+    if (c.cape && back) r(5, 6, 6, 7, K.cape);
+    /* head */
+    r(6, 2, 4, 4, K.skin);
+    if (back) r(5, 1, 6, 4, K.hair), r(6, 5, 4, 1, K.hair); else { r(6, 1, 4, 1, K.hair); r(5, 2, 6, 1, K.hair); r(5, 3, 1, 1, K.hair); r(10, 3, 1, 2, K.hair); r(7, 4, 1, 1, K.eye); r(9, 4, 1, 1, K.eye); }
+    if (c.hair === 'long') r(5, 3, 1, 3, K.hair), r(10, 3, 1, 3, K.hair);
+    if (c.hat === 'straw') { r(6, 0, 4, 2, K.hat); r(3, 2, 10, 1, K.hat); }
+    if (c.hat === 'helm') { r(5, 0, 6, 3, K.hat); if (!back) r(8, 3, 1, 1, K.hat); }
+    if (c.hat === 'hood') { r(5, 0, 6, 2, K.hat); r(5, 2, 1, 4, K.hat); r(10, 2, 1, 4, K.hat); if (back) r(5, 2, 6, 4, K.hat); }
     return fr;
   };
-  for (let k = 0; k < FRAMES; k++) {
-    s.frames.se[k] = make(false, k); s.frames.ne[k] = make(true, k); s.frames.sw[k] = flipFrame(s.frames.se[k].slice()); s.frames.nw[k] = flipFrame(s.frames.ne[k].slice());
-  }
+  for (let k = 0; k < FRAMES; k++) { s.frames.se[k] = make(false, k); s.frames.ne[k] = make(true, k); s.frames.sw[k] = flipFrame(s.frames.se[k].slice()); s.frames.nw[k] = flipFrame(s.frames.ne[k].slice()); }
   return s;
 }
+const SKIN = '#e8c49a', EYE = '#2b2116';
 const starters = () => [
-  Object.assign(person('Villager', { outline: '#2b2116', skin: '#f2d2b0', skinShade: '#c99a6e', hair: '#6b4a2b', shirt: '#6f9bc8', shirtShade: '#3f6b99', pants: '#8b5a2b', boots: '#3a2a1a', accent: '#d9b24a' }), { id: 'starter-villager' }),
-  Object.assign(person('Guard', { outline: '#2b2116', skin: '#c99a6e', skinShade: '#a87a50', hair: '#3a2a1a', shirt: '#9a3b2e', shirtShade: '#6b2a20', pants: '#4a4a52', boots: '#2b2116', accent: '#c9c9c9' }), { id: 'starter-guard' }),
-  Object.assign(person('Merchant', { outline: '#2b2116', skin: '#f2d2b0', skinShade: '#c99a6e', hair: '#c9c9c9', shirt: '#5b3a6b', shirtShade: '#3f2a4a', pants: '#3a2a1a', boots: '#2b2116', accent: '#d9b24a' }), { id: 'starter-merchant' })
+  figure('Villager', 'starter-villager', { col: { skin: SKIN, eye: EYE, hair: '#5a3f28', top: '#87a05a', sleeve: '#87a05a', belt: '#7a5a3a', legs: '#8c6d4b', legs2: '#8c6d4b', boots: '#4a3524' } }),
+  figure('Farmer', 'starter-farmer', { hat: 'straw', col: { skin: SKIN, eye: EYE, hair: '#7a5a3a', hat: '#d9b860', top: '#efe3c4', sleeve: '#efe3c4', belt: '#a07a4a', legs: '#7a5a3a', legs2: '#7a5a3a', boots: '#4a3524' } }),
+  figure('Guard', 'starter-guard', { hat: 'helm', cape: true, col: { skin: '#d9b088', eye: EYE, hair: '#3a2a1a', hat: '#9aa3a6', top: '#a6533b', sleeve: '#66727e', belt: '#4a3524', legs: '#48525c', legs2: '#48525c', boots: '#2f271f', cape: '#7c3a2a' } }),
+  figure('Merchant', 'starter-merchant', { robe: true, col: { skin: SKIN, eye: EYE, hair: '#d3c199', top: '#4f6f8f', sleeve: '#4f6f8f', belt: '#c9a24f', boots: '#5a3f28' } }),
+  figure('Monk', 'starter-monk', { robe: true, hat: 'hood', col: { skin: '#d9b088', eye: EYE, hair: '#5a3f28', hat: '#7a5a3a', top: '#7a5a3a', sleeve: '#7a5a3a', belt: '#d3c199', boots: '#4a3524' } }),
+  figure('Healer', 'starter-healer', { hair: 'long', col: { skin: SKIN, eye: EYE, hair: '#bf9850', top: '#7a6a8a', sleeve: '#efe3c4', belt: '#c9a24f', legs: '#5a4a62', legs2: '#5a4a62', boots: '#4a3524' } })
 ];
 
 export { DEFAULT_PAL, FACES, FACE_LABEL, FRAMES, MAX_PAL, SIZE, blankFrame, blankSprite, cloneSprite, fillFrame, flipFrame, inFrame, isBlank, newId, setPixel, shiftFrame, spriteFromJSON, spriteToJSON, starters };

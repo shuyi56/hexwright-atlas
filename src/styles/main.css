@@ -154,9 +154,8 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .sp-swatch{aspect-ratio:1;border:1px solid var(--line);border-radius:3px;cursor:pointer;padding:0}
 .sp-swatch.clear{background:repeating-conic-gradient(#3a4547 0 25%,#222c2d 0 50%) 0 0/10px 10px}
 .sp-swatch[aria-pressed="true"]{outline:2px solid var(--brass-2);outline-offset:1px}
-.sp-preview{margin:0 10px 12px;width:calc(100% - 20px);height:auto;image-rendering:pixelated;background:var(--panel-2);border:1px solid var(--line);border-radius:3px}
+.sp-preview{margin:0 10px 12px;width:calc(100% - 20px);height:auto;background:var(--panel-2);border:1px solid var(--line);border-radius:3px}
 #spColor{width:34px;height:28px;padding:0;border:1px solid var(--line);background:none;border-radius:3px}
-.ed-char{image-rendering:pixelated}
 .ed-palette .tabs{flex-wrap:wrap}
 .ed-palette .tab{padding:9px 8px 7px;font-size:13px;letter-spacing:.05em}
 .ed-charbar{padding-top:8px}

@@ -1,5 +1,5 @@
 import { $ } from '../ui/state.js';
-import { renderFrame, spriteThumb } from './draw.js';
+import { INK_PAD, INK_SIZE, INK_UP, frameCanvas, renderFrame, spriteThumb, standOn } from './draw.js';
 import * as library from './library.js';
 import { FACES, FACE_LABEL, FRAMES, MAX_PAL, SIZE, blankSprite, cloneSprite, fillFrame, flipFrame, setPixel, shiftFrame, spriteFromJSON, spriteToJSON } from './sprite.js';
 
@@ -11,7 +11,7 @@ const root = $('spriteEditor'), cv = $('spCanvas'), cx = cv.getContext('2d'), pv
 const TOOLS = [['pencil', 'Pencil', 'B'], ['eraser', 'Eraser', 'E'], ['fill', 'Fill', 'G'], ['pick', 'Pick', 'I']];
 const MIRROR = { sw: 'se', se: 'sw', ne: 'nw', nw: 'ne' };
 const HIST = 80;
-const SP = { open: false, s: null, face: 'se', frame: 0, tool: 'pencil', color: 1, sym: false, onion: true, undo: [], redo: [], stroke: null, back: null, tick: 0, timer: 0, saveT: 0 };
+const SP = { open: false, s: null, face: 'se', frame: 0, tool: 'pencil', color: 1, sym: false, onion: true, inked: false, undo: [], redo: [], stroke: null, back: null, tick: 0, timer: 0, saveT: 0 };
 const frameOf = () => SP.s.frames[SP.face][SP.frame];
 
 /* ---------- history and saving ---------- */
@@ -31,7 +31,8 @@ function paint() {
   for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) { cx.fillStyle = (x + y) % 2 ? '#2a3436' : '#243032'; cx.fillRect(x * cell, y * cell, cell, cell); }
   cx.imageSmoothingEnabled = false;
   if (SP.onion && FRAMES > 1) { cx.globalAlpha = 0.28; cx.drawImage(renderFrame(SP.s, SP.face, 1 - SP.frame), 0, 0, W, W); cx.globalAlpha = 1; }
-  cx.drawImage(renderFrame(SP.s, SP.face, SP.frame), 0, 0, W, W);
+  if (SP.inked) { const k = W / (SIZE * INK_UP); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.drawImage(frameCanvas(SP.s, SP.face, SP.frame), -INK_PAD * k, -INK_PAD * k, INK_SIZE * k, INK_SIZE * k); }
+  else cx.drawImage(renderFrame(SP.s, SP.face, SP.frame), 0, 0, W, W);
   cx.strokeStyle = 'rgba(255,240,200,0.13)'; cx.lineWidth = 1; cx.beginPath();
   for (let i = 1; i < SIZE; i++) { cx.moveTo(i * cell, 0); cx.lineTo(i * cell, W); cx.moveTo(0, i * cell); cx.lineTo(W, i * cell); }
   cx.stroke();
@@ -39,8 +40,9 @@ function paint() {
   drawPreview();
 }
 function drawPreview() {
-  const px = pv.width / (SIZE * FACES.length), k = SP.tick % FRAMES; pvx.clearRect(0, 0, pv.width, pv.height); pvx.imageSmoothingEnabled = false;
-  FACES.forEach((f, i) => pvx.drawImage(renderFrame(SP.s, f, k), i * SIZE * px, pv.height - SIZE * px, SIZE * px, SIZE * px));
+  /* each facing as it will look on the map: inked, on a grass block, at four times map scale */
+  const k = SP.tick % FRAMES, cw = pv.width / FACES.length; pvx.clearRect(0, 0, pv.width, pv.height);
+  FACES.forEach((f, i) => standOn(pvx, SP.s, f, k, cw * (i + 0.5), pv.height * 0.72, cw * 0.42));
 }
 const cellAt = e => { const r = cv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * SIZE), Math.floor((e.clientY - r.top) / r.height * SIZE)]; };
 
@@ -115,7 +117,8 @@ function build() {
   });
   $('spUndo').addEventListener('click', undo); $('spRedo').addEventListener('click', redo);
   $('spSym').addEventListener('click', () => { SP.sym = !SP.sym; $('spSym').setAttribute('aria-pressed', String(SP.sym)); });
-  $('spOnion').addEventListener('click', () => { SP.onion = !SP.onion; $('spOnion').setAttribute('aria-pressed', String(SP.onion)); paint(); });
+  $('spInked').addEventListener('click', () => { SP.inked = !SP.inked; $('spInked').setAttribute('aria-pressed', String(SP.inked)); paint(); });
+  $('spOnion').addEventListener('click', () => { SP.onion = !SP.onion; $('spOnion').setAttribute('aria-pressed', String(SP.onion)); $('spInked').setAttribute('aria-pressed', String(SP.inked)); paint(); });
   $('spMirror').addEventListener('click', mirrorToOpposite);
   $('spCopyFrame').addEventListener('click', copyFrame);
   $('spFlip').addEventListener('click', () => act(() => flipFrame(frameOf())));

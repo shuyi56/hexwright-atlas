@@ -1,4 +1,4 @@
-import { drawFrame, frameCanvas, spriteThumb } from '../characters/draw.js';
+import { drawFrame, footShadow, frameCanvas, spriteThumb } from '../characters/draw.js';
 import * as library from '../characters/library.js';
 import { openSpriteEditor } from '../characters/sprite-editor.js';
 import { FACES } from '../characters/sprite.js';
@@ -8,7 +8,7 @@ import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, setElev, shiftElev } from './ops.js';
 import { EL, THH, TWH, pieceBox, renderTiles, rotInst, thumb, updateTiles } from './render.js';
-import { FACE_DELTA, blockedBy, canStep, charAt, eraseCharAt, findPath, placeChar, walkChar } from './walk.js';
+import { blockedBy, charAt, eraseCharAt, findPath, placeChar, reachable, walkChar } from './walk.js';
 
 /* ================= tile editor screen ================= */
 const root = $('editor'), cv = $('edCanvas'), cx = cv.getContext('2d'), ov = $('edOverlay'), ovx = ov.getContext('2d'), statusEl = $('edStatus'), stage = $('edStage');
@@ -18,7 +18,8 @@ const TOOLS = [
   ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
 ];
 const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), lastT: 0, preview: null };
-const WALK_SPEED = 4.2, SPRITE_PX = 1.5;
+/* one sprite pixel in drawing units: a figure stands a little taller than a cottage door */
+const WALK_SPEED = 3.2, SPRITE_PX = 0.55;
 
 /* ---------- persistence ---------- */
 let saveT = 0;
@@ -102,25 +103,25 @@ function charViews() {
   const out = [];
   (ED.M.chars || []).forEach((c, k) => {
     const w = ED.walk.get(c), p = w ? walkerPos(w) : Object.assign(tilePt(c.x, c.y), { face: c.face }), [X, Y] = viewPt(p.x, p.y), stride = w ? Math.floor(w.d * 2) % 2 : 0;
-    out.push({ c, k, X, Y, z: p.z - (w ? Math.abs(Math.sin(w.d * Math.PI)) * 1.6 : 0), face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
+    out.push({ c, k, X, Y, ground: p.z, z: p.z + (w ? Math.abs(Math.sin(w.d * Math.PI)) * 0.7 : 0), face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
   });
   return out.sort((a, b) => a.X + a.Y - (b.X + b.Y));
 }
 /* the character whose picture is under a screen point, nearest first */
 function charAtScreen(sx, sy) {
   const R = ED.R; if (!R || !ED.M.chars || !ED.M.chars.length) return -1;
-  const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z, half = 16 * SPRITE_PX / 2, views = charViews();
-  for (let i = views.length - 1; i >= 0; i--) { const v = views[i], [px, py] = R.P(v.X, v.Y, v.z); if (wx >= px - half && wx <= px + half && wy >= py - 16 * SPRITE_PX && wy <= py + 3) return v.k; }
+  const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z, half = Math.max(7, 16 * SPRITE_PX / 2 + 2), views = charViews();
+  for (let i = views.length - 1; i >= 0; i--) { const v = views[i], [px, py] = R.P(v.X, v.Y, v.z); if (wx >= px - half && wx <= px + half && wy >= py - 16 * SPRITE_PX - 3 && wy <= py + 5) return v.k; }
   return -1;
 }
 const spriteOf = c => library.get(c.sprite);
 /* draw one character, then the pieces in front of it again so it can stand behind a house */
 function drawChar(g, R, v) {
   const [px, py] = R.P(v.X, v.Y, v.z), s = spriteOf(v.c), key = v.X + v.Y;
-  g.save(); g.fillStyle = 'rgba(0,0,0,0.28)'; g.beginPath(); g.ellipse(px, R.P(v.X, v.Y, v.z + (v.walking ? 1.6 : 0))[1], 6.5, 3.2, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  footShadow(g, px, R.P(v.X, v.Y, v.ground)[1], SPRITE_PX);
   if (s) drawFrame(g, frameCanvas(s, v.face, v.frame), px, py + 1, SPRITE_PX);
   else { g.save(); g.fillStyle = '#b8483a'; g.strokeStyle = '#2b2116'; g.beginPath(); g.arc(px, py - 8, 6, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore(); }
-  const box = [px - 14, py - 16 * SPRITE_PX - 4, px + 14, py + 6];
+  const box = [px - 8, py - 16 * SPRITE_PX - 4, px + 8, py + 4];
   for (const o of R.objs) {
     const [w, d] = footprint(o); if (o.x + w / 2 + o.y + d / 2 <= key) continue;
     const b = pieceBox(R, o); if (b[0] >= box[2] || b[2] <= box[0] || b[1] >= box[3] || b[3] <= box[1]) continue;
@@ -135,6 +136,13 @@ function drawChars(g, R) {
     drawChar(g, R, v);
   }
 }
+/* every tile the selected character can reach, faintly tinted while walking is armed */
+function walkArea() {
+  const M = ED.M, k = ED.sel; if (k < 0 || !M.chars[k]) return null;
+  const key = [k, M.chars[k].x, M.chars[k].y, ED.undo.length, M.objs.length, M.chars.length].join();
+  if (!ED.area || ED.area.key !== key) { const seen = reachable(M, k), tiles = []; for (let u = 0; u < seen.length; u++) if (seen[u]) tiles.push([u % M.S, (u / M.S) | 0]); ED.area = { key, tiles }; }
+  return ED.area.tiles;
+}
 /* the tiles the selected character would walk over to reach the hovered tile, or the reachable area in faint tint */
 function walkPreview() {
   const M = ED.M, k = ED.sel; if (ED.tool !== 'walk' || k < 0 || !M.chars[k] || !ED.hover) return null;
@@ -142,15 +150,6 @@ function walkPreview() {
   if (!ED.preview || ED.preview.key !== key) { const path = findPath(M, k, ED.hover.x, ED.hover.y); ED.preview = { key, path }; }
   return ED.preview.path;
 }
-/* key arrows step the selected character one tile: right = south-east, down = south-west, left = north-west, up = north-east */
-const ARROW_FACE = { ArrowDown: 0, ArrowRight: 1, ArrowUp: 2, ArrowLeft: 3 };
-function stepSelected(viewFace) {
-  const M = ED.M, k = ED.sel, c = M && M.chars && M.chars[k]; if (!c) return false;
-  const f = (viewFace + ED.rot) % 4, [dx, dy] = FACE_DELTA[f], nx = c.x + dx, ny = c.y + dy;
-  if (canStep(M, c.x, c.y, nx, ny, k)) { checkpoint(); doWalk(k, [[nx, ny]]); } else if (c.face !== f) { checkpoint(); c.face = f; changed(); }
-  status(); return true;
-}
-
 /* ---------- view ---------- */
 /* ED.stale is true when the view itself changed (rotation, grid, size) and 'model' after an edit */
 function rebuild() {
@@ -244,17 +243,22 @@ function draw() {
   if (ED.hover && ED.tool === 'character') {
     const { x, y } = ED.hover, ok = isFreeTile(x, y), z = zAt(x, y), [X, Y] = viewPt(x + 0.5, y + 0.5), s = library.get(ED.char);
     outline([[x, y]], ok ? 'rgba(255,240,200,0.9)' : '#b8483a', ok ? 'rgba(255,240,200,0.18)' : 'rgba(184,72,58,0.25)');
-    if (s) { const [px, py] = R.P(X, Y, z); g.globalAlpha = ok ? 0.85 : 0.4; drawFrame(g, frameCanvas(s, FACES[faceIn(ED.face)], 0), px, py + 1, SPRITE_PX); g.globalAlpha = 1; }
+    if (s) { const [px, py] = R.P(X, Y, z); g.globalAlpha = ok ? 0.85 : 0.4; footShadow(g, px, py, SPRITE_PX); drawFrame(g, frameCanvas(s, FACES[faceIn(ED.face)], 0), px, py + 1, SPRITE_PX); g.globalAlpha = 1; }
+  }
+  /* walking: the reachable ground tinted, the route to the hovered tile traced, all beneath the figures */
+  if (ED.tool === 'walk') {
+    const area = walkArea(); if (area) outline(area, 'rgba(228,198,132,0.3)', 'rgba(228,198,132,0.2)');
+    if (ED.hover) {
+      const { x, y } = ED.hover, path = walkPreview(), k = charAt(ED.M, x, y);
+      if (k >= 0) outline([[x, y]], 'rgba(255,240,200,0.9)', 'rgba(255,240,200,0.15)');
+      else if (path && path.length) outline(path, 'rgba(228,198,132,0.9)', 'rgba(228,198,132,0.25)');
+      else outline([[x, y]], ED.sel >= 0 ? '#b8483a' : 'rgba(255,240,200,0.7)', ED.sel >= 0 ? 'rgba(184,72,58,0.22)' : null);
+    }
   }
   if (hasChars) drawChars(g, R);
   if (!ED.hover) { g.restore(); return; }
   const { x, y } = ED.hover;
-  if (ED.tool === 'walk') {
-    const path = walkPreview(), k = ED.sel >= 0 && ED.M.chars[ED.sel] ? charAt(ED.M, x, y) : -1;
-    if (path && path.length) outline(path, 'rgba(228,198,132,0.9)', 'rgba(228,198,132,0.22)');
-    else if (ED.sel >= 0 && k < 0) outline([[x, y]], '#b8483a', 'rgba(184,72,58,0.22)');
-    else outline([[x, y]], 'rgba(255,240,200,0.7)');
-  } else if (ED.tool === 'character') { /* outlined and ghosted above */ }
+  if (ED.tool === 'walk' || ED.tool === 'character') { /* drawn above */ }
   else if (ED.tool === 'place') {
     const o = ghost(), ok = fits(ED.M, o), [w, d] = footprint(o), tiles = [];
     for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) if (x + i < ED.M.S && y + j < ED.M.S) tiles.push([x + i, y + j]);
@@ -280,12 +284,19 @@ function applyAt(p, first) {
   else if (ED.tool === 'level') { if (first) st.level = M.elev[p.y * S + p.x]; setElev(M, brushTiles(p.x, p.y), st.level); changed(); }
   else if (ED.tool === 'fill' && first) { if (floodFill(M, p.x, p.y, ED.terrain)) changed(); }
   else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(); }
-  else if (ED.tool === 'character' && first) { if (ED.char && placeChar(M, { sprite: ED.char, x: p.x, y: p.y, face: ED.face }).ok) { ED.sel = M.chars.length - 1; changed(); } }
-  else if (ED.tool === 'walk' && first) {
+  else if (ED.tool === 'character' && first) {
+    /* clicking a character that is already there picks it up for walking instead of stacking another */
     const k = charAt(M, p.x, p.y);
-    if (k >= 0) { ED.sel = k; req(); }
-    else if (ED.sel >= 0 && M.chars[ED.sel]) { const path = findPath(M, ED.sel, p.x, p.y); if (path && path.length) doWalk(ED.sel, path); else walkNote = path ? '' : 'No way there: the tile is blocked or cut off.'; }
-    else walkNote = 'Click a character first, then a free tile.';
+    if (k >= 0) { ED.sel = k; setTool('walk'); walkNote = 'Selected: click a tile to walk there.'; }
+    else if (ED.char && placeChar(M, { sprite: ED.char, x: p.x, y: p.y, face: ED.face }).ok) { ED.sel = M.chars.length - 1; changed(); }
+  }
+  else if (ED.tool === 'walk' && first) {
+    /* click a character to choose it, then click any tile it can reach */
+    const k = charAt(M, p.x, p.y);
+    if (k >= 0) { ED.sel = k; walkNote = 'Selected: click a tile to walk there.'; req(); return; }
+    if (ED.sel < 0 && M.chars.length === 1) ED.sel = 0;
+    if (ED.sel >= 0 && M.chars[ED.sel]) { const path = findPath(M, ED.sel, p.x, p.y); if (path && path.length) doWalk(ED.sel, path); else walkNote = `No way to ${p.x}, ${p.y}: ${blockedBy(M, p.x, p.y, ED.sel) || 'cut off from here'}.`; }
+    else walkNote = M.chars.length ? 'Click a character, then click a tile to walk there.' : 'Place a character first (Characters tab).';
   }
   else if (ED.tool === 'erase') { if (eraseCharAt(M, p.x, p.y)) { changed(); } else if (eraseAt(M, p.x, p.y)) changed(); }
   else if (ED.tool === 'pick' && first) { const ck = charAt(M, p.x, p.y), k = objAt(M, p.x, p.y); if (ck >= 0) { ED.char = M.chars[ck].sprite; ED.face = M.chars[ck].face; ED.sel = ck; setTab('Characters'); setTool('character'); } else if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); } else { ED.terrain = TERRAIN[M.terr[p.y * S + p.x]].id; setTab('Terrain'); setTool('paint'); } syncPalette(); }
@@ -391,7 +402,6 @@ root.addEventListener('keydown', e => {
   else if (k === '+' || k === '=') zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.3);
   else if (k === '-' || k === '_') zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.3);
   else if (k >= '1' && k <= '3') { ED.brush = +k; syncBrush(); }
-  else if (k in ARROW_FACE) { if (!stepSelected(ARROW_FACE[k])) return; }
   else if (k === 'Escape') { if (ED.sel >= 0) { ED.sel = -1; req(); } else closeEditor(); }
   else { const t = TOOLS.find(t2 => t2[2].toLowerCase() === k.toLowerCase()); if (!t) return; setTool(t[0]); }
   e.preventDefault();

@@ -149,6 +149,7 @@
       <div class="ed-row sp-gap">
         <button class="chip" id="spSym" aria-pressed="false" title="Draw each pixel on both sides of the middle">Symmetry</button>
         <button class="chip" id="spOnion" aria-pressed="true" title="Show the other frame faintly">Ghost</button>
+        <button class="chip" id="spInked" aria-pressed="false" title="Show the frame inked and shaded as it is drawn on the map">Inked</button>
       </div>
       <div class="ed-row">
         <button class="chip" id="spMirror" title="Copy this facing, flipped, to its opposite side">Mirror to other side</button>
@@ -162,8 +163,8 @@
       </div>
       <div class="ed-row"><span class="ed-lbl">colour</span><input type="color" id="spColor" aria-label="Edit the selected colour"><button class="chip" id="spAddColor">+ New colour</button></div>
       <div class="sp-swatches" id="spSwatches"></div>
-      <div class="ed-row"><span class="ed-lbl">walking</span></div>
-      <canvas id="spPreview" class="sp-preview" width="256" height="64" aria-label="Animated preview of all four facings"></canvas>
+      <div class="ed-row"><span class="ed-lbl">on the map</span></div>
+      <canvas id="spPreview" class="sp-preview" width="600" height="190" aria-label="Animated preview of all four facings"></canvas>
     </aside>
   </div>
 </div>

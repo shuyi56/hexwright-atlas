@@ -18,21 +18,28 @@ district** opens just the selected district. The map is autosaved in the browser
 
 ### Characters
 
-The **Characters** tab lists your sprite library (three starters ship with it). **Draw new character…**
-opens the **character editor**: a 16×16 pixel canvas with pencil, eraser, fill and pick, a symmetry
-mode, a ghost of the other frame, shift/flip/clear, a colour list you can recolour, and an animated
-preview. Each character has four facings (front/back, left/right) with a standing and a stride frame;
-**Mirror to other side** copies a facing flipped. Every stroke saves to the library at once, and sprites can
-be exported and imported as `.character.json`.
+The **Characters** tab lists your character library; six starters (villager, farmer, guard, merchant, monk,
+healer) come with it. **Draw new character…** opens the **character editor**: a 16×16 pixel canvas with
+pencil, eraser, fill and pick, a symmetry mode, a ghost of the other frame, shift/flip/clear, and a colour
+list that starts from the tile set's own palette. Each character has four facings (front/back,
+left/right), each with a standing frame and a stride frame. **Mirror to other side** copies a facing,
+flipped. Every stroke saves to the library at once, and characters can be exported and imported as
+`.character.json`.
 
-Pick a sprite and use **Person** (`C`) to stand it on any free tile (`R` turns it). With **Walk** (`W`),
-click a character, then click a tile: it walks the shortest route over free tiles, and the route is
-previewed as you hover. Arrow keys step the selected character one tile (right = south-east, down =
-south-west, left = north-west, up = north-east). A tile is free when it is dry, not lava, and holds neither
-a piece nor another character; a step may climb or drop one height level at most. Characters walk behind
-and in front of buildings correctly, are saved inside the map JSON together with their sprites, and are on
-the same undo stack as every other edit. The automation API has `listSprites`, `listCharacters`,
-`placeCharacter`, `walkCharacter` and `removeCharacter`.
+On the map, sprites are not shown as raw pixels. Each frame is smoothed (three Scale2x passes), outlined in
+the same ink as the tiles, given ink lines where colours meet, lit from the left and shaded on the right like
+the pieces, and grained like the paper. A figure stands a little taller than a cottage door. **Inked** in the
+character editor and the **On the map** preview, which shows each facing on a grass block, display that
+finished look while you draw.
+
+Movement is by clicking. Pick a sprite and click a free tile with **Person** (`C`) to stand it there (`R`
+turns it). With **Walk** (`W`), click a character, then click a tile. The ground it can reach is tinted, the
+route to the tile under the pointer is traced, and it walks the shortest way there. Clicking a character with
+Person also picks it up for walking. A tile is free when it is dry, not lava, and holds neither a piece nor
+another character; a step may climb or drop one height level at most. Characters walk behind and in front of
+buildings correctly, are saved inside the map JSON together with their sprites, and are on the same undo
+stack as every other edit. The automation API has `listSprites`, `listCharacters`, `placeCharacter`,
+`walkCharacter` and `removeCharacter`.
 
 ## Automation API and MCP server
 
