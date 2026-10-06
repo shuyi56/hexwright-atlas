@@ -29,13 +29,18 @@ function renderTiles(M, rot, SC, opts = {}) {
   const g = can.getContext('2d'); g.setTransform(SC, 0, 0, SC, 0, 0); g.lineJoin = 'round'; g.lineCap = 'round';
   const poly = (pts, fill, lw) => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]); g.closePath(); if (fill) { g.fillStyle = fill; g.fill(); } if (lw) { g.strokeStyle = INK; g.lineWidth = lw; g.stroke(); } };
 
-  /* diorama slab under the map */
+  /* diorama slab and ground tiles depend only on terrain and height, never on pieces, so edits that
+     only move pieces hand the finished layer back in as opts.base and skip all of it */
+  let base = opts.base;
+  if (base) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(base, 0, 0); g.restore(); }
+  else {
   const zb = -6 - BASE;
   poly([P(0, S, -6), P(S, S, -6), P(S, S, zb), P(0, S, zb)], '#8c6d4b', 1);
   poly([P(S, 0, -6), P(S, S, -6), P(S, S, zb), P(S, 0, zb)], '#6f553a', 1);
   g.strokeStyle = 'rgba(43,33,22,0.28)'; g.lineWidth = 0.8; g.beginPath();
   for (const k of [9, 17]) { const a = P(0, S, -6 - k), b = P(S, S, -6 - k), c = P(S, 0, -6 - k); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); }
   g.stroke();
+  }
 
   /* asset instances in view space; tiles under a footprint are never repainted over it */
   const objs = M.objs.map((o, k) => Object.assign(rotInst(o, rot, S), { k }));
@@ -67,7 +72,10 @@ function renderTiles(M, rot, SC, opts = {}) {
   }
   function strata(p, q, h) { g.strokeStyle = 'rgba(43,33,22,0.3)'; g.lineWidth = 0.5; g.beginPath(); for (let k = EL; k < h; k += EL) { g.moveTo(p[0], p[1] + k); g.lineTo(q[0], q[1] + k); } g.stroke(); }
 
-  for (let s2 = 0; s2 <= 2 * S - 2; s2++) for (let X = Math.max(0, s2 - S + 1); X <= Math.min(S - 1, s2); X++) drawTile((s2 - X) * S + X);
+  if (!base) {
+    for (let s2 = 0; s2 <= 2 * S - 2; s2++) for (let X = Math.max(0, s2 - S + 1); X <= Math.min(S - 1, s2); X++) drawTile((s2 - X) * S + X);
+    base = document.createElement('canvas'); base.width = can.width; base.height = can.height; base.getContext('2d').drawImage(can, 0, 0);
+  }
 
   /* soft shadows composited once */
   if (objs.length) {
@@ -101,7 +109,7 @@ function renderTiles(M, rot, SC, opts = {}) {
     gx.putImageData(gi, 0, 0);
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = g.createPattern(gr, 'repeat'); g.fillRect(0, 0, can.width, can.height); g.restore();
   }
-  return { can, W, H, OX, OY, P, zOf, rti, back, S, rot, objs };
+  return { can, base, W, H, OX, OY, P, zOf, rti, back, S, rot, objs };
 }
 
 /* small square preview of one terrain or asset for the palette */
