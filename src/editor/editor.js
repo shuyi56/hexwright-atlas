@@ -1,7 +1,8 @@
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
-import { MAX_ELEV, TI, blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
+import { MAX_ELEV, blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
+import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, setElev, shiftElev } from './ops.js';
 import { EL, THH, TWH, renderTiles, rotInst, thumb } from './render.js';
 
 /* ================= tile editor screen ================= */
@@ -34,6 +35,28 @@ function setModel(M, keepView) {
 }
 function changed() { ED.stale = true; autosave(); req(); }
 
+/* ---------- programmatic edits (used by the automation API) ---------- */
+function ensureModel() { if (!ED.M) { ED.M = restore() || generateScene('ember', 28, 'vale'); ED.stale = true; } return ED.M; }
+/* run fn(M) as one undoable edit; fn returns { changed } (a count) and anything else is passed through.
+   If fn throws, the map is put back as it was. */
+function mutate(fn) {
+  ensureModel(); const snap = cloneModel(ED.M); let r;
+  try { r = fn(ED.M); } catch (err) { Object.assign(ED.M, snap); throw err; }
+  if (r && r.changed) { ED.undo.push(snap); if (ED.undo.length > HIST) ED.undo.shift(); ED.redo.length = 0; syncHist(); changed(); status(); }
+  return r;
+}
+/* swap in a whole new map as one undoable step */
+function replaceModel(M) { ensureModel(); checkpoint(); setModel(M); }
+/* drag the current tool through a path of model tiles, as pointer events would */
+function runStroke(path) {
+  ensureModel(); checkpoint(); ED.stroke = { seen: new Set() }; const keep = ED.hover;
+  try { path.forEach((p, i) => { ED.hover = { x: p[0], y: p[1] }; applyAt(ED.hover, i === 0); }); } finally { ED.hover = keep; endStroke(); status(); }
+}
+function setRot(r) {
+  if (!ED.open || !ED.R) { ED.rot = r; ED.stale = true; return; }
+  for (let n = ((r - ED.rot) % 4 + 4) % 4; n > 0; n--) turnView(1);
+}
+
 /* ---------- view ---------- */
 function rebuild() { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid }); ED.stale = false; }
 function size() { const r = stage.getBoundingClientRect(); if (!r.width) return; ED.cw = r.width; ED.ch = r.height; cv.width = Math.round(r.width * state.dpr); cv.height = Math.round(r.height * state.dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; req(); }
@@ -54,7 +77,7 @@ function pick(sx, sy) {
   }
   return null;
 }
-const brushTiles = (x, y) => { const out = [], n = ED.brush, o = Math.floor((n - 1) / 2), S = ED.M.S; for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const xx = x - o + i, yy = y - o + j; if (xx >= 0 && yy >= 0 && xx < S && yy < S) out.push([xx, yy]); } return out; };
+const brushTiles = (x, y) => brushAt(ED.M, x, y, ED.brush);
 const ghost = () => ED.hover && { id: ED.asset, x: ED.hover.x, y: ED.hover.y, face: ED.face, v: 0.37 };
 
 function draw() {
@@ -90,17 +113,12 @@ function draw() {
 function applyAt(p, first) {
   const M = ED.M, S = M.S, st = ED.stroke;
   const key = p.x + ',' + p.y; if (!first && st.seen.has(key) && ED.tool !== 'paint') return; st.seen.add(key);
-  if (ED.tool === 'paint') { let any = false; for (const [x, y] of brushTiles(p.x, p.y)) { const u = y * S + x; if (M.terr[u] !== TI[ED.terrain]) { M.terr[u] = TI[ED.terrain]; any = true; } } if (any) changed(); }
-  else if (ED.tool === 'raise' || ED.tool === 'lower') { const dz = ED.tool === 'raise' ? 1 : -1; for (const [x, y] of brushTiles(p.x, p.y)) { const u = y * S + x, k = x + ',' + y + '#'; if (st.seen.has(k)) continue; st.seen.add(k); M.elev[u] = Math.max(0, Math.min(MAX_ELEV, M.elev[u] + dz)); } changed(); }
-  else if (ED.tool === 'level') { if (first) st.level = M.elev[p.y * S + p.x]; for (const [x, y] of brushTiles(p.x, p.y)) M.elev[y * S + x] = st.level; changed(); }
-  else if (ED.tool === 'fill' && first) {
-    const t0 = M.terr[p.y * S + p.x], tn = TI[ED.terrain]; if (t0 === tn) return;
-    const q = [p.y * S + p.x], seen = new Uint8Array(S * S); seen[q[0]] = 1;
-    while (q.length) { const u = q.pop(); M.terr[u] = tn; const x = u % S, y = (u / S) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy, v = yy * S + xx; if (xx < 0 || yy < 0 || xx >= S || yy >= S || seen[v] || M.terr[v] !== t0) continue; seen[v] = 1; q.push(v); } }
-    changed();
-  }
-  else if (ED.tool === 'place') { const o = ghost(); o.v = Math.random(); if (fits(M, o)) { M.objs.push(o); changed(); } }
-  else if (ED.tool === 'erase') { const k = objAt(M, p.x, p.y); if (k >= 0) { M.objs.splice(k, 1); changed(); } }
+  if (ED.tool === 'paint') { if (paintTiles(M, brushTiles(p.x, p.y), ED.terrain)) changed(); }
+  else if (ED.tool === 'raise' || ED.tool === 'lower') { const fresh = brushTiles(p.x, p.y).filter(([x, y]) => { const k = x + ',' + y + '#'; if (st.seen.has(k)) return false; st.seen.add(k); return true; }); shiftElev(M, fresh, ED.tool === 'raise' ? 1 : -1); changed(); }
+  else if (ED.tool === 'level') { if (first) st.level = M.elev[p.y * S + p.x]; setElev(M, brushTiles(p.x, p.y), st.level); changed(); }
+  else if (ED.tool === 'fill' && first) { if (floodFill(M, p.x, p.y, ED.terrain)) changed(); }
+  else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(); }
+  else if (ED.tool === 'erase') { if (eraseAt(M, p.x, p.y)) changed(); }
   else if (ED.tool === 'pick' && first) { const k = objAt(M, p.x, p.y); if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); } else { ED.terrain = TERRAIN[M.terr[p.y * S + p.x]].id; setTab('Terrain'); setTool('paint'); } syncPalette(); }
 }
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }
@@ -209,7 +227,7 @@ function buildChrome() {
 }
 
 function openEditor(M) {
-  if (!ED.M) ED.M = restore() || generateScene('ember', 28, 'vale');
+  ensureModel();
   root.hidden = false; ED.open = true; ED.rot = 0;
   if (M) { if (ED.M) checkpoint(); ED.M = M; autosave(); }
   $('edName').value = ED.M.name; $('edSize').value = [16, 24, 28, 32, 48, 60].includes(ED.M.S) ? String(ED.M.S) : '32';
@@ -222,4 +240,4 @@ function closeEditor() { if (!ED.open) return; ED.open = false; root.hidden = tr
 buildChrome();
 $('openEditor').addEventListener('click', () => openEditor());
 
-export { ED, closeEditor, openEditor };
+export { ED, applyAt, closeEditor, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, syncPalette, toView, undo, zoomAt };
