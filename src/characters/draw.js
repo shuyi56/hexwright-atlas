@@ -7,9 +7,8 @@ import { SIZE } from './sprite.js';
    colours on paper, so every sprite colour is washed a little toward the paper tone and faintly grained
    like the map image. The one-pixel outline is the tiles' ink softened by the colour it borders, and the
    light from the left comes in gentle pixel steps (a highlight band on the lit side, a shade band on the
-   far side). On the map a character is treated exactly like the tiles: its frame is rendered once at the
-   map image's own resolution and that image is scaled with the map, so its colours, line weight and
-   softness are the same at every zoom (see drawSprite). */
+   far side). On the map every zoom draws from one master per frame (see drawSprite), so the character
+   looks the same zoomed out or in: no zoom-dependent versions, and no blurring of pixel art. */
 const PAD = 1, UP = 1, N = SIZE + PAD * 2;
 const INK_RGB = hexRgb(INK), PAPER = [240, 230, 203];
 const lum = rgb => rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11, dark = rgb => lum(rgb) < 60;
@@ -49,8 +48,48 @@ function paintLabels(pal, L, n) {
   }
   g.putImageData(im, 0, 0); return c;
 }
-/* the finished pixel-art frame, one canvas pixel per sprite pixel */
+/* the finished pixel-art frame, one canvas pixel per sprite pixel (the character editor's Shaded view) */
 function pixelFrame(pal, fr) { return paintLabels(pal, labels(fr), N); }
+
+/* Scale2x on labels: doubles the image, rounding corners and staircases where two sides agree */
+function scale2x(src, n) {
+  const m = n * 2, out = new Int32Array(m * m), at = (x, y) => (x < 0 || y < 0 || x >= n || y >= n ? 0 : src[y * n + x]);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const P = src[y * n + x], A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1), o = 2 * y * m + 2 * x;
+    out[o] = C === A && C !== D && A !== B ? A : P; out[o + 1] = A === B && A !== C && B !== D ? B : P;
+    out[o + m] = D === C && D !== B && C !== A ? C : P; out[o + m + 1] = B === D && B !== A && D !== C ? D : P;
+  }
+  return out;
+}
+/* keep only the part of the outline within r fine pixels of the figure */
+function thinOutline(L, n, r) {
+  const R = Math.ceil(r), drop = [];
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const u = y * n + x; if (L[u] < OUTLINE) continue;
+    let near = false;
+    for (let j = -R; j <= R && !near; j++) for (let i = -R; i <= R; i++) {
+      const xx = x + i, yy = y + j; if (xx < 0 || yy < 0 || xx >= n || yy >= n || i * i + j * j > r * r) continue;
+      const l = L[yy * n + xx]; if (l && l < OUTLINE) { near = true; break; }
+    }
+    if (!near) drop.push(u);
+  }
+  for (const u of drop) L[u] = 0;
+}
+/* The master: 8x, its staircases rounded by three Scale2x passes, the outline trimmed to a bit over half a
+   sprite pixel (the weight a one-pixel outline has once filtered at map scale). Then a mip chain, each level
+   half the last, so drawing never shrinks an image by more than half and nothing aliases or blurs. */
+const MASTER = 8;
+function mipChain(pal, fr) {
+  let L = labels(fr), n = N; for (let k = 1; k < MASTER; k *= 2) { L = scale2x(L, n); n *= 2; }
+  thinOutline(L, n, 4.6);
+  const levels = [{ up: MASTER, can: paintLabels(pal, L, n) }];
+  for (let up = MASTER / 2; up >= 0.25; up /= 2) {
+    const prev = levels[levels.length - 1].can, c = document.createElement('canvas'); c.width = c.height = Math.max(1, Math.round(N * up));
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(prev, 0, 0, c.width, c.height);
+    levels.push({ up, can: c });
+  }
+  return levels;
+}
 
 /* the flat pixels of one frame as a SIZE×SIZE canvas, for the pixel grid */
 function renderFrame(s, face, k) {
@@ -66,26 +105,20 @@ function frameCanvas(s, face, k) {
   let c = cache.get(key); if (!c) { if (cache.size > 300) cache.clear(); c = pixelFrame(s.pal, fr); cache.set(key, c); }
   return c;
 }
-/* The frame as the map image would hold it: res canvas pixels per sprite pixel (the map's SC times the sprite
-   pixel size; below one, so the pixel art is filtered down the way the tiles' fine lines are). */
-const LOOK_RES = 0.84, looks = new Map();
-function lookCanvas(s, face, k, res = LOOK_RES) {
-  const base = frameCanvas(s, face, k), key = res + '|' + s.pal.join() + '|' + String.fromCharCode(...s.frames[face][k]);
-  let c = looks.get(key);
-  if (!c) {
-    if (looks.size > 300) looks.clear();
-    c = document.createElement('canvas'); c.width = c.height = Math.max(1, Math.round(N * res));
-    const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(base, 0, 0, c.width, c.height);
-    looks.set(key, c);
-  }
-  return c;
+const mips = new Map();
+function mipFor(s, face, k) {
+  const key = s.pal.join() + '|' + String.fromCharCode(...s.frames[face][k]); let m = mips.get(key);
+  if (!m) { if (mips.size > 200) mips.clear(); m = mipChain(s.pal, s.frames[face][k]); mips.set(key, m); }
+  return m;
 }
-/* Draw a frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units and res
-   the map image's pixels per sprite pixel. Always the same image, always smoothed, exactly as the map canvas
-   is drawn to the screen: zoomed out or in, the character keeps the tiles' colours, line weight and softness. */
-function drawSprite(g, s, face, k, x, y, px, res = LOOK_RES) {
+/* Draw a frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units. The level
+   used is the smallest one with at least as many pixels as the screen will show, drawn smoothed, so every zoom
+   shows the same picture at the sharpness the screen allows. */
+function drawSprite(g, s, face, k, x, y, px) {
+  const m = g.getTransform(), screen = Math.hypot(m.a, m.b) * px, levels = mipFor(s, face, k);
+  let lv = levels[0]; for (const l of levels) if (l.up >= screen) lv = l;
   g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-  g.drawImage(lookCanvas(s, face, k, res), x - N / 2 * px, y - (PAD + SIZE) * px, N * px, N * px); g.restore();
+  g.drawImage(lv.can, x - N / 2 * px, y - (PAD + SIZE) * px, N * px, N * px); g.restore();
 }
 /* soft ground shadow under a figure, leaning the way the pieces' shadows lean */
 function footShadow(g, x, y, px) {
