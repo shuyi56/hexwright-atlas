@@ -33,7 +33,8 @@ function setModel(M, keepView) {
   if (resize || !keepView) { rebuild(); fitView(); } else changed();
   status();
 }
-function changed() { ED.stale = true; autosave(); req(); }
+/* piecesOnly: terrain and heights are untouched, so the cached ground layer can be reused */
+function changed(piecesOnly) { if (!piecesOnly || !ED.R) ED.stale = true; else if (!ED.stale) ED.stale = 'pieces'; autosave(); req(); }
 
 /* ---------- programmatic edits (used by the automation API) ---------- */
 function ensureModel() { if (!ED.M) { ED.M = restore() || generateScene('ember', 28, 'vale'); ED.stale = true; } return ED.M; }
@@ -58,7 +59,7 @@ function setRot(r) {
 }
 
 /* ---------- view ---------- */
-function rebuild() { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid }); ED.stale = false; }
+function rebuild() { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid, base: ED.stale === 'pieces' && ED.R ? ED.R.base : null }); ED.stale = false; }
 function size() { const r = stage.getBoundingClientRect(); if (!r.width) return; ED.cw = r.width; ED.ch = r.height; cv.width = Math.round(r.width * state.dpr); cv.height = Math.round(r.height * state.dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; req(); }
 function fitView() { if (!ED.R) return; ED.fitZ = Math.min(ED.cw / ED.R.W, ED.ch / ED.R.H) * 0.96; ED.z = ED.fitZ; ED.ox = (ED.cw - ED.R.W * ED.z) / 2; ED.oy = (ED.ch - ED.R.H * ED.z) / 2; req(); }
 const clampZ = v => Math.max(ED.fitZ * 0.5, Math.min(Math.max(ED.fitZ * 8, 4), v));
@@ -117,8 +118,8 @@ function applyAt(p, first) {
   else if (ED.tool === 'raise' || ED.tool === 'lower') { const fresh = brushTiles(p.x, p.y).filter(([x, y]) => { const k = x + ',' + y + '#'; if (st.seen.has(k)) return false; st.seen.add(k); return true; }); shiftElev(M, fresh, ED.tool === 'raise' ? 1 : -1); changed(); }
   else if (ED.tool === 'level') { if (first) st.level = M.elev[p.y * S + p.x]; setElev(M, brushTiles(p.x, p.y), st.level); changed(); }
   else if (ED.tool === 'fill' && first) { if (floodFill(M, p.x, p.y, ED.terrain)) changed(); }
-  else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(); }
-  else if (ED.tool === 'erase') { if (eraseAt(M, p.x, p.y)) changed(); }
+  else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(true); }
+  else if (ED.tool === 'erase') { if (eraseAt(M, p.x, p.y)) changed(true); }
   else if (ED.tool === 'pick' && first) { const k = objAt(M, p.x, p.y); if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); } else { ED.terrain = TERRAIN[M.terr[p.y * S + p.x]].id; setTab('Terrain'); setTool('paint'); } syncPalette(); }
 }
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }
@@ -179,7 +180,7 @@ function turnView(dir) {
   const wx = (ED.cw / 2 - ED.ox) / ED.z, wy = (ED.ch / 2 - ED.oy) / ED.z, S = R.S;
   const gx = ((wx - R.OX) / TWH + (wy - R.OY) / THH) / 2, gy = ((wy - R.OY) / THH - (wx - R.OX) / TWH) / 2;
   const back = [[gx, gy], [gy, S - gx], [S - gx, S - gy], [S - gy, gx]][ED.rot], nr = (ED.rot + dir + 4) % 4, [nx, ny] = [[back[0], back[1]], [S - back[1], back[0]], [S - back[0], S - back[1]], [back[1], S - back[0]]][nr];
-  ED.rot = nr; rebuild();
+  ED.rot = nr; ED.stale = true; rebuild();
   const sx = ED.R.OX + (nx - ny) * TWH, sy = ED.R.OY + (nx + ny) * THH; ED.ox = ED.cw / 2 - sx * ED.z; ED.oy = ED.ch / 2 - sy * ED.z; req();
 }
 function turnPiece() { ED.face = (ED.face + 1) % 4; syncPalette(); req(); }
