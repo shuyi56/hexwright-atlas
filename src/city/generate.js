@@ -4,9 +4,10 @@ import { buildCathedral, buildMonastery, cathedralDims, makeBuilder, monasteryDi
 import { ADJ2, makeNamer } from '../core/names.js';
 import { BIOME } from '../world/data.js';
 import { ROOFS, climate, hexRgb, lerp } from '../render/palette.js';
+import { footprint } from '../tiles/index.js';
 
 /* ================= city districts: generation ================= */
-const CT = { GRASS: 0, SEA: 1, RIVER: 2, SAND: 3, FIELD: 4, FOREST: 5, STREET: 6, PLAZA: 7, DOCK: 8, GARDEN: 9, YARD: 10, GRAVE: 11, BRIDGE: 12, ROAD: 13 };
+const CT = { GRASS: 0, SEA: 1, RIVER: 2, SAND: 3, FIELD: 4, FOREST: 5, STREET: 6, PLAZA: 7, DOCK: 8, GARDEN: 9, YARD: 10, GRAVE: 11, BRIDGE: 12, ROAD: 13, MEADOW: 14, MARSH: 15, SCREE: 16, SNOW: 17, HEATH: 18 };
 const TWH = 16, THH = 8, FH = 9, EL = 8, YARDS_PER_TILE = 25;
 const SLATE = ['#6d7a86', '#4d5862'], COPPER = ['#6f9a8c', '#4f7a6c'], TERRA = ['#b8643f', '#8a4529'], BROWN = ['#8a6a4a', '#664c33'], WEATHER = ['#7d7468', '#5c544a'];
 const DTYPE = {
@@ -620,6 +621,17 @@ function generateCity(map, s) {
   const tb = objs.filter(o => o.type === 'bldg' && o.district != null && ['market', 'oldtown', 'harbour', 'artisans', 'merchants', 'slums'].includes(districts[o.district].type) && o.h >= 2 * FH);
   for (let j = 0; j < Math.min(cap ? 5 : 4, tb.length); j++) { const b = tb[Math.floor(rng() * tb.length)]; if (b.tavern) continue; b.tavern = tnames.pop(); b.sign = true; taverns.push(b); landmark(b.tavern, b.x + b.w / 2, b.y + b.d / 2, 'tavern', b.district, { z: b.z0 }); }
 
+  /* wilder ground outside the walls: wet meadows by the water, flowers in the vale, heath and scree on the hills, snow in the north */
+  for (let t = 0; t < NN; t++) {
+    if (T[t] !== CT.GRASS || inside[t] || occ[t]) continue;
+    const x = t % S, y = (t / S) | 0, n1 = nz(x / 4.5 + 51, y / 4.5 - 17), n2 = nz2(x / 5 - 23, y / 5 + 61);
+    let wetNear = false; for (let dy = -2; dy <= 2 && !wetNear; dy++) for (let dx = -2; dx <= 2; dx++) if (inb(x + dx, y + dy) && isWater(id(x + dx, y + dy)) && (T[id(x + dx, y + dy)] !== CT.SEA || isLake)) { wetNear = true; break; }
+    if (clim === 'cold' && (elev[t] >= 1 || n1 > 0.2)) T[t] = CT.SNOW;
+    else if (elev[t] >= 2 && n1 > -0.1) T[t] = CT.SCREE;
+    else if (elev[t] >= 1 && clim !== 'arid' && n2 > 0.15) T[t] = CT.HEATH;
+    else if (!elev[t] && clim !== 'arid' && (wetNear || (river && n1 > 0.55)) && n2 > -0.25) T[t] = CT.MARSH;
+    else if (!elev[t] && clim === 'temperate' && n2 > 0.32) T[t] = CT.MEADOW;
+  }
   /* trees outside */
   for (let t = 0; t < NN; t++) {
     const x = t % S, y = (t / S) | 0;
@@ -640,6 +652,54 @@ function generateCity(map, s) {
       if (edgeR && rng() < 0.16) tree(x + 0.95, y + 0.2 + rng() * 0.6, 9 + rng() * 3, rng() < 0.35 ? 'bush' : treeSp('open', x, y));
       else if (edgeD && rng() < 0.16) tree(x + 0.2 + rng() * 0.6, y + 0.95, 9 + rng() * 3, rng() < 0.35 ? 'bush' : treeSp('open', x, y));
     }
+  }
+  /* catalogue pieces from the shared tile set: farm clutter, roadside carts, quay cargo, hilltop stones */
+  {
+    const treeT = new Set(); for (const o of objs) if (o.type === 'tree') treeT.add(id(Math.floor(o.x), Math.floor(o.y)));
+    const okT = new Set([CT.GRASS, CT.MEADOW, CT.HEATH, CT.SCREE, CT.SNOW, CT.SAND, CT.FIELD, CT.MARSH]);
+    const piece = (pid, x, y, face = Math.floor(rng() * 4), opt = {}) => {
+      const o = { type: 'asset', id: pid, x, y, face, v: rng() }, [w, d] = footprint(o);
+      if (!inb(x, y) || !inb(x + w - 1, y + d - 1)) return null;
+      const e = elev[id(x, y)];
+      for (let yy = y; yy < y + d; yy++) for (let xx = x; xx < x + w; xx++) { const t = id(xx, yy); if (occ[t] || treeT.has(t) || isWater(t) || elev[t] !== e || !(opt.on ? opt.on.has(T[t]) : okT.has(T[t]))) return null; }
+      for (let yy = y; yy < y + d; yy++) for (let xx = x; xx < x + w; xx++) occ[id(xx, yy)] = 1;
+      o.z0 = T[id(x, y)] === CT.DOCK ? -1 : e * EL; objs.push(o); return o;
+    };
+    const nextTo = (x, y, ty) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(x + dx, y + dy) && T[id(x + dx, y + dy)] === ty);
+    const roadFace = (x, y) => inb(x, y + 1) && streetish(id(x, y + 1)) ? 0 : inb(x + 1, y) && streetish(id(x + 1, y)) ? 1 : inb(x, y - 1) && streetish(id(x, y - 1)) ? 2 : 3;
+    let barns = 0, roadside = 0, hill = 0;
+    for (const t of order) {
+      const x = t % S, y = (t / S) | 0, ty = T[t]; if (occ[t] || treeT.has(t)) continue;
+      if (ty === CT.FIELD) { const r = rng(); if (r < 0.018) piece(clim === 'arid' ? 'haybales' : 'haystack', x, y); else if (r < 0.024) piece('scarecrow', x, y); continue; }
+      if (ty === CT.MARSH) { if (rng() < 0.3) piece('reeds', x, y, 0, { on: new Set([CT.MARSH]) }); continue; }
+      if (inside[t]) continue;
+      const byRoad = nextTo(x, y, CT.ROAD), byField = nextTo(x, y, CT.FIELD);
+      if (byField && byRoad && barns < (cap ? 4 : 3) && rng() < 0.3) { const f = roadFace(x, y), pid = rng() < 0.6 ? 'barn' : 'granary'; if (piece(pid, x, y, f) || piece(pid, x - 1, y, f) || piece(pid, x, y - 1, f)) { barns++; continue; } }
+      if (byRoad && roadside < (cap ? 14 : 10) && rng() < 0.06) { if (piece(clim === 'arid' ? pick(['cart', 'barrels', 'signpost', 'haybales']) : pick(['cart', 'logpile', 'signpost', 'barrels', 'haybales', 'lamppost']), x, y, roadFace(x, y))) roadside++; continue; }
+      if (elev[t] >= 1 && hill < 8 && rng() < 0.05) { if (piece(pick(['boulders', 'boulders', 'stump', clim === 'cold' ? 'boulders' : 'logpile']), x, y)) hill++; continue; }
+      if (clim === 'arid' && (ty === CT.SAND || ty === CT.GRASS) && rng() < 0.012) piece(nextTo(x, y, CT.SEA) || nextTo(x, y, CT.RIVER) ? 'palm' : 'cactus', x, y);
+      else if (ty === CT.MEADOW && rng() < 0.05) piece(rng() < 0.6 ? 'flowers' : 'beehives', x, y);
+    }
+    /* cargo on the quays and clutter in back yards */
+    for (let t = 0; t < NN; t++) {
+      const x = t % S, y = (t / S) | 0;
+      if (T[t] === CT.DOCK && !occ[t] && rng() < 0.08 && !nextTo(x, y, CT.STREET)) piece(pick(['crates', 'barrels', 'crates']), x, y, 0, { on: new Set([CT.DOCK]) });
+      else if (T[t] === CT.YARD && !treeT.has(t) && rng() < 0.22) { occ[t] = 0; piece(pick(['barrels', 'crates', 'logpile', 'cart', 'well']), x, y, 0, { on: new Set([CT.YARD]) }) || (occ[t] = 1); }
+      else if (T[t] === CT.GARDEN && !treeT.has(t) && rng() < 0.12) { occ[t] = 0; piece(pick(['beehives', 'statue', 'flowers']), x, y, 0, { on: new Set([CT.GARDEN]) }) || (occ[t] = 1); }
+    }
+    /* one ring of standing stones and a lonely watchtower out in the country */
+    const wild = (pid, minR, name, kind) => {
+      for (let j = 0; j < 400; j++) {
+        const t = Math.floor(rng() * NN), x = t % S, y = (t / S) | 0;
+        if (Math.hypot(x - gcx, y - gcy) < minR || x < 2 || y < 2 || x > S - 4 || y > S - 4) continue;
+        const o = piece(pid, x, y); if (o) { const [w, d] = footprint(o); if (name) landmark(name, x + w / 2, y + d / 2, kind, null, { z: o.z0 }); return o; }
+      }
+      return null;
+    };
+    if (!abbey) {
+      if (rng() < 0.75) wild('stones', rW + 6, nm.uniq([() => `The ${pick(ADJ2)} Stones`, () => `${raw()}'s Ring`]), 'stones');
+      if (hillDirs.length || rng() < 0.4) wild('watchtower', rW + 7, nm.uniq([() => `${P()} Watch`, () => `The ${pick(ADJ2)} Lookout`]), 'watch');
+    } else if (rng() < 0.6) wild('stones', rW + 5, nm.uniq([() => `The ${pick(ADJ2)} Stones`]), 'stones');
   }
   /* tallies and text */
   let insideCount = 0;

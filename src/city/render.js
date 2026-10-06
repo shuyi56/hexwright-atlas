@@ -4,10 +4,12 @@ import { drawShip } from '../render/sea.js';
 import { banner, drawSettlement } from '../render/settlements.js';
 import { CT, EL, FH, SLATE, THH, TWH } from './generate.js';
 import { GOLD, INK, ROOFS, TREE, WAX, hexRgb, lerp, rgbStr } from '../render/palette.js';
+import { ASSET_BY_ID, TERRAIN_BY_ID, decorateTerrain, drawAsset, footprint, turnAsset } from '../tiles/index.js';
 import { branchFork, drawPine, foliage, leafPal, makeBlob, mixHex, trunkStroke } from '../render/trees.js';
 
 /* ================= city districts: 2.5D rendering ================= */
 function rotObj(o, rot, S) {
+  if (o.type === 'asset') return turnAsset(o, rot, S);
   const rp = (x, y) => rot === 0 ? [x, y] : rot === 1 ? [S - y, x] : rot === 2 ? [S - x, S - y] : [y, S - x];
   if (o.type === 'bldg' || o.type === 'bridge') { const [ax, ay] = rp(o.x, o.y), [bx, by] = rp(o.x + o.w, o.y + o.d); return Object.assign({}, o, { x: Math.min(ax, bx), y: Math.min(ay, by), w: Math.abs(bx - ax), d: Math.abs(by - ay), axis: rot % 2 ? (o.axis === 'x' ? 'y' : 'x') : o.axis }); }
   if (o.type === 'wall' || o.type === 'flyer') { const [x1, y1] = rp(o.x1, o.y1), [x2, y2] = rp(o.x2, o.y2); return Object.assign({}, o, { x1, y1, x2, y2 }); }
@@ -51,6 +53,8 @@ function renderCity(C, rot, SC) {
   /* ground */
   const GC = { temperate: '#b5be83', arid: '#d3c48e', cold: '#c6cab3' }[C.clim];
   const COL = {}; COL[CT.GRASS] = GC; COL[CT.SEA] = '#8eb0ab'; COL[CT.RIVER] = '#94b6af'; COL[CT.SAND] = '#e2d3a2'; COL[CT.FOREST] = '#97a86c'; COL[CT.STREET] = '#d6c9a9'; COL[CT.PLAZA] = '#e0d3b4'; COL[CT.DOCK] = '#a27a4c'; COL[CT.GARDEN] = '#a5ba76'; COL[CT.YARD] = '#d9c89d'; COL[CT.GRAVE] = '#a9b384'; COL[CT.BRIDGE] = '#cbbb97'; COL[CT.ROAD] = '#cfb98e';
+  const WILD = {}; WILD[CT.MEADOW] = 'meadow'; WILD[CT.MARSH] = 'marsh'; WILD[CT.SCREE] = 'scree'; WILD[CT.SNOW] = 'snow'; WILD[CT.HEATH] = 'heath';
+  for (const k in WILD) COL[k] = TERRAIN_BY_ID[WILD[k]].top;
   const RGB = {}; for (const k in COL) RGB[k] = hexRgb(COL[k]);
   const BANK = hexRgb(mixHex(GC, '#8a8456', 0.3));
   const FRGB = ['#d8c27a', '#b5bd76', '#cfb27b', '#c4ca8b'].map(hexRgb);
@@ -110,6 +114,7 @@ function renderCity(C, rot, SC) {
     else if (wet(u) && h < 0.08) { const p = at(0.5, 0.5); g.strokeStyle = 'rgba(245,245,232,0.6)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(p[0] - 4, p[1]); g.quadraticCurveTo(p[0] - 2, p[1] - 2, p[0], p[1]); g.quadraticCurveTo(p[0] + 2, p[1] - 2, p[0] + 4, p[1]); g.stroke(); }
     else if (ty === CT.GRAVE) { for (let k = 0; k < 3; k++) { const p = at(0.2 + k * 0.3, 0.3 + (k % 2) * 0.35); g.fillStyle = '#d7d1c2'; g.fillRect(p[0] - 1, p[1] - 3, 2, 3); g.strokeStyle = INK; g.lineWidth = 0.4; g.strokeRect(p[0] - 1, p[1] - 3, 2, 3); } }
     else if (ty === CT.GARDEN && h < 0.5) { const cols = ['#b8483a', '#f4ecd8', '#d9b44a']; for (let k = 0; k < 3; k++) { const p = at(0.2 + hrand(X + k, Y) * 0.6, 0.2 + hrand(Y, X + k) * 0.6); g.fillStyle = cols[k]; g.fillRect(p[0] - 0.6, p[1] - 0.6, 1.2, 1.2); } }
+    else if (WILD[ty]) decorateTerrain(g, WILD[ty], at, h, X * 7919 + Y * 131 + rot);
     else if (ty === CT.GRASS && h < 0.07) { const p = at(0.5, 0.5); g.strokeStyle = 'rgba(43,33,22,0.35)'; g.beginPath(); line(p, [p[0] - 1.5, p[1] - 2.5]); line(p, [p[0], p[1] - 3.2]); line(p, [p[0] + 1.5, p[1] - 2.5]); g.stroke(); }
     if (!wet(u) && ty !== CT.DOCK) {
       g.strokeStyle = INK; g.lineWidth = 0.9; g.beginPath(); let any = false;
@@ -202,6 +207,7 @@ function renderCity(C, rot, SC) {
       else if (o.type === 'wall') { const dx = o.x2 - o.x1, dy = o.y2 - o.y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L * 0.31, ny = dx / L * 0.31; cast([[o.x1 + nx, o.y1 + ny], [o.x2 + nx, o.y2 + ny], [o.x2 - nx, o.y2 - ny], [o.x1 - nx, o.y1 - ny]], o.z0, o.h); }
       else if (o.type === 'tree') cast(circ(o.x, o.y, 0.28), o.z0, o.s * 1.6);
       else if (o.type === 'mill') cast(circ(o.x, o.y, 0.3), o.z0, 22);
+      else if (o.type === 'asset') { const a = ASSET_BY_ID[o.id], [w, d] = footprint(o), k = a.group === 'Nature' ? 0.3 : a.group === 'Props' ? 0.12 : 0.06; cast([[o.x + k, o.y + k], [o.x + w - k, o.y + k], [o.x + w - k, o.y + d - k], [o.x + k, o.y + d - k]], o.z0, a.h); }
       else if (o.type === 'bridge') cast([[o.x, o.y], [o.x + o.w, o.y], [o.x + o.w, o.y + o.d], [o.x, o.y + o.d]], WZ, 8);
       else if (o.type === 'solid') { let zmin = 1e9, zmax = -1e9; const pts = []; for (const f of o.faces) for (const q of f.p) { pts.push([q[0], q[1]]); zmin = Math.min(zmin, q[2]); zmax = Math.max(zmax, q[2]); } cast(convexHull(pts), zmin, (zmax - zmin) * 0.85); }
     }
@@ -641,8 +647,14 @@ function renderCity(C, rot, SC) {
   }
   /* sort and paint */
   const list = [];
-  for (const o of objs) { const key = o.type === 'bridge' ? o.x + o.w / 2 + o.y + o.d / 2 - 0.6 : o.type === 'bldg' ? o.x + o.w / 2 + o.y + o.d / 2 : (o.type === 'wall' || o.type === 'flyer') ? (o.x1 + o.x2) / 2 + (o.y1 + o.y2) / 2 + (o.kb || 0) : o.type === 'solid' ? o.kx + o.ky + o.kb : o.x + o.y; list.push({ key, pri: 1, o }); }
-  for (let u = 0; u < NN; u++) if (RE[u] > 0) list.push({ key: (u % S) + ((u / S) | 0) + 1, pri: 0, u });
+  const under = new Uint8Array(NN);
+  for (const o of objs) {
+    if (o.type !== 'asset') continue;
+    const [w, d] = footprint(o); list.push({ key: o.x + w / 2 + o.y + d / 2, pri: 1, o });
+    for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) if (x >= 0 && y >= 0 && x < S && y < S) under[y * S + x] = 1;
+  }
+  for (const o of objs) { if (o.type === 'asset') continue; const key = o.type === 'bridge' ? o.x + o.w / 2 + o.y + o.d / 2 - 0.6 : o.type === 'bldg' ? o.x + o.w / 2 + o.y + o.d / 2 : (o.type === 'wall' || o.type === 'flyer') ? (o.x1 + o.x2) / 2 + (o.y1 + o.y2) / 2 + (o.kb || 0) : o.type === 'solid' ? o.kx + o.ky + o.kb : o.x + o.y; list.push({ key, pri: 1, o }); }
+  for (let u = 0; u < NN; u++) if (RE[u] > 0 && !under[u]) list.push({ key: (u % S) + ((u / S) | 0) + 1, pri: 0, u });
   list.sort((a, b) => a.key - b.key || a.pri - b.pri);
   for (const it of list) {
     if (it.u != null) { drawTile(it.u); continue; }
@@ -655,6 +667,7 @@ function renderCity(C, rot, SC) {
     else if (o.type === 'solid') solidDraw(o);
     else if (o.type === 'flyer') flyerDraw(o);
     else if (o.type === 'smoke' || o.type === 'hive' || o.type === 'bed' || o.type === 'cross') smallObj(o);
+    else if (o.type === 'asset') drawAsset(g, P, o, o.z0, C.clim);
     else if (o.type === 'stall') stallDraw(o);
     else if (o.type === 'fountain') fountainDraw(o);
     else if (o.type === 'well') roundDraw({ x: o.x, y: o.y, z0: o.z0, r: 0.28, h: 5, roof: 'cone', rh: 9, roofC: ROOFS[2], wall: '#cfc6b2' });

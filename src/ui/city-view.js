@@ -6,6 +6,8 @@ import { $, canvas, coarse, reduceMotion } from './state.js';
 import { FONT_FELL, FONT_SC } from './draw.js';
 import { esc, showTab, survey } from './ledger.js';
 import { KIND } from '../world/data.js';
+import { openEditor } from '../editor/editor.js';
+import { cityToModel } from '../editor/from-city.js';
 
 /* ================= city view ================= */
 const cityEl = $('city'), cc = $('cityCanvas'), cctx = cc.getContext('2d'), ctip = $('cityTip'), cveil = $('cityVeil');
@@ -242,6 +244,7 @@ function districtPanel(k) {
   $('cIn').addEventListener('click', () => cZoomAt(CV.cw / 2, CV.ch / 2, CV.z * 1.4));
   $('cOut').addEventListener('click', () => cZoomAt(CV.cw / 2, CV.ch / 2, CV.z / 1.4));
   $('cFit').addEventListener('click', cityFit);
+  $('cityEdit').addEventListener('click', () => { if (CV.C) openEditor(cityToModel(CV.C)); });
   $('cityLabels').addEventListener('click', () => { CV.labels = !CV.labels; $('cityLabels').setAttribute('aria-pressed', String(CV.labels)); cityReq(); });
   new ResizeObserver(() => { if (CV.open) citySize(); }).observe(cityEl);
 }

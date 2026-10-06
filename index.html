@@ -20,6 +20,7 @@
       <input id="seedInput" name="seed" spellcheck="false" maxlength="40">
       <button type="submit" class="btn">Redraw</button>
       <button type="button" class="btn btn-brass" id="newRealm">New realm</button>
+      <button type="button" class="btn" id="openEditor">Tile editor</button>
     </form>
   </header>
   <main class="stage">
@@ -46,6 +47,7 @@
             <button class="chip" id="cityRotL" aria-label="Rotate view left">⟲ Turn</button>
             <button class="chip" id="cityRotR" aria-label="Rotate view right">Turn ⟳</button>
             <button class="chip" id="cityLabels" aria-pressed="true">Names</button>
+            <button class="chip" id="cityEdit">Edit as tiles</button>
           </div>
         </div>
         <div class="zoom">
@@ -68,6 +70,52 @@
       <section class="pane" id="pane-key" role="tabpanel" aria-labelledby="tab-key" hidden></section>
     </aside>
   </main>
+</div>
+<div class="editor" id="editor" hidden tabindex="-1" aria-label="Isometric tile editor">
+  <header class="ed-bar">
+    <button class="btn" id="edBack">← Atlas</button>
+    <div class="ed-title"><span class="eyebrow">tile editor</span><input id="edName" maxlength="60" spellcheck="false" aria-label="Map name"></div>
+    <div class="ed-actions">
+      <label class="ed-field"><span>size</span><select id="edSize"><option>16</option><option>24</option><option>28</option><option>32</option><option>48</option><option>60</option></select></label>
+      <label class="ed-field"><span>land</span><select id="edBiome"></select></label>
+      <button class="btn btn-brass" id="edGen">Generate</button>
+      <button class="btn" id="edNew">Blank</button>
+      <span class="ed-sep" aria-hidden="true"></span>
+      <button class="btn" id="edUndo" title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="edRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+      <span class="ed-sep" aria-hidden="true"></span>
+      <button class="btn" id="edPng">PNG</button>
+      <button class="btn" id="edSave">Save</button>
+      <button class="btn" id="edLoad">Open…</button>
+      <input type="file" id="edFile" accept=".json,application/json" hidden>
+    </div>
+  </header>
+  <div class="ed-body">
+    <div class="ed-stage" id="edStage">
+      <canvas id="edCanvas" tabindex="0" role="img" aria-label="Isometric tile map. Click or drag to apply the current tool; right-drag or space-drag to pan; scroll to zoom."></canvas>
+      <div class="ed-view">
+        <button class="chip" id="edRotL" title="Turn view ([)">⟲ Turn</button>
+        <button class="chip" id="edRotR" title="Turn view (])">Turn ⟳</button>
+        <button class="chip" id="edGrid" aria-pressed="true">Grid</button>
+      </div>
+      <div class="zoom">
+        <button class="btn" id="edIn" aria-label="Zoom in">+</button>
+        <button class="btn" id="edOut" aria-label="Zoom out">−</button>
+        <button class="btn fit" id="edFit" aria-label="Fit whole map">fit</button>
+      </div>
+      <div class="ed-status" id="edStatus" aria-live="polite"></div>
+    </div>
+    <aside class="ed-palette" aria-label="Tile palette">
+      <div class="ed-tools" id="edTools" role="toolbar" aria-label="Tools"></div>
+      <div class="ed-row">
+        <span class="ed-lbl">brush</span>
+        <button class="chip" data-brush="1">1</button><button class="chip" data-brush="2">2</button><button class="chip" data-brush="3">3</button>
+        <button class="chip ed-face" id="edFace" title="Turn the piece (R)">Facing</button>
+      </div>
+      <div class="tabs" id="edTabs" role="tablist"></div>
+      <div class="ed-items" id="edItems"></div>
+    </aside>
+  </div>
 </div>
 <script type="module" src="/src/main.js"></script>
 </body>
