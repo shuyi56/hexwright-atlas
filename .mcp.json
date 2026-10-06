@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hexwright": {
+      "command": "node",
+      "args": ["mcp/server.mjs"]
+    }
+  }
+}
