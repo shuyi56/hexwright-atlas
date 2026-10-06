@@ -5,9 +5,9 @@ import { FACES, SIZE as SPRITE_SIZE } from '../characters/sprite.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
-import { MAX_ELEV, MAX_LEVEL, STOREY, blankModel, cloneModel, fits, floorAt, fromJSON, levelOf, objAt, toJSON } from './model.js';
+import { MAX_ELEV, MAX_LEVEL, blankModel, floorAt, levelOf, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, removeFloor, setElev, shiftElev } from './ops.js';
-import { EL, HEIGHT_RAMP, SZ, THH, TWH, frontMask, renderTiles, rotInst, thumb, updateTiles } from './render.js';
+import { EL, SZ, THH, TWH, frontMask, renderTiles, rotInst, thumb, updateTiles } from './render.js';
 import { blockedBy, charAt, eraseCharAt, findPath, placeChar, reachable, walkChar } from './walk.js';
 
 /* ================= tile editor screen ================= */
@@ -17,7 +17,7 @@ const TOOLS = [
   ['paint', 'Paint', 'B', '▦'], ['fill', 'Fill', 'G', '◩'], ['raise', 'Raise', 'U', '▲'], ['lower', 'Lower', 'J', '▼'], ['level', 'Level', 'L', '▬'],
   ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
 ];
-const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, heights: false, level: 0, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), occ: new Map(), lastT: 0, preview: null };
+const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, level: 0, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), occ: new Map(), lastT: 0, preview: null };
 /* one sprite pixel in drawing units: a figure stands about as tall as a cottage's eaves and chimney */
 const WALK_SPEED = 3.2, SPRITE_PX = 0.42, FIG_H = SPRITE_SIZE * SPRITE_PX;
 
@@ -173,7 +173,7 @@ function walkPreview() {
 /* ED.stale is true when the view itself changed (rotation, grid, size) and 'model' after an edit */
 function rebuild() {
   if (ED.stale !== true && ED.R && updateTiles(ED.R, ED.M)) { const b = ED.R.patched; if (b && patch !== 'all') patch = patch ? [Math.min(patch[0], b[0]), Math.min(patch[1], b[1]), Math.max(patch[2], b[2]), Math.max(patch[3], b[3])] : b; }
-  else { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid, top: ED.level, heights: ED.heights }); patch = 'all'; }
+  else { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid, top: ED.level }); patch = 'all'; }
   ED.stale = false;
 }
 function size() { const r = stage.getBoundingClientRect(); if (!r.width) return; ED.cw = r.width; ED.ch = r.height; for (const c of [cv, ov]) { c.width = Math.round(r.width * state.dpr); c.height = Math.round(r.height * state.dpr); c.style.width = r.width + 'px'; c.style.height = r.height + 'px'; } patch = 'all'; req(); }
@@ -340,30 +340,7 @@ function setLevel(L) {
 }
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }
 function setTab(t) { ED.tab = t; for (const b of root.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === t)); buildPalette(); }
-/* ---------- height legend ----------
-   The scale in the corner of the stage: one cell per height level in the tint the map uses when Tint is on, a
-   marker on the level under the pointer, and the hovered spot's height above the ground's lowest level (with
-   the storey, on upper floors). A height level is taken as 1.5 m, so a storey (two levels) is 3 m. */
-const M_PER_LEVEL = 1.5, metres = n => `${+(n * M_PER_LEVEL).toFixed(1)} m`;
-function buildLegend() {
-  const ramp = $('edRamp'); ramp.textContent = '';
-  HEIGHT_RAMP.forEach((col, k) => {
-    const c = document.createElement('div'); c.className = 'ed-cell'; c.dataset.h = k; c.title = `height ${k} · ${metres(k)}`;
-    const sw = document.createElement('span'); sw.className = 'ed-sw'; sw.style.background = col; c.appendChild(sw);
-    const lb = document.createElement('span'); lb.textContent = k === HEIGHT_RAMP.length - 1 ? metres(k) : +(k * M_PER_LEVEL).toFixed(1); c.appendChild(lb);
-    ramp.appendChild(c);
-  });
-  $('edTint').addEventListener('click', () => setHeights(!ED.heights));
-}
-function syncLegend() {
-  const M = ED.M; if (!M) return;
-  const h = ED.hover, u = h ? h.y * M.S + h.x : -1, e = h ? M.elev[u] : -1, L = ED.level;
-  for (const c of root.querySelectorAll('.ed-cell')) c.classList.toggle('on', +c.dataset.h === e);
-  $('edLegendNote').textContent = h ? `${h.x}, ${h.y}: ${L ? `floor ${L} at ${metres(e + L * STOREY)}, ground ${metres(e)}` : `height ${e}, ${metres(e)}`}` : `1 level = ${metres(1)} · storey ${metres(STOREY)}`;
-}
-function setHeights(on) { ED.heights = !!on; $('edTint').setAttribute('aria-pressed', String(ED.heights)); ED.stale = true; req(); }
 function status() {
-  syncLegend();
   const nc = (ED.M.chars || []).length, cname = c => (library.get(c.sprite) || { name: 'Unknown character' }).name;
   if (walkNote) { const n = walkNote; walkNote = ''; statusEl.textContent = n; return; }
   const L = ED.level, where = L ? ` · ${LEVEL_NAME(L)}` : '';
@@ -464,7 +441,6 @@ root.addEventListener('keydown', e => {
   else if (k === '+' || k === '=') zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.3);
   else if (k === '-' || k === '_') zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.3);
   else if (k >= '1' && k <= '3') { ED.brush = +k; syncBrush(); }
-  else if (k === 't' || k === 'T') setHeights(!ED.heights);
   else if (k === 'PageUp') setLevel(ED.level + 1);
   else if (k === 'PageDown') setLevel(ED.level - 1);
   else if (k === 'Escape') { if (ED.sel >= 0) { ED.sel = -1; req(); } else closeEditor(); }
@@ -486,13 +462,12 @@ function buildChrome() {
   $('edRotL').addEventListener('click', () => turnView(-1)); $('edRotR').addEventListener('click', () => turnView(1));
   $('edFace').addEventListener('click', turnPiece);
   for (const b of root.querySelectorAll('[data-level]')) b.addEventListener('click', () => setLevel(+b.dataset.level));
-  buildLegend();
   $('edGrid').addEventListener('click', () => { ED.grid = !ED.grid; $('edGrid').setAttribute('aria-pressed', String(ED.grid)); ED.stale = true; req(); });
   $('edIn').addEventListener('click', () => zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.4)); $('edOut').addEventListener('click', () => zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.4)); $('edFit').addEventListener('click', fitView);
   $('edName').addEventListener('change', () => { ED.M.name = $('edName').value.trim().slice(0, 60) || 'Untitled survey'; autosave(); });
   $('edGen').addEventListener('click', () => { checkpoint(); const seed = Math.random().toString(36).slice(2, 7); setModel(generateScene(seed, +$('edSize').value, $('edBiome').value)); });
   $('edNew').addEventListener('click', () => { checkpoint(); const S = +$('edSize').value, B = BIOMES[$('edBiome').value]; const M = blankModel(S, B.ground[0]); M.clim = B.clim; setModel(M); });
-  $('edPng').addEventListener('click', () => { const R = renderTiles(ED.M, ED.rot, 2, { grid: false, top: ED.level, heights: ED.heights }); R.can.toBlob(b => b && download(slug(ED.M.name) + '.png', b)); });
+  $('edPng').addEventListener('click', () => { const R = renderTiles(ED.M, ED.rot, 2, { grid: false, top: ED.level }); R.can.toBlob(b => b && download(slug(ED.M.name) + '.png', b)); });
   $('edSave').addEventListener('click', () => download(slug(ED.M.name) + '.json', new Blob([JSON.stringify(toJSON(ED.M))], { type: 'application/json' })));
   $('edLoad').addEventListener('click', () => $('edFile').click());
   $('edFile').addEventListener('change', async () => { const f = $('edFile').files[0]; $('edFile').value = ''; if (!f) return; try { const M = fromJSON(JSON.parse(await f.text())); checkpoint(); setModel(M); } catch (err) { statusEl.textContent = `Could not open ${f.name}: ${err.message}`; } });
@@ -514,4 +489,4 @@ function closeEditor() { if (!ED.open) return; ED.open = false; root.hidden = tr
 buildChrome();
 $('openEditor').addEventListener('click', () => openEditor());
 
-export { ED, LEVEL_NAME, applyAt, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setHeights, setLevel, syncPalette, toView, undo, zoomAt };
+export { ED, LEVEL_NAME, applyAt, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };

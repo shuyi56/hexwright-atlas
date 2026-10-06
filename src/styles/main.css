@@ -163,18 +163,3 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .ed-levels{display:flex;align-items:center;gap:3px;padding:0 4px 0 8px;background:rgba(18,24,25,.6);border-radius:16px}
 .ed-levels .chip{min-width:30px;padding-left:8px;padding-right:8px}
 .ed-levels .chip::before{content:none!important}
-/* bottom-left of the stage: the status line over the height legend */
-.ed-foot{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:calc(100% - 80px);pointer-events:none}
-.ed-foot .ed-status{position:static;max-width:100%}
-.ed-legend{pointer-events:auto;background:rgba(18,24,25,.84);border:1px solid var(--line);border-radius:3px;padding:6px 9px 6px}
-.ed-legend-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}
-.ed-legend-head .chip{padding:2px 9px;font-size:12px}
-.ed-ramp{display:flex}
-.ed-cell{display:flex;flex-direction:column;align-items:flex-start;width:30px}
-.ed-sw{display:block;width:100%;height:11px;border:1px solid rgba(43,33,22,.85);border-left-width:0}
-.ed-cell:first-child .ed-sw{border-left-width:1px}
-.ed-cell span:last-child{font:500 10.5px var(--ui);color:var(--muted);margin-top:2px;margin-left:-2px;white-space:nowrap}
-.ed-cell.on .ed-sw{outline:2px solid var(--brass-2);outline-offset:0;position:relative;z-index:1}
-.ed-cell.on span:last-child{color:var(--brass-2)}
-.ed-legend-note{margin-top:4px;font:500 11.5px var(--ui);color:var(--vellum);white-space:nowrap}
-@media (max-width:560px){.ed-cell{width:24px}.ed-legend-note{white-space:normal}}

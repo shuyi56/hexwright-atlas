@@ -8,9 +8,6 @@ import { MAX_LEVEL, STOREY, levelOf } from './model.js';
    look identical in both places. `rot` turns the whole map in quarter steps. opts.top is the highest storey
    drawn (default all): the editor hides the floors above the one being worked on, so it can always be seen. */
 const TWH = 16, THH = 8, EL = 8, BASE = 24, SZ = STOREY * EL, SLAB = 2.5;
-/* hypsometric tints for height levels 0..6, in the map's own chalky palette: low meadow to pale summit.
-   opts.heights washes each ground tile with its level's tint, and the editor's legend shows the same scale. */
-const HEIGHT_RAMP = ['#9fb47a', '#bcc283', '#d6c98d', '#dcb277', '#c8936a', '#a98a76', '#e2dcd0'];
 const hrand = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
 function hull(pts) {
   const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (p.length < 3) return p;
@@ -125,7 +122,6 @@ function paint(R, clip) {
     if (zl < z) { poly([d, c, [c[0], c[1] + z - zl], [d[0], d[1] + z - zl]], T.side[0], 0.7); if (z - zl > EL) strata(d, c, z - zl); }
     const fs = rgbStr(hexRgb(T.top), 1 + 0.05 * (hrand(back[u], 3) - 0.5) + 0.04 * RE[u]);
     g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fillStyle = fs; g.fill(); g.strokeStyle = fs; g.lineWidth = 0.6; g.stroke();
-    if (opts.heights && !T.water) { g.save(); g.globalAlpha = 0.62; g.fillStyle = HEIGHT_RAMP[Math.min(HEIGHT_RAMP.length - 1, RE[u])]; g.fill(); g.restore(); }
     if (T.glow) { const m = P(X + 0.5, Y + 0.5, z), gl = g.createRadialGradient(m[0], m[1], 0, m[0], m[1], 18); gl.addColorStop(0, 'rgba(255,190,90,0.35)'); gl.addColorStop(1, 'rgba(255,160,60,0)'); g.fillStyle = gl; g.fillRect(m[0] - 18, m[1] - 18, 36, 36); }
     const t0 = back[u], at = (fx, fy) => P(X + fx, Y + fy, z);
     if (opts.deco !== false) decorateTerrain(g, T.id, at, hrand(t0 % S, (t0 / S) | 0), t0 * 7919 + 13);
@@ -278,4 +274,4 @@ function thumb(kind, id, size = 64) {
   return c;
 }
 
-export { EL, HEIGHT_RAMP, SZ, THH, TWH, frontMask, layout, renderTiles, rotInst, thumb, updateTiles };
+export { EL, SZ, THH, TWH, frontMask, layout, renderTiles, rotInst, thumb, updateTiles };
