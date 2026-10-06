@@ -19,7 +19,7 @@ test('characters stand only on free tiles', () => {
 });
 test('paths go around obstacles and respect height steps', () => {
   const M = map(); for (let y = 0; y < 7; y++) M.terr[y * 8 + 3] = water;
-  const p = findPath(M, 0, 6, 0); assert.ok(p && p[p.length - 1].join() === '6,0');
+  const p = findPath(M, 0, 6, 0); assert.ok(p && p[p.length - 1].join() === '6,0,0');
   assert.ok(p.length > 6, 'detours over the gap at the bottom');
   for (let y = 0; y < 8; y++) M.terr[y * 8 + 3] = water;
   assert.equal(findPath(M, 0, 6, 0), null, 'cut off');

@@ -1,5 +1,6 @@
 import { TAU } from '../core/geometry.js';
 import { GOLD, INK } from '../render/palette.js';
+import { shade } from './kit.js';
 
 /* ================= interiors: room pieces and furniture =================
    Same contract as assets.js: footprint w×d (before turning), shadow height h, draw(K, o). Furniture is
@@ -96,6 +97,14 @@ const INTERIOR = [
     F.onFront(0.24, 0.76, 0.42, 0.4, 6, '#2f271f', 0.5);
     F.at3(0.5, 0.46, 0.6, ([px, py]) => { const g = K.g; glow(g, px, py - 2, 14, 0.6); for (const dx of [-1.6, 0, 1.6]) flame(g, px + dx, py, dx ? 0.8 : 1.1); g.strokeStyle = WOOD_D; g.lineWidth = 1.2; g.beginPath(); g.moveTo(px - 3, py + 0.5); g.lineTo(px + 3, py - 0.3); g.stroke(); });
     F.box(0.05, 0.95, 0.52, 0.95, 0, 0.5, '#c9bea6');
+    F.done();
+  } },
+  /* a straight flight rising from its front to its back, one storey (16 units) in one tile; a character on it
+     can step off its high end onto the floor above (see editor/walk.js) */
+  { id: 'stairs', label: 'Stairs', w: 1, d: 1, h: 18, walk: true, draw(K, o) {
+    const F = frame(K, o), n = 6, rise = 16 / n;
+    for (let i = 0; i < n; i++) F.box(0.16, 0.84, 1 - (i + 1) / n, 1 - i / n, 0, (i + 1) * rise, i % 2 ? WOOD : WOOD_L, { top: shade(WOOD_L, 1.06) });
+    for (const a of [0.12, 0.88]) F.box(a - 0.04, a + 0.04, 0, 1, 0, 1.2, WOOD_D);
     F.done();
   } },
   { id: 'post', label: 'Timber post', w: 1, d: 1, h: WALL_H + 4, joins: 'room', draw(K, o) { const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2]; K.box(cx - 0.12, cy - 0.12, cx + 0.12, cy + 0.12, o.z, o.z + 1, STONE, { lw: 0.45 }); K.box(cx - 0.08, cy - 0.08, cx + 0.08, cy + 0.08, o.z + 1, o.z + WALL_H + 3, TIMBER, { lw: 0.5 }); } }
@@ -250,7 +259,7 @@ const FURNITURE = [
   } }
 ];
 /* soft shadows: walls are thin, furniture sits inside its tile */
-for (const a of INTERIOR) a.shade = a.id === 'hearth' ? 0.12 : 0.38;
+for (const a of INTERIOR) a.shade = a.id === 'hearth' || a.id === 'stairs' ? 0.12 : 0.38;
 for (const a of FURNITURE) a.shade = 0.16;
 
 export { FURNITURE, INTERIOR };

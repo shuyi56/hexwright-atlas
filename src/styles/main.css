@@ -160,3 +160,6 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .ed-palette .tab{padding:9px 8px 7px;font-size:13px;letter-spacing:.05em}
 .ed-charbar{padding-top:8px}
 .ed-charbar .btn{padding:5px 10px;font-size:13.5px}
+.ed-levels{display:flex;align-items:center;gap:3px;padding:0 4px 0 8px;background:rgba(18,24,25,.6);border-radius:16px}
+.ed-levels .chip{min-width:30px;padding-left:8px;padding-right:8px}
+.ed-levels .chip::before{content:none!important}
