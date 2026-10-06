@@ -93,3 +93,49 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .enter-city{margin:2px 0 14px}
 @media (prefers-reduced-motion:reduce){.city.entering{animation:none}}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* Tile editor: a full-screen workbench over the atlas */
+.editor{position:fixed;inset:0;z-index:30;display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px;padding:12px 16px 16px;background:var(--table)}
+.editor:focus{outline:none}
+.ed-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.ed-title{display:flex;flex-direction:column;min-width:0;flex:1 1 200px}
+.ed-title input{background:none;border:0;border-bottom:1px solid transparent;color:var(--vellum);font:400 clamp(20px,2.4vw,28px)/1.1 var(--display);padding:0 0 2px;min-width:0;width:100%}
+.ed-title input:hover,.ed-title input:focus{border-bottom-color:var(--line);outline:none}
+.ed-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.ed-actions .btn{padding:6px 11px}
+.ed-actions .btn:disabled{opacity:.4;cursor:default;border-color:var(--line)}
+.ed-field{display:flex;align-items:center;gap:6px;font:500 12.5px var(--ui-sc);letter-spacing:.08em;color:var(--muted)}
+.ed-field select{background:var(--panel);color:var(--vellum);border:1px solid var(--line);border-radius:3px;font:500 14px var(--ui);padding:6px 8px}
+.ed-sep{width:1px;height:24px;background:var(--line);margin:0 2px}
+.ed-body{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;min-height:0}
+.ed-stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#1c2627,var(--table) 75%)}
+#edCanvas{display:block;touch-action:none;cursor:crosshair}
+.ed-view{position:absolute;top:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ed-status{position:absolute;left:10px;bottom:10px;max-width:calc(100% - 80px);font:500 13px var(--ui);color:var(--vellum);background:rgba(18,24,25,.82);border:1px solid var(--line);border-radius:3px;padding:3px 9px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-palette{min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.ed-tools{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:10px 10px 6px}
+.ed-tool{display:flex;flex-direction:column;align-items:center;gap:1px;font:500 12px var(--ui);color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:5px 2px;cursor:pointer}
+.ed-tool span{font-size:15px;line-height:1.1;color:var(--vellum)}
+.ed-tool:hover{border-color:var(--brass)}
+.ed-tool[aria-pressed="true"]{border-color:var(--brass);color:var(--brass-2);background:#2a2a1f}
+.ed-row{display:flex;align-items:center;gap:5px;padding:2px 10px 10px;flex-wrap:wrap}
+.ed-lbl{font:500 12.5px var(--ui-sc);letter-spacing:.08em;color:var(--muted);margin-right:2px}
+.ed-face{margin-left:auto}
+.ed-face::before{content:none!important}
+.ed-items{overflow:auto;padding:4px 10px 14px;min-height:0;flex:1}
+.ed-group{margin:12px 0 6px;font:500 12.5px var(--ui-sc);letter-spacing:.1em;color:var(--brass);font-weight:500}
+.ed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:6px;margin-top:8px}
+.ed-group+.ed-grid{margin-top:0}
+.ed-item{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:4px 2px 5px;cursor:pointer;color:var(--vellum);min-width:0}
+.ed-item canvas{width:60px;height:60px}
+.ed-item span{font:500 11.5px/1.2 var(--ui);text-align:center;color:var(--muted);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-width:100%}
+.ed-item:hover{border-color:var(--brass)}
+.ed-item[aria-pressed="true"]{border-color:var(--brass-2);background:#2a2a1f}
+.ed-item[aria-pressed="true"] span{color:var(--brass-2)}
+.ed-item:focus-visible,.ed-tool:focus-visible,#edCanvas:focus-visible,.ed-field select:focus-visible{outline:2px solid var(--brass-2);outline-offset:1px}
+@media (max-width:860px){
+  .editor{padding:10px 12px 12px;overflow:auto;grid-template-rows:auto auto}
+  .ed-body{grid-template-columns:1fr;grid-template-rows:62vh auto}
+  .ed-palette{max-height:none}
+  .ed-items{max-height:46vh}
+}
