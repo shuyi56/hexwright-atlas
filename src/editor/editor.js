@@ -8,7 +8,7 @@ import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, MAX_LEVEL, blankModel, floorAt, levelOf, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, removeFloor, setElev, shiftElev } from './ops.js';
 import { EL, SZ, THH, TWH, frontMask, renderTiles, rotInst, thumb, updateTiles } from './render.js';
-import { blockedBy, charAt, eraseCharAt, findPath, placeChar, reachable, walkChar } from './walk.js';
+import { blockedBy, charAt, eraseCharAt, findPath, placeChar, reachable, stairsAt, walkChar, walkGoal } from './walk.js';
 
 /* ================= tile editor screen ================= */
 const root = $('editor'), cv = $('edCanvas'), cx = cv.getContext('2d'), ov = $('edOverlay'), ovx = ov.getContext('2d'), statusEl = $('edStatus'), stage = $('edStage');
@@ -94,17 +94,22 @@ function doWalk(k, path) {
   if (r.ok && path.length) { beginWalk(c, start, path); changed(); status(); }
   return r;
 }
+let followLevel = null;
 function stepAnim(now) {
   const dt = Math.min(0.1, (now - (ED.lastT || now)) / 1000); ED.lastT = now;
-  for (const [c, w] of ED.walk) { w.d += dt * WALK_SPEED; if (w.d >= walkLen(w)) ED.walk.delete(c); }
+  for (const [c, w] of ED.walk) {
+    w.d += dt * WALK_SPEED; if (w.d >= walkLen(w)) ED.walk.delete(c);
+    /* the view follows the selected character onto the floor it steps on, so it stays in sight */
+    if (c === ED.M.chars[ED.sel]) { const L = ED.walk.has(c) ? walkerPos(w).L : levelOf(c); if (L != null && L !== ED.level) followLevel = L; }
+  }
   if (!ED.walk.size) ED.lastT = 0;
 }
 /* each character as it is drawn: view-space centre, height, facing and frame, nearest the viewer last */
 function charViews() {
   const out = [];
   (ED.M.chars || []).forEach((c, k) => {
-    if (levelOf(c) > ED.level) return;  /* above the storey being worked on: hidden with its floor */
     const w = ED.walk.get(c), p = w ? walkerPos(w) : Object.assign(tilePt(c.x, c.y, levelOf(c)), { face: c.face }), [X, Y] = viewPt(p.x, p.y), stride = w ? Math.floor(w.d * 2) % 2 : 0;
+    if ((w ? p.L ?? levelOf(c) : levelOf(c)) > ED.level) return;  /* above the storey being worked on: hidden with its floor */
     out.push({ c, k, X, Y, level: w ? (p.L ?? levelOf(c)) : levelOf(c), ground: p.z, z: p.z + (stride ? SPRITE_PX : 0),  /* the stride frame rides one pixel higher */ face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
   });
   return out.sort((a, b) => a.X + a.Y - (b.X + b.Y));
@@ -166,7 +171,7 @@ function walkArea() {
 function walkPreview() {
   const M = ED.M, k = ED.sel; if (ED.tool !== 'walk' || k < 0 || !M.chars[k] || !ED.hover) return null;
   const key = [k, ED.hover.x, ED.hover.y, ED.level, M.chars[k].x, M.chars[k].y, levelOf(M.chars[k]), ED.undo.length, M.objs.length, M.chars.length].join();
-  if (!ED.preview || ED.preview.key !== key) { const path = findPath(M, k, ED.hover.x, ED.hover.y, ED.level); ED.preview = { key, path }; }
+  if (!ED.preview || ED.preview.key !== key) { const [gx, gy, gL] = walkGoal(M, k, ED.hover.x, ED.hover.y, ED.level), path = findPath(M, k, gx, gy, gL); ED.preview = { key, path }; }
   return ED.preview.path;
 }
 /* ---------- view ---------- */
@@ -251,6 +256,7 @@ function draw() {
   const g = ovx;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, ov.width, ov.height);
   if (ED.walk.size) { stepAnim(performance.now()); req(); }
+  if (followLevel != null) { const L = followLevel; followLevel = null; setLevel(L); return; }
   const hasChars = ED.M.chars && ED.M.chars.length;
   if (!ED.hover && !hasChars) return;
   g.save(); g.setTransform(dpr * ED.z, 0, 0, dpr * ED.z, dpr * ED.ox, dpr * ED.oy);
@@ -271,7 +277,8 @@ function draw() {
       const { x, y } = ED.hover, path = walkPreview(), k = charAt(ED.M, x, y, -1, ED.level);
       if (k >= 0) outline([[x, y]], 'rgba(255,240,200,0.9)', 'rgba(255,240,200,0.15)');
       else if (path && path.length) outline(path, 'rgba(228,198,132,0.9)', 'rgba(228,198,132,0.25)');
-      else outline([[x, y]], ED.sel >= 0 ? '#b8483a' : 'rgba(255,240,200,0.7)', ED.sel >= 0 ? 'rgba(184,72,58,0.22)' : null);
+      /* red only when there is no way there; an empty route means the character is already there (or on its way) */
+      else outline([[x, y]], ED.sel >= 0 && !path ? '#b8483a' : 'rgba(255,240,200,0.7)', ED.sel >= 0 && !path ? 'rgba(184,72,58,0.22)' : null);
     }
   }
   if (hasChars) drawChars(g, R);
@@ -313,9 +320,14 @@ function applyAt(p, first) {
   else if (ED.tool === 'walk' && first) {
     /* click a character to choose it, then click any tile it can reach, on this floor or (by stairs) another */
     const k = charAt(M, p.x, p.y, -1, L);
-    if (k >= 0) { ED.sel = k; walkNote = 'Selected: click a tile to walk there.'; req(); return; }
+    /* the selected character standing on a flight: clicking them climbs it */
+    if (k >= 0 && !(k === ED.sel && stairsAt(M, p.x, p.y, L))) { ED.sel = k; walkNote = 'Selected: click a tile to walk there.'; req(); return; }
     if (ED.sel < 0 && M.chars.length === 1) ED.sel = 0;
-    if (ED.sel >= 0 && M.chars[ED.sel]) { const path = findPath(M, ED.sel, p.x, p.y, L); if (path && path.length) doWalk(ED.sel, path); else walkNote = `No way to ${p.x}, ${p.y}${L ? ` on floor ${L}` : ''}: ${blockedBy(M, p.x, p.y, ED.sel, L) || 'cut off from here'}.`; }
+    if (ED.sel >= 0 && M.chars[ED.sel]) {
+      const [gx, gy, gL] = walkGoal(M, ED.sel, p.x, p.y, L), path = findPath(M, ED.sel, gx, gy, gL);
+      if (path && path.length) doWalk(ED.sel, path);
+      else walkNote = `No way to ${gx}, ${gy}${gL ? ` on floor ${gL}` : ''}: ${blockedBy(M, gx, gy, ED.sel, gL) || 'cut off from here'}.`;
+    }
     else walkNote = M.chars.length ? 'Click a character, then click a tile to walk there.' : 'Place a character first (Characters tab).';
   }
   else if (ED.tool === 'erase') {

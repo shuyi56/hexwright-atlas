@@ -43,7 +43,10 @@ hidden so you can always see inside.
 - **Stairs:** the **Stairs** piece (Interior tab) joins two storeys. It rises towards its back, and a
   character on it steps off its top end onto the floor tile behind it, one storey up. Leave that tile's
   floor in place and take up the floor over the stairs for a stairwell. With **Walk**, clicking any reachable
-  tile on any storey routes the character there, up and down stairs as needed.
+  tile on any storey routes the character there, up and down stairs as needed. Clicking a flight of stairs
+  sends the selected character up it (clicking them while they stand on a flight does too), and clicking the
+  open stairwell from the floor above brings them down onto it. The floor switch follows the selected character
+  to whichever storey they step onto.
 - **Heights:** raising and lowering land works on the ground only. A floor follows the ground under it, so
   walking keeps the one-level step everywhere: on the ground, along a floor laid over a slope, and onto the
   landing at the top of a flight.

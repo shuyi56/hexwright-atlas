@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { wallLinks } from '../tiles/index.js';
 import { blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { eraseAt, floodFill, paintTiles, placePiece, rectTiles, removeFloor } from './ops.js';
-import { findPath, placeChar, walkChar } from './walk.js';
+import { findPath, placeChar, walkChar, walkGoal } from './walk.js';
 
 /* a 6×6 house: ground floor everywhere, floor 1 over the back half (y 0-2), stairs at (1, 3) rising north to (1, 2) */
 function house() {
@@ -81,4 +81,16 @@ test('stairs only join a floor whose height matches the top of the flight', () =
   assert.equal(findPath(M, 0, 1, 2, 1), null);
   M.elev[2 * 6 + 1] = 1;
   assert.ok(findPath(M, 0, 1, 2, 1), 'one level off is a normal step');
+});
+
+test('a click on a flight of stairs means up it, a click on the stairwell above means down it', () => {
+  const M = house(); placeChar(M, { sprite: 's', x: 4, y: 5 });
+  assert.deepEqual(walkGoal(M, 0, 1, 3, 0), [1, 2, 1], 'the stairs on the ground lead to the landing on floor 1');
+  assert.deepEqual(walkGoal(M, 0, 4, 4, 0), [4, 4, 0], 'any other tile is itself');
+  M.floors[0][3 * 6 + 1] = 0;  /* a stairwell over the flight */
+  assert.deepEqual(walkGoal(M, 0, 1, 3, 1), [1, 3, 0], 'the open stairwell on floor 1 leads down onto the flight');
+  const up = findPath(M, 0, ...walkGoal(M, 0, 1, 3, 0)); assert.ok(up); walkChar(M, 0, up);
+  assert.deepEqual([M.chars[0].x, M.chars[0].y, M.chars[0].level], [1, 2, 1]);
+  placeChar(M, { sprite: 's', x: 4, y: 5 });
+  assert.deepEqual(walkGoal(M, 1, 1, 3, 0), [1, 3, 0], 'with someone on the landing, the stairs are just a tile');
 });

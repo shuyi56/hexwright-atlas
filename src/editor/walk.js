@@ -49,6 +49,14 @@ function neighbours(M, x, y, L, except) {
 }
 const stepOK = (M, from, to, except) => neighbours(M, from[0], from[1], from[2], except).some(n => n[0] === to[0] && n[1] === to[1] && n[2] === to[2]);
 
+/* where a click on (x, y) of level L sends character k: a flight of stairs means "go up it", to the landing on
+   the floor above; the open stairwell over a flight means "go down", onto the flight; anything else is itself */
+function walkGoal(M, k, x, y, L) {
+  const st = stairsAt(M, x, y, L);
+  if (st && L < MAX_LEVEL && inb(M, st.up[0], st.up[1]) && isFree(M, st.up[0], st.up[1], k, L + 1)) return st.up;
+  if (L > 0 && inb(M, x, y) && !floorAt(M, L, y * M.S + x) && stairsAt(M, x, y, L - 1)) return [x, y, L - 1];
+  return [x, y, L];
+}
 /* shortest route from character k to (tx, ty) on level tL (default its own), as [[x, y, level], ...] without the start; null if unreachable */
 function findPath(M, k, tx, ty, tL) {
   const c = M.chars[k], S = M.S, NN = S * S, L0 = levelOf(c); if (tL == null) tL = L0;
@@ -95,4 +103,4 @@ function walkChar(M, k, path) {
   return { ok: true, steps: path.length };
 }
 
-export { FACE_DELTA, blockedBy, canStep, charAt, eraseCharAt, faceOf, findPath, isFree, neighbours, placeChar, reachable, stairsAt, walkChar };
+export { FACE_DELTA, blockedBy, canStep, charAt, eraseCharAt, faceOf, findPath, isFree, neighbours, placeChar, reachable, stairsAt, walkChar, walkGoal };
