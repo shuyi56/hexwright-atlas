@@ -11,6 +11,7 @@
     "lint": "eslint src tools mcp",
     "test": "node --test \"src/**/*.test.js\"",
     "test:e2e": "node mcp/e2e.mjs",
+    "perf": "node tools/perf.js",
     "mcp": "node mcp/server.mjs"
   },
   "devDependencies": {

@@ -35,13 +35,13 @@ function check(schema, value, path) {
   }
   if (t === 'object') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${path} must be an object`);
-    if (schema.properties) checkProps(schema.properties, schema.required, value, path);
+    if (schema.properties) checkProps(schema.properties, schema.required, value, path, schema.additionalProperties === true);
   }
 }
-function checkProps(props, required = [], value, path) {
+function checkProps(props, required = [], value, path, open = false) {
   for (const [k, v] of Object.entries(value)) {
     if (v == null) continue;
-    if (!props[k]) fail(`unknown parameter "${path ? path + '.' : ''}${k}"; known: ${Object.keys(props).join(', ') || '(none)'}`);
+    if (!props[k]) { if (open) continue; fail(`unknown parameter "${path ? path + '.' : ''}${k}"; known: ${Object.keys(props).join(', ') || '(none)'}`); }
     check(props[k], v, path ? `${path}.${k}` : k);
   }
   for (const k of required) if (value[k] == null) fail(`${path ? path + '.' : ''}${k} is required`);
@@ -188,7 +188,7 @@ function screenToTile(p) { needOpen(); const t = pick(p.sx, p.sy); return t ? ti
 const frames = n => new Promise(r => { const f = () => (n-- > 0 ? requestAnimationFrame(f) : r()); f(); });
 async function screenshot(p) {
   const M = ensureModel(), max = p.maxSize || 1600; let can;
-  if (p.source === 'viewport') { needOpen(); await frames(2); can = $('edCanvas'); }
+  if (p.source === 'viewport') { needOpen(); await frames(2); const m = $('edCanvas'); can = document.createElement('canvas'); can.width = m.width; can.height = m.height; const g = can.getContext('2d'); g.drawImage(m, 0, 0); g.drawImage($('edOverlay'), 0, 0); }
   else {
     const scale = p.scale || 1, R = renderTiles(M, p.rot != null ? p.rot : ED.rot, scale, { grid: !!p.grid }); can = R.can;
     if (p.rect) {
@@ -262,8 +262,18 @@ async function call(method, params = {}) {
   return METHOD_IMPL[method](params || {});
 }
 
+/* test hook, not part of the API: compares the editor's patched-in-place map image with a fresh
+   full render of the same map and counts the pixels that differ */
+function renderCheck() {
+  needOpen(); const R = ED.R, F = renderTiles(ED.M, R.rot, R.SC, R.opts), w = R.can.width, h = R.can.height;
+  const a = R.can.getContext('2d').getImageData(0, 0, w, h).data, b = F.can.getContext('2d').getImageData(0, 0, w, h).data;
+  let differing = 0, maxDelta = 0;
+  for (let i = 0; i < a.length; i += 4) { const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]), Math.abs(a[i + 3] - b[i + 3])); if (d) { differing++; maxDelta = Math.max(maxDelta, d); } }
+  return { pixels: w * h, differing, maxDelta };
+}
+
 /* the object other code (and a DevTools console) talks to */
-const api = { version: 1, spec: METHODS, call, ApiError, ...Object.fromEntries(Object.keys(METHODS).map(k => [k, p => call(k, p)])) };
+const api = { version: 1, spec: METHODS, call, ApiError, debug: { renderCheck }, ...Object.fromEntries(Object.keys(METHODS).map(k => [k, p => call(k, p)])) };
 window.hexwright = api;
 
 export { ApiError, api, call };

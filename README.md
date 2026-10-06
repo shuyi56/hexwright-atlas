@@ -37,10 +37,18 @@ The tile editor can be driven without a mouse or Playwright. Three layers share 
    curl -s -XPOST localhost:5173/__hexwright/api/paint -d '{"terrain":"sand","rect":{"x":2,"y":2,"w":4,"h":3}}'
    ```
 3. **MCP server** (`mcp/server.mjs`, registered in `.mcp.json`): one `hexwright_<method>` tool per method.
-   It uses the dev server at `HEXWRIGHT_URL` (default `http://127.0.0.1:5173`) and the page the user
-   already has open. With nothing running it starts Vite on a free port and a headless Chromium to host
-   the page (`HEXWRIGHT_BROWSER=none` disables that, `HEXWRIGHT_HEADED=1` shows the window,
-   `HEXWRIGHT_CHROME` points at a specific binary). The browser only hosts the page; no clicks are scripted.
+   It uses the dev server at `HEXWRIGHT_URL`, else one already on port 5173 (`127.0.0.1` or `[::1]`, preferring
+   the one with an editor page attached), else it starts Vite on a free port. Which browser hosts the page is
+   set by `HEXWRIGHT_BROWSER` (in `.mcp.json` `env`) or a `--browser=<mode>` argument:
+
+   | Mode       | Behaviour |
+   | ---------- | --------- |
+   | `auto`     | Default. Drives the editor tab you have open; with none, starts a headless Chromium. |
+   | `browser`  | Only your own browser: edits appear live in your tab. Never launches Chromium (`none` is an alias). |
+   | `headless` | Always a private headless Chromium; calls go only to its page, never to your tabs. |
+
+   `HEXWRIGHT_HEADED=1` shows the launched window, `HEXWRIGHT_CHROME` points at a specific binary. The browser
+   only hosts the page; no clicks are scripted. Headless needs a Chromium: `npx playwright-core install chromium`.
 
 Methods, all in model tile coordinates (x east, y south):
 
@@ -60,6 +68,12 @@ mean sand?`), unknown parameter names are rejected, and a placement that does no
 (MCP client, server, dev server, headless Chromium) and needs a Chromium: set `PLAYWRIGHT_BROWSERS_PATH`
 or run `npx playwright-core install chromium`. `E2E_OUT=<dir>` saves the screenshots it takes.
 
+`npm run perf` (after `npm run build`) clicks through the tile editor's tools on a 48×48 map in
+headless Chromium and reads the browser's Event Timing entries, the numbers Interaction to Next Paint
+is built from. It fails when an interaction's p75 latency passes 200 ms, or when the map image the
+editor patched in place after those edits differs by a single pixel from a full render. CI runs it on
+every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust it.
+
 ## Scripts
 
 | Command           | What it does                    |
@@ -71,6 +85,7 @@ or run `npx playwright-core install chromium`. `E2E_OUT=<dir>` saves the screens
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
 | `npm test`        | Unit tests (no browser needed)  |
 | `npm run test:e2e`| MCP end-to-end test (Chromium)  |
+| `npm run perf`    | Editor latency budget (Chromium)|
 | `npm run mcp`     | Run the MCP server on stdio     |
 
 Requires Node 18+.

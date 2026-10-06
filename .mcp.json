@@ -2,7 +2,10 @@
   "mcpServers": {
     "hexwright": {
       "command": "node",
-      "args": ["mcp/server.mjs"]
+      "args": ["mcp/server.mjs"],
+      "env": {
+        "HEXWRIGHT_BROWSER": "auto"
+      }
     }
   }
 }

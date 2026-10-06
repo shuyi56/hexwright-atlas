@@ -3,10 +3,10 @@ import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, setElev, shiftElev } from './ops.js';
-import { EL, THH, TWH, renderTiles, rotInst, thumb } from './render.js';
+import { EL, THH, TWH, renderTiles, rotInst, thumb, updateTiles } from './render.js';
 
 /* ================= tile editor screen ================= */
-const root = $('editor'), cv = $('edCanvas'), cx = cv.getContext('2d'), statusEl = $('edStatus'), stage = $('edStage');
+const root = $('editor'), cv = $('edCanvas'), cx = cv.getContext('2d'), ov = $('edOverlay'), ovx = ov.getContext('2d'), statusEl = $('edStatus'), stage = $('edStage');
 const SC = coarse ? 1.4 : 2, SAVE_KEY = 'hexwright.tiles.v1', HIST = 60;
 const TOOLS = [
   ['paint', 'Paint', 'B', '▦'], ['fill', 'Fill', 'G', '◩'], ['raise', 'Raise', 'U', '▲'], ['lower', 'Lower', 'J', '▼'], ['level', 'Level', 'L', '▬'],
@@ -29,14 +29,14 @@ function redo() { if (!ED.redo.length) return; ED.undo.push(cloneModel(ED.M)); s
 function showSize(S) { const sel = $('edSize'); if (![...sel.options].some(o => +o.value === S)) { const o = new Option(String(S)); sel.add(o, [...sel.options].find(x => +x.value > S) || null); } sel.value = String(S); }
 function syncHist() { $('edUndo').disabled = !ED.undo.length; $('edRedo').disabled = !ED.redo.length; }
 function setModel(M, keepView) {
-  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.stale = true;
+  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.stale = resize || ED.stale === true ? true : 'model';
   $('edName').value = M.name; showSize(M.S);
   syncHist(); autosave();
   if (resize || !keepView) { rebuild(); fitView(); } else changed();
   status();
 }
-/* piecesOnly: terrain and heights are untouched, so the cached ground layer can be reused */
-function changed(piecesOnly) { if (!piecesOnly || !ED.R) ED.stale = true; else if (!ED.stale) ED.stale = 'pieces'; autosave(); req(); }
+/* the model was edited: the next frame patches the map image rather than redrawing it */
+function changed() { if (!ED.stale) ED.stale = 'model'; autosave(); req(); }
 
 /* ---------- programmatic edits (used by the automation API) ---------- */
 function ensureModel() { if (!ED.M) { ED.M = restore() || generateScene('ember', 28, 'vale'); ED.stale = true; } return ED.M; }
@@ -61,8 +61,13 @@ function setRot(r) {
 }
 
 /* ---------- view ---------- */
-function rebuild() { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid, base: ED.stale === 'pieces' && ED.R ? ED.R.base : null }); ED.stale = false; }
-function size() { const r = stage.getBoundingClientRect(); if (!r.width) return; ED.cw = r.width; ED.ch = r.height; cv.width = Math.round(r.width * state.dpr); cv.height = Math.round(r.height * state.dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; req(); }
+/* ED.stale is true when the view itself changed (rotation, grid, size) and 'model' after an edit */
+function rebuild() {
+  if (ED.stale !== true && ED.R && updateTiles(ED.R, ED.M)) { const b = ED.R.patched; if (b && patch !== 'all') patch = patch ? [Math.min(patch[0], b[0]), Math.min(patch[1], b[1]), Math.max(patch[2], b[2]), Math.max(patch[3], b[3])] : b; }
+  else { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid }); patch = 'all'; }
+  ED.stale = false;
+}
+function size() { const r = stage.getBoundingClientRect(); if (!r.width) return; ED.cw = r.width; ED.ch = r.height; for (const c of [cv, ov]) { c.width = Math.round(r.width * state.dpr); c.height = Math.round(r.height * state.dpr); c.style.width = r.width + 'px'; c.style.height = r.height + 'px'; } patch = 'all'; req(); }
 function fitView() { if (!ED.R) return; ED.fitZ = Math.min(ED.cw / ED.R.W, ED.ch / ED.R.H) * 0.96; ED.z = ED.fitZ; ED.ox = (ED.cw - ED.R.W * ED.z) / 2; ED.oy = (ED.ch - ED.R.H * ED.z) / 2; req(); }
 const clampZ = v => Math.max(ED.fitZ * 0.5, Math.min(Math.max(ED.fitZ * 8, 4), v));
 function zoomAt(sx, sy, nz) { nz = clampZ(nz); const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z; ED.z = nz; ED.ox = sx - wx * ED.z; ED.oy = sy - wy * ED.z; req(); }
@@ -83,13 +88,58 @@ function pick(sx, sy) {
 const brushTiles = (x, y) => brushAt(ED.M, x, y, ED.brush);
 const ghost = () => ED.hover && { id: ED.asset, x: ED.hover.x, y: ED.hover.y, face: ED.face, v: 0.37 };
 
+/* the soft shadow the map casts on the desk, blurred once per map and zoom level rather than every
+   frame; blurring the whole map image on each hover cost more than everything else in a frame */
+let shade = null;
+function dropShadow(R) {
+  const z = ED.z, dpr = state.dpr;
+  if (shade && shade.R === R && shade.z === z && shade.dpr === dpr) return shade;
+  const S = R.S, pts = [R.P(0, 0, 0), R.P(S, 0, 0), R.P(S, 0, -30), R.P(S, S, -30), R.P(0, S, -30), R.P(0, S, 0)];
+  const x0 = Math.min(...pts.map(p => p[0])), y0 = Math.min(...pts.map(p => p[1])), x1 = Math.max(...pts.map(p => p[0])), y1 = Math.max(...pts.map(p => p[1]));
+  /* blur 36 and drop 16 device px, as a canvas shadow on the image itself would; drawn at reduced size when zoomed in, which a blur this soft hides */
+  const pad = 90, q = Math.min(1, 1600 / ((Math.max(x1 - x0, y1 - y0)) * z * dpr + 2 * pad)), k = z * dpr * q;
+  const can = document.createElement('canvas'); can.width = Math.ceil((x1 - x0) * k + 2 * pad * q); can.height = Math.ceil((y1 - y0) * k + 2 * pad * q);
+  const g = can.getContext('2d'), off = can.width + 50;
+  g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 36 * q; g.shadowOffsetX = off; g.shadowOffsetY = 16 * q;
+  /* the shape itself sits off the left edge so only its shadow lands on the canvas */
+  g.setTransform(k, 0, 0, k, pad * q - x0 * k - off, pad * q - y0 * k);
+  g.beginPath(); pts.forEach((p, j) => j ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fillStyle = '#000'; g.fill();
+  const css = 1 / (dpr * q);
+  shade = { R, z, dpr, can, x: x0 * z - pad / dpr, y: y0 * z - pad / dpr, w: can.width * css, h: can.height * css };
+  return shade;
+}
+
+/* Two stacked canvases: the map below is redrawn only when the map or the view changes, since
+   scaling the full-size map image down to the screen is the slowest thing a frame does. The hover
+   outline and piece ghost go on the overlay above, which every pointer move redraws. */
+let drawn = '', patch = null;
 function draw() {
   raf = 0; if (!ED.open) return;
   if (ED.stale) rebuild();
-  const g = cx, R = ED.R, dpr = state.dpr;
-  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, ED.cw, ED.ch);
-  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-  g.save(); g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 36; g.shadowOffsetY = 16; g.drawImage(R.can, ED.ox, ED.oy, R.W * ED.z, R.H * ED.z); g.restore();
+  const R = ED.R, dpr = state.dpr, view = [ED.ox, ED.oy, ED.z, ED.cw, ED.ch, dpr].join(), m = cx;
+  if (view !== drawn || patch === 'all') {
+    drawn = view; patch = null;
+    m.setTransform(dpr, 0, 0, dpr, 0, 0); m.clearRect(0, 0, ED.cw, ED.ch);
+    m.imageSmoothingEnabled = true; m.imageSmoothingQuality = 'high';
+    const sh = dropShadow(R); m.drawImage(sh.can, ED.ox + sh.x, ED.oy + sh.y, sh.w, sh.h);
+    m.drawImage(R.can, ED.ox, ED.oy, R.W * ED.z, R.H * ED.z);
+  } else if (patch) {
+    /* an edit patched part of the map image: copy just that part to the screen, reading a margin
+       around it so the scaled edges sample the same neighbours a full copy would */
+    const b = patch, k = ED.z * dpr, x0 = Math.max(0, Math.floor((ED.ox + b[0] * ED.z) * dpr)), y0 = Math.max(0, Math.floor((ED.oy + b[1] * ED.z) * dpr));
+    const x1 = Math.min(cv.width, Math.ceil((ED.ox + b[2] * ED.z) * dpr)), y1 = Math.min(cv.height, Math.ceil((ED.oy + b[3] * ED.z) * dpr)); patch = null;
+    if (x1 > x0 && y1 > y0) {
+      const pad = 4 / Math.min(1, k / R.SC), sx0 = Math.max(0, (x0 - ED.ox * dpr) / k * R.SC - pad), sy0 = Math.max(0, (y0 - ED.oy * dpr) / k * R.SC - pad);
+      const sx1 = Math.min(R.can.width, (x1 - ED.ox * dpr) / k * R.SC + pad), sy1 = Math.min(R.can.height, (y1 - ED.oy * dpr) / k * R.SC + pad);
+      m.save(); m.setTransform(1, 0, 0, 1, 0, 0); m.beginPath(); m.rect(x0, y0, x1 - x0, y1 - y0); m.clip(); m.clearRect(x0, y0, x1 - x0, y1 - y0);
+      m.imageSmoothingEnabled = true; m.imageSmoothingQuality = 'high';
+      const sh = dropShadow(R); m.drawImage(sh.can, (ED.ox + sh.x) * dpr, (ED.oy + sh.y) * dpr, sh.w * dpr, sh.h * dpr);
+      if (sx1 > sx0 && sy1 > sy0) m.drawImage(R.can, sx0, sy0, sx1 - sx0, sy1 - sy0, ED.ox * dpr + sx0 / R.SC * k, ED.oy * dpr + sy0 / R.SC * k, (sx1 - sx0) / R.SC * k, (sy1 - sy0) / R.SC * k);
+      m.restore();
+    }
+  }
+  const g = ovx;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, ov.width, ov.height);
   if (!ED.hover) return;
   g.save(); g.setTransform(dpr * ED.z, 0, 0, dpr * ED.z, dpr * ED.ox, dpr * ED.oy);
   const outline = (tiles, stroke, fill) => {
@@ -120,8 +170,8 @@ function applyAt(p, first) {
   else if (ED.tool === 'raise' || ED.tool === 'lower') { const fresh = brushTiles(p.x, p.y).filter(([x, y]) => { const k = x + ',' + y + '#'; if (st.seen.has(k)) return false; st.seen.add(k); return true; }); shiftElev(M, fresh, ED.tool === 'raise' ? 1 : -1); changed(); }
   else if (ED.tool === 'level') { if (first) st.level = M.elev[p.y * S + p.x]; setElev(M, brushTiles(p.x, p.y), st.level); changed(); }
   else if (ED.tool === 'fill' && first) { if (floodFill(M, p.x, p.y, ED.terrain)) changed(); }
-  else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(true); }
-  else if (ED.tool === 'erase') { if (eraseAt(M, p.x, p.y)) changed(true); }
+  else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(); }
+  else if (ED.tool === 'erase') { if (eraseAt(M, p.x, p.y)) changed(); }
   else if (ED.tool === 'pick' && first) { const k = objAt(M, p.x, p.y); if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); } else { ED.terrain = TERRAIN[M.terr[p.y * S + p.x]].id; setTab('Terrain'); setTool('paint'); } syncPalette(); }
 }
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }

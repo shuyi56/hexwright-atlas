@@ -27,20 +27,21 @@ function turnAsset(o, rot, S) {
 /* wall pieces join up with the wall pieces beside them: sets links = [+x, +y, -x, -y] on each wall and tower
    (call on the instances as drawn, after any turning). A gatehouse joins only at the ends of its long side. */
 const WALLISH = new Set(['wall', 'walltower', 'gatehouse']);
-function linkWalls(objs) {
-  const at = new Map();
+function wallLinks(objs) {
+  const at = new Map(), out = new Map();
   for (const o of objs) if (WALLISH.has(o.id)) { const [w, d] = footprint(o); for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) at.set(x + ',' + y, o); }
   for (const o of objs) {
     if (o.id !== 'wall' && o.id !== 'walltower') continue;
     const q = (dx, dy) => { const n = at.get((o.x + dx) + ',' + (o.y + dy)); if (!n || n === o) return 0; if (n.id !== 'gatehouse') return 1; const [w, d] = footprint(n); return (dx !== 0) === (w > d) ? 1 : 0; };
-    o.links = [q(1, 0), q(0, 1), q(-1, 0), q(0, -1)];
+    out.set(o, [q(1, 0), q(0, 1), q(-1, 0), q(0, -1)]);
   }
-  return objs;
+  return out;
 }
+function linkWalls(objs) { for (const [o, links] of wallLinks(objs)) o.links = links; return objs; }
 /* decoration marks on a terrain tile top */
 function decorateTerrain(g, id, at, h, seed) {
   const t = TERRAIN_BY_ID[id]; if (!t || !t.deco) return;
   g.save(); t.deco(g, at, h, mulberry32(seed)); g.restore();
 }
 
-export { ASSETS, ASSET_BY_ID, ASSET_GROUPS, TERRAIN, TERRAIN_BY_ID, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset };
+export { ASSETS, ASSET_BY_ID, ASSET_GROUPS, TERRAIN, TERRAIN_BY_ID, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset, wallLinks };
