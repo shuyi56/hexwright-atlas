@@ -62,3 +62,23 @@ test('storeys survive saving, loading and undo copies', () => {
   const c = cloneModel(M); c.floors[0][0] = 0; assert.notEqual(M.floors[0][0], 0, 'copies do not share floors');
   assert.equal(toJSON(blankModel(4)).floors, undefined, 'single-storey maps save as before');
 });
+
+/* a floor laid over a slope follows the ground, so walking on it obeys the same one-level step as the ground */
+test('upper floors over uneven ground keep the one-level step', () => {
+  const M = blankModel(6, 'grass');
+  M.elev.set([0, 1, 3, 3, 3, 3], 0);  /* row y = 0: heights 0, 1, 3, 3 ... */
+  paintTiles(M, rectTiles(M, 0, 0, 6, 1), 'floorboards', 1);
+  placeChar(M, { sprite: 's', x: 0, y: 0, level: 1 });
+  assert.ok(findPath(M, 0, 1, 0, 1), 'one level up along the floor');
+  assert.equal(findPath(M, 0, 3, 0, 1), null, 'a two-level jump on the floor is refused');
+  M.elev[2] = 2;
+  assert.ok(findPath(M, 0, 3, 0, 1), 'with a one-level step between, the floor can be walked');
+});
+test('stairs only join a floor whose height matches the top of the flight', () => {
+  const M = house(); placeChar(M, { sprite: 's', x: 1, y: 5 });
+  assert.ok(findPath(M, 0, 1, 2, 1), 'level ground: the flight lands on the floor');
+  M.elev[2 * 6 + 1] = 2;  /* the ground under the landing two levels higher: the floor there floats above the flight's top */
+  assert.equal(findPath(M, 0, 1, 2, 1), null);
+  M.elev[2 * 6 + 1] = 1;
+  assert.ok(findPath(M, 0, 1, 2, 1), 'one level off is a normal step');
+});

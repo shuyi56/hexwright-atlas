@@ -142,18 +142,21 @@ function paint(R, clip) {
     const f = R.FL[L], X = u % S, Y = (u / S) | 0, T = TERRAIN[f[u] - 1], z = R.zAt(u, L);
     const a = P(X, Y, z), b = P(X + 1, Y, z), c = P(X + 1, Y + 1, z), d = P(X, Y + 1, z), open = v => v < 0 || !f[v];
     const nR = X + 1 < S ? u + 1 : -1, nL = Y + 1 < S ? u + S : -1;
-    if (open(nR)) poly([b, c, [c[0], c[1] + SLAB], [b[0], b[1] + SLAB]], T.side[1], 0.6);
-    if (open(nL)) poly([d, c, [c[0], c[1] + SLAB], [d[0], d[1] + SLAB]], T.side[0], 0.6);
+    /* the floor's edge shows where it stops, and where the floor next door is lower (it follows the ground) */
+    const drop = v => (open(v) ? SLAB : Math.max(0, z - R.zAt(v, L))), dR = drop(nR), dL = drop(nL);
+    if (dR) poly([b, c, [c[0], c[1] + dR], [b[0], b[1] + dR]], T.side[1], 0.6);
+    if (dL) poly([d, c, [c[0], c[1] + dL], [d[0], d[1] + dL]], T.side[0], 0.6);
     const fs = rgbStr(hexRgb(T.top), 1 + 0.05 * (hrand(back[u], 3 + L) - 0.5));
     g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fillStyle = fs; g.fill(); g.strokeStyle = fs; g.lineWidth = 0.6; g.stroke();
     const t0 = back[u];
     if (opts.deco !== false) decorateTerrain(g, T.id, (fx, fy) => P(X + fx, Y + fy, z), hrand(t0 % S + L * 7, (t0 / S) | 0), t0 * 7919 + 13 + L * 101);
     if (opts.grid) { g.strokeStyle = 'rgba(43,33,22,0.16)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.stroke(); }
     g.strokeStyle = INK; g.lineWidth = 0.8; g.beginPath(); let any = false;
-    if (open(Y > 0 ? u - S : -1)) { g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); any = true; }
-    if (open(nR)) { g.moveTo(b[0], b[1]); g.lineTo(c[0], c[1]); any = true; }
-    if (open(nL)) { g.moveTo(d[0], d[1]); g.lineTo(c[0], c[1]); any = true; }
-    if (open(X > 0 ? u - 1 : -1)) { g.moveTo(a[0], a[1]); g.lineTo(d[0], d[1]); any = true; }
+    const edge = v => open(v) || R.zAt(v, L) !== z;
+    if (edge(Y > 0 ? u - S : -1)) { g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); any = true; }
+    if (edge(nR)) { g.moveTo(b[0], b[1]); g.lineTo(c[0], c[1]); any = true; }
+    if (edge(nL)) { g.moveTo(d[0], d[1]); g.lineTo(c[0], c[1]); any = true; }
+    if (edge(X > 0 ? u - 1 : -1)) { g.moveTo(a[0], a[1]); g.lineTo(d[0], d[1]); any = true; }
     if (any) g.stroke();
   }
   function strata(p, q, h) { g.strokeStyle = 'rgba(43,33,22,0.3)'; g.lineWidth = 0.5; g.beginPath(); for (let k = EL; k < h; k += EL) { g.moveTo(p[0], p[1] + k); g.lineTo(q[0], q[1] + k); } g.stroke(); }

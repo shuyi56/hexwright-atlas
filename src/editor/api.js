@@ -112,7 +112,7 @@ const EDITS = {
     if (p.path) { p.path.forEach(([x, y]) => tileOf(M, x, y)); path = p.path; }
     else { if (!p.to) fail('walkCharacter needs to or path'); tileOf(M, p.to.x, p.to.y, 'target'); path = findPath(M, k, p.to.x, p.to.y, p.to.level); if (!path) return { changed: 0, walked: false, reason: `no route to ${p.to.x},${p.to.y}: the tile is blocked or cut off` }; }
     if (!path.length) return { changed: 0, walked: false, reason: 'already there' };
-    const r = doWalk(k, path); return r.ok ? { changed: 1, walked: true, steps: r.steps, character: charInfo(M, k) } : { changed: 0, walked: false, reason: r.reason };
+    const r = doWalk(k, path); return r.ok ? { changed: 1, walked: true, steps: r.steps, route: path.map(([x, y, L]) => [x, y, L || 0]), character: charInfo(M, k) } : { changed: 0, walked: false, reason: r.reason };
   },
   removeCharacter(M, p) {
     const k = p.index != null ? p.index : p.x != null && p.y != null ? (tileOf(M, p.x, p.y), charAt(M, p.x, p.y, -1, p.level || 0)) : fail('removeCharacter needs index or x and y');

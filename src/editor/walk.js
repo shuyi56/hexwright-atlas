@@ -6,9 +6,11 @@ import { MAX_LEVEL, floorAt, levelOf, objAt } from './model.js';
    A tile on level L is free when it is on the map, has ground (dry, not lava) or, above the ground, a floor,
    and holds neither a piece (other than one made to be walked through, such as a doorway or stairs) nor
    another character on that level.
-   A step goes to one of the four edge-neighbours on the same level; on the ground it may climb or drop at
-   most one height level. Stairs join two levels: from a stairs piece on level L a step towards its high end
-   (its back) lands on the tile behind it on level L + 1, and the same step back comes down. Pure, so the
+   A step goes to one of the four edge-neighbours on the same level and may climb or drop at most one height
+   level; an upper floor follows the ground under it, so the rule holds there too. Stairs join two levels:
+   from a stairs piece on level L a step towards its high end (its back) lands on the tile behind it on level
+   L + 1, and the same step back comes down, provided the flight's top and that floor are within one height
+   level of each other. Pure, so the
    pointer and the automation API walk by the same rules. Positions in paths are [x, y, level]. */
 const FACE_DELTA = [[0, 1], [1, 0], [0, -1], [-1, 0]];  /* facing 0..3 = south-west, south-east, north-east, north-west */
 const MAX_STEP = 1;
@@ -23,8 +25,9 @@ function blockedBy(M, x, y, except = -1, L = 0) {
   return null;
 }
 const isFree = (M, x, y, except = -1, L = 0) => !blockedBy(M, x, y, except, L);
-/* a step on one level */
-const canStep = (M, x, y, nx, ny, except = -1, L = 0) => isFree(M, nx, ny, except, L) && (L > 0 || Math.abs(M.elev[ny * M.S + nx] - M.elev[y * M.S + x]) <= MAX_STEP);
+/* a step on one level: free, and no more than MAX_STEP height levels up or down (floors sit on the ground's height) */
+const climb = (M, x, y, nx, ny) => Math.abs(M.elev[ny * M.S + nx] - M.elev[y * M.S + x]);
+const canStep = (M, x, y, nx, ny, except = -1, L = 0) => isFree(M, nx, ny, except, L) && climb(M, x, y, nx, ny) <= MAX_STEP;
 const faceOf = (dx, dy) => FACE_DELTA.findIndex(([a, b]) => a === dx && b === dy);
 /* the stairs piece on (x, y, L), if any, and the tile its top lands on (one level up) */
 function stairsAt(M, x, y, L) {
@@ -38,10 +41,10 @@ function neighbours(M, x, y, L, except) {
     const nx = x + dx, ny = y + dy; if (!inb(M, nx, ny)) continue;
     if (canStep(M, x, y, nx, ny, except, L)) out.push([nx, ny, L]);
     /* down a flight: the tile in front is stairs on the level below whose top is here */
-    if (L > 0) { const st = stairsAt(M, nx, ny, L - 1); if (st && st.up[0] === x && st.up[1] === y && isFree(M, nx, ny, except, L - 1)) out.push([nx, ny, L - 1]); }
+    if (L > 0) { const st = stairsAt(M, nx, ny, L - 1); if (st && st.up[0] === x && st.up[1] === y && isFree(M, nx, ny, except, L - 1) && climb(M, x, y, nx, ny) <= MAX_STEP) out.push([nx, ny, L - 1]); }
   }
   /* up a flight */
-  const st = stairsAt(M, x, y, L); if (st && L < MAX_LEVEL && isFree(M, st.up[0], st.up[1], except, L + 1)) out.push(st.up);
+  const st = stairsAt(M, x, y, L); if (st && L < MAX_LEVEL && inb(M, st.up[0], st.up[1]) && isFree(M, st.up[0], st.up[1], except, L + 1) && climb(M, x, y, st.up[0], st.up[1]) <= MAX_STEP) out.push(st.up);
   return out;
 }
 const stepOK = (M, from, to, except) => neighbours(M, from[0], from[1], from[2], except).some(n => n[0] === to[0] && n[1] === to[1] && n[2] === to[2]);

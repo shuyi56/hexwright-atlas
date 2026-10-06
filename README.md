@@ -44,11 +44,13 @@ hidden so you can always see inside.
   character on it steps off its top end onto the floor tile behind it, one storey up. Leave that tile's
   floor in place and take up the floor over the stairs for a stairwell. With **Walk**, clicking any reachable
   tile on any storey routes the character there, up and down stairs as needed.
-- **Heights:** raising and lowering land works on the ground only.
+- **Heights:** raising and lowering land works on the ground only. A floor follows the ground under it, so
+  walking keeps the one-level step everywhere: on the ground, along a floor laid over a slope, and onto the
+  landing at the top of a flight.
 
 Saved maps include their floors, and maps without them save exactly as before. In the automation API, edits
 and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `getTile`, `listObjects`,
-`ascii`, `placeCharacter`, `walkCharacter`, `removeCharacter`). `removeFloor` takes floor up, and
+`ascii`, `placeCharacter`, `walkCharacter` (which returns the route it took), `removeCharacter`). `removeFloor` takes floor up, and
 `setView({ level })` switches the storey.
 
 ### Characters
