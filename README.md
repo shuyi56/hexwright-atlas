@@ -21,7 +21,7 @@ district** opens just the selected district. The map is autosaved in the browser
 The **Interior** tab holds room pieces and furniture, and the Terrain tab has a **Floors** group (floorboards,
 dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
 
-- **Room pieces:** an interior wall, a wall with a window, a doorway, a fireplace and a timber post. Walls are
+- **Room pieces:** an interior wall, a wall with a window, a doorway, a fireplace, stairs and a timber post. Walls are
   kept low, cut away like a dolls' house so the room stays visible, and they join the room pieces beside them
   into corners and tees. Characters can walk through a doorway; every other piece blocks them.
 - **Furniture:** a bed, a straw cot, a table, a long table, a chair, a stool, a bench, a chest, a wardrobe, a
@@ -29,7 +29,29 @@ dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
   throne, an altar, a pew, a weapon rack and a spinning wheel. Each is drawn in its own frame, so `R` turns it
   to face any of the four ways and turning the view shows its back.
 
+### Storeys
 
+A map has a ground level and up to three floors above it. The **floor** switch over the map (G, 1, 2, 3, or
+`PgUp`/`PgDn`) chooses the storey you work on. Every tool acts on that storey, and the floors above it are
+hidden so you can always see inside.
+
+- **Laying floors:** on floors 1-3, **Paint** and **Fill** lay floor tiles in any terrain (floorboards,
+  carpet and so on), and **Erase** takes up floor where no piece or character stands. A floor sits one storey
+  (16 units) above the ground under it.
+- **Furnishing:** pieces and characters belong to the storey they were placed on. They only collide with
+  things on that storey, so a bedroom can sit directly over the kitchen.
+- **Stairs:** the **Stairs** piece (Interior tab) joins two storeys. It rises towards its back, and a
+  character on it steps off its top end onto the floor tile behind it, one storey up. Leave that tile's
+  floor in place and take up the floor over the stairs for a stairwell. With **Walk**, clicking any reachable
+  tile on any storey routes the character there, up and down stairs as needed.
+- **Heights:** raising and lowering land works on the ground only.
+
+Saved maps include their floors, and maps without them save exactly as before. In the automation API, edits
+and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `getTile`, `listObjects`,
+`ascii`, `placeCharacter`, `walkCharacter`, `removeCharacter`). `removeFloor` takes floor up, and
+`setView({ level })` switches the storey.
+
+### Characters
 
 The **Characters** tab lists your character library. Six detailed starters come with it: a villager in a vest, a
 farmer in a straw hat and apron, a guard with helmet, cape and spear, a bearded merchant with a satchel, a hooded
@@ -99,7 +121,7 @@ Methods, all in model tile coordinates (x east, y south):
 | Group    | Methods |
 | -------- | ------- |
 | Discover | `describe` (terrain, assets, biomes, limits), `state`, `ascii` (text map), `getTile`, `getRegion`, `listObjects`, `listSprites`, `listCharacters`, `getMap` |
-| Edit     | `paint`, `fill`, `elevation`, `place`, `erase`, `moveObject`, `placeCharacter`, `walkCharacter`, `removeCharacter`, `useTool` (a drag path), `batch` (atomic, one undo step), `rename` |
+| Edit     | `paint`, `fill`, `elevation`, `place`, `erase`, `moveObject`, `removeFloor`, `placeCharacter`, `walkCharacter`, `removeCharacter`, `useTool` (a drag path), `batch` (atomic, one undo step), `rename` |
 | Map      | `newMap`, `generate`, `setMap`, `undo`, `redo` |
 | View     | `open`, `close`, `setView` (rotation, zoom, centre, grid), `setSelection`, `tileToScreen`, `screenToTile` |
 | See      | `screenshot` (`map`: offscreen render at any scale, rotation or tile crop; `viewport`: the on-screen canvas) |
