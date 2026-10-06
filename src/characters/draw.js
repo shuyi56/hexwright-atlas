@@ -7,8 +7,9 @@ import { SIZE } from './sprite.js';
    colours on paper, so every sprite colour is washed a little toward the paper tone and faintly grained
    like the map image. The one-pixel outline is the tiles' ink softened by the colour it borders, and the
    light from the left comes in gentle pixel steps (a highlight band on the lit side, a shade band on the
-   far side). At normal zoom the pixels stay square; zoomed in close, where square steps would stand out
-   against the tiles' smooth lines, the frame is rounded by Scale2x and drawn anti-aliased (see drawSprite). */
+   far side). On the map a character is treated exactly like the tiles: its frame is rendered once at the
+   map image's own resolution and that image is scaled with the map, so its colours, line weight and
+   softness are the same at every zoom (see drawSprite). */
 const PAD = 1, UP = 1, N = SIZE + PAD * 2;
 const INK_RGB = hexRgb(INK), PAPER = [240, 230, 203];
 const lum = rgb => rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11, dark = rgb => lum(rgb) < 60;
@@ -19,7 +20,7 @@ const out = (c, k, gr = 1) => c.map(ch => Math.max(0, Math.min(255, Math.round(c
 
 /* Each pixel of the finished frame as a label: 0 clear, 1 + 4 * (index - 1) + band for a filled pixel (band 0
    plain, 1 lit, 2 shaded, 3 dark detail drawn as is), and OUTLINE + index for an outline pixel bordering that
-   colour. Labels let the frame be scaled up by Scale2x without grain or rounding errors spoiling its edges. */
+   colour. */
 const OUTLINE = 1 << 12;
 function labels(fr) {
   const L = new Int32Array(N * N), at = (x, y) => (x < 0 || y < 0 || x >= SIZE || y >= SIZE ? 0 : fr[y * SIZE + x]);
@@ -35,18 +36,7 @@ function labels(fr) {
   }
   return L;
 }
-/* Scale2x on labels: doubles the image, rounding corners and staircases where two sides agree */
-function scale2x(src, n) {
-  const m = n * 2, out = new Int32Array(m * m), at = (x, y) => (x < 0 || y < 0 || x >= n || y >= n ? 0 : src[y * n + x]);
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const P = src[y * n + x], A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1), o = 2 * y * m + 2 * x;
-    out[o] = C === A && C !== D && A !== B ? A : P; out[o + 1] = A === B && A !== C && B !== D ? B : P;
-    out[o + m] = D === C && D !== B && C !== A ? C : P; out[o + m + 1] = B === D && B !== A && D !== C ? D : P;
-  }
-  return out;
-}
-/* paint labels to a canvas of side n; grain is per output pixel, so the scaled-up versions are grained like
-   the map image rather than in big blocks */
+/* paint labels to a canvas of side n */
 function paintLabels(pal, L, n) {
   const rgb = pal.map(h => wash(hexRgb(h))), c = document.createElement('canvas'); c.width = c.height = n;
   const g = c.getContext('2d'), im = g.createImageData(n, n), d = im.data;
@@ -59,27 +49,8 @@ function paintLabels(pal, L, n) {
   }
   g.putImageData(im, 0, 0); return c;
 }
-/* the finished frame at UP-fold detail: 1 is the true pixel art; 4 and 8 are Scale2x'd for close zoom */
-function pixelFrame(pal, fr, up = 1) {
-  let L = labels(fr), n = N; for (let k = 1; k < up; k *= 2) { L = scale2x(L, n); n *= 2; }
-  if (up > 1) thinOutline(L, n, up >= 8 ? 2.6 : 1.6);
-  return paintLabels(pal, L, n);
-}
-/* Scaled up, a one-pixel outline would be four or eight fine pixels wide, heavier than the tiles' ink.
-   Keep only the part within r fine pixels of the figure: about 0.4 of a sprite pixel at 4x, a third at 8x. */
-function thinOutline(L, n, r) {
-  const R = Math.ceil(r), drop = [];
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const u = y * n + x; if (L[u] < OUTLINE) continue;
-    let near = false;
-    for (let j = -R; j <= R && !near; j++) for (let i = -R; i <= R; i++) {
-      const xx = x + i, yy = y + j; if (xx < 0 || yy < 0 || xx >= n || yy >= n || i * i + j * j > r * r) continue;
-      const l = L[yy * n + xx]; if (l && l < OUTLINE) { near = true; break; }
-    }
-    if (!near) drop.push(u);
-  }
-  for (const u of drop) L[u] = 0;
-}
+/* the finished pixel-art frame, one canvas pixel per sprite pixel */
+function pixelFrame(pal, fr) { return paintLabels(pal, labels(fr), N); }
 
 /* the flat pixels of one frame as a SIZE×SIZE canvas, for the pixel grid */
 function renderFrame(s, face, k) {
@@ -88,22 +59,33 @@ function renderFrame(s, face, k) {
   for (let u = 0; u < fr.length; u++) { const v = fr[u]; if (!v || !s.pal[v - 1]) continue; const [r, gg, b] = hexRgb(s.pal[v - 1]); im.data.set([r, gg, b, 255], u * 4); }
   g.putImageData(im, 0, 0); return c;
 }
-/* finished frames are cached by their content and detail level, so the sprite editor's unsaved edits and the library share it */
+/* finished frames are cached by their content, so the sprite editor's unsaved edits and the library share it */
 const cache = new Map();
-function frameCanvas(s, face, k, up = 1) {
-  const fr = s.frames[face][k], key = up + '|' + s.pal.join() + '|' + String.fromCharCode(...fr);
-  let c = cache.get(key); if (!c) { if (cache.size > 300) cache.clear(); c = pixelFrame(s.pal, fr, up); cache.set(key, c); }
+function frameCanvas(s, face, k) {
+  const fr = s.frames[face][k], key = s.pal.join() + '|' + String.fromCharCode(...fr);
+  let c = cache.get(key); if (!c) { if (cache.size > 300) cache.clear(); c = pixelFrame(s.pal, fr); cache.set(key, c); }
   return c;
 }
-/* Draw a frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units.
-   - under about 1.5 screen pixels per sprite pixel: the true frame, filtered down so detail is not dropped
-   - up to 4: the true frame, hard-edged, the crisp pixel-art look
-   - larger: the frame rounded by Scale2x (4x, or 8x past 10 screen pixels) and drawn smoothed, so its edges
-     are anti-aliased curves like the tiles' lines instead of big square steps */
-function drawSprite(g, s, face, k, x, y, px) {
-  const m = g.getTransform(), screen = Math.hypot(m.a, m.b) * px, up = screen < 4 ? 1 : screen < 10 ? 4 : 8, can = frameCanvas(s, face, k, up);
-  g.save(); g.imageSmoothingEnabled = screen < 1.5 || up > 1; g.imageSmoothingQuality = 'high';
-  g.drawImage(can, x - N / 2 * px, y - (PAD + SIZE) * px, N * px, N * px); g.restore();
+/* The frame as the map image would hold it: res canvas pixels per sprite pixel (the map's SC times the sprite
+   pixel size; below one, so the pixel art is filtered down the way the tiles' fine lines are). */
+const LOOK_RES = 0.84, looks = new Map();
+function lookCanvas(s, face, k, res = LOOK_RES) {
+  const base = frameCanvas(s, face, k), key = res + '|' + s.pal.join() + '|' + String.fromCharCode(...s.frames[face][k]);
+  let c = looks.get(key);
+  if (!c) {
+    if (looks.size > 300) looks.clear();
+    c = document.createElement('canvas'); c.width = c.height = Math.max(1, Math.round(N * res));
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(base, 0, 0, c.width, c.height);
+    looks.set(key, c);
+  }
+  return c;
+}
+/* Draw a frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units and res
+   the map image's pixels per sprite pixel. Always the same image, always smoothed, exactly as the map canvas
+   is drawn to the screen: zoomed out or in, the character keeps the tiles' colours, line weight and softness. */
+function drawSprite(g, s, face, k, x, y, px, res = LOOK_RES) {
+  g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(lookCanvas(s, face, k, res), x - N / 2 * px, y - (PAD + SIZE) * px, N * px, N * px); g.restore();
 }
 /* soft ground shadow under a figure, leaning the way the pieces' shadows lean */
 function footShadow(g, x, y, px) {

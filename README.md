@@ -30,9 +30,9 @@ flipped. Every stroke saves to the library at once, and characters can be export
 On the map, characters are crisp pixel art in the tiles' pale palette. The renderer washes each colour
 slightly toward the paper tone and adds the map's faint grain. It draws a one-pixel outline in the tiles' ink,
 softened by the colour it borders, and lights each part from the left in gentle pixel steps, the way the pieces
-are lit. At normal zoom the pixels
-stay square. Zoomed in close, the frame is rounded off by Scale2x and drawn anti-aliased, so its edges stay
-as smooth as the tiles' lines instead of turning into big square steps. A figure stands about as tall as a cottage's eaves. Characters drawn
+are lit. On the map, a character is handled exactly
+like the tiles. Its frame is rendered once at the map image's own resolution and scaled with the map, so its
+colours, line weight and softness look the same at every zoom. A figure stands about as tall as a cottage's eaves. Characters drawn
 at 16×16 in an earlier version are doubled to 32×32 when they load. **Shaded** in the character editor and
 the **On the map** preview, which shows each facing on a grass block, display that finished look while you
 draw.
