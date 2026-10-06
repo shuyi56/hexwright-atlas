@@ -3,32 +3,41 @@ import { TERRAIN_BY_ID } from '../tiles/index.js';
 import { SIZE } from './sprite.js';
 
 /* ================= character sprites: pixel art =================
-   Characters are drawn as crisp pixel art in the tile set's colours: a one-pixel outline in the tiles'
-   ink round the figure, and light from the left in hard pixel steps (a highlight band on the lit side,
-   a shadow band on the far side) the way the kit lights its pieces. Nothing is smoothed: the pixels
-   stay square at every zoom where they are big enough to see. */
+   Characters are crisp pixel art made to sit in the tile set's palette. The tiles are pale, chalky
+   colours on paper, so every sprite colour is washed a little toward the paper tone and faintly grained
+   like the map image. The one-pixel outline is the tiles' ink softened by the colour it borders, and the
+   light from the left comes in gentle pixel steps (a highlight band on the lit side, a shade band on the
+   far side). Nothing is smoothed: pixels stay square at every zoom where they are big enough to see. */
 const PAD = 1, UP = 1, N = SIZE + PAD * 2;
-const INK_RGB = hexRgb(INK);
+const INK_RGB = hexRgb(INK), PAPER = [240, 230, 203];
 const lum = rgb => rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11, dark = rgb => lum(rgb) < 60;
+const noise = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+/* toward the paper: 14% of the paper tone and a tenth of the saturation gone */
+const wash = c => { const l = lum(c); return c.map((ch, i) => (ch * 0.9 + l * 0.1) * 0.86 + PAPER[i] * 0.14); };
+const out = (c, k, gr) => c.map(ch => Math.max(0, Math.min(255, Math.round(ch * k * gr))));
 
 /* the shaded, outlined frame as an N×N canvas (one pixel of margin for the outline); feet on row PAD + SIZE */
 function pixelFrame(pal, fr) {
-  const rgb = pal.map(hexRgb), c = document.createElement('canvas'); c.width = c.height = N;
+  const rgb = pal.map(h => wash(hexRgb(h))), c = document.createElement('canvas'); c.width = c.height = N;
   const g = c.getContext('2d'), im = g.createImageData(N, N), d = im.data, at = (x, y) => (x < 0 || y < 0 || x >= SIZE || y >= SIZE ? 0 : fr[y * SIZE + x]);
   /* each row's extent, so the light bands follow the figure's own width (arms, head, legs alike) */
   const lo = new Int32Array(SIZE).fill(SIZE), hi = new Int32Array(SIZE).fill(-1);
   for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (fr[y * SIZE + x]) { if (x < lo[y]) lo[y] = x; hi[y] = x; }
-  const put = (x, y, col, a = 255) => { const o = ((y + PAD) * N + x + PAD) * 4; d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = a; };
+  const put = (x, y, col) => { const o = ((y + PAD) * N + x + PAD) * 4; d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = 255; };
   for (let y = -PAD; y < SIZE + PAD; y++) for (let x = -PAD; x < SIZE + PAD; x++) {
-    const v = at(x, y);
-    if (!v) { if (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1)) put(x, y, INK_RGB); continue; }
+    const v = at(x, y), gr = 1 + (noise(x + 7, y + 3) - 0.5) * 0.06;
+    if (!v) {
+      /* outline: ink, warmed by the colour it borders so a pale sleeve gets a lighter line than a dark boot */
+      const n = at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1); if (!n) continue;
+      const nc = rgb[n - 1] || INK_RGB; put(x, y, INK_RGB.map((ch, i) => ch * 0.62 + nc[i] * 0.45 * 0.38)); continue;
+    }
     const col = rgb[v - 1] || INK_RGB; if (dark(col)) { put(x, y, col); continue; }
     /* a lit run of pixels on the left of each part, shade on the right; the top edge of a part catches light too */
     const span = hi[y] - lo[y] + 1, t = (x - lo[y]) / Math.max(1, span - 1);
     const edgeL = !at(x - 1, y) || at(x - 1, y) !== v, edgeR = !at(x + 1, y) || at(x + 1, y) !== v, top = !at(x, y - 1);
     let k = 1;
-    if (t > 0.72 || (edgeR && t > 0.5)) k = 0.8; else if ((edgeL && t < 0.5) || top) k = 1.12;
-    put(x, y, col.map(ch => Math.min(255, Math.round(ch * k))));
+    if (t > 0.72 || (edgeR && t > 0.5)) k = 0.89; else if ((edgeL && t < 0.5) || top) k = 1.06;
+    put(x, y, out(col, k, gr));
   }
   g.putImageData(im, 0, 0); return c;
 }

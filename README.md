@@ -27,8 +27,10 @@ left/right), each with a standing frame and a stride frame. **Mirror to other si
 flipped. Every stroke saves to the library at once, and characters can be exported and imported as
 `.character.json`.
 
-On the map, characters are crisp pixel art. The renderer adds a one-pixel outline in the tiles' ink colour and
-lights each part from the left in hard pixel steps, the way the pieces are lit. Pixels stay square at every
+On the map, characters are crisp pixel art in the tiles' pale palette. The renderer washes each colour
+slightly toward the paper tone and adds the map's faint grain. It draws a one-pixel outline in the tiles' ink,
+softened by the colour it borders, and lights each part from the left in gentle pixel steps, the way the pieces
+are lit. Pixels stay square at every
 zoom where they are large enough to see. A figure stands about as tall as a cottage's eaves. Characters drawn
 at 16×16 in an earlier version are doubled to 32×32 when they load. **Shaded** in the character editor and
 the **On the map** preview, which shows each facing on a grass block, display that finished look while you

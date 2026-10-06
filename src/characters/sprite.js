@@ -6,7 +6,7 @@ const SIZE = 32, OLD_SIZE = 16, FACES = ['sw', 'se', 'ne', 'nw'], FRAMES = 2, MA
 const FACE_LABEL = { sw: 'Front left', se: 'Front right', ne: 'Back right', nw: 'Back left' };
 const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 /* the tile set's own colours: ink, skin, timber, thatch, roof tiles, slate, plaster, foliage, stone */
-const DEFAULT_PAL = ['#2b2116', '#e8c49a', '#c99a6e', '#5a3f28', '#7a5a3a', '#d9b860', '#bf9850', '#a6533b', '#7c3a2a', '#66727e', '#48525c', '#4f6f8f', '#efe3c4', '#d3c199', '#87a05a', '#637d43', '#ddd1b0', '#9aa3a6', '#7a6a8a', '#c9a24f'];
+const DEFAULT_PAL = ['#2b2116', '#e8c49a', '#d0a87e', '#7a5a3a', '#9a7a56', '#d9b860', '#c9a868', '#b8664a', '#9a4a38', '#8592a0', '#6f7a86', '#6f8faa', '#efe3c4', '#d3c199', '#9fb06a', '#87a05a', '#ddd1b0', '#b9bfc0', '#9a8aaa', '#c9a24f'];
 
 const blankFrame = () => new Uint8Array(SIZE * SIZE);
 function blankSprite(name = 'New character', id = newId()) {
@@ -65,7 +65,7 @@ function spriteFromJSON(J) {
    (south-east); the left-facing views are mirror images. */
 const darken = (hex, k) => '#' + [1, 3, 5].map(i => Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
 function figure(name, id, o) {
-  const c = Object.assign({ skin: '#e8c49a', eye: '#2b2116', lip: '#4a2a22', boots: '#4a3524', legs: '#8c6d4b', belt: '#5a3f28', buckle: '#c9a24f', inner: '#efe3c4' }, o.col);
+  const c = Object.assign({ skin: '#e8c49a', eye: '#2b2116', lip: '#8a5444', boots: '#7a5a3a', legs: '#9a7d5a', belt: '#7a5a3a', buckle: '#c9a24f', inner: '#efe3c4' }, o.col);
   c.skinD = darken(c.skin, 0.84); c.topD = darken(c.top, 0.82); c.sleeve = c.sleeve || c.top; c.sleeveD = darken(c.sleeve, 0.82); c.legsD = darken(c.legs, 0.84); c.bootsD = darken(c.boots, 0.8); c.hairD = darken(c.hair, 0.8);
   if (c.hat) c.hatD = darken(c.hat, 0.8); if (c.apron) c.apronD = darken(c.apron, 0.86); if (c.cape) c.capeD = darken(c.cape, 0.8);
   const pal = [], K = {};
@@ -147,12 +147,12 @@ function figure(name, id, o) {
   return s;
 }
 const starters = () => [
-  figure('Villager', 'starter-villager', { vest: true, col: { hair: '#5a3f28', top: '#efe3c4', vest: '#637d43', sleeve: '#e6d8b6', legs: '#8c6d4b' } }),
-  figure('Farmer', 'starter-farmer', { hat: 'straw', apron: true, col: { hair: '#7a5a3a', hat: '#d9b860', band: '#a6533b', top: '#87a05a', apron: '#d3c199', legs: '#7a5a3a', boots: '#5a3f28' } }),
-  figure('Guard', 'starter-guard', { hat: 'helm', cape: true, spear: true, col: { skin: '#d9b088', hair: '#3a2a1a', hat: '#9aa3a6', top: '#a6533b', sleeve: '#66727e', legs: '#48525c', boots: '#5a3f28', cape: '#7c3a2a', inner: '#c9c4b4' } }),
-  figure('Merchant', 'starter-merchant', { robe: true, beard: true, satchel: true, col: { hair: '#d3c199', beard: '#e6dcc6', top: '#4f6f8f', trim: '#c9a24f', strap: '#5a3f28', bag: '#8c6d4b', boots: '#5a3f28' } }),
-  figure('Monk', 'starter-monk', { robe: true, hat: 'hood', rope: true, col: { skin: '#d9b088', hair: '#5a3f28', hat: '#7a5a3a', top: '#8a6a48', rope: '#d3c199', boots: '#4a3524' } }),
-  figure('Healer', 'starter-healer', { longHair: true, satchel: true, col: { hair: '#bf9850', top: '#7a6a8a', sleeve: '#efe3c4', legs: '#5a4a62', strap: '#7a5a3a', bag: '#efe3c4', inner: '#f4eede' } })
+  figure('Villager', 'starter-villager', { vest: true, col: { hair: '#8a6a48', top: '#efe3c4', vest: '#9fb06a', sleeve: '#e6d8b6', legs: '#a68a62' } }),
+  figure('Farmer', 'starter-farmer', { hat: 'straw', apron: true, col: { hair: '#9a7a56', hat: '#dfc070', band: '#b8664a', top: '#a6b878', apron: '#e6dcc0', legs: '#9a7d5a', boots: '#8a6a48' } }),
+  figure('Guard', 'starter-guard', { hat: 'helm', cape: true, spear: true, col: { skin: '#e0b890', hair: '#6b4c32', hat: '#c4c8c6', top: '#c27458', sleeve: '#94a0aa', legs: '#808a94', boots: '#8a6a48', cape: '#a6533b', inner: '#e2dccb' } }),
+  figure('Merchant', 'starter-merchant', { robe: true, beard: true, satchel: true, col: { hair: '#e0d6bc', beard: '#efe8d6', top: '#7f9cb4', trim: '#dfc070', strap: '#8a6a48', bag: '#b89a70', boots: '#8a6a48' } }),
+  figure('Monk', 'starter-monk', { robe: true, hat: 'hood', rope: true, col: { skin: '#e0b890', hair: '#8a6a48', hat: '#a88a64', top: '#b49872', rope: '#e6dcc0', boots: '#7a5a3a' } }),
+  figure('Healer', 'starter-healer', { longHair: true, satchel: true, col: { hair: '#dfc070', top: '#a898b8', sleeve: '#f0e6cb', legs: '#8a7a9a', strap: '#9a7a56', bag: '#f0e6cb', inner: '#f6efdc' } })
 ];
 
 export { DEFAULT_PAL, FACES, FACE_LABEL, FRAMES, MAX_PAL, SIZE, blankFrame, blankSprite, cloneSprite, fillFrame, flipFrame, inFrame, isBlank, newId, setPixel, shiftFrame, spriteFromJSON, spriteToJSON, starters };
