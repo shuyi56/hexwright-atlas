@@ -1,18 +1,24 @@
+import { drawFrame, frameCanvas, spriteThumb } from '../characters/draw.js';
+import * as library from '../characters/library.js';
+import { openSpriteEditor } from '../characters/sprite-editor.js';
+import { FACES } from '../characters/sprite.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, setElev, shiftElev } from './ops.js';
-import { EL, THH, TWH, renderTiles, rotInst, thumb, updateTiles } from './render.js';
+import { EL, THH, TWH, pieceBox, renderTiles, rotInst, thumb, updateTiles } from './render.js';
+import { FACE_DELTA, blockedBy, canStep, charAt, eraseCharAt, findPath, placeChar, walkChar } from './walk.js';
 
 /* ================= tile editor screen ================= */
 const root = $('editor'), cv = $('edCanvas'), cx = cv.getContext('2d'), ov = $('edOverlay'), ovx = ov.getContext('2d'), statusEl = $('edStatus'), stage = $('edStage');
 const SC = coarse ? 1.4 : 2, SAVE_KEY = 'hexwright.tiles.v1', HIST = 60;
 const TOOLS = [
   ['paint', 'Paint', 'B', '▦'], ['fill', 'Fill', 'G', '◩'], ['raise', 'Raise', 'U', '▲'], ['lower', 'Lower', 'J', '▼'], ['level', 'Level', 'L', '▬'],
-  ['place', 'Place', 'P', '⌂'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
+  ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
 ];
-const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain' };
+const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), lastT: 0, preview: null };
+const WALK_SPEED = 4.2, SPRITE_PX = 1.5;
 
 /* ---------- persistence ---------- */
 let saveT = 0;
@@ -29,7 +35,7 @@ function redo() { if (!ED.redo.length) return; ED.undo.push(cloneModel(ED.M)); s
 function showSize(S) { const sel = $('edSize'); if (![...sel.options].some(o => +o.value === S)) { const o = new Option(String(S)); sel.add(o, [...sel.options].find(x => +x.value > S) || null); } sel.value = String(S); }
 function syncHist() { $('edUndo').disabled = !ED.undo.length; $('edRedo').disabled = !ED.redo.length; }
 function setModel(M, keepView) {
-  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.stale = resize || ED.stale === true ? true : 'model';
+  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.walk.clear(); ED.sel = -1; ED.stale = resize || ED.stale === true ? true : 'model';
   $('edName').value = M.name; showSize(M.S);
   syncHist(); autosave();
   if (resize || !keepView) { rebuild(); fitView(); } else changed();
@@ -60,6 +66,91 @@ function setRot(r) {
   for (let n = ((r - ED.rot) % 4 + 4) % 4; n > 0; n--) turnView(1);
 }
 
+/* ---------- characters: where they are drawn, and walking ---------- */
+const zAt = (x, y) => { const u = y * ED.M.S + x; return ED.M.elev[u] * EL - (TERRAIN[ED.M.terr[u]].sink || 0); };
+/* a position is a model-space tile centre with a height: { x: tile + 0.5, y: tile + 0.5, z } */
+const tilePt = (x, y) => ({ x: x + 0.5, y: y + 0.5, z: zAt(x, y) });
+const viewPt = (x, y) => { const S = ED.M.S, r = ED.rot; return r === 0 ? [x, y] : r === 1 ? [S - y, x] : r === 2 ? [S - x, S - y] : [y, S - x]; };
+const faceIn = f => (f + 3 * ED.rot) % 4;
+function walkerPos(w) {
+  let d = w.d; const P = w.pts;
+  for (let i = 0; i + 1 < P.length; i++) {
+    const a = P[i], b = P[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
+    if (d <= len || i + 2 === P.length) { const f = Math.min(1, d / len); return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f, face: Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 1 : 3) : (b.y > a.y ? 0 : 2) }; }
+    d -= len;
+  }
+  return Object.assign({ face: 0 }, P[P.length - 1]);
+}
+const walkLen = w => w.pts.reduce((n, p, i) => i ? n + Math.hypot(p.x - w.pts[i - 1].x, p.y - w.pts[i - 1].y) : 0, 0);
+/* where a character is drawn right now: its tile, or partway along its walk */
+function curPoint(c) { const w = ED.walk.get(c); if (!w) return tilePt(c.x, c.y); const p = walkerPos(w); return { x: p.x, y: p.y, z: p.z }; }
+/* the model already holds the end of the walk; this only sets up the picture of getting there */
+function beginWalk(c, start, path) { ED.walk.set(c, { pts: [start, ...path.map(([x, y]) => tilePt(x, y))], d: 0 }); req(); }
+/* walk character k along path as one step of the current edit */
+function doWalk(k, path) {
+  const M = ED.M, c = M.chars[k], start = curPoint(c), r = walkChar(M, k, path);
+  if (r.ok && path.length) { beginWalk(c, start, path); changed(); status(); }
+  return r;
+}
+function stepAnim(now) {
+  const dt = Math.min(0.1, (now - (ED.lastT || now)) / 1000); ED.lastT = now;
+  for (const [c, w] of ED.walk) { w.d += dt * WALK_SPEED; if (w.d >= walkLen(w)) ED.walk.delete(c); }
+  if (!ED.walk.size) ED.lastT = 0;
+}
+/* each character as it is drawn: view-space centre, height, facing and frame, nearest the viewer last */
+function charViews() {
+  const out = [];
+  (ED.M.chars || []).forEach((c, k) => {
+    const w = ED.walk.get(c), p = w ? walkerPos(w) : Object.assign(tilePt(c.x, c.y), { face: c.face }), [X, Y] = viewPt(p.x, p.y), stride = w ? Math.floor(w.d * 2) % 2 : 0;
+    out.push({ c, k, X, Y, z: p.z - (w ? Math.abs(Math.sin(w.d * Math.PI)) * 1.6 : 0), face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
+  });
+  return out.sort((a, b) => a.X + a.Y - (b.X + b.Y));
+}
+/* the character whose picture is under a screen point, nearest first */
+function charAtScreen(sx, sy) {
+  const R = ED.R; if (!R || !ED.M.chars || !ED.M.chars.length) return -1;
+  const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z, half = 16 * SPRITE_PX / 2, views = charViews();
+  for (let i = views.length - 1; i >= 0; i--) { const v = views[i], [px, py] = R.P(v.X, v.Y, v.z); if (wx >= px - half && wx <= px + half && wy >= py - 16 * SPRITE_PX && wy <= py + 3) return v.k; }
+  return -1;
+}
+const spriteOf = c => library.get(c.sprite);
+/* draw one character, then the pieces in front of it again so it can stand behind a house */
+function drawChar(g, R, v) {
+  const [px, py] = R.P(v.X, v.Y, v.z), s = spriteOf(v.c), key = v.X + v.Y;
+  g.save(); g.fillStyle = 'rgba(0,0,0,0.28)'; g.beginPath(); g.ellipse(px, R.P(v.X, v.Y, v.z + (v.walking ? 1.6 : 0))[1], 6.5, 3.2, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  if (s) drawFrame(g, frameCanvas(s, v.face, v.frame), px, py + 1, SPRITE_PX);
+  else { g.save(); g.fillStyle = '#b8483a'; g.strokeStyle = '#2b2116'; g.beginPath(); g.arc(px, py - 8, 6, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore(); }
+  const box = [px - 14, py - 16 * SPRITE_PX - 4, px + 14, py + 6];
+  for (const o of R.objs) {
+    const [w, d] = footprint(o); if (o.x + w / 2 + o.y + d / 2 <= key) continue;
+    const b = pieceBox(R, o); if (b[0] >= box[2] || b[2] <= box[0] || b[1] >= box[3] || b[3] <= box[1]) continue;
+    drawAsset(g, R.P, o, o.z, R.clim);
+  }
+}
+function drawChars(g, R) {
+  const views = charViews();
+  if (ED.sel >= (ED.M.chars || []).length) ED.sel = -1;
+  for (const v of views) {
+    if (v.k === ED.sel) { const u = [Math.floor(v.X), Math.floor(v.Y)], z = v.z; g.beginPath(); for (const [a, b] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const q = R.P(u[0] + a, u[1] + b, z); a || b ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.closePath(); g.strokeStyle = '#e4c684'; g.lineWidth = 2 / ED.z; g.stroke(); g.fillStyle = 'rgba(228,198,132,0.16)'; g.fill(); }
+    drawChar(g, R, v);
+  }
+}
+/* the tiles the selected character would walk over to reach the hovered tile, or the reachable area in faint tint */
+function walkPreview() {
+  const M = ED.M, k = ED.sel; if (ED.tool !== 'walk' || k < 0 || !M.chars[k] || !ED.hover) return null;
+  const key = [k, ED.hover.x, ED.hover.y, M.chars[k].x, M.chars[k].y, ED.undo.length, M.objs.length, M.chars.length].join();
+  if (!ED.preview || ED.preview.key !== key) { const path = findPath(M, k, ED.hover.x, ED.hover.y); ED.preview = { key, path }; }
+  return ED.preview.path;
+}
+/* key arrows step the selected character one tile: right = south-east, down = south-west, left = north-west, up = north-east */
+const ARROW_FACE = { ArrowDown: 0, ArrowRight: 1, ArrowUp: 2, ArrowLeft: 3 };
+function stepSelected(viewFace) {
+  const M = ED.M, k = ED.sel, c = M && M.chars && M.chars[k]; if (!c) return false;
+  const f = (viewFace + ED.rot) % 4, [dx, dy] = FACE_DELTA[f], nx = c.x + dx, ny = c.y + dy;
+  if (canStep(M, c.x, c.y, nx, ny, k)) { checkpoint(); doWalk(k, [[nx, ny]]); } else if (c.face !== f) { checkpoint(); c.face = f; changed(); }
+  status(); return true;
+}
+
 /* ---------- view ---------- */
 /* ED.stale is true when the view itself changed (rotation, grid, size) and 'model' after an edit */
 function rebuild() {
@@ -86,6 +177,7 @@ function pick(sx, sy) {
   return null;
 }
 const brushTiles = (x, y) => brushAt(ED.M, x, y, ED.brush);
+const isFreeTile = (x, y) => !blockedBy(ED.M, x, y);
 const ghost = () => ED.hover && { id: ED.asset, x: ED.hover.x, y: ED.hover.y, face: ED.face, v: 0.37 };
 
 /* the soft shadow the map casts on the desk, blurred once per map and zoom level rather than every
@@ -140,29 +232,46 @@ function draw() {
   }
   const g = ovx;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, ov.width, ov.height);
-  if (!ED.hover) return;
+  if (ED.walk.size) { stepAnim(performance.now()); req(); }
+  const hasChars = ED.M.chars && ED.M.chars.length;
+  if (!ED.hover && !hasChars) return;
   g.save(); g.setTransform(dpr * ED.z, 0, 0, dpr * ED.z, dpr * ED.ox, dpr * ED.oy);
   const outline = (tiles, stroke, fill) => {
     g.beginPath();
     for (const [x, y] of tiles) { const u = toView(x, y), X = u % R.S, Y = (u / R.S) | 0, z = R.zOf(u), a = R.P(X, Y, z), b = R.P(X + 1, Y, z), c = R.P(X + 1, Y + 1, z), d = R.P(X, Y + 1, z); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); }
     if (fill) { g.fillStyle = fill; g.fill(); } g.strokeStyle = stroke; g.lineWidth = 1.6 / ED.z; g.stroke();
   };
+  if (ED.hover && ED.tool === 'character') {
+    const { x, y } = ED.hover, ok = isFreeTile(x, y), z = zAt(x, y), [X, Y] = viewPt(x + 0.5, y + 0.5), s = library.get(ED.char);
+    outline([[x, y]], ok ? 'rgba(255,240,200,0.9)' : '#b8483a', ok ? 'rgba(255,240,200,0.18)' : 'rgba(184,72,58,0.25)');
+    if (s) { const [px, py] = R.P(X, Y, z); g.globalAlpha = ok ? 0.85 : 0.4; drawFrame(g, frameCanvas(s, FACES[faceIn(ED.face)], 0), px, py + 1, SPRITE_PX); g.globalAlpha = 1; }
+  }
+  if (hasChars) drawChars(g, R);
+  if (!ED.hover) { g.restore(); return; }
   const { x, y } = ED.hover;
-  if (ED.tool === 'place') {
+  if (ED.tool === 'walk') {
+    const path = walkPreview(), k = ED.sel >= 0 && ED.M.chars[ED.sel] ? charAt(ED.M, x, y) : -1;
+    if (path && path.length) outline(path, 'rgba(228,198,132,0.9)', 'rgba(228,198,132,0.22)');
+    else if (ED.sel >= 0 && k < 0) outline([[x, y]], '#b8483a', 'rgba(184,72,58,0.22)');
+    else outline([[x, y]], 'rgba(255,240,200,0.7)');
+  } else if (ED.tool === 'character') { /* outlined and ghosted above */ }
+  else if (ED.tool === 'place') {
     const o = ghost(), ok = fits(ED.M, o), [w, d] = footprint(o), tiles = [];
     for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) if (x + i < ED.M.S && y + j < ED.M.S) tiles.push([x + i, y + j]);
     outline(tiles, ok ? 'rgba(255,240,200,0.9)' : '#b8483a', ok ? 'rgba(255,240,200,0.18)' : 'rgba(184,72,58,0.25)');
     const v = rotInst(o, ED.rot, ED.M.S); let z = 0; for (const [tx, ty] of tiles) z = Math.max(z, R.zOf(toView(tx, ty)));
     g.globalAlpha = ok ? 0.85 : 0.45; drawAsset(g, R.P, v, ASSET_BY_ID[o.id].water ? z : z, ED.M.clim); g.globalAlpha = 1;
   } else if (ED.tool === 'erase' || ED.tool === 'pick') {
-    const k = objAt(ED.M, x, y);
-    if (k >= 0) { const o = ED.M.objs[k], [w, d] = footprint(o), tiles = []; for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) tiles.push([o.x + i, o.y + j]); outline(tiles, ED.tool === 'erase' ? '#b8483a' : '#e4c684', ED.tool === 'erase' ? 'rgba(184,72,58,0.3)' : 'rgba(228,198,132,0.25)'); }
+    const k = objAt(ED.M, x, y), ck = charAt(ED.M, x, y);
+    if (ck >= 0) outline([[x, y]], ED.tool === 'erase' ? '#b8483a' : '#e4c684', ED.tool === 'erase' ? 'rgba(184,72,58,0.3)' : 'rgba(228,198,132,0.25)');
+    else if (k >= 0) { const o = ED.M.objs[k], [w, d] = footprint(o), tiles = []; for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) tiles.push([o.x + i, o.y + j]); outline(tiles, ED.tool === 'erase' ? '#b8483a' : '#e4c684', ED.tool === 'erase' ? 'rgba(184,72,58,0.3)' : 'rgba(228,198,132,0.25)'); }
     else outline([[x, y]], 'rgba(255,240,200,0.7)');
   } else if (ED.tool !== 'pan') outline(ED.tool === 'fill' ? [[x, y]] : brushTiles(x, y), 'rgba(255,240,200,0.9)', 'rgba(255,240,200,0.12)');
   g.restore();
 }
 
 /* ---------- tools ---------- */
+let walkNote = '';
 function applyAt(p, first) {
   const M = ED.M, S = M.S, st = ED.stroke;
   const key = p.x + ',' + p.y; if (!first && st.seen.has(key) && ED.tool !== 'paint') return; st.seen.add(key);
@@ -171,21 +280,31 @@ function applyAt(p, first) {
   else if (ED.tool === 'level') { if (first) st.level = M.elev[p.y * S + p.x]; setElev(M, brushTiles(p.x, p.y), st.level); changed(); }
   else if (ED.tool === 'fill' && first) { if (floodFill(M, p.x, p.y, ED.terrain)) changed(); }
   else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(); }
-  else if (ED.tool === 'erase') { if (eraseAt(M, p.x, p.y)) changed(); }
-  else if (ED.tool === 'pick' && first) { const k = objAt(M, p.x, p.y); if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); } else { ED.terrain = TERRAIN[M.terr[p.y * S + p.x]].id; setTab('Terrain'); setTool('paint'); } syncPalette(); }
+  else if (ED.tool === 'character' && first) { if (ED.char && placeChar(M, { sprite: ED.char, x: p.x, y: p.y, face: ED.face }).ok) { ED.sel = M.chars.length - 1; changed(); } }
+  else if (ED.tool === 'walk' && first) {
+    const k = charAt(M, p.x, p.y);
+    if (k >= 0) { ED.sel = k; req(); }
+    else if (ED.sel >= 0 && M.chars[ED.sel]) { const path = findPath(M, ED.sel, p.x, p.y); if (path && path.length) doWalk(ED.sel, path); else walkNote = path ? '' : 'No way there: the tile is blocked or cut off.'; }
+    else walkNote = 'Click a character first, then a free tile.';
+  }
+  else if (ED.tool === 'erase') { if (eraseCharAt(M, p.x, p.y)) { changed(); } else if (eraseAt(M, p.x, p.y)) changed(); }
+  else if (ED.tool === 'pick' && first) { const ck = charAt(M, p.x, p.y), k = objAt(M, p.x, p.y); if (ck >= 0) { ED.char = M.chars[ck].sprite; ED.face = M.chars[ck].face; ED.sel = ck; setTab('Characters'); setTool('character'); } else if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); } else { ED.terrain = TERRAIN[M.terr[p.y * S + p.x]].id; setTab('Terrain'); setTool('paint'); } syncPalette(); }
 }
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }
 function setTab(t) { ED.tab = t; for (const b of root.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === t)); buildPalette(); }
 function status() {
-  if (!ED.hover) { statusEl.textContent = `${ED.M.S}×${ED.M.S} tiles · ${ED.M.objs.length} pieces`; return; }
-  const { x, y } = ED.hover, u = y * ED.M.S + x, k = objAt(ED.M, x, y);
-  statusEl.textContent = `${x}, ${y} · ${TERRAIN[ED.M.terr[u]].label} · height ${ED.M.elev[u]}${k >= 0 ? ' · ' + ASSET_BY_ID[ED.M.objs[k].id].label : ''}`;
+  const nc = (ED.M.chars || []).length, cname = c => (library.get(c.sprite) || { name: 'Unknown character' }).name;
+  if (walkNote) { const n = walkNote; walkNote = ''; statusEl.textContent = n; return; }
+  if (!ED.hover) { statusEl.textContent = `${ED.M.S}×${ED.M.S} tiles · ${ED.M.objs.length} pieces${nc ? ` · ${nc} character${nc > 1 ? 's' : ''}` : ''}`; return; }
+  const { x, y } = ED.hover, u = y * ED.M.S + x, k = objAt(ED.M, x, y), ck = charAt(ED.M, x, y);
+  statusEl.textContent = `${x}, ${y} · ${TERRAIN[ED.M.terr[u]].label} · height ${ED.M.elev[u]}${k >= 0 ? ' · ' + ASSET_BY_ID[ED.M.objs[k].id].label : ''}${ck >= 0 ? ' · ' + cname(ED.M.chars[ck]) : ''}`;
 }
 
 /* ---------- palette ---------- */
 const thumbs = new Map();
 function buildPalette() {
   const box = $('edItems'); box.textContent = '';
+  if (ED.tab === 'Characters') { buildCharacters(box); return; }
   const groups = ED.tab === 'Terrain' ? [...new Set(TERRAIN.map(t => t.group))].map(gn => [gn, TERRAIN.filter(t => t.group === gn), 'terrain']) : [[ED.tab, ASSET_GROUPS.find(a => a[0] === ED.tab)[1], 'asset']];
   for (const [gn, items, kind] of groups) {
     if (ED.tab === 'Terrain') { const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h); }
@@ -201,7 +320,28 @@ function buildPalette() {
   }
   syncPalette();
 }
-function syncPalette() { for (const b of root.querySelectorAll('.ed-item')) b.setAttribute('aria-pressed', String(b.dataset.kind === 'terrain' ? b.dataset.id === ED.terrain : b.dataset.id === ED.asset)); $('edFace').textContent = `Facing ${['south-west', 'south-east', 'north-east', 'north-west'][ED.face]}`; }
+/* the Characters tab lists the sprite library; clicking one arms the Person tool */
+function buildCharacters(box) {
+  const row = document.createElement('div'); row.className = 'ed-row ed-charbar';
+  for (const [label, fn] of [['Draw new character…', () => edit('new')], ['Edit selected…', () => edit(ED.char)]]) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = label; b.addEventListener('click', fn); row.appendChild(b); }
+  box.appendChild(row);
+  const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
+  for (const s of library.list()) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-item'; b.dataset.kind = 'char'; b.dataset.id = s.id; b.title = s.name;
+    const c = spriteThumb(s, 60); c.className = 'ed-char'; b.appendChild(c);
+    const t = document.createElement('span'); t.textContent = s.name; b.appendChild(t);
+    b.addEventListener('click', () => { ED.char = s.id; setTool('character'); syncPalette(); });
+    grid.appendChild(b);
+  }
+  syncPalette();
+}
+/* open the sprite editor; a new character is created when id is null. On return the list and the map pick up the changes. */
+function edit(id) {
+  const back = sid => { if (sid && library.get(sid)) ED.char = sid; buildPalette(); req(); cv.focus({ preventScroll: true }); };
+  openSpriteEditor(id || 'new', 'Tile editor', back);
+}
+library.onChange(() => { if (ED.open && ED.tab === 'Characters' && $('spriteEditor').hidden) buildPalette(); req(); });
+function syncPalette() { for (const b of root.querySelectorAll('.ed-item')) b.setAttribute('aria-pressed', String(b.dataset.kind === 'terrain' ? b.dataset.id === ED.terrain : b.dataset.kind === 'char' ? b.dataset.id === ED.char : b.dataset.id === ED.asset)); $('edFace').textContent = `Facing ${['south-west', 'south-east', 'north-east', 'north-west'][ED.face]}`; }
 
 /* ---------- input ---------- */
 const pts = new Map(); let pan = null, pinch = null, spaceDown = false;
@@ -211,7 +351,9 @@ cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture(e.pointerId); const [x, y] = local(e); pts.set(e.pointerId, [x, y]);
   if (pts.size === 2) { if (ED.stroke) endStroke(); const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2, z: ED.z, ox: ED.ox, oy: ED.oy }; pan = null; return; }
   if (ED.tool === 'pan' || e.button === 1 || e.button === 2 || spaceDown) { pan = { x, y, ox: ED.ox, oy: ED.oy }; cv.style.cursor = 'grabbing'; return; }
-  const p = pick(x, y); if (!p) return;
+  let p = pick(x, y);
+  if (['walk', 'erase', 'pick'].includes(ED.tool)) { const ck = charAtScreen(x, y); if (ck >= 0) p = { x: ED.M.chars[ck].x, y: ED.M.chars[ck].y }; }
+  if (!p) return;
   checkpoint(); ED.stroke = { seen: new Set() }; ED.hover = p; applyAt(p, true); status();
 });
 cv.addEventListener('pointermove', e => {
@@ -249,7 +391,8 @@ root.addEventListener('keydown', e => {
   else if (k === '+' || k === '=') zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.3);
   else if (k === '-' || k === '_') zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.3);
   else if (k >= '1' && k <= '3') { ED.brush = +k; syncBrush(); }
-  else if (k === 'Escape') closeEditor();
+  else if (k in ARROW_FACE) { if (!stepSelected(ARROW_FACE[k])) return; }
+  else if (k === 'Escape') { if (ED.sel >= 0) { ED.sel = -1; req(); } else closeEditor(); }
   else { const t = TOOLS.find(t2 => t2[2].toLowerCase() === k.toLowerCase()); if (!t) return; setTool(t[0]); }
   e.preventDefault();
 });
@@ -261,7 +404,7 @@ function buildChrome() {
   for (const [id, label, key, glyph] of TOOLS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-tool'; b.dataset.tool = id; b.title = `${label} (${key})`; b.innerHTML = `<span aria-hidden="true">${glyph}</span>${label}`; b.addEventListener('click', () => setTool(id)); tb.appendChild(b); }
   for (const b of root.querySelectorAll('[data-brush]')) b.addEventListener('click', () => { ED.brush = +b.dataset.brush; syncBrush(); });
   const tabs = $('edTabs');
-  for (const t of ['Terrain', ...ASSET_GROUPS.map(a => a[0])]) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.role = 'tab'; b.dataset.tab = t; b.textContent = t; b.addEventListener('click', () => setTab(t)); tabs.appendChild(b); }
+  for (const t of ['Terrain', ...ASSET_GROUPS.map(a => a[0]), 'Characters']) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.role = 'tab'; b.dataset.tab = t; b.textContent = t; b.addEventListener('click', () => setTab(t)); tabs.appendChild(b); }
   const bs = $('edBiome'); for (const [k, B] of Object.entries(BIOMES)) { const o = document.createElement('option'); o.value = k; o.textContent = B.label; bs.appendChild(o); }
   $('edBack').addEventListener('click', closeEditor);
   $('edUndo').addEventListener('click', undo); $('edRedo').addEventListener('click', redo);
@@ -281,7 +424,7 @@ function buildChrome() {
 
 /* back: label of the screen the editor returns to (the one left showing underneath it) */
 function openEditor(M, back = 'Atlas') {
-  ensureModel();
+  ensureModel(); if (!library.get(ED.char)) ED.char = (library.list()[0] || {}).id || null;
   root.hidden = false; ED.open = true; ED.rot = 0; $('edBack').textContent = `← ${back}`;
   if (M) { if (ED.M) checkpoint(); ED.M = M; autosave(); }
   $('edName').value = ED.M.name; showSize(ED.M.S);
@@ -294,4 +437,4 @@ function closeEditor() { if (!ED.open) return; ED.open = false; root.hidden = tr
 buildChrome();
 $('openEditor').addEventListener('click', () => openEditor());
 
-export { ED, applyAt, closeEditor, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, syncPalette, toView, undo, zoomAt };
+export { ED, applyAt, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, syncPalette, toView, undo, zoomAt };

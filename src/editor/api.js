@@ -1,11 +1,13 @@
 import { ASSET_BY_ID, ASSETS, TERRAIN, footprint } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { METHODS } from './api-spec.js';
-import { ED, closeEditor, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
+import * as library from '../characters/library.js';
+import { ED, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
 import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, TI, blankModel, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles, eraseAt, floodFill, inb, paintTiles, placePiece, rectTiles, setElev, shiftElev } from './ops.js';
 import { renderTiles } from './render.js';
+import { charAt, findPath, placeChar } from './walk.js';
 
 /* ================= tile editor automation API =================
    window.hexwright.call(method, params) drives the live editor with JSON in and JSON out; the
@@ -62,6 +64,13 @@ function targetTiles(M, p) {
   if (p.x != null && p.y != null) { tileOf(M, p.x, p.y); return brushTiles(M, p.x, p.y, p.brush || 1); }
   return fail('give a target: x and y, tiles, or rect');
 }
+const spriteId = id => { if (!library.get(id)) fail(`unknown sprite "${id}".${guess(id, library.list().map(s => s.id))}`); return id; };
+const charInfo = (M, k) => { const c = M.chars[k], s = library.get(c.sprite); return { index: k, sprite: c.sprite, name: s ? s.name : null, x: c.x, y: c.y, face: c.face }; };
+function charIndex(M, p) {
+  const k = p.index != null ? p.index : p.at ? (tileOf(M, p.at.x, p.at.y), charAt(M, p.at.x, p.at.y)) : fail('give index or at to pick a character');
+  if (k < 0 || k >= (M.chars || []).length) fail(p.index != null ? `no character with index ${p.index}; the map has ${(M.chars || []).length}` : `no character at ${p.at.x},${p.at.y}`);
+  return k;
+}
 const pieceInfo = (M, o, k) => { const [w, d] = footprint(o), a = ASSET_BY_ID[o.id]; return { index: k, id: o.id, label: a.label, x: o.x, y: o.y, face: o.face, w, d, v: o.v }; };
 
 /* ---------- edits: each takes the model and returns { changed, ... } ---------- */
@@ -91,6 +100,22 @@ const EDITS = {
     const r = placePiece(M, { id: o.id, x: p.to ? p.to.x : o.x, y: p.to ? p.to.y : o.y, face: p.face != null ? p.face : o.face, v: o.v });
     if (!r.ok) { M.objs.splice(k, 0, o); return { changed: 0, moved: false, reason: r.reason }; }
     M.objs.splice(k, 0, M.objs.pop()); return { changed: 1, moved: true, piece: pieceInfo(M, M.objs[k], k) };
+  },
+  placeCharacter(M, p) {
+    spriteId(p.sprite); tileOf(M, p.x, p.y);
+    const r = placeChar(M, p); return r.ok ? { changed: 1, placed: true, character: charInfo(M, r.index) } : { changed: 0, placed: false, reason: r.reason };
+  },
+  walkCharacter(M, p) {
+    const k = charIndex(M, p); let path;
+    if (p.path) { p.path.forEach(([x, y]) => tileOf(M, x, y)); path = p.path; }
+    else { if (!p.to) fail('walkCharacter needs to or path'); tileOf(M, p.to.x, p.to.y, 'target'); path = findPath(M, k, p.to.x, p.to.y); if (!path) return { changed: 0, walked: false, reason: `no route to ${p.to.x},${p.to.y}: the tile is blocked or cut off` }; }
+    if (!path.length) return { changed: 0, walked: false, reason: 'already there' };
+    const r = doWalk(k, path); return r.ok ? { changed: 1, walked: true, steps: r.steps, character: charInfo(M, k) } : { changed: 0, walked: false, reason: r.reason };
+  },
+  removeCharacter(M, p) {
+    const k = p.index != null ? p.index : p.x != null && p.y != null ? (tileOf(M, p.x, p.y), charAt(M, p.x, p.y)) : fail('removeCharacter needs index or x and y');
+    if (k < 0 || k >= (M.chars || []).length) fail(p.index != null ? `no character with index ${p.index}` : `no character at ${p.x},${p.y}`);
+    M.chars.splice(k, 1); return { changed: 1, removed: 1 };
   },
   rename(M, p) { const n = String(p.name).trim().slice(0, 60) || 'Untitled survey'; const was = M.name; M.name = n; return { changed: n === was ? 0 : 1 }; }
 };
@@ -148,7 +173,8 @@ function describe() {
   return {
     api: 'hexwright-tiles automation', version: 1, coordinates: 'x east, y south, (0,0) top-left of the unrotated map; rect = {x, y, w, h}',
     limits: { size: [4, 96], elevation: [0, MAX_ELEV], brush: [1, 3], facing: [0, 3] },
-    tools: ['paint', 'fill', 'raise', 'lower', 'level', 'place', 'erase', 'pick', 'pan'],
+    tools: ['paint', 'fill', 'raise', 'lower', 'level', 'place', 'character', 'walk', 'erase', 'pick', 'pan'],
+    sprites: library.list().map(s => ({ id: s.id, name: s.name })),
     biomes: Object.entries(BIOMES).map(([id, B]) => ({ id, label: B.label, climate: B.clim })),
     terrain: TERRAIN.map(t => ({ id: t.id, label: t.label, group: t.group, water: !!t.water, symbol: SYM[t.id] })),
     assets: ASSETS.map(a => ({ id: a.id, label: a.label, group: a.group, w: a.w, d: a.d, height: a.h, water: !!a.water })),
@@ -159,8 +185,8 @@ function describe() {
 function state() {
   const M = ensureModel();
   return {
-    open: ED.open, name: M.name, size: M.S, climate: M.clim, objects: M.objs.length,
-    tool: ED.tool, brush: ED.brush, terrain: ED.terrain, asset: ED.asset, face: ED.face, tab: ED.tab,
+    open: ED.open, name: M.name, size: M.S, climate: M.clim, objects: M.objs.length, characters: (M.chars || []).length, selectedCharacter: ED.sel,
+    tool: ED.tool, brush: ED.brush, terrain: ED.terrain, asset: ED.asset, sprite: ED.char, face: ED.face, tab: ED.tab,
     view: { rot: ED.rot, zoom: ED.fitZ ? +(ED.z / ED.fitZ).toFixed(3) : null, grid: ED.grid, stage: { width: ED.cw, height: ED.ch } },
     history: { undo: ED.undo.length, redo: ED.redo.length }, status: $('edStatus').textContent,
     page: { url: location.href, title: document.title }
@@ -210,6 +236,8 @@ function setSelection(p) {
   ensureModel();
   if (p.terrain) { terrainId(p.terrain); ED.terrain = p.terrain; if (!p.tool && !p.asset) setTab('Terrain'); }
   if (p.asset) { assetId(p.asset); ED.asset = p.asset; setTab(ASSET_BY_ID[p.asset].group); }
+  if (p.sprite) { spriteId(p.sprite); ED.char = p.sprite; setTab('Characters'); }
+  if (p.character != null) { if (!(ED.M.chars || [])[p.character]) fail(`no character with index ${p.character}`); ED.sel = p.character; }
   if (p.face != null) ED.face = p.face;
   if (p.brush != null) { ED.brush = p.brush; syncBrush(); }
   if (p.tool) setTool(p.tool);
@@ -218,9 +246,13 @@ function setSelection(p) {
 function useTool(p) {
   const M = ensureModel(); p.path.forEach(([x, y]) => tileOf(M, x, y));
   if (!p.path.length) fail('path is empty');
-  setSelection({ tool: p.tool, terrain: p.terrain, asset: p.asset, face: p.face, brush: p.brush });
+  if (p.tool === 'walk') {
+    const k = charAt(M, p.path[0][0], p.path[0][1]); if (k < 0) fail(`no character at ${p.path[0][0]},${p.path[0][1]} to select`);
+    ED.sel = k; p = { ...p, path: [p.path[p.path.length - 1]] };
+  }
+  setSelection({ tool: p.tool, terrain: p.terrain, asset: p.asset, sprite: p.sprite, face: p.face, brush: p.brush });
   const before = JSON.stringify(toJSON(M)); runStroke(p.path); syncName();
-  return { changed: before === JSON.stringify(toJSON(ED.M)) ? 0 : 1, tiles: p.path.length, objects: ED.M.objs.length };
+  return { changed: before === JSON.stringify(toJSON(ED.M)) ? 0 : 1, tiles: p.path.length, objects: ED.M.objs.length, characters: ED.M.chars.length };
 }
 
 /* ---------- map-level ---------- */
@@ -239,7 +271,7 @@ const METHOD_IMPL = {
     const M0 = ensureModel(); biomeOf(p.biome); const seed = p.seed || Math.random().toString(36).slice(2, 7), M = generateScene(seed, sizeOf(p, M0), p.biome || 'vale');
     replaceModel(M); return { name: M.name, seed, size: M.S, objects: M.objs.length };
   },
-  rename: edit('rename'), paint: edit('paint'), fill: edit('fill'), elevation: edit('elevation'), place: edit('place'), erase: edit('erase'), moveObject: edit('moveObject'),
+  rename: edit('rename'), placeCharacter: edit('placeCharacter'), walkCharacter: edit('walkCharacter'), removeCharacter: edit('removeCharacter'), paint: edit('paint'), fill: edit('fill'), elevation: edit('elevation'), place: edit('place'), erase: edit('erase'), moveObject: edit('moveObject'),
   getTile(p) { const M = ensureModel(); tileOf(M, p.x, p.y); return tileInfo(M, p.x, p.y); },
   getRegion(p) {
     const M = ensureModel(), tiles = rectOf(M, p); if (!tiles.length) fail('rect is outside the map');
@@ -251,6 +283,8 @@ const METHOD_IMPL = {
     if (p.rect) list = list.filter(o => o.x < p.rect.x + p.rect.w && o.y < p.rect.y + p.rect.h && o.x + o.w > p.rect.x && o.y + o.d > p.rect.y);
     return { count: list.length, objects: list };
   },
+  listSprites() { return { count: library.list().length, sprites: library.list().map(s => ({ id: s.id, name: s.name, colours: s.pal.length })) }; },
+  listCharacters() { const M = ensureModel(); return { count: (M.chars || []).length, characters: (M.chars || []).map((c, k) => charInfo(M, k)) }; },
   undo(p) { ensureModel(); let n = 0; for (let i = 0; i < (p.steps || 1) && ED.undo.length; i++, n++) undo(); syncName(); return { undone: n, history: state().history }; },
   redo(p) { ensureModel(); let n = 0; for (let i = 0; i < (p.steps || 1) && ED.redo.length; i++, n++) redo(); syncName(); return { redone: n, history: state().history }; }
 };

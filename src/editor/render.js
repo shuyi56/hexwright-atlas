@@ -204,4 +204,4 @@ function thumb(kind, id, size = 64) {
   return c;
 }
 
-export { EL, THH, TWH, layout, renderTiles, rotInst, thumb, updateTiles };
+export { EL, THH, TWH, layout, pieceBox, renderTiles, rotInst, thumb, updateTiles };

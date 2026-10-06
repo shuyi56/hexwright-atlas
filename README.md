@@ -16,6 +16,24 @@ water, rivers and roads crossing the same sides as on the map, farmland, and the
 other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter
 district** opens just the selected district. The map is autosaved in the browser.
 
+### Characters
+
+The **Characters** tab lists your sprite library (three starters ship with it). **Draw new character…**
+opens the **character editor**: a 16×16 pixel canvas with pencil, eraser, fill and pick, a symmetry
+mode, a ghost of the other frame, shift/flip/clear, a colour list you can recolour, and an animated
+preview. Each character has four facings (front/back, left/right) with a standing and a stride frame;
+**Mirror to other side** copies a facing flipped. Every stroke saves to the library at once, and sprites can
+be exported and imported as `.character.json`.
+
+Pick a sprite and use **Person** (`C`) to stand it on any free tile (`R` turns it). With **Walk** (`W`),
+click a character, then click a tile: it walks the shortest route over free tiles, and the route is
+previewed as you hover. Arrow keys step the selected character one tile (right = south-east, down =
+south-west, left = north-west, up = north-east). A tile is free when it is dry, not lava, and holds neither
+a piece nor another character; a step may climb or drop one height level at most. Characters walk behind
+and in front of buildings correctly, are saved inside the map JSON together with their sprites, and are on
+the same undo stack as every other edit. The automation API has `listSprites`, `listCharacters`,
+`placeCharacter`, `walkCharacter` and `removeCharacter`.
+
 ## Automation API and MCP server
 
 The tile editor can be driven without a mouse or Playwright. Three layers share one method list
@@ -54,8 +72,8 @@ Methods, all in model tile coordinates (x east, y south):
 
 | Group    | Methods |
 | -------- | ------- |
-| Discover | `describe` (terrain, assets, biomes, limits), `state`, `ascii` (text map), `getTile`, `getRegion`, `listObjects`, `getMap` |
-| Edit     | `paint`, `fill`, `elevation`, `place`, `erase`, `moveObject`, `useTool` (a drag path), `batch` (atomic, one undo step), `rename` |
+| Discover | `describe` (terrain, assets, biomes, limits), `state`, `ascii` (text map), `getTile`, `getRegion`, `listObjects`, `listSprites`, `listCharacters`, `getMap` |
+| Edit     | `paint`, `fill`, `elevation`, `place`, `erase`, `moveObject`, `placeCharacter`, `walkCharacter`, `removeCharacter`, `useTool` (a drag path), `batch` (atomic, one undo step), `rename` |
 | Map      | `newMap`, `generate`, `setMap`, `undo`, `redo` |
 | View     | `open`, `close`, `setView` (rotation, zoom, centre, grid), `setSelection`, `tileToScreen`, `screenToTile` |
 | See      | `screenshot` (`map`: offscreen render at any scale, rotation or tile crop; `viewport`: the on-screen canvas) |
