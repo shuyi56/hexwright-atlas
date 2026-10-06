@@ -134,7 +134,7 @@ function paint(R, clip) {
     const sh = document.createElement('canvas'); sh.width = dw; sh.height = dh;
     const sg = sh.getContext('2d'); sg.setTransform(SC, 0, 0, SC, -dx, -dy); sg.fillStyle = '#000';
     for (const o of near) {
-      const a = ASSET_BY_ID[o.id], [w, d] = footprint(o), k = a.group === 'Nature' ? 0.3 : a.group === 'Props' ? 0.12 : 0.06;
+      const a = ASSET_BY_ID[o.id], [w, d] = footprint(o), k = a.shade ?? (a.group === 'Nature' ? 0.3 : a.group === 'Props' ? 0.12 : 0.06);
       const pts = [[o.x + k, o.y + k], [o.x + w - k, o.y + k], [o.x + w - k, o.y + d - k], [o.x + k, o.y + d - k]];
       const all = pts.concat(pts.map(([x, y]) => [x + a.h * 0.042, y - a.h * 0.024]));
       sg.beginPath(); hull(all).forEach((p, j) => { const q = P(p[0], p[1], o.z); j ? sg.lineTo(q[0], q[1]) : sg.moveTo(q[0], q[1]); }); sg.closePath(); sg.fill();

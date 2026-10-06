@@ -1,9 +1,10 @@
-import { TERRAIN } from '../tiles/index.js';
+import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
 import { inb } from './ops.js';
 import { objAt } from './model.js';
 
 /* ================= tile editor: where characters can stand and walk =================
-   A tile is free when it is on the map, dry, not lava and holds neither a piece nor another character.
+   A tile is free when it is on the map, dry, not lava and holds neither a piece (other than one made to be
+   walked through, such as a doorway) nor another character.
    A step goes to one of the four edge-neighbours and may climb or drop at most one height level. Pure,
    so the pointer, the keyboard and the automation API walk by the same rules. */
 const FACE_DELTA = [[0, 1], [1, 0], [0, -1], [-1, 0]];  /* facing 0..3 = south-west, south-east, north-east, north-west */
@@ -13,7 +14,7 @@ function blockedBy(M, x, y, except = -1) {
   if (!inb(M, x, y)) return 'outside the map';
   const T = TERRAIN[M.terr[y * M.S + x]];
   if (T.water) return 'water'; if (T.glow) return 'lava';
-  if (objAt(M, x, y) >= 0) return 'a piece stands there';
+  const k = objAt(M, x, y); if (k >= 0 && !ASSET_BY_ID[M.objs[k].id].walk) return 'a piece stands there';
   if (charAt(M, x, y, except) >= 0) return 'another character stands there';
   return null;
 }

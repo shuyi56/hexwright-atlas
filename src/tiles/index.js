@@ -24,15 +24,20 @@ function turnAsset(o, rot, S) {
   const [ax, ay] = rp(o.x, o.y), [bx, by] = rp(o.x + w, o.y + d);
   return Object.assign({}, o, { x: Math.min(ax, bx), y: Math.min(ay, by), face: ((o.face || 0) + 3 * rot) % 4 });
 }
-/* wall pieces join up with the wall pieces beside them: sets links = [+x, +y, -x, -y] on each wall and tower
-   (call on the instances as drawn, after any turning). A gatehouse joins only at the ends of its long side. */
-const WALLISH = new Set(['wall', 'walltower', 'gatehouse']);
+/* wall pieces join up with the wall pieces beside them: sets links = [+x, +y, -x, -y] on each joining piece
+   (call on the instances as drawn, after any turning). City walls and towers join each other and gatehouses (a
+   gatehouse only at the ends of its long side); interior walls, windows, doorways, fireplaces and posts join
+   each other. Pieces only join pieces of their own kind. */
+const JOIN = { wall: 'city', walltower: 'city', gatehouse: 'city' };
+for (const a of ASSETS) if (a.joins) JOIN[a.id] = a.joins;
+const DRAWS_LINKS = new Set(['wall', 'walltower', ...ASSETS.filter(a => a.joins).map(a => a.id)]);
 function wallLinks(objs) {
   const at = new Map(), out = new Map();
-  for (const o of objs) if (WALLISH.has(o.id)) { const [w, d] = footprint(o); for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) at.set(x + ',' + y, o); }
+  for (const o of objs) { const kind = JOIN[o.id]; if (!kind) continue; const [w, d] = footprint(o); for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) at.set(kind + ',' + x + ',' + y, o); }
   for (const o of objs) {
-    if (o.id !== 'wall' && o.id !== 'walltower') continue;
-    const q = (dx, dy) => { const n = at.get((o.x + dx) + ',' + (o.y + dy)); if (!n || n === o) return 0; if (n.id !== 'gatehouse') return 1; const [w, d] = footprint(n); return (dx !== 0) === (w > d) ? 1 : 0; };
+    if (!DRAWS_LINKS.has(o.id)) continue;
+    const kind = JOIN[o.id];
+    const q = (dx, dy) => { const n = at.get(kind + ',' + (o.x + dx) + ',' + (o.y + dy)); if (!n || n === o) return 0; if (n.id !== 'gatehouse') return 1; const [w, d] = footprint(n); return (dx !== 0) === (w > d) ? 1 : 0; };
     out.set(o, [q(1, 0), q(0, 1), q(-1, 0), q(0, -1)]);
   }
   return out;

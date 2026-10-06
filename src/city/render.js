@@ -207,7 +207,7 @@ function renderCity(C, rot, SC) {
       else if (o.type === 'wall') { const dx = o.x2 - o.x1, dy = o.y2 - o.y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L * 0.31, ny = dx / L * 0.31; cast([[o.x1 + nx, o.y1 + ny], [o.x2 + nx, o.y2 + ny], [o.x2 - nx, o.y2 - ny], [o.x1 - nx, o.y1 - ny]], o.z0, o.h); }
       else if (o.type === 'tree') cast(circ(o.x, o.y, 0.28), o.z0, o.s * 1.6);
       else if (o.type === 'mill') cast(circ(o.x, o.y, 0.3), o.z0, 22);
-      else if (o.type === 'asset') { const a = ASSET_BY_ID[o.id], [w, d] = footprint(o), k = a.group === 'Nature' ? 0.3 : a.group === 'Props' ? 0.12 : 0.06; cast([[o.x + k, o.y + k], [o.x + w - k, o.y + k], [o.x + w - k, o.y + d - k], [o.x + k, o.y + d - k]], o.z0, a.h); }
+      else if (o.type === 'asset') { const a = ASSET_BY_ID[o.id], [w, d] = footprint(o), k = a.shade ?? (a.group === 'Nature' ? 0.3 : a.group === 'Props' ? 0.12 : 0.06); cast([[o.x + k, o.y + k], [o.x + w - k, o.y + k], [o.x + w - k, o.y + d - k], [o.x + k, o.y + d - k]], o.z0, a.h); }
       else if (o.type === 'bridge') cast([[o.x, o.y], [o.x + o.w, o.y], [o.x + o.w, o.y + o.d], [o.x, o.y + o.d]], WZ, 8);
       else if (o.type === 'solid') { let zmin = 1e9, zmax = -1e9; const pts = []; for (const f of o.faces) for (const q of f.p) { pts.push([q[0], q[1]]); zmin = Math.min(zmin, q[2]); zmax = Math.max(zmax, q[2]); } cast(convexHull(pts), zmin, (zmax - zmin) * 0.85); }
     }

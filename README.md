@@ -7,7 +7,7 @@ isometric district map.
 ## Tile editor
 
 The **Tile editor** button opens an isometric workbench built on the same tile set as the city
-districts. Paint 34 kinds of ground, raise and lower terrain, place 63 buildings, props and plants,
+districts. Paint 34 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
 turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
 builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
 fenland, ashlands). On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
@@ -16,7 +16,20 @@ water, rivers and roads crossing the same sides as on the map, farmland, and the
 other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter
 district** opens just the selected district. The map is autosaved in the browser.
 
-### Characters
+### Interiors
+
+The **Interior** tab holds room pieces and furniture, and the Terrain tab has a **Floors** group (floorboards,
+dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
+
+- **Room pieces:** an interior wall, a wall with a window, a doorway, a fireplace and a timber post. Walls are
+  kept low, cut away like a dolls' house so the room stays visible, and they join the room pieces beside them
+  into corners and tees. Characters can walk through a doorway; every other piece blocks them.
+- **Furniture:** a bed, a straw cot, a table, a long table, a chair, a stool, a bench, a chest, a wardrobe, a
+  bookshelf, a dresser, a writing desk, a counter, a cooking pot, a wash tub, a candle stand, a potted plant, a
+  throne, an altar, a pew, a weapon rack and a spinning wheel. Each is drawn in its own frame, so `R` turns it
+  to face any of the four ways and turning the view shows its back.
+
+
 
 The **Characters** tab lists your character library. Six detailed starters come with it: a villager in a vest, a
 farmer in a straw hat and apron, a guard with helmet, cape and spear, a bearded merchant with a satchel, a hooded

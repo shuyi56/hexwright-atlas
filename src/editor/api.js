@@ -177,7 +177,7 @@ function describe() {
     sprites: library.list().map(s => ({ id: s.id, name: s.name })),
     biomes: Object.entries(BIOMES).map(([id, B]) => ({ id, label: B.label, climate: B.clim })),
     terrain: TERRAIN.map(t => ({ id: t.id, label: t.label, group: t.group, water: !!t.water, symbol: SYM[t.id] })),
-    assets: ASSETS.map(a => ({ id: a.id, label: a.label, group: a.group, w: a.w, d: a.d, height: a.h, water: !!a.water })),
+    assets: ASSETS.map(a => ({ id: a.id, label: a.label, group: a.group, w: a.w, d: a.d, height: a.h, water: !!a.water, walkable: !!a.walk })),
     methods: Object.fromEntries(Object.entries(METHODS).map(([k, m]) => [k, m.description]))
   };
 }
