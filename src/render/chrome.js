@@ -1,11 +1,6 @@
 import { COLS, HW, M, R, ROWS, TAU, worldH, worldW } from '../core/geometry.js';
 import { GOLD, INK, VEL, WAX } from './palette.js';
 
-function smoothPath(g, pts) {
-  g.moveTo(pts[0][0], pts[0][1]);
-  if (pts.length === 2) { g.lineTo(pts[1][0], pts[1][1]); return; }
-  for (let k = 1; k < pts.length - 1; k++) { const mx = (pts[k][0] + pts[k + 1][0]) / 2, my = (pts[k][1] + pts[k + 1][1]) / 2; g.quadraticCurveTo(pts[k][0], pts[k][1], k === pts.length - 2 ? pts[k + 1][0] : mx, k === pts.length - 2 ? pts[k + 1][1] : my); }
-}
 function drawCompass(g, x, y, r) {
   g.save(); g.translate(x, y);
   g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fillStyle = 'rgba(240,230,203,0.55)'; g.fill();

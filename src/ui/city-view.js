@@ -7,7 +7,7 @@ import { FONT_FELL, FONT_SC } from './draw.js';
 import { esc, showTab, survey } from './ledger.js';
 import { KIND } from '../world/data.js';
 import { openEditor } from '../editor/editor.js';
-import { cityToModel } from '../editor/from-city.js';
+import { districtToModel } from '../editor/from-city.js';
 
 /* ================= city view ================= */
 const cityEl = $('city'), cc = $('cityCanvas'), cctx = cc.getContext('2d'), ctip = $('cityTip'), cveil = $('cityVeil');
@@ -197,8 +197,10 @@ function districtPanel(k) {
     <p class="kind">${C.kind === 'abbey' ? 'Part of' : 'District of'} ${esc(C.name)}</p>
     <p class="flavour">${esc(D.desc)}</p>
     <dl class="facts">${facts.map(([a, b]) => `<div><dt>${a}</dt><dd>${esc(b)}</dd></div>`).join('')}</dl>
+    <button class="btn enter-city" id="enterDistrict" title="Open this district as a tile map in the tile editor">Enter ${C.kind === 'abbey' ? 'grounds' : 'district'}</button>
     <p class="hint">Click another district, or the city name above to return to the overview.</p>`;
   $('crumb').addEventListener('click', () => selectDistrict(-1, false));
+  $('enterDistrict').addEventListener('click', () => { const M = districtToModel(C, k); if (M) openEditor(M, C.name); });
 }
 /* city input */
 {
@@ -244,7 +246,6 @@ function districtPanel(k) {
   $('cIn').addEventListener('click', () => cZoomAt(CV.cw / 2, CV.ch / 2, CV.z * 1.4));
   $('cOut').addEventListener('click', () => cZoomAt(CV.cw / 2, CV.ch / 2, CV.z / 1.4));
   $('cFit').addEventListener('click', cityFit);
-  $('cityEdit').addEventListener('click', () => { if (CV.C) openEditor(cityToModel(CV.C)); });
   $('cityLabels').addEventListener('click', () => { CV.labels = !CV.labels; $('cityLabels').setAttribute('aria-pressed', String(CV.labels)); cityReq(); });
   new ResizeObserver(() => { if (CV.open) citySize(); }).observe(cityEl);
 }

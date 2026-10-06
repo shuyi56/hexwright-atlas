@@ -5,7 +5,7 @@ import { requestDraw } from './draw.js';
 import { clampPan, clampZ, fit, toWorldHex, zoomAt } from './view.js';
 import { select, terrainName } from './ledger.js';
 import { openCity } from './city-view.js';
-import { rebuildBase } from '../main.js';
+import { rebuildBase } from './rebuild.js';
 
 /* ================= input ================= */
 const pts = new Map(); let drag = null, pinch = null;

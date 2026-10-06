@@ -7,11 +7,14 @@ isometric district map.
 ## Tile editor
 
 The **Tile editor** button opens an isometric workbench built on the same tile set as the city
-districts. Paint 34 kinds of ground, raise and lower terrain, place 55 buildings, props and plants,
+districts. Paint 34 kinds of ground, raise and lower terrain, place 63 buildings, props and plants,
 turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
 builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
-fenland, ashlands). Inside a city, **Edit as tiles** opens that district in the editor. The map is
-autosaved in the browser.
+fenland, ashlands). On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
+generated from the atlas: its biome blended into its neighbours', coast or lake shore on the sides that touch
+water, rivers and roads crossing the same sides as on the map, farmland, and the village, town, keep, ruin or
+other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter
+district** opens just the selected district. The map is autosaved in the browser.
 
 ## Automation API and MCP server
 
@@ -107,7 +110,7 @@ src/
   city/               City districts: generation, architecture solids, 2.5D rendering
   tiles/              Shared isometric tile set: terrain tiles, buildings, props and nature,
                       drawn procedurally with a small iso kit (used by the city view and the editor)
-  editor/             Tile editor: map model, pure ops, renderer, scene generator, city import, UI,
+  editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
 tools/                Vite plugin that relays HTTP calls to the editor page (dev server only)
 mcp/                  MCP server, backend launcher and end-to-end test

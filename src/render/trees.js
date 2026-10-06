@@ -2,16 +2,6 @@ import { TAU } from '../core/geometry.js';
 import { INK, TREE, castShadow, hexRgb, lerp } from './palette.js';
 
 /* ---------- trees ---------- */
-function crown(g, cx, cy, rx, ry, bl) {
-  const n = bl.length; g.beginPath();
-  for (let k = 0; k <= n; k++) {
-    const a = k / n * TAU - Math.PI / 2, px = cx + Math.cos(a) * rx, py = cy + Math.sin(a) * ry;
-    if (!k) { g.moveTo(px, py); continue; }
-    const am = (k - 0.5) / n * TAU - Math.PI / 2, b = bl[k - 1];
-    g.quadraticCurveTo(cx + Math.cos(am) * rx * b, cy + Math.sin(am) * ry * b, px, py);
-  }
-  g.closePath();
-}
 /* ---- foliage: clustered canopies with lit volume, leaf clumps and a single ink silhouette ---- */
 function mixHex(a, b, t) { const A = hexRgb(a), Bc = hexRgb(b); return '#' + A.map((v, i) => Math.max(0, Math.min(255, Math.round(v + (Bc[i] - v) * t))).toString(16).padStart(2, '0')).join(''); }
 const _leafPals = new Map();

@@ -1,6 +1,6 @@
 import { CX, CY, R, TAU, hexDist } from '../core/geometry.js';
 import { church, house } from './settlements.js';
-import { corrHit, fitIcon, riverNear } from './rivers-roads.js';
+import { corrHit, fitIcon } from './rivers-roads.js';
 import { HILLP, INK, MT, ROOFS, climate } from './palette.js';
 import { drawHill, drawMountain, drawRock } from './relief.js';
 import { drawPalm, drawPine, drawSnag, drawTree } from './trees.js';
@@ -8,12 +8,6 @@ import { drawBones, drawDune, drawFarm, drawMesa, drawPool, drawReeds, tuft } fr
 
 /* ---------- terrain dispatcher ---------- */
 const FPTS = [[-0.42, -0.08], [0.06, -0.36], [0.46, -0.02], [-0.16, 0.34], [0.3, 0.42], [-0.55, 0.42], [0.62, 0.38]];
-// keep a tree off the water: push it to the bank, drop it if its crown would sit over the river
-function riverClear(x, y, crown) {
-  const q = riverNear(x, y, crown); if (!q) return [x, y];
-  if (q[2] > 0.2 && q[0] < crown) return null;
-  return q[0] < 3.5 ? [x + q[1] * (3.5 - q[0]), y + q[2] * (3.5 - q[0])] : [x, y];
-}
 // a suburb hex: lanes of cottages thickening toward the walls, kitchen gardens and orchards between, a parish church
 // in the first ring of the bigger places; every building stands clear of the roads and rivers that cross it
 function drawSprawl(g, i, map, rnd) {

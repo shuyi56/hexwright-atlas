@@ -1,6 +1,6 @@
 import { mulberry32 } from '../core/random.js';
 import { INK, hexRgb, rgbStr } from '../render/palette.js';
-import { ASSET_BY_ID, TERRAIN, decorateTerrain, drawAsset, footprint, turnAsset } from '../tiles/index.js';
+import { ASSET_BY_ID, TERRAIN, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset, wallLinks } from '../tiles/index.js';
 
 /* ================= tile editor: rendering =================
    Same projection as the city districts (TWH x THH tiles, EL px per height level) so assets
@@ -30,6 +30,9 @@ const GRAIN = (() => { let c; return () => {
   gx.putImageData(gi, 0, 0); return c;
 }; })();
 const pieceKey = o => `${o.id},${o.x},${o.y},${o.face},${o.v}`;
+/* walls are drawn from their neighbours, so which pieces they join is part of what identifies them: the
+   neighbour of a wall that was added or removed counts as changed and is repainted with it */
+const pieceKeys = objs => { const wl = wallLinks(objs); return objs.map(o => pieceKey(o) + (wl.has(o) ? ',' + wl.get(o).join('') : '')); };
 
 function renderTiles(M, rot, SC, opts = {}) {
   const S = M.S, NN = S * S, { W, H, OX, OY } = layout(S);
@@ -48,7 +51,10 @@ function scene(R, M) {
   const { S, rot, rti, RT, RE, covered, zOf } = R, NN = S * S;
   for (let t = 0; t < NN; t++) { const u = rti(t); RT[u] = M.terr[t]; RE[u] = M.elev[t]; }
   covered.fill(0);
-  R.objs = M.objs.map((o, k) => Object.assign(rotInst(o, rot, S), { k, key: pieceKey(o) }));
+  const keys = pieceKeys(M.objs);
+  /* copies: at rot 0 turnAsset hands back the model's own piece, and render data (key, links) must not leak into it */
+  R.objs = M.objs.map((o, k) => Object.assign({}, rotInst(o, rot, S), { k, key: keys[k] }));
+  linkWalls(R.objs);
   for (const o of R.objs) {
     const [w, d] = footprint(o); let z = 0, zmin = Infinity;
     for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) { const u = y * S + x, zz = zOf(u); covered[u] = 1; z = Math.max(z, zz); zmin = Math.min(zmin, zz); }
@@ -163,7 +169,7 @@ function updateTiles(R, M) {
   /* pieces that came or went, as a multiset of their model-space keys */
   const left = new Map(); for (const o of R.objs) left.set(o.key, (left.get(o.key) || 0) + 1);
   const added = new Set();
-  for (const o of M.objs) { const key = pieceKey(o), n = left.get(key) || 0; if (n) left.set(key, n - 1); else added.add(key); }
+  for (const key of pieceKeys(M.objs)) { const n = left.get(key) || 0; if (n) left.set(key, n - 1); else added.add(key); }
   const gone = new Set([...left].filter(([, n]) => n > 0).map(([key]) => key));
   const touches = o => { const [w, d] = footprint(o); for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) if (dirty[y * S + x]) return true; return false; };
   let box = null; const grow = b => { box = box ? [Math.min(box[0], b[0]), Math.min(box[1], b[1]), Math.max(box[2], b[2]), Math.max(box[3], b[3])] : b.slice(); };

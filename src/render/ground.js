@@ -44,7 +44,9 @@ function drawFarm(g, x, y, rnd) {
   }
   g.strokeStyle = 'rgba(78,98,48,0.6)'; g.lineWidth = 1; g.beginPath(); for (const [ox, oy] of cells) g.rect(ox, oy, cw, chh); g.stroke();
   g.restore();
-  if (rnd() < 0.4) drawTree(g, x + (rnd() - 0.5) * R * 0.7, y + (rnd() - 0.2) * R * 0.5, R * 0.26, rnd() < 0.5 ? 'oak' : 'bush', rnd);
+  /* two separate draws: the haystack roll only happens when the tree roll fails */
+  const tree = rnd() < 0.4;
+  if (tree) drawTree(g, x + (rnd() - 0.5) * R * 0.7, y + (rnd() - 0.2) * R * 0.5, R * 0.26, rnd() < 0.5 ? 'oak' : 'bush', rnd);
   else if (rnd() < 0.4) drawHaystack(g, x + (rnd() - 0.5) * R * 0.6, y + (rnd() - 0.2) * R * 0.5, R * 0.14);
 }
 function drawHaystack(g, x, y, s) {

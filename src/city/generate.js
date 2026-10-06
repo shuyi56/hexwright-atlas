@@ -310,7 +310,8 @@ function generateCity(map, s) {
   }
 
   /* building helpers */
-  const objs = [], landmarks = [];
+  /* complexes: footprint and turn of each great church, for the tile conversion */
+  const objs = [], landmarks = [], complexes = [];
   const zAt = (x, y) => { const t = id(Math.min(S - 1, Math.max(0, Math.floor(x))), Math.min(S - 1, Math.max(0, Math.floor(y)))); return isWater(t) ? -5 : T[t] === CT.DOCK ? -1 : elev[t] * EL; };
   const freeRect = (x0, y0, w, d, k, opt = {}) => {
     let lvl = -1;
@@ -347,6 +348,8 @@ function generateCity(map, s) {
     for (const [lx0, ly0, lx1, ly1, ty] of Bd.ground) { const [ax, ay] = Bd.M(lx0, ly0), [bx, by] = Bd.M(lx1, ly1), mx0 = Math.min(ax, bx), mx1 = Math.max(ax, bx), my0 = Math.min(ay, by), my1 = Math.max(ay, by); for (let y = Math.floor(my0); y <= my1; y++) for (let x = Math.floor(mx0); x <= mx1; x++) if (inb(x, y) && x + 0.5 > mx0 && x + 0.5 < mx1 && y + 0.5 > my0 && y + 0.5 < my1) { T[id(x, y)] = ty; occ[id(x, y)] = 1; } }
     for (const ob of Bd.out) objs.push(ob);
     for (const mk of Bd.marks) landmark(mk.name, mk.x, mk.y, mk.kind, k, { z: mk.z });
+    const ch = Bd.marks.find(mk => mk.kind === 'cathedral' || mk.kind === 'church');
+    if (ch) complexes.push({ kind: ch.kind === 'cathedral' ? 'cathedral' : 'abbey', x: x0, y: y0, w: tw, d: td, axis: o % 2 ? 'y' : 'x', cx: ch.x, cy: ch.y });
   };
   const landmark = (name, x, y, kind, k, extra) => { const l = Object.assign({ name, x, y, kind, d: k }, extra); landmarks.push(l); return l; };
 
@@ -380,7 +383,7 @@ function generateCity(map, s) {
     for (let k = 0; k < poly.length; k++) {
       const a = poly[k], b = poly[(k + 1) % poly.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(L / 0.9));
       let run = null;
-      const flush = () => { if (!run) return; const [p, q, kind] = run; if (kind === 'gate') { objs.push({ type: 'wall', x1: p[0], y1: p[1], x2: q[0], y2: q[1], z0: 0, h: gateH, t: 0.8, gate: true }); round(p[0], p[1], { z0: 0, r: towerR * 0.85, h: gateH + 8, roof: 'crenel' }); round(q[0], q[1], { z0: 0, r: towerR * 0.85, h: gateH + 8, roof: 'crenel' }); } else { for (const e of [p, q]) { const ex = Math.floor(e[0]), ey = Math.floor(e[1]); if (inb(ex, ey) && !isWater(id(ex, ey)) && T[id(ex, ey)] !== CT.DOCK) { round(e[0], e[1], { z0: 0, r: towerR * 0.8, h: towerH * 0.8, roof: 'crenel' }); break; } } } run = null; };
+      const flush = () => { if (!run) return; const [p, q, kind] = run; if (kind === 'gate') { objs.push({ type: 'wall', x1: p[0], y1: p[1], x2: q[0], y2: q[1], z0: 0, h: gateH, t: 0.8, gate: true }); round(p[0], p[1], { z0: 0, r: towerR * 0.85, h: gateH + 8, roof: 'crenel', wt: 1 }); round(q[0], q[1], { z0: 0, r: towerR * 0.85, h: gateH + 8, roof: 'crenel', wt: 1 }); } else { for (const e of [p, q]) { const ex = Math.floor(e[0]), ey = Math.floor(e[1]); if (inb(ex, ey) && !isWater(id(ex, ey)) && T[id(ex, ey)] !== CT.DOCK) { round(e[0], e[1], { z0: 0, r: towerR * 0.8, h: towerH * 0.8, roof: 'crenel', wt: 1 }); break; } } } run = null; };
       for (let j = 0; j < n; j++) {
         const p = [lerp(a[0], b[0], j / n), lerp(a[1], b[1], j / n)], q = [lerp(a[0], b[0], (j + 1) / n), lerp(a[1], b[1], (j + 1) / n)];
         const mx = Math.floor((p[0] + q[0]) / 2), my = Math.floor((p[1] + q[1]) / 2);
@@ -393,7 +396,7 @@ function generateCity(map, s) {
       }
       flush();
       const vx = Math.floor(a[0]), vy = Math.floor(a[1]);
-      if (inb(vx, vy) && !isWater(id(vx, vy)) && !(T[id(vx, vy)] === CT.STREET && occ[id(vx, vy)] === 2)) { round(a[0], a[1], { z0: 0, r: towerR, h: towerH, roof: towerRoof }); towers++; }
+      if (inb(vx, vy) && !isWater(id(vx, vy)) && !(T[id(vx, vy)] === CT.STREET && occ[id(vx, vy)] === 2)) { round(a[0], a[1], { z0: 0, r: towerR, h: towerH, roof: towerRoof, wt: 1 }); towers++; }
     }
     return towers;
   }
@@ -453,7 +456,7 @@ function generateCity(map, s) {
           const [x0, y0] = sp, stone = '#ebe3cf';
           if (ax2 === 'x') { bld(x0, y0, 4.2, 3, { h: 3 * FH, roof: 'gable', axis: 'x', wall: stone, roofC: SLATE, rh: 18, rose: true }); bld(x0 + 4.2, y0 + 0.5, 1.8, 2, { h: 6 * FH, roof: 'spire', wall: stone, roofC: SLATE, rh: 44 }); take(x0, y0, 6, 3, CT.YARD); ring(x0, y0, 6, 3, CT.PLAZA, 0); }
           else { bld(x0, y0, 3, 4.2, { h: 3 * FH, roof: 'gable', axis: 'y', wall: stone, roofC: SLATE, rh: 18, rose: true }); bld(x0 + 0.5, y0 + 4.2, 2, 1.8, { h: 6 * FH, roof: 'spire', wall: stone, roofC: SLATE, rh: 44 }); take(x0, y0, 3, 6, CT.YARD); ring(x0, y0, 3, 6, CT.PLAZA, 0); }
-          landmark(name, x0 + (ax2 === 'x' ? 3 : 1.5), y0 + (ax2 === 'x' ? 1.5 : 3), 'cathedral', k); D.lm = name;
+          landmark(name, x0 + (ax2 === 'x' ? 3 : 1.5), y0 + (ax2 === 'x' ? 1.5 : 3), 'cathedral', k); D.lm = name; complexes.push({ kind: 'church', x: x0, y: y0, w: ax2 === 'x' ? 6 : 3, d: ax2 === 'x' ? 3 : 6, axis: ax2, tower: 'end' });
         }
       }
     } else if (D.type === 'temple') {
@@ -757,7 +760,7 @@ function generateCity(map, s) {
       objs.push(nb);
     }
   }
-  return { chan, riverCurve: rCurve, rmat, kind: abbey ? "abbey" : "city", order: orderName, community: abbey ? 18 + Math.floor(rng() * 60) : 0, founded: abbey ? map.realm.year - 120 - Math.floor(rng() * 500) : 0, cx: abbey ? AB.gx : cx, cy: abbey ? AB.gy : cy, S, T, elev, dist, tint, ftint, inside, objs, districts, landmarks, gates, taverns, river, waterName, coastal, isLake, cap, clim, name: s.name, intro, towers: towerCount, insideCount, spanYards: Math.round(2 * rW * YARDS_PER_TILE / 10) * 10 };
+  return { chan, riverCurve: rCurve, rmat, kind: abbey ? "abbey" : "city", order: orderName, community: abbey ? 18 + Math.floor(rng() * 60) : 0, founded: abbey ? map.realm.year - 120 - Math.floor(rng() * 500) : 0, cx: abbey ? AB.gx : cx, cy: abbey ? AB.gy : cy, S, T, elev, dist, tint, ftint, inside, objs, districts, landmarks, complexes, gates, taverns, river, waterName, coastal, isLake, cap, clim, name: s.name, intro, towers: towerCount, insideCount, spanYards: Math.round(2 * rW * YARDS_PER_TILE / 10) * 10 };
 }
 
 export { CT, DTYPE, EL, FH, SLATE, THH, TWH, generateCity };
