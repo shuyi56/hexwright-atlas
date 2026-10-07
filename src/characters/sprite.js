@@ -68,7 +68,7 @@ const mix = (a, b, t) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i,
 const darken = (hex, k) => '#' + [1, 3, 5].map(i => Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
 function figure(name, id, o) {
   const c = Object.assign({ skin: '#e8c49a', eye: '#2b2116', lip: '#8a5444', boots: '#7a5a3a', legs: '#9a7d5a', belt: '#7a5a3a', buckle: '#c9a24f', inner: '#efe3c4' }, o.col);
-  c.skinD = darken(c.skin, 0.84); c.topD = darken(c.top, 0.82); c.seam = darken(c.top, 0.6); c.sleeve = c.sleeve || c.top; c.sleeveD = darken(c.sleeve, 0.82); c.sleeveS = darken(c.sleeve, 0.48); c.legsD = darken(c.legs, 0.84); c.bootsD = darken(c.boots, 0.8); c.hairD = darken(c.hair, 0.8); c.hairL = mix(c.hair, '#fff4dc', 0.3);
+  c.skinD = darken(c.skin, 0.84); c.topD = darken(c.top, 0.82); c.sleeve = c.sleeve || c.top; c.sleeveD = darken(c.sleeve, 0.82); c.legsD = darken(c.legs, 0.84); c.bootsD = darken(c.boots, 0.8); c.hairD = darken(c.hair, 0.8); c.hairL = mix(c.hair, '#fff4dc', 0.3);
   if (c.hat) c.hatD = darken(c.hat, 0.8); if (c.apron) { c.apronD = darken(c.apron, 0.84); c.apronS = darken(c.apron, 0.66); } if (c.cape) c.capeD = darken(c.cape, 0.8);
   const pal = [], K = {};
   for (const [k, v] of Object.entries(c)) { let i = pal.indexOf(v); if (i < 0) { pal.push(v); i = pal.length - 1; } K[k] = i + 1; }
@@ -86,8 +86,9 @@ function figure(name, id, o) {
         if (top) p(left ? x : x + 2, y + j, K.hairL); else { r(left ? x + 1 : x, y + j, 2, 1, K.hairD); }
       }
     };
-    /* stride: the viewer-left leg steps forward (down and out), the other lifts; arms swing the other way */
-    const lf = step ? 1 : 0, rl = step ? -2 : 0, la = step ? -1 : 0, ra = step ? 1 : 0;
+    /* stride: the viewer-left leg steps forward (down and out), the other lifts; the arms swing the other way,
+       which in these three-quarter views carries both hands outward. A hand holding the spear stays put. */
+    const lf = step ? 1 : 0, rl = step ? -2 : 0, sw = step ? 1 : 0;
 
     /* spear, behind the body */
     if (o.spear) { const sx = back ? 8 : 23; r(sx, 3, 1, 26, K.belt); r(sx - 1, 1, 3, 2, K.inner); p(sx, 0, K.inner); }
@@ -99,29 +100,31 @@ function figure(name, id, o) {
       r(11 - lf, 28 + lf, 4, 3, K.boots); r(11 - lf, 30 + lf, 4, 1, K.bootsD);
       r(17, 28 + rl, 4, 3, K.boots); r(17, 30 + rl, 4, 1, K.bootsD);
     } else {
-      r(12 - lf, 24, 3, 4 + lf, K.legs); r(17, 24, 3, 4 + rl, K.legsD);
+      r(12 - lf, 23, 3, 5 + lf, K.legs); r(17, 23, 3, 5 + rl, K.legsD);
       r(11 - lf, 28 + lf, 4, 3, K.boots); r(11 - lf, 28 + lf, 4, 1, K.bootsD); r(10 - lf, 30 + lf, 5, 1, K.bootsD);
       r(17, 28 + rl, 4, 3, K.boots); r(17, 28 + rl, 4, 1, K.bootsD); r(17, 30 + rl, 5, 1, K.bootsD);
     }
 
-    /* arms (behind the torso's edge), shaded along the inner edge, with cuffs and hands */
-    const arm = (x, dy) => {
-      r(x, 16 + dy, 2, 6, K.sleeve);
-      if (o.armor) for (let j = 17; j < 21; j += 2) r(x, j + dy, 2, 1, K.sleeveD);             /* rows of mail */
-      r(x < 16 ? x + 1 : x, 16 + dy, 1, 5, K.sleeveS); r(x, 21 + dy, 2, 1, K.sleeveD); r(x, 22 + dy, 2, 2, K.skin);
+    /* arms: each hangs a pixel clear of the torso, joined to it only at the shoulder, so the ink between them
+       parts arm from body. Swinging (d is the outward step, -1 on the left), the elbow moves a pixel out, the
+       forearm and hand two, and the hand rides a pixel higher as the arm turns toward or away from the viewer. */
+    const arm = (x, d) => {
+      const at = j => (j < 18 ? 0 : j < 20 ? d : 2 * d), fold = d ? 1 : 0;
+      for (let j = 16; j < 21 - fold; j++) r(x + at(j), j, 2, 1, o.armor && j % 2 ? K.sleeveD : K.sleeve);   /* rows of mail */
+      r(x + 2 * d, 21 - fold, 2, 1, K.sleeveD); r(x + 2 * d, 22 - fold, 2, 2, K.skin);
     };
-    arm(9, back ? ra : la); arm(21, back ? la : ra);
-    r(10, 15, 1, 2, K.sleeve); r(21, 15, 1, 2, K.sleeve);                       /* the shoulders' round */
+    const hold = o.spear ? (back ? 'l' : 'r') : '';
+    arm(9, hold === 'l' ? 0 : -sw); arm(21, hold === 'r' ? 0 : sw);
+    r(10, 15, 2, 1, K.sleeve); r(11, 16, 1, 1, K.sleeve); r(20, 15, 2, 1, K.sleeve); r(20, 16, 1, 1, K.sleeve);   /* the shoulders' round */
 
-    /* torso: sloped shoulders rising to the collar, a full chest and a hem rounded at its corners; or a robe to the ankles */
-    r(13, 13, 6, 1, K.top); r(12, 14, 8, 1, K.top); r(11, 15, 10, 7, K.top); r(10, 22, 12, 1, K.top); r(11, 23, 10, 1, K.topD);
-    if (o.robe) { r(10, 22, 12, 5, K.top); r(9, 26, 14, 3, K.top); r(9, 28, 14, 1, K.trim || K.topD); r(17, 22, 1, 6, K.topD); }
-    if (o.gown) { r(9, 24, 14, 3, K.top); r(8, 27, 16, 2, K.top); r(8, 29, 16, 1, K.trim); r(13, 23, 1, 6, K.topD); r(17, 22, 1, 7, K.topD); r(20, 24, 1, 5, K.topD); }   /* a gown flaring to the floor */
-    if (!o.vest || back) { r(11, 16, 1, 4, K.seam); r(20, 16, 1, 4, K.seam); }    /* creases under the arms part them from the body */
+    /* torso: a slim body no wider than the head, its shoulders sloping up to the collar, its hem shaded; or a robe to the ankles */
+    r(14, 13, 4, 1, K.top); r(13, 14, 6, 1, K.top); r(12, 15, 8, 7, K.top); r(12, 22, 8, 1, K.topD);
+    if (o.robe) { r(12, 22, 8, 1, K.top); r(11, 23, 10, 3, K.top); r(10, 26, 12, 3, K.top); r(10, 28, 12, 1, K.trim || K.topD); r(17, 22, 1, 6, K.topD); }
+    if (o.gown) { r(10, 24, 12, 3, K.top); r(9, 27, 14, 2, K.top); r(9, 29, 14, 1, K.trim); r(13, 23, 1, 6, K.topD); r(17, 22, 1, 7, K.topD); r(19, 24, 1, 5, K.topD); }   /* a gown flaring to the floor */
     if (!back) {
       if (o.gown) { r(14, 13, 4, 1, K.skin); r(13, 14, 6, 1, K.skin); r(14, 15, 4, 1, K.trim); p(16, 16, K.band); }   /* square neckline, gold choker and a jewel */
       else { r(14, 14, 4, 1, K.inner); r(15, 15, 2, 1, K.inner); }            /* open collar */
-      if (o.vest) { r(12, 14, 2, 1, K.vest); r(11, 15, 3, 6, K.vest); r(18, 14, 2, 1, K.vest); r(18, 15, 3, 6, K.vest); }
+      if (o.vest) { p(13, 14, K.vest); r(12, 15, 2, 6, K.vest); p(18, 14, K.vest); r(18, 15, 2, 6, K.vest); }
       else { r(16, 16, 1, 4, K.topD); p(17, 16, K.buckle); p(17, 18, K.buckle); } /* placket and buttons */
       if (o.apron) {                                                          /* bib-and-brace overalls: straps, bib with a pocket, a pleated skirt */
         r(13, 14, 1, 2, K.apronD); r(18, 14, 1, 2, K.apronD);
@@ -132,21 +135,21 @@ function figure(name, id, o) {
       }
       if (o.armor) {                                                          /* a steel breastplate with a raised ridge over the tunic, its skirt split */
         r(13, 15, 6, 5, K.hat); r(17, 15, 2, 5, K.hatD); r(13, 19, 6, 1, K.hatD); r(15, 15, 1, 4, K.inner);
-        r(15, 21, 2, 3, K.topD); r(19, 21, 1, 2, K.topD);
+        r(15, 21, 2, 2, K.topD); r(18, 21, 1, 2, K.topD);
       }
     } else {
       r(15, 15, 2, 6, K.topD);                                                  /* back seam */
       if (o.apron) { r(13, 14, 1, 6, K.apronD); r(18, 14, 1, 6, K.apronD); }      /* braces down the back */
-      if (o.armor) r(15, 21, 2, 3, K.topD);
+      if (o.armor) r(15, 21, 2, 2, K.topD);
     }
-    r(11, 20, 10, 1, K.belt); if (!back) r(15, 20, 2, 1, K.buckle);
-    if (o.rope) { r(11, 20, 10, 1, K.rope); if (!back) r(13, 21, 1, 4, K.rope); }
+    r(12, 20, 8, 1, K.belt); if (!back) r(15, 20, 2, 1, K.buckle);
+    if (o.rope) { r(12, 20, 8, 1, K.rope); if (!back) r(13, 21, 1, 4, K.rope); }
     /* satchel strap across the chest, bag on the hip */
     if (o.satchel) {
-      if (!back) for (let k = 0; k < 7; k++) p(12 + k, 14 + k, K.strap);
-      const bx = back ? 10 : 18; r(bx, 20, 4, 4, K.bag); r(bx, 20, 4, 1, K.strap);
+      if (!back) for (let k = 0; k < 6; k++) p(13 + k, 14 + k, K.strap);
+      const bx = back ? 11 : 17; r(bx, 20, 4, 4, K.bag); r(bx, 20, 4, 1, K.strap);
     }
-    if (o.cape && !back) { p(11, 15, K.cape); p(20, 15, K.cape); r(10, 15, 1, 8, K.cape); r(21, 15, 1, 8, K.cape); p(12, 14, K.buckle); p(19, 14, K.buckle); }
+    if (o.cape && !back) { p(11, 15, K.cape); p(20, 15, K.cape); p(13, 14, K.buckle); p(18, 14, K.buckle); }   /* the cape over the shoulders, clasped at the collar */
 
     if (o.armor) for (const x of [9, 21]) { r(x, 15, 2, 2, K.hat); r(x, 17, 2, 1, K.hatD); p(x === 9 ? 10 : 21, 14, K.hat); }   /* steel pauldrons */
     /* neck and head */
