@@ -5,9 +5,8 @@ import { SIZE } from './sprite.js';
 /* ================= character sprites: pixel art =================
    Characters are crisp pixel art made to sit in the tile set's palette. The tiles are pale, chalky
    colours on paper, so every sprite colour is washed a little toward the paper tone and faintly grained
-   like the map image. The one-pixel outline is the tiles' ink softened by the colour it borders, and the
-   light from the left comes in gentle pixel steps (a highlight band on the lit side, a shade band on the
-   far side). On the map every zoom draws from one master per frame (see drawSprite), so the character
+   like the map image. The one-pixel outline is the tiles' ink, heavier on the shadow side, and the light
+   from the upper left models each figure in stepped tones (see labels). On the map every zoom draws from one master per frame (see drawSprite), so the character
    looks the same zoomed out or in: no zoom-dependent versions, and no blurring of pixel art. */
 const PAD = 1, UP = 1, N = SIZE + PAD * 2;
 const INK_RGB = hexRgb(INK), PAPER = [240, 230, 203];
@@ -17,21 +16,44 @@ const noise = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5
 const wash = c => { const l = lum(c); return c.map((ch, i) => (ch * 0.9 + l * 0.1) * 0.86 + PAPER[i] * 0.14); };
 const out = (c, k, gr = 1) => c.map(ch => Math.max(0, Math.min(255, Math.round(ch * k * gr))));
 
-/* Each pixel of the finished frame as a label: 0 clear, 1 + 4 * (index - 1) + band for a filled pixel (band 0
-   plain, 1 lit, 2 shaded, 3 dark detail drawn as is), and OUTLINE + index for an outline pixel bordering that
-   colour. */
-const OUTLINE = 1 << 12;
+/* Each pixel of the finished frame as a label: 0 clear, 1 + BANDS * (index - 1) + band for a filled pixel, and
+   OUTLINE + index (+ HEAVY on the shadow side) for an outline pixel bordering that colour. The band is one of
+   eight light steps (TONE), worked out per pixel so the figure reads as a solid lit from the upper left:
+   - the whole body turns like a cylinder: a highlight a quarter of the way in from the left, the core shadow
+     near the right, and a little light bounced back onto the very right edge;
+   - each part rounds itself: its left edge catches light, its right and lower edges turn away;
+   - a part's top facing open sky is brighter, while one tucked under another part (under the hair, a brim,
+     the belt) sits in that part's shadow;
+   - the figure darkens toward the feet, where the ground shades it. */
+/* highlights lift toward a warm white so pale cloth and hair still show a lit side */
+const LIT = [255, 246, 222];
+const BANDS = 8, TONE = [0.6, 0.69, 0.78, 0.89, 1, 1.09, 1.18, 1.27], OUTLINE = 1 << 12, HEAVY = 64;
 function labels(fr) {
   const L = new Int32Array(N * N), at = (x, y) => (x < 0 || y < 0 || x >= SIZE || y >= SIZE ? 0 : fr[y * SIZE + x]);
-  const lo = new Int32Array(SIZE).fill(SIZE), hi = new Int32Array(SIZE).fill(-1);
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (fr[y * SIZE + x]) { if (x < lo[y]) lo[y] = x; hi[y] = x; }
+  const lo = new Int32Array(SIZE).fill(SIZE), hi = new Int32Array(SIZE).fill(-1); let y0 = SIZE, y1 = -1;
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (fr[y * SIZE + x]) { if (x < lo[y]) lo[y] = x; hi[y] = x; y0 = Math.min(y0, y); y1 = y; }
+  /* The face's small marks (a colour on four pixels or fewer in the head: mouth, nose) and the skin around them
+     keep the plain/lit/shaded steps the characters had before, so the mouth keeps its old smile. */
+  const used = new Int32Array(256); for (const v of fr) used[v]++;
+  const small = (x, y) => { const w = at(x, y); return w && used[w] <= 4; };
+  const face = (x, y) => { if (y > 13) return false; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (small(x + i, y + j)) return true; return false; };
+  const OLD = [4, 5, 3];
   for (let y = -PAD; y < SIZE + PAD; y++) for (let x = -PAD; x < SIZE + PAD; x++) {
     const v = at(x, y), u = (y + PAD) * N + x + PAD;
-    if (!v) { const n = at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1); if (n) L[u] = OUTLINE + n; continue; }
-    /* a lit run of pixels on the left of each part, shade on the right; the top edge of a part catches light too */
-    const t = (x - lo[y]) / Math.max(1, hi[y] - lo[y]);
-    const edgeL = !at(x - 1, y) || at(x - 1, y) !== v, edgeR = !at(x + 1, y) || at(x + 1, y) !== v, top = !at(x, y - 1);
-    L[u] = 1 + 4 * (v - 1) + (t > 0.72 || (edgeR && t > 0.5) ? 2 : (edgeL && t < 0.5) || top ? 1 : 0);
+    if (!v) { const lt = at(x - 1, y), up = at(x, y - 1), n = lt || at(x + 1, y) || up || at(x, y + 1); if (n) L[u] = OUTLINE + n + (lt || up ? HEAVY : 0); continue; }
+    const t = hi[y] > lo[y] ? (x - lo[y]) / (hi[y] - lo[y]) : 0.4, l = at(x - 1, y), r = at(x + 1, y), a = at(x, y - 1), b = at(x, y + 1);
+    let f = t < 0.12 ? 1.1 : t < 0.38 ? 1.17 : t < 0.58 ? 1.02 : t < 0.8 ? 0.84 : x === hi[y] && t > 0.9 ? 0.8 : 0.7;
+    if (l !== v) f += t < 0.6 ? 0.1 : 0.04;
+    if (r !== v && t > 0.3) f -= 0.08;
+    if (!a) f += 0.1; else if (a !== v) f -= 0.14;
+    if (b !== v) f -= 0.06;
+    f *= 1.05 - 0.16 * (y - y0) / Math.max(1, y1 - y0);
+    let band = 0, best = 9; TONE.forEach((k, i) => { if (Math.abs(k - f) < best) { best = Math.abs(k - f); band = i; } });
+    if (face(x, y)) {
+      const s = (x - lo[y]) / Math.max(1, hi[y] - lo[y]), eL = l !== v, eR = r !== v;
+      band = OLD[s > 0.72 || (eR && s > 0.5) ? 2 : (eL && s < 0.5) || !a ? 1 : 0];
+    }
+    L[u] = 1 + BANDS * (v - 1) + band;
   }
   return L;
 }
@@ -42,8 +64,9 @@ function paintLabels(pal, L, n) {
   for (let u = 0; u < L.length; u++) {
     const l = L[u]; if (!l) continue;
     const x = u % n, y = (u / n) | 0, gr = 1 + (noise(x + 7, y + 3) - 0.5) * 0.06; let col;
-    if (l >= OUTLINE) { const nc = rgb[l - OUTLINE - 1] || INK_RGB; col = INK_RGB.map((ch, i) => ch * 0.62 + nc[i] * 0.45 * 0.38); }
-    else { const base = rgb[(l - 1) >> 2] || INK_RGB, band = (l - 1) & 3; col = dark(base) ? base : out(base, band === 2 ? 0.89 : band === 1 ? 1.06 : 1, gr); }
+    /* the outline is full ink on the shadow side and lets the colour through on the lit side */
+    if (l >= OUTLINE) { const heavy = (l - OUTLINE) & HEAVY, nc = rgb[((l - OUTLINE) & (HEAVY - 1)) - 1] || INK_RGB, m = heavy ? 0.1 : 0.3; col = INK_RGB.map((ch, i) => ch * (1 - m) * (heavy ? 0.92 : 1) + nc[i] * m * 0.6); }
+    else { const base = rgb[((l - 1) / BANDS) | 0] || INK_RGB, k = TONE[(l - 1) % BANDS]; col = dark(base) ? base : k > 1 ? out(base.map((ch, i) => ch + (LIT[i] - ch) * (k - 1) * 1.4), 1, gr) : out(base, k, gr); }
     d.set([col[0], col[1], col[2], 255], u * 4);
   }
   g.putImageData(im, 0, 0); return c;
@@ -79,16 +102,58 @@ function thinOutline(L, n, r) {
    sprite pixel (the weight a one-pixel outline has once filtered at map scale). Then a mip chain, each level
    half the last, so drawing never shrinks an image by more than half and nothing aliases or blurs. */
 const MASTER = 8;
-function mipChain(pal, fr) {
+function mipChain(pal, fr, lashes) {
   let L = labels(fr), n = N; for (let k = 1; k < MASTER; k *= 2) { L = scale2x(L, n); n *= 2; }
   thinOutline(L, n, 4.6);
-  const levels = [{ up: MASTER, can: paintLabels(pal, L, n) }];
+  const master = paintLabels(pal, L, n); roundEyes(master.getContext('2d'), pal, fr, lashes);
+  const levels = [{ up: MASTER, can: master }];
   for (let up = MASTER / 2; up >= 0.25; up /= 2) {
     const prev = levels[levels.length - 1].can, c = document.createElement('canvas'); c.width = c.height = Math.max(1, Math.round(N * up));
     const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(prev, 0, 0, c.width, c.height);
     levels.push({ up, can: c });
   }
   return levels;
+}
+
+/* Eyes are one pixel wide and two tall, which Scale2x cannot round. On the master each such run of a near-black
+   colour is redrawn as an oval in its own colour over the skin beside it, with a brow, an upper lid and a small glint toward the light. */
+function roundEyes(g, pal, fr, lashes) {
+  const feat = pal.map(h => lum(hexRgb(h)) < 60), isF = (x, y) => x >= 0 && y >= 0 && x < SIZE && y < SIZE && fr[y * SIZE + x] > 0 && feat[fr[y * SIZE + x] - 1];
+  const px = (x, y) => { const d = g.getImageData(x, y, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; };
+  const eyes = [];
+  for (let y = 0; y < SIZE - 1; y++) for (let x = 0; x < SIZE; x++) {
+    if (!isF(x, y) || !isF(x, y + 1) || isF(x, y - 1) || isF(x, y + 2) || isF(x - 1, y) || isF(x + 1, y) || isF(x - 1, y + 1) || isF(x + 1, y + 1)) continue;
+    const X = (x + PAD) * MASTER, Y = (y + PAD) * MASTER;
+    /* the skin is whatever most of the eye's neighbours are, so a nasal or a beard beside it is not taken for it */
+    const nb = [[x - 1, y], [x + 1, y], [x - 1, y + 1], [x + 1, y + 1], [x, y + 2]].filter(([i, j]) => fr[j * SIZE + i]), count = {};
+    for (const [i, j] of nb) count[fr[j * SIZE + i]] = (count[fr[j * SIZE + i]] || 0) + 1;
+    const [sx, sy] = nb.reduce((m, q) => (count[fr[q[1] * SIZE + q[0]]] > count[fr[m[1] * SIZE + m[0]]] ? q : m), nb[0] || [x - 1, y]);
+    /* a brow is the hair-coloured pixel just above the eye */
+    const above = y > 0 ? fr[(y - 1) * SIZE + x] : 0, brow = above && above !== fr[sy * SIZE + sx] && !feat[above - 1] ? px(X + MASTER / 2, Y - MASTER / 2) : null;
+    eyes.push({ X, Y, brow, eye: px(X + MASTER / 2, Y + MASTER), skin: px((sx + PAD) * MASTER + MASTER / 2, (sy + PAD) * MASTER + MASTER / 2) });
+  }
+  const mid = eyes.reduce((a, e) => a + e.X, 0) / Math.max(1, eyes.length);
+  for (const { X, Y, brow, eye, skin } of eyes) {
+    const cx = X + MASTER / 2, cy = Y + MASTER, rx = MASTER * 0.62, ry = MASTER * 1.1, out = eyes.length > 1 ? Math.sign(X - mid) || -1 : -1;
+    g.fillStyle = skin; g.fillRect(X, Y - (brow ? MASTER : 0), MASTER, MASTER * (brow ? 3 : 2));
+    /* the brow: a low, nearly flat stroke a little wider than the eye, rising slightly toward the outer side */
+    if (brow) {
+      const by = Y - MASTER * 0.32, i = cx - out * rx * 1.05, o = cx + out * rx * 1.35;
+      g.strokeStyle = brow; g.lineCap = 'round'; g.lineWidth = MASTER * 0.42;
+      g.beginPath(); g.moveTo(i, by + MASTER * 0.12); g.quadraticCurveTo(cx + out * rx * 0.45, by - MASTER * 0.12, o, by + MASTER * 0.1); g.stroke();
+    }
+    g.fillStyle = eye; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill();
+    /* the upper lid: a thin dark arc over the eye, thickening toward the outer corner and ending in a small flick */
+    /* characters marked with lashes (the women) keep a fuller lid and a longer flick */
+    const L = lashes ? { a: 1, w: 0.18, o: 0.32, f: 0.2, fx: 0.32, fy: 0.22 } : { a: 0.8, w: 0.12, o: 0.2, f: 0.12, fx: 0.16, fy: 0.1 };
+    g.strokeStyle = eye; g.lineCap = 'round'; g.globalAlpha = L.a;
+    g.lineWidth = MASTER * L.w; g.beginPath(); g.ellipse(cx, cy, rx + MASTER * 0.14, ry + MASTER * 0.1, 0, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
+    const a0 = out < 0 ? Math.PI * 1.12 : Math.PI * 1.62, a1 = out < 0 ? Math.PI * 1.38 : Math.PI * 1.88;
+    g.lineWidth = MASTER * L.o; g.beginPath(); g.ellipse(cx, cy, rx + MASTER * 0.14, ry + MASTER * 0.1, 0, a0, a1); g.stroke();
+    const ex = cx + out * (rx + MASTER * 0.05), ey = cy - ry * 0.45;
+    g.lineWidth = MASTER * L.f; g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex + out * MASTER * L.fx, ey - MASTER * L.fy); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = 'rgba(236, 226, 206, 0.85)'; g.beginPath(); g.ellipse(X + MASTER * 0.34, Y + MASTER * 0.62, MASTER * 0.2, MASTER * 0.26, 0, 0, Math.PI * 2); g.fill();   /* a glint toward the light */
+  }
 }
 
 /* the flat pixels of one frame as a SIZE×SIZE canvas, for the pixel grid */
@@ -107,8 +172,8 @@ function frameCanvas(s, face, k) {
 }
 const mips = new Map();
 function mipFor(s, face, k) {
-  const key = s.pal.join() + '|' + String.fromCharCode(...s.frames[face][k]); let m = mips.get(key);
-  if (!m) { if (mips.size > 200) mips.clear(); m = mipChain(s.pal, s.frames[face][k]); mips.set(key, m); }
+  const key = s.pal.join() + (s.lashes ? '|l' : '') + '|' + String.fromCharCode(...s.frames[face][k]); let m = mips.get(key);
+  if (!m) { if (mips.size > 200) mips.clear(); m = mipChain(s.pal, s.frames[face][k], s.lashes); mips.set(key, m); }
   return m;
 }
 /* Draw a frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units. The level
@@ -120,9 +185,15 @@ function drawSprite(g, s, face, k, x, y, px) {
   g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
   g.drawImage(lv.can, x - N / 2 * px, y - (PAD + SIZE) * px, N * px, N * px); g.restore();
 }
-/* soft ground shadow under a figure, leaning the way the pieces' shadows lean */
+/* ground shadow under a figure: a long soft shadow cast to the right (the way the pieces' shadows fall), a
+   pool under the feet, and a dark contact patch where the boots meet the ground */
 function footShadow(g, x, y, px) {
-  const rx = SIZE * px * 0.19; g.save(); g.fillStyle = 'rgba(0,0,0,0.2)'; g.beginPath(); g.ellipse(x + rx * 0.3, y - rx * 0.08, rx, rx * 0.46, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  const H = SIZE * px, ell = (cx, cy, rx, ry, a) => { g.fillStyle = `rgba(43,30,16,${a})`; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+  g.save();
+  ell(x + H * 0.22, y - H * 0.02, H * 0.3, H * 0.07, 0.13);
+  ell(x + H * 0.05, y, H * 0.2, H * 0.085, 0.18);
+  ell(x + H * 0.01, y - H * 0.005, H * 0.12, H * 0.045, 0.3);
+  g.restore();
 }
 /* a grass tile block like the ones in the tile palette, its top centre at (x, y), half-width w */
 function tileBlock(g, x, y, w) {
