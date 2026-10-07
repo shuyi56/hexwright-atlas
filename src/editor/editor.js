@@ -1,18 +1,25 @@
+import { INK_PAD, INK_SIZE, drawSprite, footShadow, spriteThumb } from '../characters/draw.js';
+import * as library from '../characters/library.js';
+import { openSpriteEditor } from '../characters/sprite-editor.js';
+import { FACES, SIZE as SPRITE_SIZE } from '../characters/sprite.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
-import { MAX_ELEV, blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
-import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, setElev, shiftElev } from './ops.js';
-import { EL, THH, TWH, renderTiles, rotInst, thumb, updateTiles } from './render.js';
+import { MAX_ELEV, MAX_LEVEL, blankModel, floorAt, levelOf, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
+import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, removeFloor, setElev, shiftElev } from './ops.js';
+import { EL, SZ, THH, TWH, frontMask, renderTiles, rotInst, thumb, updateTiles } from './render.js';
+import { blockedBy, charAt, eraseCharAt, findPath, placeChar, reachable, stairsAt, walkChar, walkGoal } from './walk.js';
 
 /* ================= tile editor screen ================= */
 const root = $('editor'), cv = $('edCanvas'), cx = cv.getContext('2d'), ov = $('edOverlay'), ovx = ov.getContext('2d'), statusEl = $('edStatus'), stage = $('edStage');
 const SC = coarse ? 1.4 : 2, SAVE_KEY = 'hexwright.tiles.v1', HIST = 60;
 const TOOLS = [
   ['paint', 'Paint', 'B', '▦'], ['fill', 'Fill', 'G', '◩'], ['raise', 'Raise', 'U', '▲'], ['lower', 'Lower', 'J', '▼'], ['level', 'Level', 'L', '▬'],
-  ['place', 'Place', 'P', '⌂'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
+  ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
 ];
-const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain' };
+const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, level: 0, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), occ: new Map(), lastT: 0, preview: null };
+/* one sprite pixel in drawing units: a figure stands about as tall as a cottage's eaves and chimney */
+const WALK_SPEED = 3.2, SPRITE_PX = 0.42, FIG_H = SPRITE_SIZE * SPRITE_PX;
 
 /* ---------- persistence ---------- */
 let saveT = 0;
@@ -29,7 +36,7 @@ function redo() { if (!ED.redo.length) return; ED.undo.push(cloneModel(ED.M)); s
 function showSize(S) { const sel = $('edSize'); if (![...sel.options].some(o => +o.value === S)) { const o = new Option(String(S)); sel.add(o, [...sel.options].find(x => +x.value > S) || null); } sel.value = String(S); }
 function syncHist() { $('edUndo').disabled = !ED.undo.length; $('edRedo').disabled = !ED.redo.length; }
 function setModel(M, keepView) {
-  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.stale = resize || ED.stale === true ? true : 'model';
+  const resize = !ED.M || ED.M.S !== M.S; ED.M = M; ED.walk.clear(); ED.occ.clear(); ED.sel = -1; ED.stale = resize || ED.stale === true ? true : 'model';
   $('edName').value = M.name; showSize(M.S);
   syncHist(); autosave();
   if (resize || !keepView) { rebuild(); fitView(); } else changed();
@@ -60,11 +67,126 @@ function setRot(r) {
   for (let n = ((r - ED.rot) % 4 + 4) % 4; n > 0; n--) turnView(1);
 }
 
+/* ---------- characters: where they are drawn, and walking ---------- */
+/* the surface height at (x, y) on level L: the ground (sunk where it is liquid) or an upper floor */
+const zAt = (x, y, L = 0) => { const u = y * ED.M.S + x; return L ? ED.M.elev[u] * EL + L * SZ : ED.M.elev[u] * EL - (TERRAIN[ED.M.terr[u]].sink || 0); };
+/* a position is a model-space tile centre with a height: { x: tile + 0.5, y: tile + 0.5, z } */
+const tilePt = (x, y, L = 0) => ({ x: x + 0.5, y: y + 0.5, z: zAt(x, y, L), L });
+const viewPt = (x, y) => { const S = ED.M.S, r = ED.rot; return r === 0 ? [x, y] : r === 1 ? [S - y, x] : r === 2 ? [S - x, S - y] : [y, S - x]; };
+const faceIn = f => (f + 3 * ED.rot) % 4;
+function walkerPos(w) {
+  let d = w.d; const P = w.pts;
+  for (let i = 0; i + 1 < P.length; i++) {
+    const a = P[i], b = P[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
+    if (d <= len || i + 2 === P.length) { const f = Math.min(1, d / len); return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f, L: f < 0.5 ? a.L : b.L, seg: [a, b], face: Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 1 : 3) : (b.y > a.y ? 0 : 2) }; }
+    d -= len;
+  }
+  return Object.assign({ face: 0 }, P[P.length - 1]);
+}
+const walkLen = w => w.pts.reduce((n, p, i) => i ? n + Math.hypot(p.x - w.pts[i - 1].x, p.y - w.pts[i - 1].y) : 0, 0);
+/* where a character is drawn right now: its tile, or partway along its walk */
+function curPoint(c) { const w = ED.walk.get(c); if (!w) return tilePt(c.x, c.y, levelOf(c)); const p = walkerPos(w); return { x: p.x, y: p.y, z: p.z, L: p.L }; }
+/* the model already holds the end of the walk; this only sets up the picture of getting there */
+function beginWalk(c, start, path) { ED.walk.set(c, { pts: [start, ...path.map(([x, y, L]) => tilePt(x, y, L || 0))], d: 0 }); req(); }
+/* walk character k along path as one step of the current edit */
+function doWalk(k, path) {
+  const M = ED.M, c = M.chars[k], start = curPoint(c), r = walkChar(M, k, path);
+  if (r.ok && path.length) { beginWalk(c, start, path); changed(); status(); }
+  return r;
+}
+let followLevel = null;
+function stepAnim(now) {
+  const dt = Math.min(0.1, (now - (ED.lastT || now)) / 1000); ED.lastT = now;
+  for (const [c, w] of ED.walk) {
+    w.d += dt * WALK_SPEED; if (w.d >= walkLen(w)) ED.walk.delete(c);
+    /* the view follows the selected character onto the floor it steps on, so it stays in sight */
+    if (c === ED.M.chars[ED.sel]) { const L = ED.walk.has(c) ? walkerPos(w).L : levelOf(c); if (L != null && L !== ED.level) followLevel = L; }
+  }
+  if (!ED.walk.size) ED.lastT = 0;
+}
+/* each character as it is drawn: view-space centre, height, facing and frame, nearest the viewer last */
+function charViews() {
+  const out = [];
+  (ED.M.chars || []).forEach((c, k) => {
+    const w = ED.walk.get(c), p = w ? walkerPos(w) : Object.assign(tilePt(c.x, c.y, levelOf(c)), { face: c.face }), [X, Y] = viewPt(p.x, p.y), stride = w ? Math.floor(w.d * 2) % 2 : 0;
+    if ((w ? p.L ?? levelOf(c) : levelOf(c)) > ED.level) return;  /* above the storey being worked on: hidden with its floor */
+    out.push({ c, k, X, Y, on: w && p.seg ? p.seg.map(q => [Math.floor(q.x), Math.floor(q.y), q.L || 0]) : [[c.x, c.y, levelOf(c)]], level: w ? (p.L ?? levelOf(c)) : levelOf(c), ground: p.z, z: p.z + (stride ? SPRITE_PX : 0),  /* the stride frame rides one pixel higher */ face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
+  });
+  return out.sort((a, b) => a.X + a.Y - (b.X + b.Y));
+}
+/* test hook: where each drawn character is on the stage, in CSS pixels (feet, and the box its picture fills) */
+function characterBoxes() {
+  const R = ED.R; if (!R) return [];
+  return charViews().map(v => { const [px, py] = R.P(v.X, v.Y, v.z), s = ED.z, x = ED.ox + px * s, y = ED.oy + py * s, hw = FIG_H * 0.45 * s; return { index: v.k, level: v.level, walking: v.walking, feet: [x, y], box: [x - hw, y - FIG_H * 1.1 * s, x + hw, y + 4 * s] }; });
+}
+/* the character whose picture is under a screen point, nearest first */
+function charAtScreen(sx, sy) {
+  const R = ED.R; if (!R || !ED.M.chars || !ED.M.chars.length) return -1;
+  const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z, half = FIG_H * 0.3 + 2, views = charViews();
+  for (let i = views.length - 1; i >= 0; i--) { const v = views[i]; if (v.level !== ED.level) continue; const [px, py] = R.P(v.X, v.Y, v.z); if (wx >= px - half && wx <= px + half && wy >= py - FIG_H - 2 && wy <= py + 5) return v.k; }
+  return -1;
+}
+const spriteOf = c => library.get(c.sprite);
+/* Draw one character (with its ground shadow) onto the overlay, cut away wherever the map stands in front of
+   it. The figure is drawn into a scratch canvas at screen resolution, the mask of the pieces and raised
+   tiles in front (render.js frontMask, cached while the character stays inside its box and depth band) is
+   punched out of it, and only what is left is copied to the overlay. Nothing of the map is redrawn. */
+const scratch = document.createElement('canvas'), sg = scratch.getContext('2d');
+function drawChar(g, R, v, s, face, frame, key, alpha = 1, level = 0) {
+  const P = SPRITE_PX, [px, py] = R.P(v.X, v.Y, v.z), gy = R.P(v.X, v.Y, v.ground)[1], top = py + 1 - (INK_PAD + SPRITE_SIZE) * P;
+  const b = [px - INK_SIZE * P / 2 - 1, top - 1, px + INK_SIZE * P / 2 + 1, Math.max(top + INK_SIZE * P, gy + 3) + 1];
+  const minKey = Math.floor((v.X + v.Y) * 2) / 2 + 0.5;
+  let m = ED.occ.get(key);
+  /* the walkable pieces under the tiles it is on or stepping between (the flight it climbs) never hide it */
+  const skip = new Set(); for (const [x, y, L] of v.on || []) { const k = objAt(ED.M, x, y, L); if (k >= 0 && ASSET_BY_ID[ED.M.objs[k].id].walk) skip.add(k); }
+  const feet = Math.round(v.ground * 2) / 2, skey = [...skip].join();
+  if (!m || m.R !== R || m.ver !== R.ver || m.minKey !== minKey || m.level !== level || m.feet !== feet || m.skey !== skey || b[0] < m.box[0] || b[1] < m.box[1] || b[2] > m.box[2] || b[3] > m.box[3]) {
+    if (ED.occ.size > 64) ED.occ.clear();
+    const box = [b[0] - 20, b[1] - 20, b[2] + 20, b[3] + 20];
+    m = { R, ver: R.ver, minKey, level, feet, skey, box, mask: frontMask(R, box, minKey, level, feet, skip) }; ED.occ.set(key, m);
+  }
+  const dpr = state.dpr, k = ED.z * dpr, dx = dpr * ED.ox + b[0] * k, dy = dpr * ED.oy + b[1] * k, ix = Math.floor(dx), iy = Math.floor(dy);
+  const w = Math.ceil((b[2] - b[0]) * k) + 2, h = Math.ceil((b[3] - b[1]) * k) + 2;
+  if (scratch.width < w || scratch.height < h) { scratch.width = Math.max(scratch.width, w); scratch.height = Math.max(scratch.height, h); }
+  sg.setTransform(1, 0, 0, 1, 0, 0); sg.clearRect(0, 0, w, h); sg.setTransform(k, 0, 0, k, dx - ix - b[0] * k, dy - iy - b[1] * k);
+  footShadow(sg, px, gy, P);
+  if (s) drawSprite(sg, s, face, frame, px, py + 1, P);
+  else { sg.fillStyle = '#b8483a'; sg.strokeStyle = '#2b2116'; sg.lineWidth = 0.6; sg.beginPath(); sg.arc(px, py - 5, 3, 0, Math.PI * 2); sg.fill(); sg.stroke(); }
+  const mk = m.mask; sg.globalCompositeOperation = 'destination-out'; sg.imageSmoothingEnabled = true; sg.drawImage(mk.can, mk.x, mk.y, mk.w, mk.h); sg.globalCompositeOperation = 'source-over';
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = alpha; g.drawImage(scratch, 0, 0, w, h, ix, iy, w, h); g.restore();
+}
+function drawChars(g, R) {
+  const views = charViews();
+  if (ED.sel >= (ED.M.chars || []).length) ED.sel = -1;
+  for (const v of views) {
+    if (v.k === ED.sel) { const u = [Math.floor(v.X), Math.floor(v.Y)], z = v.z; g.beginPath(); for (const [a, b] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const q = R.P(u[0] + a, u[1] + b, z); a || b ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.closePath(); g.strokeStyle = '#e4c684'; g.lineWidth = 2 / ED.z; g.stroke(); g.fillStyle = 'rgba(228,198,132,0.16)'; g.fill(); }
+    drawChar(g, R, v, spriteOf(v.c), v.face, v.frame, v.c, 1, v.level);
+  }
+}
+/* every tile the selected character can reach, faintly tinted while walking is armed */
+function walkArea() {
+  const M = ED.M, k = ED.sel; if (k < 0 || !M.chars[k]) return null;
+  const key = [k, M.chars[k].x, M.chars[k].y, levelOf(M.chars[k]), ED.level, ED.undo.length, M.objs.length, M.chars.length].join();
+  if (!ED.area || ED.area.key !== key) {
+    /* only the reachable tiles of the storey on show */
+    const seen = reachable(M, k), NN = M.S * M.S, tiles = [];
+    for (let u = 0; u < NN; u++) if (seen[ED.level * NN + u]) tiles.push([u % M.S, (u / M.S) | 0]);
+    ED.area = { key, tiles };
+  }
+  return ED.area.tiles;
+}
+/* the tiles the selected character would walk over to reach the hovered tile, or the reachable area in faint tint */
+function walkPreview() {
+  const M = ED.M, k = ED.sel; if (ED.tool !== 'walk' || k < 0 || !M.chars[k] || !ED.hover) return null;
+  const key = [k, ED.hover.x, ED.hover.y, ED.level, M.chars[k].x, M.chars[k].y, levelOf(M.chars[k]), ED.undo.length, M.objs.length, M.chars.length].join();
+  if (!ED.preview || ED.preview.key !== key) { const [gx, gy, gL] = walkGoal(M, k, ED.hover.x, ED.hover.y, ED.level), path = findPath(M, k, gx, gy, gL); ED.preview = { key, path }; }
+  return ED.preview.path;
+}
 /* ---------- view ---------- */
 /* ED.stale is true when the view itself changed (rotation, grid, size) and 'model' after an edit */
 function rebuild() {
   if (ED.stale !== true && ED.R && updateTiles(ED.R, ED.M)) { const b = ED.R.patched; if (b && patch !== 'all') patch = patch ? [Math.min(patch[0], b[0]), Math.min(patch[1], b[1]), Math.max(patch[2], b[2]), Math.max(patch[3], b[3])] : b; }
-  else { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid }); patch = 'all'; }
+  else { ED.R = renderTiles(ED.M, ED.rot, SC, { grid: ED.grid, top: ED.level }); patch = 'all'; }
   ED.stale = false;
 }
 function size() { const r = stage.getBoundingClientRect(); if (!r.width) return; ED.cw = r.width; ED.ch = r.height; for (const c of [cv, ov]) { c.width = Math.round(r.width * state.dpr); c.height = Math.round(r.height * state.dpr); c.style.width = r.width + 'px'; c.style.height = r.height + 'px'; } patch = 'all'; req(); }
@@ -79,14 +201,15 @@ const toView = (x, y) => { const S = ED.M.S, r = ED.rot; const X = r === 0 ? x :
 function pick(sx, sy) {
   const R = ED.R; if (!R) return null; const wx = (sx - ED.ox) / ED.z, wy = (sy - ED.oy) / ED.z, S = R.S;
   for (let e = MAX_ELEV; e >= 0; e--) {
-    const zz = e * EL, a = (wx - R.OX) / TWH, b = (wy + zz - R.OY) / THH, X = Math.floor((a + b) / 2), Y = Math.floor((b - a) / 2);
+    const zz = e * EL + ED.level * SZ, a = (wx - R.OX) / TWH, b = (wy + zz - R.OY) / THH, X = Math.floor((a + b) / 2), Y = Math.floor((b - a) / 2);
     if (X < 0 || Y < 0 || X >= S || Y >= S) continue;
     const t = R.back[Y * S + X]; if (ED.M.elev[t] === e) return { x: t % S, y: (t / S) | 0 };
   }
   return null;
 }
 const brushTiles = (x, y) => brushAt(ED.M, x, y, ED.brush);
-const ghost = () => ED.hover && { id: ED.asset, x: ED.hover.x, y: ED.hover.y, face: ED.face, v: 0.37 };
+const isFreeTile = (x, y) => !blockedBy(ED.M, x, y, -1, ED.level);
+const ghost = () => ED.hover && Object.assign({ id: ED.asset, x: ED.hover.x, y: ED.hover.y, face: ED.face, v: 0.37 }, ED.level ? { level: ED.level } : {});
 
 /* the soft shadow the map casts on the desk, blurred once per map and zoom level rather than every
    frame; blurring the whole map image on each hover cost more than everything else in a frame */
@@ -140,52 +263,118 @@ function draw() {
   }
   const g = ovx;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, ov.width, ov.height);
-  if (!ED.hover) return;
+  if (ED.walk.size) { stepAnim(performance.now()); req(); }
+  if (followLevel != null) { const L = followLevel; followLevel = null; setLevel(L); return; }
+  const hasChars = ED.M.chars && ED.M.chars.length;
+  if (!ED.hover && !hasChars) return;
   g.save(); g.setTransform(dpr * ED.z, 0, 0, dpr * ED.z, dpr * ED.ox, dpr * ED.oy);
   const outline = (tiles, stroke, fill) => {
     g.beginPath();
-    for (const [x, y] of tiles) { const u = toView(x, y), X = u % R.S, Y = (u / R.S) | 0, z = R.zOf(u), a = R.P(X, Y, z), b = R.P(X + 1, Y, z), c = R.P(X + 1, Y + 1, z), d = R.P(X, Y + 1, z); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); }
+    for (const [x, y] of tiles) { const u = toView(x, y), X = u % R.S, Y = (u / R.S) | 0, z = R.zAt(u, ED.level), a = R.P(X, Y, z), b = R.P(X + 1, Y, z), c = R.P(X + 1, Y + 1, z), d = R.P(X, Y + 1, z); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); }
     if (fill) { g.fillStyle = fill; g.fill(); } g.strokeStyle = stroke; g.lineWidth = 1.6 / ED.z; g.stroke();
   };
+  if (ED.hover && ED.tool === 'character') {
+    const { x, y } = ED.hover, ok = isFreeTile(x, y), z = zAt(x, y, ED.level), [X, Y] = viewPt(x + 0.5, y + 0.5), s = library.get(ED.char);
+    outline([[x, y]], ok ? 'rgba(255,240,200,0.9)' : '#b8483a', ok ? 'rgba(255,240,200,0.18)' : 'rgba(184,72,58,0.25)');
+    if (s) drawChar(g, R, { X, Y, z, ground: z }, s, FACES[faceIn(ED.face)], 0, 'ghost', ok ? 0.85 : 0.4, ED.level);
+  }
+  /* walking: the reachable ground tinted, the route to the hovered tile traced, all beneath the figures */
+  if (ED.tool === 'walk') {
+    const area = walkArea(); if (area) outline(area, 'rgba(228,198,132,0.3)', 'rgba(228,198,132,0.2)');
+    if (ED.hover) {
+      const { x, y } = ED.hover, path = walkPreview(), k = charAt(ED.M, x, y, -1, ED.level);
+      if (k >= 0) outline([[x, y]], 'rgba(255,240,200,0.9)', 'rgba(255,240,200,0.15)');
+      else if (path && path.length) outline(path, 'rgba(228,198,132,0.9)', 'rgba(228,198,132,0.25)');
+      /* red only when there is no way there; an empty route means the character is already there (or on its way) */
+      else outline([[x, y]], ED.sel >= 0 && !path ? '#b8483a' : 'rgba(255,240,200,0.7)', ED.sel >= 0 && !path ? 'rgba(184,72,58,0.22)' : null);
+    }
+  }
+  if (hasChars) drawChars(g, R);
+  if (!ED.hover) { g.restore(); return; }
   const { x, y } = ED.hover;
-  if (ED.tool === 'place') {
+  if (ED.tool === 'walk' || ED.tool === 'character') { /* drawn above */ }
+  else if (ED.tool === 'place') {
     const o = ghost(), ok = fits(ED.M, o), [w, d] = footprint(o), tiles = [];
     for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) if (x + i < ED.M.S && y + j < ED.M.S) tiles.push([x + i, y + j]);
     outline(tiles, ok ? 'rgba(255,240,200,0.9)' : '#b8483a', ok ? 'rgba(255,240,200,0.18)' : 'rgba(184,72,58,0.25)');
-    const v = rotInst(o, ED.rot, ED.M.S); let z = 0; for (const [tx, ty] of tiles) z = Math.max(z, R.zOf(toView(tx, ty)));
+    const v = rotInst(o, ED.rot, ED.M.S); let z = 0; for (const [tx, ty] of tiles) z = Math.max(z, R.zAt(toView(tx, ty), ED.level));
     g.globalAlpha = ok ? 0.85 : 0.45; drawAsset(g, R.P, v, ASSET_BY_ID[o.id].water ? z : z, ED.M.clim); g.globalAlpha = 1;
   } else if (ED.tool === 'erase' || ED.tool === 'pick') {
-    const k = objAt(ED.M, x, y);
-    if (k >= 0) { const o = ED.M.objs[k], [w, d] = footprint(o), tiles = []; for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) tiles.push([o.x + i, o.y + j]); outline(tiles, ED.tool === 'erase' ? '#b8483a' : '#e4c684', ED.tool === 'erase' ? 'rgba(184,72,58,0.3)' : 'rgba(228,198,132,0.25)'); }
+    const k = objAt(ED.M, x, y, ED.level), ck = charAt(ED.M, x, y, -1, ED.level);
+    if (ck >= 0) outline([[x, y]], ED.tool === 'erase' ? '#b8483a' : '#e4c684', ED.tool === 'erase' ? 'rgba(184,72,58,0.3)' : 'rgba(228,198,132,0.25)');
+    else if (k >= 0) { const o = ED.M.objs[k], [w, d] = footprint(o), tiles = []; for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) tiles.push([o.x + i, o.y + j]); outline(tiles, ED.tool === 'erase' ? '#b8483a' : '#e4c684', ED.tool === 'erase' ? 'rgba(184,72,58,0.3)' : 'rgba(228,198,132,0.25)'); }
     else outline([[x, y]], 'rgba(255,240,200,0.7)');
   } else if (ED.tool !== 'pan') outline(ED.tool === 'fill' ? [[x, y]] : brushTiles(x, y), 'rgba(255,240,200,0.9)', 'rgba(255,240,200,0.12)');
   g.restore();
 }
 
 /* ---------- tools ---------- */
+let walkNote = '';
 function applyAt(p, first) {
-  const M = ED.M, S = M.S, st = ED.stroke;
+  const M = ED.M, S = M.S, st = ED.stroke, L = ED.level;
   const key = p.x + ',' + p.y; if (!first && st.seen.has(key) && ED.tool !== 'paint') return; st.seen.add(key);
-  if (ED.tool === 'paint') { if (paintTiles(M, brushTiles(p.x, p.y), ED.terrain)) changed(); }
+  if (ED.tool === 'paint') { if (paintTiles(M, brushTiles(p.x, p.y), ED.terrain, L)) changed(); }
+  else if ((ED.tool === 'raise' || ED.tool === 'lower' || ED.tool === 'level') && L) { if (first) walkNote = 'Heights belong to the ground: switch to the ground floor to raise or lower land.'; }
   else if (ED.tool === 'raise' || ED.tool === 'lower') { const fresh = brushTiles(p.x, p.y).filter(([x, y]) => { const k = x + ',' + y + '#'; if (st.seen.has(k)) return false; st.seen.add(k); return true; }); shiftElev(M, fresh, ED.tool === 'raise' ? 1 : -1); changed(); }
   else if (ED.tool === 'level') { if (first) st.level = M.elev[p.y * S + p.x]; setElev(M, brushTiles(p.x, p.y), st.level); changed(); }
-  else if (ED.tool === 'fill' && first) { if (floodFill(M, p.x, p.y, ED.terrain)) changed(); }
-  else if (ED.tool === 'place') { if (placePiece(M, ghost()).ok) changed(); }
-  else if (ED.tool === 'erase') { if (eraseAt(M, p.x, p.y)) changed(); }
-  else if (ED.tool === 'pick' && first) { const k = objAt(M, p.x, p.y); if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); } else { ED.terrain = TERRAIN[M.terr[p.y * S + p.x]].id; setTab('Terrain'); setTool('paint'); } syncPalette(); }
+  else if (ED.tool === 'fill' && first) { if (floodFill(M, p.x, p.y, ED.terrain, L)) changed(); }
+  else if (ED.tool === 'place') { const r = placePiece(M, ghost()); if (r.ok) changed(); else if (first) walkNote = r.reason; }
+  else if (ED.tool === 'character' && first) {
+    /* clicking a character that is already there picks it up for walking instead of stacking another */
+    const k = charAt(M, p.x, p.y, -1, L);
+    if (k >= 0) { ED.sel = k; setTool('walk'); walkNote = 'Selected: click a tile to walk there.'; }
+    else if (ED.char) { const r = placeChar(M, Object.assign({ sprite: ED.char, x: p.x, y: p.y, face: ED.face }, L ? { level: L } : {})); if (r.ok) { ED.sel = M.chars.length - 1; changed(); } else walkNote = r.reason; }
+  }
+  else if (ED.tool === 'walk' && first) {
+    /* click a character to choose it, then click any tile it can reach, on this floor or (by stairs) another */
+    const k = charAt(M, p.x, p.y, -1, L);
+    /* the selected character standing on a flight: clicking them climbs it */
+    if (k >= 0 && !(k === ED.sel && stairsAt(M, p.x, p.y, L))) { ED.sel = k; walkNote = 'Selected: click a tile to walk there.'; req(); return; }
+    if (ED.sel < 0 && M.chars.length === 1) ED.sel = 0;
+    if (ED.sel >= 0 && M.chars[ED.sel]) {
+      const [gx, gy, gL] = walkGoal(M, ED.sel, p.x, p.y, L), path = findPath(M, ED.sel, gx, gy, gL);
+      if (path && path.length) doWalk(ED.sel, path);
+      else walkNote = `No way to ${gx}, ${gy}${gL ? ` on floor ${gL}` : ''}: ${blockedBy(M, gx, gy, ED.sel, gL) || 'cut off from here'}.`;
+    }
+    else walkNote = M.chars.length ? 'Click a character, then click a tile to walk there.' : 'Place a character first (Characters tab).';
+  }
+  else if (ED.tool === 'erase') {
+    /* a character, else a piece, else (above the ground) the floor itself */
+    if (eraseCharAt(M, p.x, p.y, L) || eraseAt(M, p.x, p.y, L) || (L && removeFloor(M, brushTiles(p.x, p.y), L))) changed();
+  }
+  else if (ED.tool === 'pick' && first) {
+    const ck = charAt(M, p.x, p.y, -1, L), k = objAt(M, p.x, p.y, L), f = floorAt(M, L, p.y * S + p.x);
+    if (ck >= 0) { ED.char = M.chars[ck].sprite; ED.face = M.chars[ck].face; ED.sel = ck; setTab('Characters'); setTool('character'); }
+    else if (k >= 0) { ED.asset = M.objs[k].id; ED.face = M.objs[k].face; setTab(ASSET_BY_ID[ED.asset].group); setTool('place'); }
+    else if (f) { ED.terrain = TERRAIN[f - 1].id; setTab('Terrain'); setTool('paint'); }
+    syncPalette();
+  }
+}
+/* the storey being worked on: the tools act on it, and the floors above it are hidden so it can be seen */
+const LEVEL_NAME = L => (L ? `floor ${L}` : 'ground floor');
+function setLevel(L) {
+  L = Math.max(0, Math.min(MAX_LEVEL, L | 0)); if (L === ED.level && ED.R) return;
+  ED.level = L; ED.stale = true; ED.occ.clear(); ED.area = null; ED.preview = null;
+  for (const b of root.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(+b.dataset.level === L));
+  req(); status();
 }
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }
 function setTab(t) { ED.tab = t; for (const b of root.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === t)); buildPalette(); }
 function status() {
-  if (!ED.hover) { statusEl.textContent = `${ED.M.S}×${ED.M.S} tiles · ${ED.M.objs.length} pieces`; return; }
-  const { x, y } = ED.hover, u = y * ED.M.S + x, k = objAt(ED.M, x, y);
-  statusEl.textContent = `${x}, ${y} · ${TERRAIN[ED.M.terr[u]].label} · height ${ED.M.elev[u]}${k >= 0 ? ' · ' + ASSET_BY_ID[ED.M.objs[k].id].label : ''}`;
+  const nc = (ED.M.chars || []).length, cname = c => (library.get(c.sprite) || { name: 'Unknown character' }).name;
+  if (walkNote) { const n = walkNote; walkNote = ''; statusEl.textContent = n; return; }
+  const L = ED.level, where = L ? ` · ${LEVEL_NAME(L)}` : '';
+  if (!ED.hover) { statusEl.textContent = `${ED.M.S}×${ED.M.S} tiles · ${ED.M.objs.length} pieces${nc ? ` · ${nc} character${nc > 1 ? 's' : ''}` : ''}${where}`; return; }
+  const { x, y } = ED.hover, u = y * ED.M.S + x, k = objAt(ED.M, x, y, L), ck = charAt(ED.M, x, y, -1, L), f = floorAt(ED.M, L, u);
+  const surface = L ? (f ? `${TERRAIN[f - 1].label} · floor ${L}` : `no floor on level ${L}`) : `${TERRAIN[ED.M.terr[u]].label} · height ${ED.M.elev[u]}`;
+  statusEl.textContent = `${x}, ${y} · ${surface}${k >= 0 ? ' · ' + ASSET_BY_ID[ED.M.objs[k].id].label : ''}${ck >= 0 ? ' · ' + cname(ED.M.chars[ck]) : ''}`;
 }
 
 /* ---------- palette ---------- */
 const thumbs = new Map();
 function buildPalette() {
   const box = $('edItems'); box.textContent = '';
+  if (ED.tab === 'Characters') { buildCharacters(box); return; }
   const groups = ED.tab === 'Terrain' ? [...new Set(TERRAIN.map(t => t.group))].map(gn => [gn, TERRAIN.filter(t => t.group === gn), 'terrain']) : [[ED.tab, ASSET_GROUPS.find(a => a[0] === ED.tab)[1], 'asset']];
   for (const [gn, items, kind] of groups) {
     if (ED.tab === 'Terrain') { const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h); }
@@ -201,7 +390,28 @@ function buildPalette() {
   }
   syncPalette();
 }
-function syncPalette() { for (const b of root.querySelectorAll('.ed-item')) b.setAttribute('aria-pressed', String(b.dataset.kind === 'terrain' ? b.dataset.id === ED.terrain : b.dataset.id === ED.asset)); $('edFace').textContent = `Facing ${['south-west', 'south-east', 'north-east', 'north-west'][ED.face]}`; }
+/* the Characters tab lists the sprite library; clicking one arms the Person tool */
+function buildCharacters(box) {
+  const row = document.createElement('div'); row.className = 'ed-row ed-charbar';
+  for (const [label, fn] of [['Draw new character…', () => edit('new')], ['Edit selected…', () => edit(ED.char)]]) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = label; b.addEventListener('click', fn); row.appendChild(b); }
+  box.appendChild(row);
+  const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
+  for (const s of library.list()) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-item'; b.dataset.kind = 'char'; b.dataset.id = s.id; b.title = s.name;
+    const c = spriteThumb(s, 60); c.className = 'ed-char'; b.appendChild(c);
+    const t = document.createElement('span'); t.textContent = s.name; b.appendChild(t);
+    b.addEventListener('click', () => { ED.char = s.id; setTool('character'); syncPalette(); });
+    grid.appendChild(b);
+  }
+  syncPalette();
+}
+/* open the sprite editor; a new character is created when id is null. On return the list and the map pick up the changes. */
+function edit(id) {
+  const back = sid => { if (sid && library.get(sid)) ED.char = sid; buildPalette(); req(); cv.focus({ preventScroll: true }); };
+  openSpriteEditor(id || 'new', 'Tile editor', back);
+}
+library.onChange(() => { if (ED.open && ED.tab === 'Characters' && $('spriteEditor').hidden) buildPalette(); req(); });
+function syncPalette() { for (const b of root.querySelectorAll('.ed-item')) b.setAttribute('aria-pressed', String(b.dataset.kind === 'terrain' ? b.dataset.id === ED.terrain : b.dataset.kind === 'char' ? b.dataset.id === ED.char : b.dataset.id === ED.asset)); $('edFace').textContent = `Facing ${['south-west', 'south-east', 'north-east', 'north-west'][ED.face]}`; }
 
 /* ---------- input ---------- */
 const pts = new Map(); let pan = null, pinch = null, spaceDown = false;
@@ -211,7 +421,9 @@ cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture(e.pointerId); const [x, y] = local(e); pts.set(e.pointerId, [x, y]);
   if (pts.size === 2) { if (ED.stroke) endStroke(); const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2, z: ED.z, ox: ED.ox, oy: ED.oy }; pan = null; return; }
   if (ED.tool === 'pan' || e.button === 1 || e.button === 2 || spaceDown) { pan = { x, y, ox: ED.ox, oy: ED.oy }; cv.style.cursor = 'grabbing'; return; }
-  const p = pick(x, y); if (!p) return;
+  let p = pick(x, y);
+  if (['walk', 'erase', 'pick'].includes(ED.tool)) { const ck = charAtScreen(x, y); if (ck >= 0) p = { x: ED.M.chars[ck].x, y: ED.M.chars[ck].y }; }
+  if (!p) return;
   checkpoint(); ED.stroke = { seen: new Set() }; ED.hover = p; applyAt(p, true); status();
 });
 cv.addEventListener('pointermove', e => {
@@ -249,7 +461,9 @@ root.addEventListener('keydown', e => {
   else if (k === '+' || k === '=') zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.3);
   else if (k === '-' || k === '_') zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.3);
   else if (k >= '1' && k <= '3') { ED.brush = +k; syncBrush(); }
-  else if (k === 'Escape') closeEditor();
+  else if (k === 'PageUp') setLevel(ED.level + 1);
+  else if (k === 'PageDown') setLevel(ED.level - 1);
+  else if (k === 'Escape') { if (ED.sel >= 0) { ED.sel = -1; req(); } else closeEditor(); }
   else { const t = TOOLS.find(t2 => t2[2].toLowerCase() === k.toLowerCase()); if (!t) return; setTool(t[0]); }
   e.preventDefault();
 });
@@ -261,18 +475,19 @@ function buildChrome() {
   for (const [id, label, key, glyph] of TOOLS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-tool'; b.dataset.tool = id; b.title = `${label} (${key})`; b.innerHTML = `<span aria-hidden="true">${glyph}</span>${label}`; b.addEventListener('click', () => setTool(id)); tb.appendChild(b); }
   for (const b of root.querySelectorAll('[data-brush]')) b.addEventListener('click', () => { ED.brush = +b.dataset.brush; syncBrush(); });
   const tabs = $('edTabs');
-  for (const t of ['Terrain', ...ASSET_GROUPS.map(a => a[0])]) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.role = 'tab'; b.dataset.tab = t; b.textContent = t; b.addEventListener('click', () => setTab(t)); tabs.appendChild(b); }
+  for (const t of ['Terrain', ...ASSET_GROUPS.map(a => a[0]), 'Characters']) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.role = 'tab'; b.dataset.tab = t; b.textContent = t; b.addEventListener('click', () => setTab(t)); tabs.appendChild(b); }
   const bs = $('edBiome'); for (const [k, B] of Object.entries(BIOMES)) { const o = document.createElement('option'); o.value = k; o.textContent = B.label; bs.appendChild(o); }
   $('edBack').addEventListener('click', closeEditor);
   $('edUndo').addEventListener('click', undo); $('edRedo').addEventListener('click', redo);
   $('edRotL').addEventListener('click', () => turnView(-1)); $('edRotR').addEventListener('click', () => turnView(1));
   $('edFace').addEventListener('click', turnPiece);
+  for (const b of root.querySelectorAll('[data-level]')) b.addEventListener('click', () => setLevel(+b.dataset.level));
   $('edGrid').addEventListener('click', () => { ED.grid = !ED.grid; $('edGrid').setAttribute('aria-pressed', String(ED.grid)); ED.stale = true; req(); });
   $('edIn').addEventListener('click', () => zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.4)); $('edOut').addEventListener('click', () => zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.4)); $('edFit').addEventListener('click', fitView);
   $('edName').addEventListener('change', () => { ED.M.name = $('edName').value.trim().slice(0, 60) || 'Untitled survey'; autosave(); });
   $('edGen').addEventListener('click', () => { checkpoint(); const seed = Math.random().toString(36).slice(2, 7); setModel(generateScene(seed, +$('edSize').value, $('edBiome').value)); });
   $('edNew').addEventListener('click', () => { checkpoint(); const S = +$('edSize').value, B = BIOMES[$('edBiome').value]; const M = blankModel(S, B.ground[0]); M.clim = B.clim; setModel(M); });
-  $('edPng').addEventListener('click', () => { const R = renderTiles(ED.M, ED.rot, 2, { grid: false }); R.can.toBlob(b => b && download(slug(ED.M.name) + '.png', b)); });
+  $('edPng').addEventListener('click', () => { const R = renderTiles(ED.M, ED.rot, 2, { grid: false, top: ED.level }); R.can.toBlob(b => b && download(slug(ED.M.name) + '.png', b)); });
   $('edSave').addEventListener('click', () => download(slug(ED.M.name) + '.json', new Blob([JSON.stringify(toJSON(ED.M))], { type: 'application/json' })));
   $('edLoad').addEventListener('click', () => $('edFile').click());
   $('edFile').addEventListener('change', async () => { const f = $('edFile').files[0]; $('edFile').value = ''; if (!f) return; try { const M = fromJSON(JSON.parse(await f.text())); checkpoint(); setModel(M); } catch (err) { statusEl.textContent = `Could not open ${f.name}: ${err.message}`; } });
@@ -281,7 +496,7 @@ function buildChrome() {
 
 /* back: label of the screen the editor returns to (the one left showing underneath it) */
 function openEditor(M, back = 'Atlas') {
-  ensureModel();
+  ensureModel(); if (!library.get(ED.char)) ED.char = (library.list()[0] || {}).id || null;
   root.hidden = false; ED.open = true; ED.rot = 0; $('edBack').textContent = `← ${back}`;
   if (M) { if (ED.M) checkpoint(); ED.M = M; autosave(); }
   $('edName').value = ED.M.name; showSize(ED.M.S);
@@ -294,4 +509,4 @@ function closeEditor() { if (!ED.open) return; ED.open = false; root.hidden = tr
 buildChrome();
 $('openEditor').addEventListener('click', () => openEditor());
 
-export { ED, applyAt, closeEditor, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, syncPalette, toView, undo, zoomAt };
+export { ED, LEVEL_NAME, applyAt, characterBoxes, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };

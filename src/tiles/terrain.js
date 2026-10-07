@@ -12,6 +12,8 @@ const tufts = (g, at, r, n, col, hgt = 2.6) => { g.strokeStyle = col; g.lineWidt
 const rows = (g, at, col, n, alongX, lw = 0.6) => { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); for (let k = 1; k < n; k++) { const f = k / n, a = alongX ? at(0.05, f) : at(f, 0.05), b = alongX ? at(0.95, f) : at(f, 0.95); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); } g.stroke(); };
 const pebble = (g, p, rx, col) => { g.beginPath(); g.ellipse(p[0], p[1], rx, rx * 0.6, 0, 0, TAU); g.fillStyle = col; g.fill(); g.strokeStyle = 'rgba(43,33,22,0.55)'; g.lineWidth = 0.4; g.stroke(); };
 const ripple = (g, p, w, col = 'rgba(245,245,232,0.6)') => { g.strokeStyle = col; g.lineWidth = 0.7; g.beginPath(); g.moveTo(p[0] - w, p[1]); g.quadraticCurveTo(p[0] - w / 2, p[1] - 1.6, p[0], p[1]); g.quadraticCurveTo(p[0] + w / 2, p[1] - 1.6, p[0] + w, p[1]); g.stroke(); };
+/* a carpet's border and medallion, so a run of carpet tiles reads as one woven floor */
+const carpet = (g, at, edge, mark) => { const q = (k, col, lw) => { const a = at(k, k), b = at(1 - k, k), c = at(1 - k, 1 - k), d = at(k, 1 - k); g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.stroke(); }; q(0.1, edge, 0.8); q(0.17, mark, 0.4); const m = at(0.5, 0.5); g.fillStyle = edge; g.beginPath(); g.ellipse(m[0], m[1], 3, 1.5, 0, 0, TAU); g.fill(); g.fillStyle = mark; g.beginPath(); g.ellipse(m[0], m[1], 1.3, 0.65, 0, 0, TAU); g.fill(); };
 const grid = (g, at, n, col, jit) => { g.strokeStyle = col; g.lineWidth = 0.45; g.beginPath(); for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const o = jit && j % 2 ? 0.5 / n : 0, x0 = Math.max(0.03, i / n + o), x1 = Math.min(0.97, (i + 1) / n + o), y0 = j / n + 0.03, y1 = (j + 1) / n - 0.03; if (x1 - x0 < 0.06) continue; const a = at(x0, y0), b = at(x1, y0), c = at(x1, y1), d = at(x0, y1); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); } g.stroke(); };
 
 const TERRAIN = [
@@ -52,7 +54,15 @@ const TERRAIN = [
   { id: 'cobble', label: 'Cobbles', group: 'Paved', top: '#d4cbb3', side: ['#b8ad93', '#9c927a'], deco: (g, at) => grid(g, at, 3, 'rgba(85,70,50,0.38)', true) },
   { id: 'flagstone', label: 'Flagstones', group: 'Paved', top: '#e2d9c1', side: ['#c2b89e', '#a49a82'], deco: (g, at) => grid(g, at, 2, 'rgba(85,70,50,0.3)', true) },
   { id: 'plaza', label: 'Plaza tiles', group: 'Paved', top: '#e0d3b4', side: ['#c2b89e', '#a49a82'], deco: (g, at, h) => { grid(g, at, 2, 'rgba(85,70,50,0.22)', false); if (h < 0.5) { const p = at(0.5, 0.5); g.fillStyle = 'rgba(168,58,44,0.25)'; g.beginPath(); g.ellipse(p[0], p[1], 3, 1.5, 0, 0, TAU); g.fill(); } } },
-  { id: 'planks', label: 'Planking', group: 'Paved', top: '#a27a4c', side: ['#86613a', '#6e4f2e'], deco: (g, at, h) => rows(g, at, 'rgba(50,34,20,0.45)', 5, h < 0.5) }
+  { id: 'planks', label: 'Planking', group: 'Paved', top: '#a27a4c', side: ['#86613a', '#6e4f2e'], deco: (g, at, h) => rows(g, at, 'rgba(50,34,20,0.45)', 5, h < 0.5) },
+  /* indoor floors */
+  { id: 'floorboards', label: 'Floorboards', group: 'Floors', top: '#c9a676', side: ['#a07a4c', '#86613a'], deco: (g, at, h) => { rows(g, at, 'rgba(90,60,30,0.38)', 4, h < 0.5, 0.5); const ax = h < 0.5, f = 0.2 + h * 0.6, a = ax ? at(f, 0.26) : at(0.26, f), b = ax ? at(f, 0.5) : at(0.5, f); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } },
+  { id: 'oakfloor', label: 'Dark oak floor', group: 'Floors', top: '#9e7a52', side: ['#7d5d3c', '#674b30'], deco: (g, at, h) => rows(g, at, 'rgba(50,34,20,0.4)', 6, h < 0.5, 0.45) },
+  { id: 'stonefloor', label: 'Stone floor', group: 'Floors', top: '#d3cab3', side: ['#b3a98f', '#988f77'], deco: (g, at) => grid(g, at, 2, 'rgba(85,70,50,0.34)', false) },
+  { id: 'checker', label: 'Chequered floor', group: 'Floors', top: '#e8dfc8', side: ['#b3a98f', '#988f77'], deco: (g, at) => { g.fillStyle = 'rgba(70,58,44,0.42)'; for (const [i, j] of [[0, 0], [1, 1]]) { const a = at(i / 2, j / 2), b = at((i + 1) / 2, j / 2), c = at((i + 1) / 2, (j + 1) / 2), d = at(i / 2, (j + 1) / 2); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill(); } } },
+  { id: 'carpet', label: 'Red carpet', group: 'Floors', top: '#b0614a', side: ['#a07a4c', '#86613a'], deco: (g, at) => carpet(g, at, 'rgba(232,206,140,0.75)', 'rgba(90,40,30,0.5)') },
+  { id: 'carpetblue', label: 'Blue carpet', group: 'Floors', top: '#6f8faa', side: ['#a07a4c', '#86613a'], deco: (g, at) => carpet(g, at, 'rgba(232,206,140,0.7)', 'rgba(40,52,70,0.5)') },
+  { id: 'rushes', label: 'Strewn rushes', group: 'Floors', top: '#cdb985', side: SOIL, deco: (g, at, h, r) => tufts(g, at, r, 4, 'rgba(120,100,50,0.5)', 1.6) }
 ];
 const TERRAIN_BY_ID = Object.fromEntries(TERRAIN.map(t => [t.id, t]));
 

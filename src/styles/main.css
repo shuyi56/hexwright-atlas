@@ -142,3 +142,28 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
   .ed-palette{max-height:none}
   .ed-items{max-height:46vh}
 }
+
+/* Character sprite editor: reuses the tile editor's bar, palette and tabs */
+.sprite-editor{z-index:40}
+.sp-stage{display:grid;place-items:center;padding:14px}
+#spCanvas{width:min(100%,calc(100vh - 150px));aspect-ratio:1;height:auto;image-rendering:pixelated;cursor:crosshair;touch-action:none;border:1px solid var(--line);border-radius:3px;background:#1c2627}
+.sp-tools{grid-template-columns:repeat(4,1fr)}
+.sp-gap{padding-top:8px}
+.sprite-editor .tabs{padding:0 10px 4px;flex-wrap:wrap}
+.sp-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(26px,1fr));gap:4px;padding:2px 10px 10px}
+.sp-swatch{aspect-ratio:1;border:1px solid var(--line);border-radius:3px;cursor:pointer;padding:0}
+.sp-swatch.clear{background:repeating-conic-gradient(#3a4547 0 25%,#222c2d 0 50%) 0 0/10px 10px}
+.sp-swatch[aria-pressed="true"]{outline:2px solid var(--brass-2);outline-offset:1px}
+.sp-preview{margin:0 10px 12px;width:calc(100% - 20px);height:auto;background:var(--panel-2);border:1px solid var(--line);border-radius:3px}
+#spColor{width:34px;height:28px;padding:0;border:1px solid var(--line);background:none;border-radius:3px}
+.ed-palette .tabs{flex-wrap:wrap}
+.ed-palette .tab{padding:9px 8px 7px;font-size:13px;letter-spacing:.05em}
+.ed-charbar{padding-top:8px}
+.ed-charbar .btn{padding:5px 10px;font-size:13.5px}
+/* bottom-left of the stage: the storey switch, stacked like the building (top floor uppermost), over the status line */
+.ed-foot{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:calc(100% - 80px);pointer-events:none}
+.ed-foot .ed-status{position:static;max-width:100%}
+.ed-levels{pointer-events:auto;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:6px;background:rgba(18,24,25,.84);border:1px solid var(--line);border-radius:4px}
+.ed-levels .ed-lbl{margin:0 0 1px;text-align:center}
+.ed-levels .chip{min-width:34px;padding:4px 8px;justify-content:center;text-align:center}
+.ed-levels .chip::before{content:none!important}
