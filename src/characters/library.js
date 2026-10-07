@@ -3,7 +3,7 @@ import { cloneSprite, spriteFromJSON, spriteToJSON, starters } from './sprite.js
 /* ================= the character library =================
    Every sprite the user has drawn, kept in the browser and shared by the sprite editor and the tile
    editor. Maps embed the sprites they use (see model.js), so a saved map opens anywhere. */
-const KEY = 'hexwright.sprites.v4', OLD_KEYS = ['hexwright.sprites.v3', 'hexwright.sprites.v2', 'hexwright.sprites.v1'], LIB = new Map(), listeners = new Set();
+const KEY = 'hexwright.sprites.v6', OLD_KEYS = ['hexwright.sprites.v5', 'hexwright.sprites.v4', 'hexwright.sprites.v3', 'hexwright.sprites.v2', 'hexwright.sprites.v1'], LIB = new Map(), listeners = new Set();
 let ready = false;
 
 function persist() { try { localStorage.setItem(KEY, JSON.stringify([...LIB.values()].map(spriteToJSON))); } catch { /* storage unavailable: sprites stay in memory */ } }
