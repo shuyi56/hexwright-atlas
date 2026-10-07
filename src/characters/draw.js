@@ -102,10 +102,10 @@ function thinOutline(L, n, r) {
    sprite pixel (the weight a one-pixel outline has once filtered at map scale). Then a mip chain, each level
    half the last, so drawing never shrinks an image by more than half and nothing aliases or blurs. */
 const MASTER = 8;
-function mipChain(pal, fr, lashes) {
+function mipChain(pal, fr, lashes, iris) {
   let L = labels(fr), n = N; for (let k = 1; k < MASTER; k *= 2) { L = scale2x(L, n); n *= 2; }
   thinOutline(L, n, 4.6);
-  const master = paintLabels(pal, L, n); roundEyes(master.getContext('2d'), pal, fr, lashes);
+  const master = paintLabels(pal, L, n); roundEyes(master.getContext('2d'), pal, fr, lashes, iris);
   const levels = [{ up: MASTER, can: master }];
   for (let up = MASTER / 2; up >= 0.25; up /= 2) {
     const prev = levels[levels.length - 1].can, c = document.createElement('canvas'); c.width = c.height = Math.max(1, Math.round(N * up));
@@ -117,7 +117,12 @@ function mipChain(pal, fr, lashes) {
 
 /* Eyes are one pixel wide and two tall, which Scale2x cannot round. On the master each such run of a near-black
    colour is redrawn as an oval in its own colour over the skin beside it, with a brow, an upper lid and a small glint toward the light. */
-function roundEyes(g, pal, fr, lashes) {
+/* the iris colour, chestnut unless the character sets its own; its darker rim and lighter lower half are mixed
+   from it toward black and white */
+const IRIS = '#7a4a24';
+const mixHex = (h, t, k) => `rgb(${hexRgb(h).map(v => Math.round(v + (t - v) * k)).join(',')})`;
+function roundEyes(g, pal, fr, lashes, iris = IRIS) {
+  const rim = mixHex(iris, 0, 0.55), light = mixHex(iris, 255, 0.35);
   const feat = pal.map(h => lum(hexRgb(h)) < 60), isF = (x, y) => x >= 0 && y >= 0 && x < SIZE && y < SIZE && fr[y * SIZE + x] > 0 && feat[fr[y * SIZE + x] - 1];
   const px = (x, y) => { const d = g.getImageData(x, y, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; };
   const eyes = [];
@@ -142,17 +147,26 @@ function roundEyes(g, pal, fr, lashes) {
       g.strokeStyle = brow; g.lineCap = 'round'; g.lineWidth = MASTER * 0.42;
       g.beginPath(); g.moveTo(i, by + MASTER * 0.12); g.quadraticCurveTo(cx + out * rx * 0.45, by - MASTER * 0.12, o, by + MASTER * 0.1); g.stroke();
     }
+    /* the eye proper: a dark rim, a thin filament of white, and an iris filling nearly all of it, shaded darker
+       under the lid and lighter below, with a ring at its edge and a pupil */
     g.fillStyle = eye; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e6dcc6'; g.beginPath(); g.ellipse(cx, cy, rx * 0.94, ry * 0.96, 0, 0, Math.PI * 2); g.fill();
+    const irx = rx * 0.78, iry = ry * 0.84, iy = cy + MASTER * 0.04;
+    const shade = g.createLinearGradient(0, iy - iry, 0, iy + iry);
+    shade.addColorStop(0, rim); shade.addColorStop(0.35, iris); shade.addColorStop(1, light);
+    g.fillStyle = shade; g.beginPath(); g.ellipse(cx, iy, irx, iry, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = rim; g.lineWidth = MASTER * 0.14; g.beginPath(); g.ellipse(cx, iy, irx - MASTER * 0.07, iry - MASTER * 0.07, 0, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = '#0d0b0a'; g.beginPath(); g.ellipse(cx, iy - MASTER * 0.06, irx * 0.36, iry * 0.3, 0, 0, Math.PI * 2); g.fill();
     /* the upper lid: a thin dark arc over the eye, thickening toward the outer corner and ending in a small flick */
     /* characters marked with lashes (the women) keep a fuller lid and a longer flick */
-    const L = lashes ? { a: 1, w: 0.18, o: 0.32, f: 0.2, fx: 0.32, fy: 0.22 } : { a: 0.8, w: 0.12, o: 0.2, f: 0.12, fx: 0.16, fy: 0.1 };
+    const L = lashes ? { a: 1, w: 0.09, o: 0.16, f: 0.1, fx: 0.32, fy: 0.22 } : { a: 0.8, w: 0.06, o: 0.1, f: 0.06, fx: 0.16, fy: 0.1 };
     g.strokeStyle = eye; g.lineCap = 'round'; g.globalAlpha = L.a;
     g.lineWidth = MASTER * L.w; g.beginPath(); g.ellipse(cx, cy, rx + MASTER * 0.14, ry + MASTER * 0.1, 0, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
     const a0 = out < 0 ? Math.PI * 1.12 : Math.PI * 1.62, a1 = out < 0 ? Math.PI * 1.38 : Math.PI * 1.88;
     g.lineWidth = MASTER * L.o; g.beginPath(); g.ellipse(cx, cy, rx + MASTER * 0.14, ry + MASTER * 0.1, 0, a0, a1); g.stroke();
     const ex = cx + out * (rx + MASTER * 0.05), ey = cy - ry * 0.45;
     g.lineWidth = MASTER * L.f; g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex + out * MASTER * L.fx, ey - MASTER * L.fy); g.stroke(); g.globalAlpha = 1;
-    g.fillStyle = 'rgba(236, 226, 206, 0.85)'; g.beginPath(); g.ellipse(X + MASTER * 0.34, Y + MASTER * 0.62, MASTER * 0.2, MASTER * 0.26, 0, 0, Math.PI * 2); g.fill();   /* a glint toward the light */
+    g.fillStyle = 'rgba(255, 250, 238, 0.9)'; g.beginPath(); g.ellipse(X + MASTER * 0.38, Y + MASTER * 0.72, MASTER * 0.1, MASTER * 0.13, 0, 0, Math.PI * 2); g.fill();   /* a glint toward the light */
   }
 }
 
@@ -172,8 +186,8 @@ function frameCanvas(s, face, k) {
 }
 const mips = new Map();
 function mipFor(s, face, k) {
-  const key = s.pal.join() + (s.lashes ? '|l' : '') + '|' + String.fromCharCode(...s.frames[face][k]); let m = mips.get(key);
-  if (!m) { if (mips.size > 200) mips.clear(); m = mipChain(s.pal, s.frames[face][k], s.lashes); mips.set(key, m); }
+  const key = s.pal.join() + (s.lashes ? '|l' : '') + (s.iris ? '|' + s.iris : '') + '|' + String.fromCharCode(...s.frames[face][k]); let m = mips.get(key);
+  if (!m) { if (mips.size > 200) mips.clear(); m = mipChain(s.pal, s.frames[face][k], s.lashes, s.iris); mips.set(key, m); }
   return m;
 }
 /* Draw a frame with the figure's feet at (x, y); px is the size of one sprite pixel in drawing units. The level

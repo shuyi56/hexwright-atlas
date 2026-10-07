@@ -16,7 +16,7 @@ function blankSprite(name = 'New character', id = newId()) {
 const newId = () => 'c' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
 function cloneSprite(s, keepId = true) {
   const frames = {}; for (const f of FACES) frames[f] = s.frames[f].map(a => a.slice());
-  return { id: keepId ? s.id : newId(), name: s.name, pal: s.pal.slice(), frames, rev: s.rev || 0, ...(s.lashes ? { lashes: true } : {}) };
+  return { id: keepId ? s.id : newId(), name: s.name, pal: s.pal.slice(), frames, rev: s.rev || 0, ...(s.lashes ? { lashes: true } : {}), ...(s.iris ? { iris: s.iris } : {}) };
 }
 
 /* ---------- pixel operations: each works on one frame and returns the number of pixels changed ---------- */
@@ -44,7 +44,7 @@ function decodeFrame(str, palN) {
 }
 function spriteToJSON(s) {
   const frames = {}; for (const f of FACES) frames[f] = s.frames[f].map(encodeFrame);
-  return { id: s.id, name: s.name, size: SIZE, palette: s.pal.slice(), frames, ...(s.lashes ? { lashes: true } : {}) };
+  return { id: s.id, name: s.name, size: SIZE, palette: s.pal.slice(), frames, ...(s.lashes ? { lashes: true } : {}), ...(s.iris ? { iris: s.iris } : {}) };
 }
 /* a frame from the first, 16×16 release, doubled */
 function grow(fr16) { const fr = blankFrame(); for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) fr[y * SIZE + x] = fr16[(y >> 1) * OLD_SIZE + (x >> 1)]; return fr; }
@@ -54,6 +54,7 @@ function spriteFromJSON(J) {
   const pal = J.palette.filter(c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)).slice(0, MAX_PAL);
   if (pal.length !== J.palette.length) throw new Error('Character palette must be #rrggbb colours');
   const s = blankSprite(String(J.name || 'Character').slice(0, 40), String(J.id || newId()).slice(0, 40)); s.pal = pal; if (J.lashes === true) s.lashes = true;
+  if (typeof J.iris === 'string' && /^#[0-9a-f]{6}$/i.test(J.iris)) s.iris = J.iris;
   const dec = J.size === OLD_SIZE ? decodeOld : decodeFrame;
   for (const f of FACES) for (let k = 0; k < FRAMES; k++) s.frames[f][k] = dec(J.frames[f] && J.frames[f][k], pal.length);
   return s;
@@ -71,12 +72,20 @@ function figure(name, id, o) {
   if (c.hat) c.hatD = darken(c.hat, 0.8); if (c.apron) { c.apronD = darken(c.apron, 0.84); c.apronS = darken(c.apron, 0.66); } if (c.cape) c.capeD = darken(c.cape, 0.8);
   const pal = [], K = {};
   for (const [k, v] of Object.entries(c)) { let i = pal.indexOf(v); if (i < 0) { pal.push(v); i = pal.length - 1; } K[k] = i + 1; }
-  const s = blankSprite(name, id); if (o.lashes) s.lashes = true; s.pal = pal.concat(DEFAULT_PAL.filter(d => !pal.includes(d))).slice(0, MAX_PAL);
+  const s = blankSprite(name, id); if (o.lashes) s.lashes = true; if (o.iris) s.iris = o.iris; s.pal = pal.concat(DEFAULT_PAL.filter(d => !pal.includes(d))).slice(0, MAX_PAL);
 
   const make = (back, step) => {
     const fr = blankFrame();
     const r = (x, y, w, h, v) => { if (!v) return; for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (i >= 0 && j >= 0 && i < SIZE && j < SIZE) fr[j * SIZE + i] = v; };
     const p = (x, y, v) => r(x, y, 1, 1, v);
+    /* a braid three pixels wide: lobes two rows tall that lean alternately left and right, each lit on its top and
+       creased in shadow beneath, so it reads as plaited */
+    const braid = (x, y, h) => {
+      for (let j = 0; j < h; j++) {
+        const left = (j >> 1) % 2 === 0, top = j % 2 === 0; r(x, y + j, 3, 1, K.hair);
+        if (top) p(left ? x : x + 2, y + j, K.hairL); else { r(left ? x + 1 : x, y + j, 2, 1, K.hairD); }
+      }
+    };
     /* stride: the viewer-left leg steps forward (down and out), the other lifts; arms swing the other way */
     const lf = step ? 1 : 0, rl = step ? -2 : 0, la = step ? -1 : 0, ra = step ? 1 : 0;
 
@@ -107,9 +116,11 @@ function figure(name, id, o) {
     /* torso: sloped shoulders rising to the collar, a full chest and a hem rounded at its corners; or a robe to the ankles */
     r(13, 13, 6, 1, K.top); r(12, 14, 8, 1, K.top); r(11, 15, 10, 7, K.top); r(10, 22, 12, 1, K.top); r(11, 23, 10, 1, K.topD);
     if (o.robe) { r(10, 22, 12, 5, K.top); r(9, 26, 14, 3, K.top); r(9, 28, 14, 1, K.trim || K.topD); r(17, 22, 1, 6, K.topD); }
+    if (o.gown) { r(9, 24, 14, 3, K.top); r(8, 27, 16, 2, K.top); r(8, 29, 16, 1, K.trim); r(13, 23, 1, 6, K.topD); r(17, 22, 1, 7, K.topD); r(20, 24, 1, 5, K.topD); }   /* a gown flaring to the floor */
     if (!o.vest || back) { r(11, 16, 1, 4, K.seam); r(20, 16, 1, 4, K.seam); }    /* creases under the arms part them from the body */
     if (!back) {
-      r(14, 14, 4, 1, K.inner); r(15, 15, 2, 1, K.inner);                     /* open collar */
+      if (o.gown) { r(14, 13, 4, 1, K.skin); r(13, 14, 6, 1, K.skin); r(14, 15, 4, 1, K.trim); p(16, 16, K.band); }   /* square neckline, gold choker and a jewel */
+      else { r(14, 14, 4, 1, K.inner); r(15, 15, 2, 1, K.inner); }            /* open collar */
       if (o.vest) { r(12, 14, 2, 1, K.vest); r(11, 15, 3, 6, K.vest); r(18, 14, 2, 1, K.vest); r(18, 15, 3, 6, K.vest); }
       else { r(16, 16, 1, 4, K.topD); p(17, 16, K.buckle); p(17, 18, K.buckle); } /* placket and buttons */
       if (o.apron) {                                                          /* bib-and-brace overalls: straps, bib with a pocket, a pleated skirt */
@@ -146,12 +157,21 @@ function figure(name, id, o) {
       /* strands: two long locks falling from the crown either side of the parting */
       for (const [x, y] of [[14, 4], [13, 5], [13, 6], [13, 7], [12, 8], [12, 9], [17, 4], [18, 5], [18, 6], [18, 7], [19, 8], [19, 9]]) p(x, y, K.hairD);
       if (o.longHair) { r(11, 12, 10, 4, K.hair); r(12, 16, 8, 1, K.hairD); p(13, 12, K.hairD); p(13, 13, K.hairD); p(18, 12, K.hairD); p(18, 13, K.hairD); }
+      if (o.braid) {                                                          /* a braid down the back tied with a ribbon */
+        r(14, 12, 4, 1, K.hair); braid(15, 13, 11); r(15, 24, 3, 1, K.band); r(15, 25, 3, 1, K.hair); p(16, 26, K.hairD);
+      }
     } else {
       /* hair: crown, fringe swept to the right, a sideburn on the near (left) side */
       r(13, 2, 6, 1, K.hair); r(12, 3, 8, 1, K.hair); r(11, 4, 10, 2, K.hair); r(11, 6, 2, 3, K.hair); r(19, 6, 2, 2, K.hair); p(14, 6, K.hair); p(15, 6, K.hairD);
       for (const [x, y] of [[13, 3], [14, 4], [17, 3], [18, 4], [19, 5]]) p(x, y, K.hairD);                    /* strands in the fringe */
       for (const [x, y] of [[12, 4], [15, 3], [16, 4]]) p(x, y, K.hairL);                                    /* and its sheen */
       if (o.longHair) { r(11, 6, 2, 9, K.hair); r(19, 6, 2, 9, K.hair); r(11, 14, 1, 2, K.hairD); r(20, 14, 1, 2, K.hairD); p(12, 9, K.hairD); p(12, 10, K.hairD); p(11, 11, K.hairL); p(19, 10, K.hairD); p(19, 11, K.hairD); }
+      if (o.braid) {                                                          /* hair gathered down the far side into a braid over the shoulder, a ribbon and tuft */
+        /* kept clear of the face's edge, so the cheek keeps its own shading and shape */
+        r(20, 8, 1, 5, K.hair); p(20, 10, K.hairD); p(19, 12, K.hairD);            /* the lock, and hair in shadow behind the jaw */
+        r(11, 9, 1, 4, K.hair); p(11, 11, K.hairD);   /* a lock tucked behind the near ear: balances the rows, so the face lights and the mouth rounds like everyone's */
+        braid(19, 13, 9); r(19, 22, 3, 1, K.band); r(19, 23, 3, 1, K.hair); p(20, 24, K.hairD);
+      }
       p(12, 9, K.skinD);                                                          /* ear */
       p(15, 7, K.hairD); p(18, 7, K.hairD);                                       /* brows */
       r(15, 8, 1, 2, K.eye); r(18, 8, 1, 2, K.eye);                               /* eyes */
@@ -161,6 +181,7 @@ function figure(name, id, o) {
     /* headgear */
     if (o.hat === 'straw') { r(13, 1, 6, 3, K.hat); r(13, 3, 6, 1, K.band); r(8, 4, 16, 1, K.hat); r(9, 5, 14, 1, K.hatD); }
     if (o.hat === 'helm') { r(12, 1, 8, 1, K.hat); r(11, 2, 10, 4, K.hat); r(10, 6, 12, 1, K.hatD); if (!back) { r(17, 7, 1, 3, K.hat); r(11, 7, 2, 4, K.hat); } else r(11, 7, 10, 4, K.hat); r(15, 2, 1, 4, K.hatD); }
+    if (o.hat === 'circlet') { r(11, 4, 10, 1, K.hat); if (!back) { p(16, 4, K.band); p(15, 3, K.hat); p(16, 3, K.hat); } }   /* a gold circlet, a jewel at the brow */
     if (o.hat === 'hood') {
       r(12, 1, 8, 1, K.hat); r(11, 2, 10, 3, K.hat); r(10, 5, 2, 9, K.hat); r(20, 5, 2, 9, K.hat); r(10, 13, 12, 3, K.hat); r(11, 15, 10, 1, K.hatD);
       if (back) { r(10, 2, 12, 14, K.hat); r(15, 4, 2, 10, K.hatD); r(14, 16, 4, 3, K.hat); }
@@ -172,12 +193,13 @@ function figure(name, id, o) {
   return s;
 }
 const starters = () => [
-  figure('Villager', 'starter-villager', { vest: true, col: { hair: '#8a6a48', top: '#efe3c4', vest: '#9fb06a', sleeve: '#e6d8b6', legs: '#a68a62' } }),
-  figure('Farmer', 'starter-farmer', { hat: 'straw', apron: true, col: { hair: '#9a7a56', hat: '#dfc070', band: '#b8664a', top: '#a6b878', apron: '#8297b0', legs: '#9a7d5a', boots: '#8a6a48' } }),
-  figure('Guard', 'starter-guard', { hat: 'helm', cape: true, spear: true, armor: true, col: { skin: '#e0b890', hair: '#6b4c32', hat: '#c4c8c6', top: '#c27458', sleeve: '#94a0aa', legs: '#808a94', boots: '#8a6a48', cape: '#a6533b', inner: '#e2dccb' } }),
-  figure('Merchant', 'starter-merchant', { robe: true, beard: true, satchel: true, col: { hair: '#e0d6bc', beard: '#efe8d6', top: '#7f9cb4', trim: '#dfc070', strap: '#8a6a48', bag: '#b89a70', boots: '#8a6a48' } }),
-  figure('Monk', 'starter-monk', { robe: true, hat: 'hood', rope: true, col: { skin: '#e0b890', hair: '#8a6a48', hat: '#a88a64', top: '#b49872', rope: '#e6dcc0', boots: '#7a5a3a' } }),
-  figure('Healer', 'starter-healer', { longHair: true, lashes: true, satchel: true, col: { hair: '#dfc070', top: '#a898b8', sleeve: '#f0e6cb', legs: '#8a7a9a', strap: '#9a7a56', bag: '#f0e6cb', inner: '#f6efdc' } })
+  figure('Villager', 'starter-villager', { iris: '#7a4a24', vest: true, col: { hair: '#8a6a48', top: '#efe3c4', vest: '#9fb06a', sleeve: '#e6d8b6', legs: '#a68a62' } }),
+  figure('Farmer', 'starter-farmer', { iris: '#8c6a2e', hat: 'straw', apron: true, col: { hair: '#9a7a56', hat: '#dfc070', band: '#b8664a', top: '#a6b878', apron: '#8297b0', legs: '#9a7d5a', boots: '#8a6a48' } }),
+  figure('Guard', 'starter-guard', { iris: '#5f6e7a', hat: 'helm', cape: true, spear: true, armor: true, col: { skin: '#e0b890', hair: '#6b4c32', hat: '#c4c8c6', top: '#c27458', sleeve: '#94a0aa', legs: '#808a94', boots: '#8a6a48', cape: '#a6533b', inner: '#e2dccb' } }),
+  figure('Merchant', 'starter-merchant', { iris: '#4f7090', robe: true, beard: true, satchel: true, col: { hair: '#e0d6bc', beard: '#efe8d6', top: '#7f9cb4', trim: '#dfc070', strap: '#8a6a48', bag: '#b89a70', boots: '#8a6a48' } }),
+  figure('Monk', 'starter-monk', { iris: '#5a3a22', robe: true, hat: 'hood', rope: true, col: { skin: '#e0b890', hair: '#8a6a48', hat: '#a88a64', top: '#b49872', rope: '#e6dcc0', boots: '#7a5a3a' } }),
+  figure('Healer', 'starter-healer', { iris: '#6a6a98', longHair: true, lashes: true, satchel: true, col: { hair: '#dfc070', top: '#a898b8', sleeve: '#f0e6cb', legs: '#8a7a9a', strap: '#9a7a56', bag: '#f0e6cb', inner: '#f6efdc' } }),
+  figure('Noble Lady', 'starter-noble', { iris: '#4f8a3e', robe: true, gown: true, braid: true, lashes: true, hat: 'circlet', col: { skin: '#eccaa6', hair: '#b4502c', top: '#356a52', sleeve: '#3f7a5e', trim: '#dfc070', belt: '#dfc070', hat: '#e2c262', band: '#b8443a', inner: '#f6efdc', boots: '#5a3a2a' } })
 ];
 
 export { DEFAULT_PAL, FACES, FACE_LABEL, FRAMES, MAX_PAL, SIZE, blankFrame, blankSprite, cloneSprite, fillFrame, flipFrame, inFrame, isBlank, newId, setPixel, shiftFrame, spriteFromJSON, spriteToJSON, starters };

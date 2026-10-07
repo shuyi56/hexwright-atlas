@@ -57,15 +57,14 @@ and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `ge
 `setView({ level })` switches the storey.
 
 ### Characters
-
-The **Characters** tab lists your character library. Six detailed starters come with it: a villager in a vest, a
+ The **Characters** tab lists your character library. Seven detailed starters come with it: a villager in a vest, a
 farmer in a straw hat and apron, a guard with helmet, cape and spear, a bearded merchant with a satchel, a hooded
-monk with a rope belt, and a healer. **Draw new character…** opens the **character editor**: a 32×32 pixel canvas with
-pencil, eraser, fill and pick, a symmetry mode, a ghost of the other frame, shift/flip/clear, and a colour
-list that starts from the tile set's own palette. Each character has four facings (front/back,
-left/right), each with a standing frame and a stride frame. **Mirror to other side** copies a facing,
-flipped. Every stroke saves to the library at once, and characters can be exported and imported as
-`.character.json`.
+monk with a rope belt, a healer, and a red-haired noble lady in a green gown and gold circlet. **Draw new
+character…** opens the **character editor**: a 32×32 pixel canvas with pencil, eraser, fill and pick, a symmetry
+mode, a ghost of the other frame, shift/flip/clear, and a colour list that starts from the tile set's own palette.
+Each character has four facings (front/back, left/right), each with a standing frame and a stride frame. **Mirror
+to other side** copies a facing, flipped. Every stroke saves to the library at once, and characters can be exported
+and imported as `.character.json`.
 
 On the map, characters are crisp pixel art in the tiles' pale palette. The renderer washes each colour
 slightly toward the paper tone and adds the map's faint grain. It draws a one-pixel outline in the tiles' ink,

@@ -7,6 +7,11 @@ test('a sprite survives a round trip through JSON', () => {
   assert.equal(back.name, s.name); assert.deepEqual(back.pal, s.pal);
   for (const f of FACES) for (let k = 0; k < FRAMES; k++) assert.deepEqual(back.frames[f][k], s.frames[f][k]);
 });
+test('a sprite keeps its eye colour through JSON, and a malformed one is dropped', () => {
+  const s = starters()[0]; assert.match(s.iris, /^#[0-9a-f]{6}$/i);
+  assert.equal(spriteFromJSON(JSON.parse(JSON.stringify(spriteToJSON(s)))).iris, s.iris);
+  assert.equal(spriteFromJSON({ ...spriteToJSON(s), iris: 'blue' }).iris, undefined);
+});
 test('starter characters have art in every facing and frame', () => {
   for (const s of starters()) for (const f of FACES) for (let k = 0; k < FRAMES; k++) assert.ok(s.frames[f][k].some(Boolean), `${s.name} ${f} ${k}`);
 });
