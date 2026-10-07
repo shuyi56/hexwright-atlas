@@ -122,6 +122,21 @@ Rosy cheeks, a taller ear and a neck shadow were tried and taken out.
 - **Library key.** The sprite library's storage key is now `hexwright.sprites.v7`. On first load the starters
   are refreshed and the user's own characters are kept.
 
+## Experimental looks
+
+Five extra depth treatments sit behind switches in `draw.js` (`LOOK`, set with `setLook`). All are off by default.
+Try them in the app with `?look=cool,round,bounce,silhouette` or `?look=all`. Compare them side by side with
+`tools/sprite-lab.html` on the dev server (`npm run dev`, then open `/tools/sprite-lab.html`).
+
+- **cool.** Shadow steps lean toward a cool violet while highlights stay warm. This is the clearest gain at map scale.
+- **round.** The silhouette is blurred into a height field, and its slope is lit from the upper left. Hats,
+  heads and shoulders catch light on top, and hems turn away at the bottom.
+- **bounce.** The ground colour (`LOOK.ground`, grass by default) tints the lower, shaded surfaces.
+- **silhouette.** The cast shadow is the figure's own outline, laid flat toward the lower right like the trees'
+  shadows. The editor's character box is widened on the right and below to make room for it.
+- **pop.** Every level below the master is shrunk from a second master with a 1.3× wider light-to-shadow spread.
+  Combined with `cool`, it makes the shaded side muddy, so it is not in the recommended set.
+
 ## Known limits
 
 - Eye, lid, brow and glint details are smaller than a sprite pixel, so they vanish at map scale.

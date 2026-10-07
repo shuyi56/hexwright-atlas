@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sprite depth lab</title>
+<style>
+  body { margin: 0; padding: 16px; background: #efe6cf; color: #2b2116; font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  .row { display: grid; grid-template-columns: 170px auto auto; gap: 12px; align-items: center; margin-bottom: 8px; }
+  .row b { display: block; font-size: 14px; } .row span { font-size: 12px; color: #6a5a44; }
+  canvas { display: block; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>Character depth: one change per row, combinations at the bottom</h1>
+<div id="rows"></div>
+<script type="module">
+import { footShadow, drawSprite, setLook } from '../src/characters/draw.js';
+import { starters } from '../src/characters/sprite.js';
+
+const VARIANTS = [
+  ['Current', 'as on main', {}],
+  ['Cool shadows', 'shade leans violet, lights stay warm', { cool: true }],
+  ['Vertical rounding', 'heads and bodies turn top to bottom', { round: true }],
+  ['Map-scale contrast', 'wider light/shadow split on small sizes', { pop: true }],
+  ['Ground bounce', 'grass green reflected on the lower shade', { bounce: true }],
+  ['Figure shadow', 'the cast shadow is the silhouette', { silhouette: true }],
+  ['Recommended', 'everything but map-scale contrast', { cool: true, round: true, bounce: true, silhouette: true }],
+  ['All together', 'all five', { cool: true, round: true, pop: true, bounce: true, silhouette: true }],
+];
+const OFF = { cool: false, round: false, pop: false, bounce: false, silhouette: false };
+const params = new URLSearchParams(location.search), only = params.get('only');
+const sprites = starters(), dpr = window.devicePixelRatio || 1;
+const MAP = Number(params.get('map') || 1.3), BIG = Number(params.get('big') || 5), face = params.get('face') || 'se';
+
+/* a grass field like the tile tops, with faint tufts */
+function field(g, w, h) {
+  g.fillStyle = '#b5be83'; g.fillRect(0, 0, w, h);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.strokeStyle = 'rgba(70,90,40,0.35)'; g.lineWidth = 0.8;
+  for (let i = 0; i < w * h / 260; i++) { const x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 1, y - 3); g.moveTo(x + 1.5, y); g.lineTo(x + 2, y - 3.5); g.stroke(); }
+}
+function strip(list, px, gap) {
+  const H = 32 * px, w = list.length * gap + gap * 0.4, h = H * 1.25, c = document.createElement('canvas');
+  c.width = w * dpr; c.height = h * dpr; c.style.width = w + 'px'; c.style.height = h + 'px';
+  const g = c.getContext('2d'); g.scale(dpr, dpr); field(g, w, h);
+  list.forEach((s, i) => { const x = gap * (i + 0.7), y = H * 1.1; footShadow(g, x, y, px, s, face, 0); drawSprite(g, s, face, 0, x, y, px); });
+  return c;
+}
+const rows = document.getElementById('rows');
+for (const [name, note, look] of VARIANTS) {
+  if (only && !only.split(',').includes(name)) continue;
+  setLook({ ...OFF, ...look });
+  const row = document.createElement('div'); row.className = 'row';
+  row.innerHTML = `<div><b>${name}</b><span>${note}</span></div>`;
+  row.append(strip(sprites, MAP, 32 * MAP * 1.25), strip([sprites[1], sprites[2], sprites[6]], BIG, 32 * BIG * 0.95));
+  rows.append(row);
+}
+window.__labDone = true;
+</script>
+</body>
+</html>

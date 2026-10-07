@@ -134,7 +134,7 @@ const spriteOf = c => library.get(c.sprite);
 const scratch = document.createElement('canvas'), sg = scratch.getContext('2d');
 function drawChar(g, R, v, s, face, frame, key, alpha = 1, level = 0) {
   const P = SPRITE_PX, [px, py] = R.P(v.X, v.Y, v.z), gy = R.P(v.X, v.Y, v.ground)[1], top = py + 1 - (INK_PAD + SPRITE_SIZE) * P;
-  const b = [px - INK_SIZE * P / 2 - 1, top - 1, px + INK_SIZE * P / 2 + 1, Math.max(top + INK_SIZE * P, gy + 3) + 1];
+  const b = [px - INK_SIZE * P / 2 - 1, top - 1, px + INK_SIZE * P / 2 + SPRITE_SIZE * P * 0.85 + 1, Math.max(top + INK_SIZE * P, gy + 3) + SPRITE_SIZE * P * 0.12 + 1];   /* room on the right and below for the cast shadow */
   const minKey = Math.floor((v.X + v.Y) * 2) / 2 + 0.5;
   let m = ED.occ.get(key);
   /* the walkable pieces under the tiles it is on or stepping between (the flight it climbs) never hide it */
@@ -149,7 +149,7 @@ function drawChar(g, R, v, s, face, frame, key, alpha = 1, level = 0) {
   const w = Math.ceil((b[2] - b[0]) * k) + 2, h = Math.ceil((b[3] - b[1]) * k) + 2;
   if (scratch.width < w || scratch.height < h) { scratch.width = Math.max(scratch.width, w); scratch.height = Math.max(scratch.height, h); }
   sg.setTransform(1, 0, 0, 1, 0, 0); sg.clearRect(0, 0, w, h); sg.setTransform(k, 0, 0, k, dx - ix - b[0] * k, dy - iy - b[1] * k);
-  footShadow(sg, px, gy, P);
+  footShadow(sg, px, gy, P, s, face, frame);
   if (s) drawSprite(sg, s, face, frame, px, py + 1, P);
   else { sg.fillStyle = '#b8483a'; sg.strokeStyle = '#2b2116'; sg.lineWidth = 0.6; sg.beginPath(); sg.arc(px, py - 5, 3, 0, Math.PI * 2); sg.fill(); sg.stroke(); }
   const mk = m.mask; sg.globalCompositeOperation = 'destination-out'; sg.imageSmoothingEnabled = true; sg.drawImage(mk.can, mk.x, mk.y, mk.w, mk.h); sg.globalCompositeOperation = 'source-over';

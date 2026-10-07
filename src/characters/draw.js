@@ -16,6 +16,19 @@ const noise = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5
 const wash = c => { const l = lum(c); return c.map((ch, i) => (ch * 0.9 + l * 0.1) * 0.86 + PAPER[i] * 0.14); };
 const out = (c, k, gr = 1) => c.map(ch => Math.max(0, Math.min(255, Math.round(ch * k * gr))));
 
+/* Experimental looks, each off by default so the figures draw as before:
+   - cool: shadow steps lean toward a cool violet while highlights stay warm;
+   - round: a soft height field from the silhouette turns each mass top to bottom as well as side to side;
+   - pop: the map-scale mip levels come from a master with a wider light-to-shadow spread;
+   - bounce: the ground's colour is reflected onto the lower, shaded surfaces (ground is its hex colour);
+   - silhouette: the ground shadow is the figure's own outline, laid flat toward the lower right. */
+const LOOK = { cool: false, round: false, pop: false, bounce: false, silhouette: false, ground: '#b5be83' };
+function setLook(o) { Object.assign(LOOK, o); cache.clear(); mips.clear(); }
+/* try them in the app with ?look=cool,round,bounce,silhouette (or ?look=all) */
+const asked = typeof location !== 'undefined' && new URLSearchParams(location.search).get('look');
+if (asked) for (const k of asked === 'all' ? ['cool', 'round', 'pop', 'bounce', 'silhouette'] : asked.split(',')) if (k in LOOK && k !== 'ground') LOOK[k] = true;
+const COOL = [72, 66, 118];
+
 /* Each pixel of the finished frame as a label: 0 clear, 1 + BANDS * (index - 1) + band for a filled pixel, and
    OUTLINE + index (+ HEAVY on the shadow side) for an outline pixel bordering that colour. The band is one of
    eight light steps (TONE), worked out per pixel so the figure reads as a solid lit from the upper left:
@@ -38,6 +51,17 @@ function labels(fr) {
   const small = (x, y) => { const w = at(x, y); return w && used[w] <= 4; };
   const face = (x, y) => { if (y > 13) return false; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (small(x + i, y + j)) return true; return false; };
   const OLD = [4, 5, 3];
+  /* round: the silhouette blurred into a height field; its slope, lit from the upper left, rounds each mass */
+  let H = null;
+  if (LOOK.round) {
+    const m = new Float32Array(SIZE * SIZE); for (let u = 0; u < m.length; u++) m[u] = fr[u] ? 1 : 0;
+    H = m; for (let pass = 0; pass < 3; pass++) {
+      const t = new Float32Array(H.length), hb = (x, y) => (x < 0 || y < 0 || x >= SIZE || y >= SIZE ? 0 : H[y * SIZE + x]);
+      for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) t[y * SIZE + x] = (hb(x - 1, y) + hb(x + 1, y) + hb(x, y - 1) + hb(x, y + 1) + 2 * hb(x, y)) / 6;
+      H = t;
+    }
+  }
+  const slope = (x, y) => { const h = (i, j) => (i < 0 || j < 0 || i >= SIZE || j >= SIZE ? 0 : H[j * SIZE + i]); return [(h(x + 1, y) - h(x - 1, y)) / 2, (h(x, y + 1) - h(x, y - 1)) / 2]; };
   for (let y = -PAD; y < SIZE + PAD; y++) for (let x = -PAD; x < SIZE + PAD; x++) {
     const v = at(x, y), u = (y + PAD) * N + x + PAD;
     if (!v) { const lt = at(x - 1, y), up = at(x, y - 1), n = lt || at(x + 1, y) || up || at(x, y + 1); if (n) L[u] = OUTLINE + n + (lt || up ? HEAVY : 0); continue; }
@@ -47,6 +71,8 @@ function labels(fr) {
     if (r !== v && t > 0.3) f -= 0.08;
     if (!a) f += 0.1; else if (a !== v) f -= 0.14;
     if (b !== v) f -= 0.06;
+    /* facing the light (up and left) is a falling height toward the upper left, so a positive slope */
+    if (H) { const [gx, gy] = slope(x, y); f += Math.max(-0.3, Math.min(0.3, (gx * 0.45 + gy * 0.9) * 1.6)); }
     f *= 1.05 - 0.16 * (y - y0) / Math.max(1, y1 - y0);
     let band = 0, best = 9; TONE.forEach((k, i) => { if (Math.abs(k - f) < best) { best = Math.abs(k - f); band = i; } });
     if (face(x, y)) {
@@ -58,15 +84,27 @@ function labels(fr) {
   return L;
 }
 /* paint labels to a canvas of side n */
-function paintLabels(pal, L, n) {
+function paintLabels(pal, L, n, spread = 1) {
   const rgb = pal.map(h => wash(hexRgb(h))), c = document.createElement('canvas'); c.width = c.height = n;
   const g = c.getContext('2d'), im = g.createImageData(n, n), d = im.data;
+  let y0 = n, y1 = 0; if (LOOK.bounce) for (let u = 0; u < L.length; u++) if (L[u] && L[u] < OUTLINE) { const y = (u / n) | 0; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const ground = wash(hexRgb(LOOK.ground));
   for (let u = 0; u < L.length; u++) {
     const l = L[u]; if (!l) continue;
     const x = u % n, y = (u / n) | 0, gr = 1 + (noise(x + 7, y + 3) - 0.5) * 0.06; let col;
     /* the outline is full ink on the shadow side and lets the colour through on the lit side */
     if (l >= OUTLINE) { const heavy = (l - OUTLINE) & HEAVY, nc = rgb[((l - OUTLINE) & (HEAVY - 1)) - 1] || INK_RGB, m = heavy ? 0.1 : 0.3; col = INK_RGB.map((ch, i) => ch * (1 - m) * (heavy ? 0.92 : 1) + nc[i] * m * 0.6); }
-    else { const base = rgb[((l - 1) / BANDS) | 0] || INK_RGB, k = TONE[(l - 1) % BANDS]; col = dark(base) ? base : k > 1 ? out(base.map((ch, i) => ch + (LIT[i] - ch) * (k - 1) * 1.4), 1, gr) : out(base, k, gr); }
+    else {
+      const base = rgb[((l - 1) / BANDS) | 0] || INK_RGB, k = 1 + (TONE[(l - 1) % BANDS] - 1) * spread;
+      col = dark(base) ? base : k > 1 ? out(base.map((ch, i) => ch + (LIT[i] - ch) * (k - 1) * 1.4), 1, gr) : out(base, k, gr);
+      if (!dark(base)) {
+        const shade = Math.max(0, Math.min(1, (1 - k) / 0.4));
+        /* cool: the shade takes on a violet cast, a little more saturated than plain darkening */
+        if (LOOK.cool && shade > 0) col = col.map((ch, i) => Math.round(ch + (COOL[i] * k - ch) * 0.3 * shade));
+        /* bounce: the ground's colour on the lower part of the figure, most where it is shaded */
+        if (LOOK.bounce) { const low = Math.max(0, Math.min(1, ((y - y0) / Math.max(1, y1 - y0) - 0.45) / 0.55)); const w = low * (0.35 + 0.65 * shade) * 0.45; col = col.map((ch, i) => Math.round(ch + (ground[i] * Math.max(k, 0.75) - ch) * w)); }
+      }
+    }
     d.set([col[0], col[1], col[2], 255], u * 4);
   }
   g.putImageData(im, 0, 0); return c;
@@ -106,12 +144,14 @@ function mipChain(pal, fr, lashes, iris) {
   let L = labels(fr), n = N; for (let k = 1; k < MASTER; k *= 2) { L = scale2x(L, n); n *= 2; }
   thinOutline(L, n, 4.6);
   const master = paintLabels(pal, L, n); roundEyes(master.getContext('2d'), pal, fr, lashes, iris);
-  const levels = [{ up: MASTER, can: master }];
-  for (let up = MASTER / 2; up >= 0.25; up /= 2) {
-    const prev = levels[levels.length - 1].can, c = document.createElement('canvas'); c.width = c.height = Math.max(1, Math.round(N * up));
-    const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(prev, 0, 0, c.width, c.height);
-    levels.push({ up, can: c });
-  }
+  /* pop: the levels below the master (every zoom but the closest) shrink from a second master with the light and
+     shadow pushed apart, since shrinking averages the eight steps toward the middle */
+  let wide = null; if (LOOK.pop) { wide = paintLabels(pal, L, n, 1.3); roundEyes(wide.getContext('2d'), pal, fr, lashes, iris); }
+  const levels = [{ up: MASTER, can: master }], half = (src, up) => {
+    const c = document.createElement('canvas'); c.width = c.height = Math.max(1, Math.round(N * up));
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, c.width, c.height); return c;
+  };
+  for (let up = MASTER / 2; up >= 0.25; up /= 2) levels.push({ up, can: half(wide && up === MASTER / 2 ? wide : levels[levels.length - 1].can, up) });
   return levels;
 }
 
@@ -200,12 +240,26 @@ function drawSprite(g, s, face, k, x, y, px) {
   g.drawImage(lv.can, x - N / 2 * px, y - (PAD + SIZE) * px, N * px, N * px); g.restore();
 }
 /* ground shadow under a figure: a long soft shadow cast to the right (the way the pieces' shadows fall), a
-   pool under the feet, and a dark contact patch where the boots meet the ground */
-function footShadow(g, x, y, px) {
+   pool under the feet, and a dark contact patch where the boots meet the ground. Given the sprite (and the
+   silhouette look is on), the long shadow is the figure's own outline laid flat toward the lower right. */
+function footShadow(g, x, y, px, s, face = 'se', k = 0) {
   const H = SIZE * px, ell = (cx, cy, rx, ry, a) => { g.fillStyle = `rgba(43,30,16,${a})`; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
   g.save();
-  ell(x + H * 0.22, y - H * 0.02, H * 0.3, H * 0.07, 0.13);
-  ell(x + H * 0.05, y, H * 0.2, H * 0.085, 0.18);
+  if (LOOK.silhouette && s) {
+    const m = g.getTransform(), screen = Math.hypot(m.a, m.b) * px, levels = mipFor(s, face, k);
+    let lv = levels[0]; for (const l of levels) if (l.up >= screen) lv = l;
+    if (!lv.sil) {
+      const c = document.createElement('canvas'); c.width = lv.can.width; c.height = lv.can.height;
+      const sg = c.getContext('2d'); sg.drawImage(lv.can, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = 'rgb(43,30,16)'; sg.fillRect(0, 0, c.width, c.height); lv.sil = c;
+    }
+    g.save(); g.translate(x, y); g.transform(1, 0, -0.7, -0.22, 0, 0);
+    g.filter = `blur(${Math.max(0.5, screen * 0.9).toFixed(2)}px)`; g.globalAlpha = 0.26; g.imageSmoothingEnabled = true;
+    g.drawImage(lv.sil, -N / 2 * px, -(PAD + SIZE) * px, N * px, N * px); g.restore();
+    ell(x + H * 0.05, y, H * 0.19, H * 0.08, 0.15);
+  } else {
+    ell(x + H * 0.22, y - H * 0.02, H * 0.3, H * 0.07, 0.13);
+    ell(x + H * 0.05, y, H * 0.2, H * 0.085, 0.18);
+  }
   ell(x + H * 0.01, y - H * 0.005, H * 0.12, H * 0.045, 0.3);
   g.restore();
 }
@@ -219,11 +273,11 @@ function tileBlock(g, x, y, w) {
 }
 /* a character standing on a grass block, for palettes and previews */
 function standOn(g, s, face, k, x, y, w) {
-  tileBlock(g, x, y, w); const px = w * 1.55 / SIZE; footShadow(g, x, y + w * 0.06, px); drawSprite(g, s, face, k, x, y + w * 0.08, px);
+  tileBlock(g, x, y, w); const px = w * 1.55 / SIZE; footShadow(g, x, y + w * 0.06, px, s, face, k); drawSprite(g, s, face, k, x, y + w * 0.08, px);
 }
 function spriteThumb(s, size = 60, face = 'se', k = 0) {
   const c = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1); c.width = c.height = size * dpr;
   const g = c.getContext('2d'); g.scale(dpr, dpr); standOn(g, s, face, k, size / 2, size * 0.66, size * 0.4); return c;
 }
 
-export { N as INK_SIZE, PAD as INK_PAD, UP as INK_UP, drawSprite, footShadow, frameCanvas, renderFrame, spriteThumb, standOn };
+export { N as INK_SIZE, PAD as INK_PAD, UP as INK_UP, drawSprite, footShadow, frameCanvas, renderFrame, setLook, spriteThumb, standOn };
