@@ -202,15 +202,18 @@ function paint(R, clip) {
    whose sort key (the same one paint() orders by) is minKey or more. Only its alpha matters; the editor
    uses it to cut a character away where the map stands in front of it, so the map image itself is never
    drawn again. Returns the canvas (at the map's scale) and the rectangle it covers. */
-function frontMask(R, clip, minKey, level = 0) {
-  /* the storeys above the figure also cover it on its own tile: a floor overhead hides whoever stands under it */
-  const from = L => (L > level ? minKey - 0.5 : minKey);
+function frontMask(R, clip, minKey, level = 0, feetZ = -Infinity, skip = null) {
+  /* Only what rises above the figure's feet can hide it: a floor or ground top at or below them is ground it
+     walks on, and a piece of a storey below (a ground-floor wall under floor 1) tops out under them. The storeys
+     above also cover it on its own tile (a floor overhead hides whoever stands under it). skip holds the model
+     indices of pieces it is walking through (the flight it climbs), which never hide it. */
+  const from = L => (L > level ? minKey - 0.5 : minKey), above = z => z > feetZ + 0.5;
   const { S, SC, P, RE, covered, zOf } = R, NN = S * S, can = document.createElement('canvas');
   can.width = Math.max(1, Math.ceil((clip[2] - clip[0]) * SC)); can.height = Math.max(1, Math.ceil((clip[3] - clip[1]) * SC));
   const g = can.getContext('2d'); g.setTransform(SC, 0, 0, SC, -clip[0] * SC, -clip[1] * SC); g.fillStyle = '#000';
   const quad = pts => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]); g.closePath(); g.fill(); };
   for (let u = 0; u < NN; u++) {
-    const X = u % S, Y = (u / S) | 0; if (!RE[u] || covered[u] || X + Y + 1 < from(0) || !hits(tileBox(R, u), clip)) continue;
+    const X = u % S, Y = (u / S) | 0; if (!RE[u] || covered[u] || X + Y + 1 < from(0) || !above(zOf(u)) || !hits(tileBox(R, u), clip)) continue;
     const z = zOf(u), a = P(X, Y, z), b = P(X + 1, Y, z), c = P(X + 1, Y + 1, z), d = P(X, Y + 1, z), zr = X + 1 < S ? zOf(u + 1) : -6, zl = Y + 1 < S ? zOf(u + S) : -6;
     quad([a, b, c, d]);
     if (zr < z) quad([b, c, [c[0], c[1] + z - zr], [b[0], b[1] + z - zr]]);
@@ -219,12 +222,16 @@ function frontMask(R, clip, minKey, level = 0) {
   for (let L = 1; L < R.FL.length; L++) {
     const f = R.FL[L]; if (!f) continue;
     for (let u = 0; u < NN; u++) {
-      const X = u % S, Y = (u / S) | 0; if (!f[u] || X + Y + 1 < from(L) || !hits(tileBox(R, u), clip)) continue;
+      const X = u % S, Y = (u / S) | 0; if (!f[u] || X + Y + 1 < from(L) || !above(R.zAt(u, L)) || !hits(tileBox(R, u), clip)) continue;
       const z = R.zAt(u, L), a = P(X, Y, z), b = P(X + 1, Y, z), c = P(X + 1, Y + 1, z), d = P(X, Y + 1, z);
       quad([a, b, c, d]); quad([b, c, [c[0], c[1] + SLAB], [b[0], b[1] + SLAB]]); quad([d, c, [c[0], c[1] + SLAB], [d[0], d[1] + SLAB]]);
     }
   }
-  for (const o of R.objs) { const [w, d] = footprint(o); if (o.x + w / 2 + o.y + d / 2 >= from(levelOf(o)) && hits(pieceBox(R, o), clip)) drawAsset(g, P, o, o.z, R.clim); }
+  for (const o of R.objs) {
+    if (skip && skip.has(o.k)) continue;
+    const [w, d] = footprint(o), a = ASSET_BY_ID[o.id];
+    if (o.x + w / 2 + o.y + d / 2 >= from(levelOf(o)) && above(o.z + (a.top ?? a.h)) && hits(pieceBox(R, o), clip)) drawAsset(g, P, o, o.z, R.clim);
+  }
   return { can, x: clip[0], y: clip[1], w: clip[2] - clip[0], h: clip[3] - clip[1] };
 }
 

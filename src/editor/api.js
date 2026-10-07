@@ -2,7 +2,7 @@ import { ASSET_BY_ID, ASSETS, TERRAIN, footprint } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { METHODS } from './api-spec.js';
 import * as library from '../characters/library.js';
-import { ED, LEVEL_NAME, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
+import { ED, LEVEL_NAME, characterBoxes, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
 import { BIOMES, generateScene } from './generate.js';
 import { MAX_ELEV, MAX_LEVEL, STOREY, TI, blankModel, floorAt, fromJSON, levelOf, objAt, toJSON } from './model.js';
 import { brushTiles, eraseAt, floodFill, inb, paintTiles, placePiece, rectTiles, removeFloor, setElev, shiftElev } from './ops.js';
@@ -321,7 +321,7 @@ function renderCheck() {
 }
 
 /* the object other code (and a DevTools console) talks to */
-const api = { version: 1, spec: METHODS, call, ApiError, debug: { renderCheck }, ...Object.fromEntries(Object.keys(METHODS).map(k => [k, p => call(k, p)])) };
+const api = { version: 1, spec: METHODS, call, ApiError, debug: { renderCheck, characterBoxes }, ...Object.fromEntries(Object.keys(METHODS).map(k => [k, p => call(k, p)])) };
 window.hexwright = api;
 
 export { ApiError, api, call };

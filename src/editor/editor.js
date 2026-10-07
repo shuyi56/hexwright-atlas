@@ -78,7 +78,7 @@ function walkerPos(w) {
   let d = w.d; const P = w.pts;
   for (let i = 0; i + 1 < P.length; i++) {
     const a = P[i], b = P[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
-    if (d <= len || i + 2 === P.length) { const f = Math.min(1, d / len); return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f, L: f < 0.5 ? a.L : b.L, face: Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 1 : 3) : (b.y > a.y ? 0 : 2) }; }
+    if (d <= len || i + 2 === P.length) { const f = Math.min(1, d / len); return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f, L: f < 0.5 ? a.L : b.L, seg: [a, b], face: Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 1 : 3) : (b.y > a.y ? 0 : 2) }; }
     d -= len;
   }
   return Object.assign({ face: 0 }, P[P.length - 1]);
@@ -110,9 +110,14 @@ function charViews() {
   (ED.M.chars || []).forEach((c, k) => {
     const w = ED.walk.get(c), p = w ? walkerPos(w) : Object.assign(tilePt(c.x, c.y, levelOf(c)), { face: c.face }), [X, Y] = viewPt(p.x, p.y), stride = w ? Math.floor(w.d * 2) % 2 : 0;
     if ((w ? p.L ?? levelOf(c) : levelOf(c)) > ED.level) return;  /* above the storey being worked on: hidden with its floor */
-    out.push({ c, k, X, Y, level: w ? (p.L ?? levelOf(c)) : levelOf(c), ground: p.z, z: p.z + (stride ? SPRITE_PX : 0),  /* the stride frame rides one pixel higher */ face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
+    out.push({ c, k, X, Y, on: w && p.seg ? p.seg.map(q => [Math.floor(q.x), Math.floor(q.y), q.L || 0]) : [[c.x, c.y, levelOf(c)]], level: w ? (p.L ?? levelOf(c)) : levelOf(c), ground: p.z, z: p.z + (stride ? SPRITE_PX : 0),  /* the stride frame rides one pixel higher */ face: FACES[faceIn(p.face)], frame: stride, walking: !!w });
   });
   return out.sort((a, b) => a.X + a.Y - (b.X + b.Y));
+}
+/* test hook: where each drawn character is on the stage, in CSS pixels (feet, and the box its picture fills) */
+function characterBoxes() {
+  const R = ED.R; if (!R) return [];
+  return charViews().map(v => { const [px, py] = R.P(v.X, v.Y, v.z), s = ED.z, x = ED.ox + px * s, y = ED.oy + py * s, hw = FIG_H * 0.45 * s; return { index: v.k, level: v.level, walking: v.walking, feet: [x, y], box: [x - hw, y - FIG_H * 1.1 * s, x + hw, y + 4 * s] }; });
 }
 /* the character whose picture is under a screen point, nearest first */
 function charAtScreen(sx, sy) {
@@ -132,10 +137,13 @@ function drawChar(g, R, v, s, face, frame, key, alpha = 1, level = 0) {
   const b = [px - INK_SIZE * P / 2 - 1, top - 1, px + INK_SIZE * P / 2 + 1, Math.max(top + INK_SIZE * P, gy + 3) + 1];
   const minKey = Math.floor((v.X + v.Y) * 2) / 2 + 0.5;
   let m = ED.occ.get(key);
-  if (!m || m.R !== R || m.ver !== R.ver || m.minKey !== minKey || m.level !== level || b[0] < m.box[0] || b[1] < m.box[1] || b[2] > m.box[2] || b[3] > m.box[3]) {
+  /* the walkable pieces under the tiles it is on or stepping between (the flight it climbs) never hide it */
+  const skip = new Set(); for (const [x, y, L] of v.on || []) { const k = objAt(ED.M, x, y, L); if (k >= 0 && ASSET_BY_ID[ED.M.objs[k].id].walk) skip.add(k); }
+  const feet = Math.round(v.ground * 2) / 2, skey = [...skip].join();
+  if (!m || m.R !== R || m.ver !== R.ver || m.minKey !== minKey || m.level !== level || m.feet !== feet || m.skey !== skey || b[0] < m.box[0] || b[1] < m.box[1] || b[2] > m.box[2] || b[3] > m.box[3]) {
     if (ED.occ.size > 64) ED.occ.clear();
     const box = [b[0] - 20, b[1] - 20, b[2] + 20, b[3] + 20];
-    m = { R, ver: R.ver, minKey, level, box, mask: frontMask(R, box, minKey, level) }; ED.occ.set(key, m);
+    m = { R, ver: R.ver, minKey, level, feet, skey, box, mask: frontMask(R, box, minKey, level, feet, skip) }; ED.occ.set(key, m);
   }
   const dpr = state.dpr, k = ED.z * dpr, dx = dpr * ED.ox + b[0] * k, dy = dpr * ED.oy + b[1] * k, ix = Math.floor(dx), iy = Math.floor(dy);
   const w = Math.ceil((b[2] - b[0]) * k) + 2, h = Math.ceil((b[3] - b[1]) * k) + 2;
@@ -501,4 +509,4 @@ function closeEditor() { if (!ED.open) return; ED.open = false; root.hidden = tr
 buildChrome();
 $('openEditor').addEventListener('click', () => openEditor());
 
-export { ED, LEVEL_NAME, applyAt, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };
+export { ED, LEVEL_NAME, applyAt, characterBoxes, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };

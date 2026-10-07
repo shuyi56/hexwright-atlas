@@ -101,7 +101,7 @@ const INTERIOR = [
   } },
   /* a straight flight rising from its front to its back, one storey (16 units) in one tile; a character on it
      can step off its high end onto the floor above (see editor/walk.js) */
-  { id: 'stairs', label: 'Stairs', w: 1, d: 1, h: 18, walk: true, draw(K, o) {
+  { id: 'stairs', label: 'Stairs', w: 1, d: 1, h: 18, top: 16, walk: true, draw(K, o) {
     const F = frame(K, o), n = 6, rise = 16 / n;
     for (let i = 0; i < n; i++) F.box(0.16, 0.84, 1 - (i + 1) / n, 1 - i / n, 0, (i + 1) * rise, i % 2 ? WOOD : WOOD_L, { top: shade(WOOD_L, 1.06) });
     for (const a of [0.12, 0.88]) F.box(a - 0.04, a + 0.04, 0, 1, 0, 1.2, WOOD_D);
