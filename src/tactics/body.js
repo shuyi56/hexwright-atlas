@@ -58,10 +58,14 @@ function armPart(bt, view, pose, side, top, o = {}) {
     /* a bell sleeve widens below the elbow: a pixel outward over the forearm, and both ways at its mouth */
     if (sl.bell && j >= a.cuff - 2) { n++; if (a.s < 0) from--; }
     if (sl.bell && j === a.cuff) { n++; if (a.s > 0) from--; }
+    /* spiked armour: the gauntlet's cuff flares a pixel outward */
+    if (sl.spike && j === a.cuff) { n++; if (a.s < 0) from--; }
     for (let i = 0; i < n; i++) {
       const x = from + i, inner = a.s > 0 ? i === 0 : i === n - 1;
       put(x, top + j, j === a.cuff ? cuffL : inner && j > 0 && j < 5 ? sleeve.toLowerCase() : sleeve);
     }
+    /* and a spike stands out from the elbow, pointing out and up */
+    if (sl.spike && j === 5) { const out = a.s > 0 ? from + n : from - 1; put(out, top + j, sleeve); put(out + a.s, top + j - 1, sleeve); }
   }
   /* the fist, its thumb on the side the figure faces */
   const hw = Math.max(a.hand, 2), hx = a.lower + a.sx + Math.floor((a.w - hw) / 2), hy = top + a.cuff + 1;
@@ -73,22 +77,27 @@ function armPart(bt, view, pose, side, top, o = {}) {
 
 /* ---------- legs ----------
    Trousers into boots, or a robe to the ankles with the shoes beneath. In a stride one leg reaches forward a
-   pixel and the other lifts its heel two rows; the hips drop with the body. */
+   pixel and the other lifts its heel two rows; the hips drop with the body. Greaves (o.greaves) turn the boots
+   into plate: a knee cop standing forward of the knee, trimmed in gold along its lower edge, with a spike
+   thrown forward and up from its point, and sabatons drawn out to a pointed toe. */
 function legGeometry(bt, view, pose) {
   const dir = view === 'front' ? -1 : 1, far = [CX - 1 - bt.legW, CX - 2], near = [CX + 1, CX + bt.legW];
   const step = [[{ dx: 0, lift: 0 }, { dx: 0, lift: 0 }], [{ dx: dir, lift: 0 }, { dx: 0, lift: 2 }], [{ dx: 0, lift: 2 }, { dx: dir, lift: 0 }]][pose];
   return { dir, legs: [[far, step[0]], [near, step[1]]], y0: BASE + 1 - bt.legs + (pose ? 1 : 0) };
 }
-function pantsCells(bt, view, pose) {
-  const { dir, legs, y0 } = legGeometry(bt, view, pose), cells = [], boot = Math.round(bt.legs * 0.5);
+function pantsCells(bt, view, pose, o = {}) {
+  const { dir, legs, y0 } = legGeometry(bt, view, pose), cells = [], boot = Math.round(bt.legs * 0.5), knee = BASE - boot;
   for (let x = legs[0][0][0]; x <= legs[1][0][1]; x++) { cells.push([x, y0, 'P']); cells.push([x, y0 + 1, x === CX - 1 ? 'p' : 'P']); }
   for (const [[a, b], { dx, lift }] of legs) {
     const end = BASE - lift;
     for (let y = y0 + 2; y <= end; y++) {
-      const inBoot = y > BASE - boot, toe = y > BASE - 3 && !lift, sole = y === end;
+      const cop = o.greaves && y >= knee - 1 && y <= knee + 1, inBoot = y > BASE - boot || cop, toe = y > BASE - 3 && !lift, sole = y === end;
       let l = a + dx, r = b + dx; if (toe) { if (dir < 0) l--; else r++; }
+      if (cop || (o.greaves && sole && !lift)) { if (dir < 0) l--; else r++; }     /* the knee cop and the sabaton's point */
       if (sole && lift) { if (dir < 0) r = l + 1; else l = r - 1; }                 /* a lifted heel: only the toe touches down */
-      for (let x = l; x <= r; x++) cells.push([x, y, sole ? 'o' : inBoot ? 'O' : 'P']);
+      for (let x = l; x <= r; x++) cells.push([x, y, sole ? 'o' : cop && y === knee + 1 ? 'G' : inBoot ? 'O' : 'P']);
+      /* the knee cop's spike, standing forward and up from its point */
+      if (o.greaves && y === knee - 1) { const f = dir < 0 ? l - 1 : r + 1; cells.push([f, y, 'O'], [f + dir, y - 1, 'O']); }
     }
   }
   cells.push([CX, y0 + 2, 'P']);                                                 /* the crotch tapers a row */
@@ -159,7 +168,17 @@ const TORSO = {
      fold, and a fold either side below the chest that the skirt's folds carry on; behind, a seam down the back */
   gown: (j, x, t) => (t.front
     ? (j === 0 && x >= fc - 1 && x <= fc + 2) || (j === 1 && (x === fc || x === fc + 1)) ? 'C' : j >= 2 && x === fc + 1 ? 'a' : j > t.belt && (x === fc - 2 || x === fc + 4) ? 'a' : 'A'
-    : x === fc && j >= 2 ? 'a' : 'A') };
+    : x === fc && j >= 2 ? 'a' : 'A'),
+  /* a dragoon's cuirass: a gorget at the neck, a breastplate ridged down the middle and cut with two chevrons that
+     point down the ridge like overlapping scales, a belt, and mail below it; the backplate the same about the
+     spine */
+  dragon: (j, x, t) => {
+    const r = t.front ? fc + 1 : fc, d = Math.abs(x - r), k = t.belt - 1 - j;
+    if (j === t.belt) return t.front && x === fc ? 'G' : 'L';
+    if (j > t.belt) return j === t.belt + 2 ? 'a' : 'A';
+    if (j === 1 || j === t.belt - 1 || (j >= 2 && (d === 0 || d === k || d === k + 3))) return 's';
+    return 'S';
+  } };
 /* a gown hangs straight from the chest instead of taking in at the waist, and widens a pixel either side over its
    last rows (beside the hands, clear of them), so the skirt's flare runs on from it */
 const GOWN_ROWS = (bt, rows) => rows.map((s, j) => (j < 2 ? s : span(bt.chest + (j >= bt.torso - 3 ? 2 : 0))));
@@ -179,15 +198,25 @@ function torsoCells(bt, view, top, o = {}) {
   });
   /* a skirt carried on below the hem, over the legs */
   for (let k = 0; k < (o.skirt || 0); k++) { const [l, r] = span(bt.hem + (k ? 2 : 0)); for (let x = l; x <= r; x++) cells.push([x, top + T + k, k === o.skirt - 1 ? 'C' : (x - l) % 4 === 2 ? 'a' : 'A']); }
+  /* plate tassets hung below the hem over the thighs, four pixels to a plate, each cut down to a point */
+  for (let k = 0; k < (o.tassets || 0); k++) {
+    const [l, r] = span(bt.hem + 2);
+    for (let x = l; x <= r; x++) { const p = (x - l) % 4; if ((k === 1 && p === 3) || (k >= 2 && p !== 1)) continue; cells.push([x, top + T + k, k === 0 && p === 3 ? 's' : 'S']); }
+  }
   return cells;
 }
 
-/* ---------- a cloak hanging from the shoulders: edges behind the body from the front, the whole from behind ---------- */
-function cloakCells(bt, view, top) {
-  const cells = [], bottom = BASE + 1 - bt.legs + Math.round(bt.legs * 0.55), front = view === 'front';
+/* ---------- a cloak hanging from the shoulders: edges behind the body from the front, the whole from behind ----------
+   A dagged cloak ('dagged') is cut along its hem into sharp points, like a dragon's wing, its folds running down
+   into them. */
+function cloakCells(bt, view, top, style) {
+  const dagged = style === 'dagged', cells = [], bottom = BASE + 1 - bt.legs + Math.round(bt.legs * (dagged ? 0.62 : 0.55)), front = view === 'front';
   for (let y = top - (front ? 0 : 1); y <= bottom; y++) {
     const j = y - top, w = Math.min(bt.shoulder + (front ? 4 : 2), (front ? 8 : 6) + 2 * Math.max(0, j + 2)), [l, r] = span(w);
-    for (let x = l; x <= r; x++) cells.push([x, y, y === bottom && (x - l) % 3 === 1 ? '.' : (x - l) % 5 === 2 && j > 3 ? 'v' : 'V']);
+    for (let x = l; x <= r; x++) {
+      if (dagged) { const p = (x - l) % 4; if (y > bottom - [3, 1, 0, 2][p]) continue; cells.push([x, y, p === 2 && j > 3 ? 'v' : 'V']); continue; }
+      cells.push([x, y, y === bottom && (x - l) % 3 === 1 ? '.' : (x - l) % 5 === 2 && j > 3 ? 'v' : 'V']);
+    }
   }
   return cells;
 }
@@ -201,9 +230,9 @@ function measure(type, view, pose, o = {}) {
     bt, top,
     parts: {
       torso: cellsToPart(torsoCells(bt, view, top, o)),
-      legs: cellsToPart(o.legs === 'gown' ? gownCells(bt, view, pose) : o.legs === 'robe' ? robeCells(bt, view, pose, o.teeth) : pantsCells(bt, view, pose)),
+      legs: cellsToPart(o.legs === 'gown' ? gownCells(bt, view, pose) : o.legs === 'robe' ? robeCells(bt, view, pose, o.teeth) : pantsCells(bt, view, pose, o)),
       armNear: cellsToPart(near.cells), armFar: cellsToPart(far.cells), fistNear: cellsToPart(near.fist), fistFar: cellsToPart(far.fist),
-      cloak: o.cloak ? cellsToPart(cloakCells(bt, view, top)) : null },
+      cloak: o.cloak ? cellsToPart(cloakCells(bt, view, top, o.cloak)) : null },
     at: { head: [9, top - 14], neck: [CX, top], shoulderNear: [rows[2][1], top], shoulderFar: [rows[2][0], top], handNear: near.hand, handFar: far.hand } };
 }
 

@@ -132,6 +132,36 @@ test('the black mage wears a robe to the floor, with bell sleeves and a high col
   assert.ok(face(bm) < face(bare) - 6);
   assert.equal(frame(bm, 'front', 0).mat.filter(c => c === 'N').length, 4, 'both eyes, two pixels each, still glow above it');
 });
+test('the dragoon is armoured in crimson, spiked all over, and carries a winged lance', () => {
+  const dragoon = ROSTER.find(j => j.id === 'dragoon');
+  /* no violet anywhere in its colours: the plate is a warm crimson */
+  for (const [m, c] of Object.entries(dragoon.pal)) {
+    const [, C, h] = rgbLch(hexRgb(c));
+    assert.ok(C < 0.03 || h < 270 || h > 340, `${m} ${c} is violet`);
+  }
+  assert.ok(rgbLch(hexRgb(dragoon.pal.S))[2] < 50, 'crimson plate');
+  /* the spikiest silhouette in the roster: more points (a pixel with at most one filled neighbour) than any
+     other job, in both views */
+  const points = mat => mat.filter((m, u) => {
+    if (!m) return false;
+    const x = u % W, y = (u / W) | 0;
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([i, j]) => x + i >= 0 && x + i < W && y + j >= 0 && y + j < H && mat[(y + j) * W + x + i]).length <= 1;
+  }).length;
+  for (const v of VIEWS) {
+    const mine = points(frame(dragoon, v, 0).mat);
+    for (const job of ROSTER.filter(j => j !== dragoon)) assert.ok(mine > points(frame(job, v, 0).mat), `${v}: ${job.id} is spikier`);
+  }
+  /* the lance: its point at the top of the frame, a ridged blade, barbed wings either side of a gold socket, a
+     tuft beneath, and a steel spike at the butt */
+  for (const b of BODIES) for (const v of VIEWS) {
+    const [hx, hy] = measure(b, v, 0, dragoon.outfit).at[v === 'front' ? 'handFar' : 'handNear'];
+    const lance = dragoon.weapon[v].make({ hand: [hx, hy], dir: hx < 16 ? -1 : 1 }), rows = lance.rows, last = rows[rows.length - 1];
+    assert.equal(lance.y, 0, `${b} ${v}: the point at the top`);
+    assert.ok(rows.some(r => r.includes('y')) && rows.some(r => /S\.*G\.*S/.test(r)) && rows.some(r => r.includes('R')), `${b} ${v}: blade, wings, tuft`);
+    assert.ok(last.replace(/\./g, '') === 'S', `${b} ${v}: a butt spike`);
+    assert.ok(lance.x >= 1 && lance.x + rows[0].length <= W - 1, `${b} ${v}: a column spare for the outline`);
+  }
+});
 test('the figures sit in the tile set\'s palette: washed toward its paper and inked in its umber', () => {
   assert.equal(OUTLINE, INK);
   /* a wash takes away chroma and moves toward the paper's lightness */

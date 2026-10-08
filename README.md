@@ -89,7 +89,7 @@ stack as every other edit. The automation API has `listSprites`, `listCharacters
 ### Tactics sprite sheet
 
 `src/tactics/` holds a separate character style made from scratch, after Final Fantasy Tactics and Tactics Ogre: nine
-jobs (squire, knight, archer, thief, lancer, valkyrie, black mage, white mage, summoner) as big-headed 32×48 figures,
+jobs (squire, knight, archer, thief, dragoon, valkyrie, black mage, white mage, summoner) as big-headed 32×48 figures,
 in four facings, standing and in two strides.
 
 - **Palette.** Painted in the tile set's soft palette: each colour is picked from the tiles' own and washed toward

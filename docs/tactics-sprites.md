@@ -20,7 +20,7 @@ Each job has a default build (in brackets below); any job can be drawn in any of
 | Knight (stocky) | A plumed helm, plate with pauldrons, a blue tunic skirt, a kite shield with a gold cross, a long blue cloak behind. |
 | Archer (slim) | A green feathered cap, an auburn ponytail down her back, a quiver slung across her back, a recurved longbow held at her side. |
 | Thief (slim) | A red bandana with trailing knot, a red scarf, a dark leather vest over slate, a dagger in each hand. |
-| Lancer (tall) | An indigo dragon helm with a snout and swept-back horns, indigo plate, a lance carried at the ready flying a red pennant. |
+| Dragoon (standard) | Crimson plate spiked from crest to sabaton: a dragon helm with a jutting snout, fangs and an amber eye, a crest of black iron spikes and a bone horn; spiked pauldrons, couters and knee cops; pointed tassets; a black cape dagged into points; a winged lance with a gold tuft. |
 | Valkyrie (tall) | A winged silver helm, gold hair in a low braided bun, plate over crimson skirts, a spear and a round buckler. |
 | Black Mage (stocky) | A wide-brimmed pointed hat with a flopped tip, a face of pure shadow with two glowing eyes over a high collar, a floor-length blue robe flaring to a gold hem with only his toes beneath, wide bell sleeves, a crooked staff. |
 | White Mage (slim) | A white cowl whose peak droops back like a nightcap, a red band framing her face, a mantle and robe hemmed in red teeth, a staff with a red orb in a gold cup. |
@@ -111,14 +111,42 @@ Two kinds of long garment, both cut from the build:
   shadow between the hat's brim and the collar, with the two eyes glowing out of it. From behind, the collar rises
   over the nape.
 
+## Armour
+
+The dragoon is armoured from crest to sabaton, and every piece ends in a point. The cut pieces are outfit options
+in `body.js`, so they fit any build and pose. The rest are hand-drawn in `roster.js` and hang on landmarks.
+
+- **Cuirass** (`torso: 'dragon'`). A gorget at the neck, then a breastplate ridged down the middle and cut with
+  two chevrons that point down the ridge like overlapping scales. Below the belt is mail; behind, the same
+  pattern runs about the spine.
+- **Tassets** (`tassets: 3`). Plates hung below the hem over the thighs, four pixels to a plate, each cut down to a
+  point.
+- **Spiked sleeves** (`sleeves: { spike: true }`). A spike stands out and up from each elbow, and the gauntlet's
+  cuff flares a pixel outward. The gauntlets are black iron (`D`) under brass cuffs.
+- **Greaves** (`greaves: true`). The boots become plate. A knee cop stands forward of the knee, trimmed in gold
+  along its lower edge, with a spike thrown forward and up from its point; the sabatons are drawn out to a
+  pointed toe.
+- **Dagged cape** (`cloak: 'dagged'`). A short cape cut along its hem into sharp points like a wing, its folds
+  running down into them. From the front its edges and points show past the body and legs.
+- **Helm.** A dragon's head. In front, the snout juts forward past the face to a point, with an amber eye at the
+  stop and a nostril. Below it a gold-banded jaw hangs two bone fangs over the brow. A crest of black iron spikes
+  sweeps back along the skull, a bone horn sweeps back from the temple and up, and a cheek guard runs down to a
+  point. From behind, the crest runs down the middle as a spined ridge, horns curl up from both sides, and lames
+  close over the nape.
+- **Pauldrons.** Layered plates rimmed in gold, each thrown up into a spike: the near one rising beside the helm,
+  the far one pointing up and out past the shoulder.
+- **Colours.** Crimson-lacquered plate (`S`, close to the tiles' roof terracotta) with lighter greaves (`O`),
+  over grey mail (`A`, `P`). The crest, gauntlets and cape are black iron (`D`, `V`), with brass trim, bone horns
+  and fangs (`F`), an amber eye (`J`) and a gold tuft on the lance (`R`).
+
 ## Palette
 
 The figures are painted to sit in the tile set's palette (see [render/palette.js](../src/render/palette.js) and
 [tiles/terrain.js](../src/tiles/terrain.js)): pale, chalky colours on paper.
 
 - **Colours from the tiles.** Each job's colours are picked from the tile set's own: the tiles' gold (`#c9a24f`) for
-  every buckle, trim and hem; wax and roof reds; the slate of roofs and the carpet's dusty blue; the oak and pine
-  greens; plank browns.
+  every buckle, trim and hem; wax and roof reds, and the roofs' terracotta for the dragoon's plate; the slate of
+  roofs and the carpet's dusty blue; the oak and pine greens; plank browns.
 - **A wash toward the paper.** Before any shading, every colour loses over a quarter of its chroma and moves an eighth of
   the way toward the paper's lightness and warmth (`wash()` in `pixels.js`). The map's townsfolk are washed the
   same way.
@@ -147,7 +175,7 @@ the line.
 
 Four hairstyles, all drawn in locks, front and back:
 
-- **Short** (squire, knight, thief, lancer, white mage): a crown, a pointed fringe and points at the nape.
+- **Short** (squire, knight, thief, dragoon, white mage): a crown, a pointed fringe and points at the nape.
 - **Long** (summoner): falls behind the shoulders in vertical locks, its near lock beside the cheek.
 - **Ponytail** (archer): the short crown and fringe, gathered at the back of the head with a leather band. In
   front the tail stays hidden behind the head; from behind it falls down the back, over the quiver.
@@ -190,9 +218,15 @@ outward side. So a weapon sits in the fist on any build and in any pose, and sta
 - **Sword and dagger.** A crossguard under the fist and a two-pixel blade angling out from the body a pixel
   every three rows to a point, in its own bright steel (`Y`) so it never reads as more arm. The sword is ten rows
   long and the dagger three. The thief carries a dagger in each hand.
-- **Lance.** Carried at the ready: the shaft runs through the fist with its head raised forward and out, clear
-  of the helm, and its butt trails toward the ground behind the legs. A leaf-shaped steel head sits on a gold
-  socket with a red pennant tied below it. The slant tightens if the head would leave the frame.
+- **Lance** (the dragoon's). Carried at the ready: the shaft runs through the fist and its butt trails toward the
+  ground behind the legs. Its point is at the top of the frame, and the head leans forward and out of the body as
+  far as the frame allows (a pixel every four rows at most, steeper when the hand is near the edge), keeping a
+  column spare for the outline. From the point down:
+  - a long blade of bright steel (`Y`) with a ridge down its middle, narrowing at its neck;
+  - two barbed wings swept back from its base, on a gold socket;
+  - a tuft of horsehair splaying out beneath, in the job's accent (`R`);
+  - a leather grip wound about the shaft either side of the fist;
+  - a gold ferrule and a steel spike at the butt.
 - **Bow.** Held by its leather grip, with the limbs sweeping outward to the tips and the string straight
   between them, all clear of the body.
 - **Staves** (`staff()`: the valkyrie's spear and the mages' staves). A staff stands beside the fist with its foot
@@ -212,15 +246,16 @@ Every part is a hand-drawn grid of material letters (`K` skin, `H` hair, `A` mai
 on; the full list is at the top of `parts.js` and `roster.js`). Uppercase is the material as lit, lowercase
 the same material in a crease: a fold, a seam, the line between two plates.
 
-- **Body.** `body.js` cuts the torso (tunic, plate or robe), arms, legs or robe skirt and cloak for the build
-  and pose, and reports the landmarks.
+- **Body.** `body.js` cuts the torso (tunic, plate, robe, gown or the dragoon's cuirass), arms, legs (trousers,
+  greaves, or a robe or gown skirt) and cloak (plain or dagged) for the build and pose, and reports the
+  landmarks.
 - **Shared parts.** `parts.js` holds the head, two hairstyles and the gear: sword, dagger, lance, bow and a
   `staff()` maker for spears and staves, a kite shield and a buckler. `recolor()` swaps letters.
 - **Jobs.** `roster.js` gives each job a build, an outfit (torso and leg style, sleeves, gauntlets, vest,
-  strap, skirt, cloak), a palette, and parts in fixed slots, back to front: the cloak, things behind the body,
+  strap, skirt, tassets, greaves, cloak), a palette, and parts in fixed slots, back to front: the cloak, things behind the body,
   the far arm, legs, torso, what is worn over it, head, hair, hat, the near arm, a mantle, a staff and the fist
   that grips it, and what the other hand holds. Jobs draw their own headgear and anything unique (the hoods, the
-  archer's quiver, the black mage's shadow face).
+  archer's quiver, the black mage's shadow face, the dragoon's helm and pauldrons).
 - **Shading** (`pixels.js`). Each colour is washed toward the tiles' paper (see Palette), then becomes a five-step
   ramp in OKLCH, so pale and dark colours darken evenly. Highlights lean warm toward gold and shadows a touch cool.
   Each pixel's step comes from light at the upper left. The figure turns like a cylinder across its width, tops facing the sky catch light, and
@@ -268,7 +303,10 @@ It also checks that faces are solid two-tone shapes showing both whole eyes on e
 every weapon shows and sits in its fist and never shows through hair, the valkyrie's spear keeps clear of her helm, staves stay upright and reach the ground, the outline is dark all round,
 hair carries strand lines and sheen, and ramps darken step by step. The black mage must wear a gown to the floor
 with no trousers or belt, flaring to a trimmed hem with only toes beneath, bell sleeves, and a collar over his chin
-with both eyes still glowing. Every figure must stay within the tile set's palette: outlined in the tiles' ink, no
+with both eyes still glowing. The dragoon must carry no violet, wear crimson plate, have the spikiest silhouette
+in the roster in both views (the most pixels ending in a single neighbour), and carry its lance with the point at
+the top of the frame, a ridged blade, barbed wings about a gold socket, a tuft and a butt spike on every build.
+Every figure must stay within the tile set's palette: outlined in the tiles' ink, no
 pixel more saturated than the tiles' gold. Finally the walk steps stride, upright, stride, upright and encodes as
 a looping APNG, and the sheet encodes to a valid PNG.
 

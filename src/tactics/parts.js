@@ -230,17 +230,36 @@ function staff(head, rise, { lean = 0, behind = false } = {}) {
     return cellsToPart(cells);
   }) };
 }
-/* a lance carried at the ready: the shaft through the fist, its head raised forward and out a pixel every four
-   rows, its butt trailing toward the ground behind the legs, a pennant tied below the head */
+/* A dragoon's lance carried at the ready: the shaft through the fist, its point at the top of the frame and its
+   head leaning forward and out of the body, as far as the frame allows (a pixel every four rows at most), its
+   butt trailing toward the ground behind the legs. From the point down: a long blade of bright steel with a ridge
+   down its middle, narrowing at its neck; two barbed wings swept back from its base on a gold socket; a tuft of
+   horsehair in the job's accent splaying out beneath; a leather grip wound about the shaft either side of the fist; and a steel
+   spike at the butt behind a gold ferrule. */
+const LANCE_HEAD = [
+  '..Y..',
+  '..Y..',
+  '.YyY.',
+  '.YyY.',
+  '.YyY.',
+  '.YyY.',
+  '..Y..',
+  'SSGSS',
+  'S.G.S',
+  'S.G.S',
+  '.RRR.',
+  'RR.RR',
+  'R...R'];
 const LANCE = both(({ hand: [hx, hy], dir }) => {
-  const cells = [], at = y => hx + Math.round(dir * (hy - y) / 4);
-  let tip = 3; while (at(tip) < 1 || at(tip) > W - 2) tip++;
-  line(cells, at(hy + 12), Math.min(BASE - 1, hy + 12), at(tip + 5), tip + 5, 'T');
-  /* the pennant streams back from below the head */
-  for (let j = 0; j < 3; j++) for (let i = 1; i <= 4 - j; i++) cells.push([at(tip + 6 + j) - dir * i, tip + 6 + j, j === 2 && i === 1 ? 'r' : 'R']);
-  /* a leaf-shaped steel head over a gold socket */
-  cells.push([at(tip), tip, 'S']); for (const y of [tip + 1, tip + 2, tip + 3]) for (let i = -1; i <= 1; i++) cells.push([at(y) + i, y, 'S']);
-  cells.push([at(tip + 4), tip + 4, 'S'], [at(tip + 5) - 1, tip + 5, 'G'], [at(tip + 5), tip + 5, 'G'], [at(tip + 5) + 1, tip + 5, 'G']);
+  const cells = [], half = LANCE_HEAD[0].length >> 1, n = LANCE_HEAD.length, tip = 0;
+  const room = dir < 0 ? hx - half - 1 : W - 2 - half - hx, slope = Math.max(4, Math.ceil((hy - tip) / Math.max(1, room)));     /* a column spare for the outline */
+  const at = y => hx + Math.round(dir * (hy - y) / slope), foot = Math.min(BASE - 1, hy + 12);
+  line(cells, at(foot - 3), foot - 3, at(tip + n - 3), tip + n - 3, 'T');
+  LANCE_HEAD.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') cells.push([at(tip + j) + i - half, tip + j, ch]); }));
+  /* a leather grip wound about the shaft above and below the fist */
+  for (const y of [hy - 4, hy - 3, hy - 2, hy + 2, hy + 3, hy + 4]) cells.push([at(y), y, (y - hy) % 2 ? 'L' : 'l']);
+  /* the butt: a gold ferrule and a steel spike */
+  cells.push([at(foot - 2), foot - 2, 'G'], [at(foot - 1), foot - 1, 'S'], [at(foot), foot, 'S']);
   return cellsToPart(cells);
 });
 /* a longbow held by its grip in the fist, carried at the side with its limbs sweeping outward to recurved tips

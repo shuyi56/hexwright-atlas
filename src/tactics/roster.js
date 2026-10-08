@@ -173,44 +173,78 @@ const THIEF = {
         '........R.......'] } } }
 };
 
-const LANCER = {
-  id: 'lancer', name: 'Lancer', blurb: 'Dragon-crested and armoured in indigo: the lance that falls from the sky.',
-  body: 'tall', outfit: { torso: 'plate', sleeves: { A: 'S', C: 'S' }, hands: 'D', steady: true }, hair: HAIR_SHORT,
+/* The dragoon: a dragon helm, its snout jutting forward over the brow with two fangs beneath, a crest of spikes
+   swept back along its crown, a horn sweeping back from the temple, and a cheek guard down to a point; layered
+   pauldrons each thrown up into a spike; a ridged cuirass over mail with pointed tassets, spiked couters, flared
+   gauntlets, greaves with spiked knee cops and pointed sabatons; a short cape dagged into points like a wing; and
+   the winged lance (parts.js). Crimson-lacquered plate over black iron and mail, a black iron crest, gauntlets and
+   cape, brass trim, bone horns and fangs, an amber eye and a gold tuft on the lance. */
+const DRAGOON_PAULDRONS = {
+  armNear: { x: 19, y: 13, rows: [
+    '.......S.',
+    '......SS.',
+    '.....SSS.',
+    '..SSSSSS.',
+    '.SSSSSSSS',
+    'SSSSSSSS.',
+    'GGGGGGG..',
+    'SSSSSS...',
+    'sssss....'] },
+  armFar: { x: 3, y: 15, rows: [
+    'S......',
+    '.SS....',
+    '.SSSSS.',
+    'SSSSSSS',
+    '.GGGGGG',
+    '..SSSSS'] } };
+const DRAGOON = {
+  id: 'dragoon', name: 'Dragoon', blurb: 'Dragon-helmed and spiked from crest to sabaton: the lance that falls from the sky.',
+  body: 'standard', outfit: { torso: 'dragon', tassets: 3, greaves: true, cloak: 'dagged', sleeves: { A: 'S', C: 'G', spike: true }, hands: 'D', steady: true }, hair: HAIR_SHORT,
   weapon: LANCE,
-  pal: { K: SKIN, H: '#3e2e26', A: '#5f5a78', C: '#c9a24f', L: '#4a3526', G: '#c9a24f', P: '#76728f', O: '#55526b', S: '#8d8aa8', D: '#5c5874', T: '#6b4a30', R: '#b0503c', F: '#ece2cc', J: '#b0503c' },
+  pal: { K: SKIN, H: '#3e2e26', S: '#a0503f', D: '#3f3a3d', A: '#5d5a62', P: '#5d5a62', O: '#8c4a3d', C: '#c9a24f', G: '#c9a24f', L: '#4a3526', T: '#8a6238', R: '#c9a24f', V: '#34303a', F: '#e6dcc4', J: '#e0c060' },
   parts: {
     front: {
-      armNear: PAULDRONS.armNear, armFar: PAULDRONS.armFar,
-      hat: { x: 6, y: 0, rows: [
-        '...............FFF',
-        '........SSSS..FFF.',
-        '......SSSSSSSSFF..',
-        '.....SSSSSSSSSSF..',
-        '...SSJSSSSSSSSSSS.',
-        'SSSSSSSSSSSSSSSSS.',
-        '.sSSSSSSSSSSSSSSSS',
-        '...ssssssssssSSSSS',
-        '...S.........SSSSS',
-        '...S..........SSSS',
-        '...S..........SSS.',
-        '..............SSS.',
-        '..............SS..'] } },
+      armNear: DRAGOON_PAULDRONS.armNear, armFar: DRAGOON_PAULDRONS.armFar,
+      hat: { x: 2, y: 0, rows: [
+        '...........D...D...D......',
+        '..........DD..DD..DD.....F',
+        '........SDDSSDDSSDD.....FF',
+        '......SSSSSSSSSSSSS.....FF',
+        '.....SSSssssssssSSSS...FF.',
+        '.....SJJSSSSSSSSSSSSSFFF..',
+        '...SSSSSSSSSSSSSSSSFFFF...',
+        '..SsSSSsssssssssSSSSSS....',
+        '.SSSSSSSSSSSSSSSSSSSSS....',
+        '..sssGGGGGGGGGGGSSSSSS....',
+        '...F.F..........SSSSSS....',
+        '.................SSSSS....',
+        '.................SSSSS....',
+        '.................sssss....',
+        '.................SSSSS....',
+        '.................GSSS.....',
+        '.................GSS......',
+        '..................S.......'] } },
     back: {
-      armNear: PAULDRONS.armNear, armFar: PAULDRONS.armFar,
-      hat: { x: 7, y: 0, rows: [
-        '..FF.........FF..',
-        '..FF..SSSSS..FF..',
-        '...FSSSSSSSSSF...',
-        '...SSSSSJSSSSS...',
-        '..SSSSSSJSSSSSS..',
-        '.SSSSSSSJSSSSSSS.',
-        '.SSSSSSSJSSSSSSS.',
-        '.SSSSSSSSSSSSSSS.',
-        '.sssssssssssssss.',
-        '..SSSSSSSSS..SSS.',
-        '..SSSSSSSSS..SS..',
-        '...SSSSSSSS......',
-        '....SSSSSS.......'] } } }
+      armNear: DRAGOON_PAULDRONS.armNear, armFar: DRAGOON_PAULDRONS.armFar,
+      hat: { x: 4, y: 0, rows: [
+        '...........D............',
+        '..F........D............',
+        '..FF......DDD.......F...',
+        '...FF..SSSSDSSSS...FF...',
+        '...FFFSSSSDDDSSSSFFF....',
+        '....FFFSSSSDSSSSSFFF....',
+        '....SFFSSSSDSSSSSFFS....',
+        '....SSSSSSDDDSSSSSSSSS..',
+        '....SSSSSSSDSSSSSSSSSS..',
+        '....GGGGGGGGGGGGGGGGGs..',
+        '....SSSSSSSSSSSSSSSSF.F.',
+        '.....SSSSSSSSSSSSSS.....',
+        '.....ssssssssssssss.....',
+        '.....SSSSSSSSSSSSSS.....',
+        '......ssssssssssss......',
+        '.......SSSSSSSSSS.......',
+        '.........SSSSSS.........',
+        '...........SS...........'] } } }
 };
 
 const VALKYRIE = {
@@ -444,6 +478,6 @@ const SUMMONER = {
   parts: { front: { hat: SM_HOOD_FRONT, mantle: SM_LAPPETS }, back: { hat: SM_HOOD_BACK, mantle: SM_TAIL } }
 };
 
-const ROSTER = [SQUIRE, KNIGHT, ARCHER, THIEF, LANCER, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
+const ROSTER = [SQUIRE, KNIGHT, ARCHER, THIEF, DRAGOON, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
 
 export { BODIES, POSES, ROSTER, VIEWS, frame, palette, render };
