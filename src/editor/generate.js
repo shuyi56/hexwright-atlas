@@ -29,7 +29,14 @@ const BIOMES = {
   volcanic: { label: 'Ashlands', clim: 'arid', wl: -0.5, island: 0, relief: 4, peak: 2,
               ground: ['ash', 'rock', 'ash', 'scree'], high: ['rock', 'ash'], shore: 'ash', water: 'lava', deep: 'lava',
               town: ['ruin', 'ruin', 'mine', 'stonetower', 'keep', 'shrine'], road: 'dirt', square: 'flagstone',
-              trees: ['deadtree', 'deadtree', 'rocks'] }
+              trees: ['deadtree', 'deadtree', 'rocks'] },
+  /* the East Asian set: paddies terraced down every slope, a temple town on a crossroads */
+  terraces: { label: 'Terraced valley', clim: 'temperate', wl: -0.34, island: 0, river: true, relief: 5.5,
+              ground: ['grass', 'moss', 'tallgrass', 'meadow'], high: ['rock', 'moss', 'scree'], shore: 'shingle', water: 'water', deep: 'deep',
+              town: ['shophouse', 'shophouse', 'minka', 'teahouse', 'shophouse', 'courtyard', 'hall', 'bellhouse', 'pagoda', 'pavilion'], road: 'road', square: 'greybrick',
+              trees: ['gardenpine', 'bamboo', 'sakura', 'maple', 'gardenpine', 'bamboo', 'ginkgo', 'willow'], terraces: true,
+              centre: ['stonelantern', 'incense'], clutter: ['lanterns', 'stonelantern', 'ricebales', 'yatai', 'waterbasin', 'azalea'],
+              wild: ['pagoda', 'castle', 'bellhouse', 'pavilion', 'stonelantern'], scatter: ['rocks', 'azalea', 'boulders', 'stonelantern'], waterPlant: 'lotus', boat: 'sampan' }
 };
 
 function generateScene(seed, S, biome = 'vale') {
@@ -88,7 +95,7 @@ function generateScene(seed, S, biome = 'vale') {
   const arm = Math.floor(S * 0.32);
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) paveRun(tx + dx, ty + dy, dx, dy, arm + Math.floor(rng() * 4));
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(tx + dx, ty + dy)) { const u = id(tx + dx, ty + dy); M.elev[u] = te; M.terr[u] = TI[B.square]; road[u] = 1; wet[u] = 0; }
-  road[best] = 0; place(B.oasis ? 'statue' : pick(['well', 'statue', 'well']), tx, ty, 0, false); road[best] = 1;
+  road[best] = 0; place(B.centre ? pick(B.centre) : B.oasis ? 'statue' : pick(['well', 'statue', 'well']), tx, ty, 0, false); road[best] = 1;
   /* buildings line the roads, doors toward the street */
   let nb = 0; const target = Math.round(S * 0.9);
   for (let ring = 1; ring < arm + 3 && nb < target; ring++) {
@@ -104,7 +111,7 @@ function generateScene(seed, S, biome = 'vale') {
     }
   }
   /* street clutter */
-  for (let j = 0; j < S; j++) { const x = tx + Math.floor((rng() - 0.5) * arm * 2), y = ty + Math.floor((rng() - 0.5) * arm * 2); if (!inb(x, y) || road[id(x, y)] || wet[id(x, y)]) continue; let near = false; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inb(x + dx, y + dy) && road[id(x + dx, y + dy)]) near = true; if (near) place(pick(B.clim === 'arid' ? ['barrels', 'crates', 'campfire', 'stall'] : ['barrels', 'crates', 'lamppost', 'stall', 'cart', 'signpost', 'beehives']), x, y); }
+  for (let j = 0; j < S; j++) { const x = tx + Math.floor((rng() - 0.5) * arm * 2), y = ty + Math.floor((rng() - 0.5) * arm * 2); if (!inb(x, y) || road[id(x, y)] || wet[id(x, y)]) continue; let near = false; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inb(x + dx, y + dy) && road[id(x + dx, y + dy)]) near = true; if (near) place(pick(B.clutter || (B.clim === 'arid' ? ['barrels', 'crates', 'campfire', 'stall'] : ['barrels', 'crates', 'lamppost', 'stall', 'cart', 'signpost', 'beehives'])), x, y); }
   /* farms around the village */
   if (B.farm) {
     for (let f = 0; f < 4; f++) {
@@ -115,6 +122,17 @@ function generateScene(seed, S, biome = 'vale') {
       for (let x = fx; x < fx + w; x++) if (inb(x, fy + d) && !road[id(x, fy + d)]) place('fence', x, fy + d, 0);
     }
   }
+  /* terraces: rice on the low slopes, stepping with the land, a farmhouse and bales among them; a shrine gate on one road */
+  if (B.terraces) {
+    for (let u = 0; u < NN; u++) {
+      const x = u % S, y = (u / S) | 0;
+      if (wet[u] || road[u] || M.elev[u] > 3 || Math.hypot(x - tx, y - ty) < arm * 0.45 || objs.some(o => o.x === x && o.y === y) || nz2(x / 7 + 3, y / 7 - 2) < -0.15) continue;
+      M.terr[u] = TI[nz3(x / 4, y / 4) > 0.35 ? 'riperice' : 'paddy'];
+    }
+    for (let f = 0; f < 4; f++) { const a = rng() * Math.PI * 2, r = arm * 0.8 + rng() * S * 0.15, fx = Math.round(tx + Math.cos(a) * r), fy = Math.round(ty + Math.sin(a) * r); if (place('minka', fx, fy)) place('ricebales', fx + 2, fy); }
+    const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(rng() * 4)], gx = tx + dx * (arm - 2), gy = ty + dy * (arm - 2);
+    if (inb(gx, gy) && road[id(gx, gy)]) place('torii', gx, gy, dx ? 1 : 0, false);
+  }
   /* harbour: a jetty into the sea with boats */
   if (B.harbour) {
     let bw = -1, bd = 1e9; for (let u = 0; u < NN; u++) { if (!wet[u]) continue; const d = Math.hypot(u % S - tx, ((u / S) | 0) - ty); if (d < bd) { bd = d; bw = u; } }
@@ -122,18 +140,18 @@ function generateScene(seed, S, biome = 'vale') {
     for (let j = 0; j < 300; j++) { const u = Math.floor(rng() * NN), x = u % S, y = (u / S) | 0; if (wet[u] || road[u] || Math.hypot(x - tx, y - ty) < arm * 0.6) continue; if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ddx, ddy]) => inb(x + ddx, y + ddy) && wet[id(x + ddx, y + ddy)])) continue; if (place('lighthouse', x, y, 0)) break; }
   }
   /* landmarks out in the wilds */
-  const wild = B.clim === 'cold' ? ['stones', 'stonetower', 'ruin'] : B.clim === 'arid' ? ['obelisk', 'ruin', 'stones', 'mine'] : ['stones', 'ruin', 'windmill', 'watchtower'];
+  const wild = B.wild || (B.clim === 'cold' ? ['stones', 'stonetower', 'ruin'] : B.clim === 'arid' ? ['obelisk', 'ruin', 'stones', 'mine'] : ['stones', 'ruin', 'windmill', 'watchtower']);
   for (let j = 0, n = 0; j < 200 && n < 3; j++) { const x = Math.floor(rng() * (S - 2)), y = Math.floor(rng() * (S - 2)); if (Math.hypot(x - tx, y - ty) < arm + 2) continue; if (place(pick(wild), x, y)) n++; }
   /* nature by ground */
   for (let u = 0; u < NN; u++) {
     if (road[u]) continue;
     const x = u % S, y = (u / S) | 0, T = M.terr[u], forest = nz3(x / 6 + 11, y / 6 - 4);
-    if (wet[u]) { if ((T === TI.shallows || T === TI.swamp) && rng() < 0.25) place('reeds', x, y, 0, false); continue; }
+    if (wet[u]) { if ((T === TI.shallows || T === TI.swamp) && rng() < 0.25) place(B.waterPlant || 'reeds', x, y, 0, false); else if (B.boat && T === TI.water && rng() < 0.03) place(B.boat, x, y, Math.floor(rng() * 4), false); continue; }
     if (Math.hypot(x - tx, y - ty) < 2.5) continue;
     if (T === TI.marsh || T === TI.mud) { if (rng() < 0.3) place(pick(['reeds', 'reeds', 'deadtree', 'mushrooms']), x, y); continue; }
     const p = forest > 0.25 ? 0.6 : forest > 0.1 ? 0.18 : 0.04;
     if (rng() < p) { place(pick(B.trees), x, y); continue; }
-    if (rng() < 0.03) place(pick(B.clim === 'arid' ? ['rocks', 'boulders', 'cactus'] : B.clim === 'cold' ? ['rocks', 'boulders', 'stump'] : ['rocks', 'boulders', 'bush', 'flowers', 'stump', 'logpile', 'mushrooms']), x, y);
+    if (rng() < 0.03) place(pick(B.scatter || (B.clim === 'arid' ? ['rocks', 'boulders', 'cactus'] : B.clim === 'cold' ? ['rocks', 'boulders', 'stump'] : ['rocks', 'boulders', 'bush', 'flowers', 'stump', 'logpile', 'mushrooms'])), x, y);
   }
   return M;
 }

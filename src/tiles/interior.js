@@ -262,4 +262,4 @@ const FURNITURE = [
 for (const a of INTERIOR) a.shade = a.id === 'hearth' || a.id === 'stairs' ? 0.12 : 0.38;
 for (const a of FURNITURE) a.shade = 0.16;
 
-export { FURNITURE, INTERIOR };
+export { FURNITURE, INTERIOR, WALL_H, axisOf, flame, frame, glow, run };

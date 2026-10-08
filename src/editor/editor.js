@@ -377,9 +377,11 @@ const thumbs = new Map();
 function buildPalette() {
   const box = $('edItems'); box.textContent = '';
   if (ED.tab === 'Characters') { buildCharacters(box); return; }
-  const groups = ED.tab === 'Terrain' ? [...new Set(TERRAIN.map(t => t.group))].map(gn => [gn, TERRAIN.filter(t => t.group === gn), 'terrain']) : [[ED.tab, ASSET_GROUPS.find(a => a[0] === ED.tab)[1], 'asset']];
+  /* the Terrain tab is headed by ground group; an asset tab whose pieces carry sections (East Asia) by section */
+  const list = ED.tab === 'Terrain' ? null : ASSET_GROUPS.find(a => a[0] === ED.tab)[1], secs = list ? [...new Set(list.map(a => a.section).filter(Boolean))] : [];
+  const groups = !list ? [...new Set(TERRAIN.map(t => t.group))].map(gn => [gn, TERRAIN.filter(t => t.group === gn), 'terrain']) : secs.length ? secs.map(sn => [sn, list.filter(a => a.section === sn), 'asset']) : [[ED.tab, list, 'asset']];
   for (const [gn, items, kind] of groups) {
-    if (ED.tab === 'Terrain') { const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h); }
+    if (!list || secs.length) { const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h); }
     const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
     for (const it of items) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-item'; b.dataset.kind = kind; b.dataset.id = it.id; b.title = it.label + (kind === 'asset' && (it.w > 1 || it.d > 1) ? ` (${it.w}×${it.d})` : '');

@@ -7,10 +7,10 @@ isometric district map.
 ## Tile editor
 
 The **Tile editor** button opens an isometric workbench built on the same tile set as the city
-districts. Paint 34 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
+districts. Paint 43 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
 turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
-builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
-fenland, ashlands). On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
+builds a starting scene for one of seven lands (river vale, island harbour, desert oasis, frozen fells,
+fenland, ashlands, terraced valley). On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
 generated from the atlas: its biome blended into its neighbours', coast or lake shore on the sides that touch
 water, rivers and roads crossing the same sides as on the map, farmland, and the village, town, keep, ruin or
 other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter
@@ -28,6 +28,33 @@ dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
   bookshelf, a dresser, a writing desk, a counter, a cooking pot, a wash tub, a candle stand, a potted plant, a
   throne, an altar, a pew, a weapon rack and a spinning wheel. Each is drawn in its own frame, so `R` turns it
   to face any of the four ways and turning the view shows its back.
+
+### East Asian set
+
+The **East Asia** tab holds a set of East Asian buildings, props, plants and room pieces, headed by section. The
+Terrain tab has an **East Asia** group of grounds to go with it.
+
+- **Buildings:** a thatched farmhouse, a teahouse, a two-storey shophouse with lanterns and a door curtain, a temple
+  hall on a stone podium, a five-storey pagoda, a castle keep on a battered stone base, a walled courtyard house,
+  a bell pavilion, a garden pavilion and a memorial archway. Their roofs are hipped, half-hipped or gabled with the
+  eaves swept up at the corners (`eaveRoof` in `src/tiles/east.js`).
+- **Props:** a shrine gate, a stone lantern, a line of paper lanterns, an incense burner, guardian lions, rice
+  bales, a bamboo fence, a stone basin, a street stall, and on water an arched bridge and a sampan.
+- **Plants:** cherry blossom, red maple, ginkgo, a cloud-pruned garden pine, a bamboo grove, a weeping willow,
+  clipped azaleas, and lotus on water.
+- **Interior:** a paper screen wall (it joins the other room pieces), a low table, a futon, a folding screen, a
+  scroll alcove and a charcoal brazier.
+- **Ground:** rice paddy, ripening rice, tea rows, raked gravel, moss, stepping stones, grey brick paving, tatami
+  and a koi pond. A paddy lies one unit below its bank, so paddies laid over a hillside step down it in terraces.
+
+Characters walk through the shrine gate and the memorial archway like a doorway. The arched bridge is scenery:
+characters cross water on planking, as on the other maps. **Generate** with the **Terraced valley** land builds a
+scene from the set: paddies on the low slopes, a temple town of shophouses, halls and pagodas around a crossroads,
+a shrine gate across one road, farmhouses among the fields, and lotus and sampans on the river.
+
+![The East Asian set](docs/images/east-asian-set.png)
+
+![A terraced valley](docs/images/terraced-valley.png)
 
 ### Storeys
 
@@ -223,7 +250,8 @@ src/
                       (relief, trees, terrain, settlements, rivers/roads, base compositor)
   city/               City districts: generation, architecture solids, 2.5D rendering
   tiles/              Shared isometric tile set: terrain tiles, buildings, props and nature,
-                      drawn procedurally with a small iso kit (used by the city view and the editor)
+                      drawn procedurally with a small iso kit (used by the city view and the editor),
+                      and the East Asian set (east.js)
   characters/         Characters: pixel engine, body builds, shared parts, the townsfolk and the jobs, drawing
                       them on the map, the sprite sheet layout and its pixel font
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,

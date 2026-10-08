@@ -2,6 +2,7 @@ import { R, TAU } from '../core/geometry.js';
 import { GOLD, INK, ROOFS, WAX } from '../render/palette.js';
 import { drawSettlement } from '../render/settlements.js';
 import { drawPalm, drawPine, drawSnag, drawTree, mixHex } from '../render/trees.js';
+import { EAST } from './east.js';
 import { FURNITURE, INTERIOR } from './interior.js';
 import { shade } from './kit.js';
 
@@ -359,7 +360,7 @@ const NATURE = [
   { id: 'rocks', label: 'Rocks', w: 1, d: 1, h: 3, draw(K, o) { for (let k = 0; k < 3; k++) stone(K, o.x0 + 0.2 + o.r() * 0.6, o.y0 + 0.2 + o.r() * 0.6, o.z, 1.6 + o.r() * 1.2, 1.8 + o.r(), mixHex('#bdb39d', '#8a8070', o.r() * 0.5)); } }
 ];
 
-const ASSET_GROUPS = [['Buildings', [...BUILDINGS, ...CIVIC]], ['Props', PROPS], ['Nature', NATURE], ['Interior', [...INTERIOR, ...FURNITURE]]];
+const ASSET_GROUPS = [['Buildings', [...BUILDINGS, ...CIVIC]], ['Props', PROPS], ['Nature', NATURE], ['Interior', [...INTERIOR, ...FURNITURE]], ['East Asia', EAST]];
 const ASSETS = ASSET_GROUPS.flatMap(([, list]) => list);
 for (const [grp, list] of ASSET_GROUPS) for (const a of list) a.group = grp;
 const ASSET_BY_ID = Object.fromEntries(ASSETS.map(a => [a.id, a]));
