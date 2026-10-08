@@ -28,26 +28,36 @@ function profile(bt) {
 
 /* ---------- arms ----------
    An arm hangs from a fixed shoulder: a rounded cap, the upper arm overlapping the body's edge by a column, an
-   elbow where it steps a pixel further out, the forearm, a cuff and a fist. In a stride it swings from the shoulder: the forearm and hand
-   reach forward (toward the facing) or trail back, and rise a row as the arm leaves the vertical. Forward on
-   screen is left in the front view and right in the back view. */
+   elbow where it steps a pixel further out, the forearm, a cuff and a fist. In a stride it swings from the
+   shoulder like a pendulum, against the leg on its side: the leading arm leans forward (toward the facing) until
+   its hand is three pixels ahead and two rows up, the trailing arm leans back until its hand is two pixels
+   behind and a row up. Forward on screen is left in the front view and right in the back view, so in front the
+   leading near arm crosses before the body. A far arm swinging in behind the body moves only a pixel: it is
+   turning away from the viewer, and it keeps what it holds in sight. */
+const SWING = { fwd: [3, 2], back: [-2, 1] };                                   /* [hand reach toward the facing, rows it rises] */
 function armPlan(bt, view, pose, side, steady) {
   const { rows } = profile(bt), w = bt.arm, s = side === 'near' ? 1 : -1, dir = view === 'front' ? -1 : 1;
   /* a hand carrying a staff or polearm keeps it upright: that arm rides with the body but does not swing */
   if (steady && side === (view === 'front' ? 'far' : 'near')) pose = 0;
   const edge = s > 0 ? rows[2][1] : rows[2][0];
-  const fwd = pose && (pose === 1) === (side === 'near'), sx = !pose ? 0 : fwd ? 2 * dir : -dir;
+  const fwd = pose && (pose === 1) === (side === 'near'), [reach, rise] = !pose ? [0, 0] : SWING[fwd ? 'fwd' : 'back'];
+  const sx = s < 0 && reach * dir > 0 ? 1 : reach * dir;
   const upper = s > 0 ? edge : edge - w + 1, lower = upper + s;                 /* left column of each section */
-  const cuff = bt.torso - 4 - (sx ? 1 : 0);
-  return { w, s, dir, upper, lower, sx, cuff, hand: bt.hand };
+  const cuff = bt.torso - 4 - rise;
+  /* how far row j has leaned: nothing at the shoulder cap, the full reach at the cuff */
+  const lean = j => (j < 1 ? 0 : Math.round(sx * j / cuff));
+  return { w, s, dir, upper, lower, sx, cuff, lean, hand: bt.hand };
 }
 function armPart(bt, view, pose, side, top, o = {}) {
   const sl = o.sleeves || {}, sleeve = sl.A || 'A', cuffL = sl.C || 'C', skin = o.hands || 'K';
   const a = armPlan(bt, view, pose, side, o.steady), cells = [];
   const put = (x, y, ch) => cells.push([x, y, ch]);
   for (let j = 0; j <= a.cuff; j++) {
-    const elbow = j >= 5, x0 = (elbow ? a.lower : a.upper) + (j > 5 ? a.sx : j === 5 ? Math.trunc(a.sx / 2) : 0);
-    const n = j === 0 ? a.w - 1 : a.w, from = j === 0 && a.s < 0 ? x0 + 1 : x0;
+    const elbow = j >= 5, x0 = (elbow ? a.lower : a.upper) + a.lean(j);
+    let n = j === 0 ? a.w - 1 : a.w, from = j === 0 && a.s < 0 ? x0 + 1 : x0;
+    /* a bell sleeve widens below the elbow: a pixel outward over the forearm, and both ways at its mouth */
+    if (sl.bell && j >= a.cuff - 2) { n++; if (a.s < 0) from--; }
+    if (sl.bell && j === a.cuff) { n++; if (a.s > 0) from--; }
     for (let i = 0; i < n; i++) {
       const x = from + i, inner = a.s > 0 ? i === 0 : i === n - 1;
       put(x, top + j, j === a.cuff ? cuffL : inner && j > 0 && j < 5 ? sleeve.toLowerCase() : sleeve);
@@ -84,6 +94,32 @@ function pantsCells(bt, view, pose) {
   cells.push([CX, y0 + 2, 'P']);                                                 /* the crotch tapers a row */
   return cells;
 }
+/* A gown: one garment from the chest to the floor, no waist. It flares as it falls in an A-line from the lower
+   chest, its folds fanning out from the middle toward the hem, and ends in a trimmed hem with only the toes
+   showing beneath. In front the robe's overlap runs down its middle as a fold; behind, a seam. In a stride the
+   hem swings: the leading foot kicks it forward and the back of it pulls in, and the lifted foot is hidden. */
+const GOWN_FLARE = 2.6;
+function gownCells(bt, view, pose) {
+  const { dir, legs, y0 } = legGeometry(bt, view, pose), cells = [], hemY = BASE - 1, n = hemY - y0 + 1, front = view === 'front';
+  for (let j = 0; j < n; j++) {
+    const t = n > 1 ? j / (n - 1) : 1, flare = Math.round(GOWN_FLARE * t ** 1.4), y = y0 + j, hem = j === n - 1;
+    let [l, r] = span(bt.chest + 2 + 2 * flare);
+    if (pose && t > 0.45) { if (dir < 0) l--; else r++; }                          /* the leading edge swings out */
+    if (pose && j >= n - 2) { if (dir < 0) r--; else l++; }                        /* the trailing hem pulls in */
+    const mid = front ? fc + 1 : fc, d = 3 + Math.round(t ** 1.6 * ((r - l) / 2 - 6)), folds = [mid - d, mid + d];
+    for (let x = l; x <= r; x++) {
+      if (hem && (x === l || x === r)) continue;                                   /* the hem rounds off at its corners */
+      cells.push([x, y, hem ? 'C' : x === mid || folds.includes(x) ? 'a' : 'A']);
+    }
+  }
+  /* the toes beneath the hem, turned toward the facing */
+  for (const [[a, b], { dx, lift }] of legs) {
+    if (lift) continue;
+    const l = a + dx + dir, r = b + dx + dir;
+    for (let x = dir < 0 ? l : Math.max(l, r - 2); x <= (dir < 0 ? Math.min(r, l + 2) : r); x++) cells.push([x, BASE, 'O']);
+  }
+  return cells;
+}
 function robeCells(bt, view, pose, teeth) {
   const { dir, legs, y0 } = legGeometry(bt, view, pose), cells = [], hemY = BASE - 3, rows = hemY - y0 + 1;
   for (let j = 0; j < rows; j++) {
@@ -118,9 +154,18 @@ const TORSO = {
     : j === t.belt - 1 ? 's' : t.front ? (x === fc + 1 && j >= 1 ? 's' : 'S') : (x === fc && j >= 2 && j <= 4 ? 's' : 'S')),
   robe: (j, x, t) => (t.front
     ? (j === 0 && x >= fc - 1 && x <= fc + 2) || (j === 1 && (x === fc || x === fc + 1)) ? 'C' : j === t.belt ? (x === fc ? 'G' : 'L') : x === fc + 1 && j >= 2 ? 'C' : 'A'
-    : j === t.belt ? 'L' : x === fc && j >= 3 && j !== t.belt ? 'a' : 'A') };
+    : j === t.belt ? 'L' : x === fc && j >= 3 && j !== t.belt ? 'a' : 'A'),
+  /* the bodice of a gown: no belt; in front a trimmed neckline, the robe's overlap running down the middle as a
+     fold, and a fold either side below the chest that the skirt's folds carry on; behind, a seam down the back */
+  gown: (j, x, t) => (t.front
+    ? (j === 0 && x >= fc - 1 && x <= fc + 2) || (j === 1 && (x === fc || x === fc + 1)) ? 'C' : j >= 2 && x === fc + 1 ? 'a' : j > t.belt && (x === fc - 2 || x === fc + 4) ? 'a' : 'A'
+    : x === fc && j >= 2 ? 'a' : 'A') };
+/* a gown hangs straight from the chest instead of taking in at the waist, and widens a pixel either side over its
+   last rows (beside the hands, clear of them), so the skirt's flare runs on from it */
+const GOWN_ROWS = (bt, rows) => rows.map((s, j) => (j < 2 ? s : span(bt.chest + (j >= bt.torso - 3 ? 2 : 0))));
 function torsoCells(bt, view, top, o = {}) {
-  const { rows, belt } = profile(bt), T = bt.torso, front = view === 'front', style = TORSO[o.torso || 'tunic'], cells = [], [cl, cr] = rows[2];
+  const p = profile(bt), rows = o.torso === 'gown' ? GOWN_ROWS(bt, p.rows) : p.rows, { belt } = p;
+  const T = bt.torso, front = view === 'front', style = TORSO[o.torso || 'tunic'], cells = [], [cl, cr] = rows[2];
   rows.forEach(([l, r], j) => {
     for (let x = l; x <= r; x++) {
       let ch = style(j, x, { T, belt, front });
@@ -156,7 +201,7 @@ function measure(type, view, pose, o = {}) {
     bt, top,
     parts: {
       torso: cellsToPart(torsoCells(bt, view, top, o)),
-      legs: cellsToPart(o.legs === 'robe' ? robeCells(bt, view, pose, o.teeth) : pantsCells(bt, view, pose)),
+      legs: cellsToPart(o.legs === 'gown' ? gownCells(bt, view, pose) : o.legs === 'robe' ? robeCells(bt, view, pose, o.teeth) : pantsCells(bt, view, pose)),
       armNear: cellsToPart(near.cells), armFar: cellsToPart(far.cells), fistNear: cellsToPart(near.fist), fistFar: cellsToPart(far.fist),
       cloak: o.cloak ? cellsToPart(cloakCells(bt, view, top)) : null },
     at: { head: [9, top - 14], neck: [CX, top], shoulderNear: [rows[2][1], top], shoulderFar: [rows[2][0], top], handNear: near.hand, handFar: far.hand } };

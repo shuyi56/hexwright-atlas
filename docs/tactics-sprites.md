@@ -2,10 +2,13 @@
 
 A second character style, built from scratch and separate from the map's townsfolk (see
 [character-design.md](character-design.md)). It follows the squad tacticians of the 1990s, Final Fantasy
-Tactics and Tactics Ogre: chunky, big-headed figures that read by silhouette across a battlefield, painted in
-hue-shifted ramps with a dark umber outline. The code lives in `src/tactics/`.
+Tactics and Tactics Ogre: chunky, big-headed figures that read by silhouette across a battlefield. They are painted
+in the tile set's own soft, chalky palette with gently hue-shifted ramps and an outline in the tiles' umber ink, so
+they belong on the editor's ground. The code lives in `src/tactics/`.
 
-![The nine jobs in all four facings, standing and in both strides, then every job in every build](images/tactics-sprite-sheet.png)
+![The nine jobs in all four facings, standing and in both strides, each on the editor's grass tile, then every job in every build](images/tactics-sprite-sheet.png)
+
+![The nine jobs walking in all four facings: stride, upright, the other stride, upright](images/tactics-walk.png)
 
 ## The roster
 
@@ -19,7 +22,7 @@ Each job has a default build (in brackets below); any job can be drawn in any of
 | Thief (slim) | A red bandana with trailing knot, a red scarf, a dark leather vest over slate, a dagger in each hand. |
 | Lancer (tall) | An indigo dragon helm with a snout and swept-back horns, indigo plate, a lance carried at the ready flying a red pennant. |
 | Valkyrie (tall) | A winged silver helm, gold hair in a low braided bun, plate over crimson skirts, a spear and a round buckler. |
-| Black Mage (stocky) | A wide-brimmed pointed hat with a flopped tip, a face of pure shadow with two glowing eyes, a blue robe, a crooked staff. |
+| Black Mage (stocky) | A wide-brimmed pointed hat with a flopped tip, a face of pure shadow with two glowing eyes over a high collar, a floor-length blue robe flaring to a gold hem with only his toes beneath, wide bell sleeves, a crooked staff. |
 | White Mage (slim) | A white cowl whose peak droops back like a nightcap, a red band framing her face, a mantle and robe hemmed in red teeth, a staff with a red orb in a gold cup. |
 | Summoner (standard) | A moss-green cowl banded in gold with a jewel at the brow, ram's horns curling from its temples, gold-edged lappets down her chest and a long tail down her back; a rod with a blue crystal in bone claws. |
 
@@ -34,7 +37,8 @@ Each job has a default build (in brackets below); any job can be drawn in any of
   shoulder on the right, so a weapon in the right hand is on the far side from the front and the near side from
   behind, and a shield on the left arm the other way round.
 - **Poses.** Standing and two strides. In a stride the body drops a pixel, one leg reaches forward and the other
-  lifts its heel, and each arm swings against its leg; held weapons and shields move with their hand.
+  lifts its heel, and each arm swings against its leg; held weapons and shields move with their hand. Played
+  stride, standing, the other stride, standing, they make a four-beat walk (see Walking below).
 
 ## Body types
 
@@ -47,8 +51,8 @@ Four builds, set by a handful of measurements in `body.js` (`BODY_TYPES`):
 | Stocky | 12, 9 | 14, 13 | 5, 4 | −3 |
 | Tall | 14, 15 | 13, 11 | 4, 3 | +5 |
 
-- **Generated body.** The torso, arms, legs, robe skirts and cloaks are cut from these numbers rather than drawn
-  as fixed grids. Clothing is a set of rules over the cut shape: where the collar, belt, breastplate ridge or
+- **Generated body.** The torso, arms, legs, robe skirts, gowns and cloaks are cut from these numbers rather than
+  drawn as fixed grids. Clothing is a set of rules over the cut shape: where the collar, belt, breastplate ridge or
   robe panel falls, an open vest, a strap from shoulder to hip, a skirt carried below the hem, a vandyked
   robe hem.
 - **Hung on landmarks.** The hand-drawn parts (heads, hair, hats, hoods, quivers, scarves, pauldrons, weapons,
@@ -66,10 +70,64 @@ Four builds, set by a handful of measurements in `body.js` (`BODY_TYPES`):
   on the side the figure faces. A slim build has two-pixel arms and fists.
 - **Reading as limbs.** The arm sits in front of the body as its own piece, so it gets a contour line. Below
   the elbow a gap opens between forearm and waist. Both hands hang clear of the body on every build.
-- **Swing.** In a stride each arm swings from the shoulder. The leading arm's hand reaches two pixels toward the
-  facing, the trailing one falls back a pixel, and both rise a row as the arm leaves the vertical. The shoulder
-  only rides down with the body. An arm carrying a staff or polearm stays upright and does not swing.
+- **Swing.** See Walking below. The shoulder only rides down with the body. An arm carrying a staff or polearm
+  stays upright and does not swing.
 - **Materials.** Gauntlets take their own darker steel (`D`) against plate sleeves.
+
+## Walking
+
+The arms walk with the legs. In each stride every free arm swings from its shoulder like a pendulum, against the leg
+on its side: in the first stride the far leg steps forward and the near arm leads; in the second, the other way
+round.
+
+- **Leading arm.** It leans forward, toward the facing, a little more each row from the shoulder cap down, until its
+  hand is three pixels ahead and two rows up: the arm rises as it leaves the vertical, and its hand rises even
+  though the body drops.
+- **Trailing arm.** It leans back until its hand is two pixels behind and a row up.
+- **In three-quarter view.** Forward is left on screen in the front view and right from behind. So in front the
+  leading near arm crosses before the body, and on the next stride the near arm swings out behind while the far arm
+  swings out ahead. A far arm swinging in behind the body moves only a pixel, since it is turning away from the
+  viewer, and so a sword or dagger in that hand stays in sight.
+- **What moves with it.** Fists, held weapons, shields and sleeves go with the arm; a bow narrows its sweep if the
+  swing would carry it out of the frame. Staves and polearms are held steady and planted, so that arm only bobs with
+  the body.
+- **The cycle.** `WALK` in `sheet.js` is the order a game plays the frames in: stride, upright, the other stride,
+  upright. `docs/images/tactics-walk.png` is the roster walking in place in all four facings, an animated PNG at
+  170 ms a beat.
+
+## Robes
+
+Two kinds of long garment, both cut from the build:
+
+- **Robe** (white mage, summoner). A tunic-cut bodice belted at the waist over a skirt to the ankles, with the shoes
+  below it. The white mage's skirt is hemmed in red teeth.
+- **Gown** (black mage). One garment from the shoulders to the floor with no belt and no waist. It hangs straight
+  from the chest and flares from the lower chest in an A-line, its folds fanning out from the middle toward the
+  hem. The robe's overlap runs down the front as a fold, and a seam runs down the back. The hem is trimmed in gold
+  and rounds off at its corners, with only the toes showing beneath it. The sleeves are bell sleeves (`sleeves:
+  { bell: true }`), widening below the elbow to a trimmed mouth with the gloved hand beneath. In a stride the hem
+  swings: the leading foot kicks it forward, the back of it pulls in, and the lifted foot is hidden.
+- **The black mage's collar.** A high collar stands up round his jaw and closes over his chin. His face is a band of
+  shadow between the hat's brim and the collar, with the two eyes glowing out of it. From behind, the collar rises
+  over the nape.
+
+## Palette
+
+The figures are painted to sit in the tile set's palette (see [render/palette.js](../src/render/palette.js) and
+[tiles/terrain.js](../src/tiles/terrain.js)): pale, chalky colours on paper.
+
+- **Colours from the tiles.** Each job's colours are picked from the tile set's own: the tiles' gold (`#c9a24f`) for
+  every buckle, trim and hem; wax and roof reds; the slate of roofs and the carpet's dusty blue; the oak and pine
+  greens; plank browns.
+- **A wash toward the paper.** Before any shading, every colour loses over a quarter of its chroma and moves an eighth of
+  the way toward the paper's lightness and warmth (`wash()` in `pixels.js`). The map's townsfolk are washed the
+  same way.
+- **Gentle ramps.** The five shading steps are close together, like the tiles' lit and shaded faces. Highlights
+  warm a little toward gold; shadows turn only slightly cool, so they stay in the tiles' warm family.
+- **The tiles' ink.** The outline and every line inside the figure are mixed toward the tiles' umber ink (`INK`,
+  `#2b2116`), and the inner lines are lighter than the outline, so the figures read as softly as the tiles.
+- **Checked.** No pixel of any figure is more saturated than the tiles' gold, and each figure's average chroma
+  stays well under it.
 
 ## Faces
 
@@ -163,12 +221,12 @@ the same material in a crease: a fold, a seam, the line between two plates.
   the far arm, legs, torso, what is worn over it, head, hair, hat, the near arm, a mantle, a staff and the fist
   that grips it, and what the other hand holds. Jobs draw their own headgear and anything unique (the hoods, the
   archer's quiver, the black mage's shadow face).
-- **Shading** (`pixels.js`). Each colour becomes a five-step ramp in OKLCH, so pale and dark colours darken
-  evenly. Highlights lean warm toward gold and shadows cool toward violet. Each pixel's step comes from light at
-  the upper left. The figure turns like a cylinder across its width, tops facing the sky catch light, and
+- **Shading** (`pixels.js`). Each colour is washed toward the tiles' paper (see Palette), then becomes a five-step
+  ramp in OKLCH, so pale and dark colours darken evenly. Highlights lean warm toward gold and shadows a touch cool.
+  Each pixel's step comes from light at the upper left. The figure turns like a cylinder across its width, tops facing the sky catch light, and
   anything tucked under hair, a brim or a belt falls into shade.
 - **Line work.** Solid ink throughout, in strengths set by `INK` in `pixels.js`:
-  - **Outline:** a near-black umber all round, only a touch warmer above and to the left where the light falls.
+  - **Outline:** the tiles' umber ink all round, only a touch warmer above and to the left where the light falls.
     Diagonal corners are left open so curves stay round.
   - **Contours:** where one part stands in front of another (an arm against the body), the part behind gets a
     dark line. The head, its hair and its hat count as one piece, as do a torso and what is worn over it.
@@ -178,30 +236,41 @@ the same material in a crease: a fold, a seam, the line between two plates.
     edges, so faces stay clean and the hair or brim beside them carries the line.
   - **Creases:** lowercase letters (folds, seams, the ridge of a breastplate) are inked as lines rather than
     shaded.
-- **Flat marks.** Eyes, the eye white, the black mage's shadow and his glowing eyes take no light. So do the
-  hair's strand lines and sheen (below).
+- **Flat marks.** Eyes, the eye white, the black mage's shadow and his glowing eyes take no light, though they are
+  washed like every other colour. So do the hair's strand lines and sheen (below).
 
 ## Building it
 
 ```sh
-npm run sheet                 # docs/images/tactics-sprite-sheet.png
+npm run sheet                 # docs/images/tactics-sprite-sheet.png and docs/images/tactics-walk.png
 npm run sheet -- --strips     # also docs/images/tactics/<job>.png
-npm run sheet -- --scale=6 out.png
+npm run sheet -- --scale=6 out.png           # just the sheet, at 6×
+npm run sheet -- --scale=6 --walk out.png    # the sheet at 6×, and the walk
 ```
 
-The sheet is laid out like a tactics game's unit menu: a blue window per job with its name, then the four
-facings, each standing and in both strides, over a stepped ground shadow. Below that, a window per build shows
-every job standing in it. The labels use a 5×7 pixel font
+The sheet is laid out like a tactics game's unit menu, in the tile editor's own colours (its dark table, brass
+rims and vellum labels): a window per job with its name, then the four facings, each standing and in both strides.
+Every figure stands on the editor's grass tile, drawn as a pixel tile from the tile set's own grass and soil
+colours with a soft warm shadow under the feet, so the sheet shows the figures on the ground they will walk on.
+Below that, a window per build shows every job standing in it. The walk is the roster walking in place in each
+facing, written as an animated PNG (`encodeAPNG` in `tools/png.mjs`) that browsers loop; a viewer without APNG
+support shows its first frame. The labels use a 5×7 pixel font
 (`font.js`). A strip is one job's six drawn frames at 1×, left to right: front standing, front strides, back
 standing, back strides, 32×48 each on a clear background, ready to slice into a game.
 
-Everything is plain JavaScript with no DOM and no dependencies; `tools/png.mjs` writes the PNG with Node's own
-zlib. `src/tactics/tactics.test.js` (under `npm test`) checks that every part is rectangular, every frame
+Everything is plain JavaScript with no DOM and no dependencies; `tools/png.mjs` writes the PNG and the APNG with
+Node's own zlib. `src/tactics/tactics.test.js` (under `npm test`) checks that every part is rectangular, every frame
 stays inside 32×48 in every build, every letter a job draws has a colour, the strides and views differ, the
-builds differ in height and breadth on one ground line, and hands hang clear of the body and swing in a stride.
+builds differ in height and breadth on one ground line, and hands hang clear of the body. In a stride the arms
+must swing opposite ways, the leading hand forward and up, the near hand travelling at least four pixels between
+the strides.
 It also checks that faces are solid two-tone shapes showing both whole eyes on every build and in every pose,
 every weapon shows and sits in its fist and never shows through hair, the valkyrie's spear keeps clear of her helm, staves stay upright and reach the ground, the outline is dark all round,
-hair carries strand lines and sheen, ramps darken step by step, and the sheet encodes to a valid PNG.
+hair carries strand lines and sheen, and ramps darken step by step. The black mage must wear a gown to the floor
+with no trousers or belt, flaring to a trimmed hem with only toes beneath, bell sleeves, and a collar over his chin
+with both eyes still glowing. Every figure must stay within the tile set's palette: outlined in the tiles' ink, no
+pixel more saturated than the tiles' gold. Finally the walk steps stride, upright, stride, upright and encodes as
+a looping APNG, and the sheet encodes to a valid PNG.
 
 ## Not yet done
 

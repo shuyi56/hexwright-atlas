@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { inflateSync } from 'node:zlib';
-import { encodePNG } from '../../tools/png.mjs';
+import { encodeAPNG, encodePNG } from '../../tools/png.mjs';
+import { INK } from '../render/palette.js';
 import { BASE, BODY_TYPES, measure, profile } from './body.js';
 import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
-import { H, W, finish, frameBuf, hexRgb, ramp, stamp } from './pixels.js';
+import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
 import { BODIES, POSES, ROSTER, VIEWS, frame, palette, render } from './roster.js';
-import { buildSheet } from './sheet.js';
+import { WALK, buildSheet, buildWalk } from './sheet.js';
 
 const lum = hex => { const [r, g, b] = hexRgb(hex); return r * 0.3 + g * 0.59 + b * 0.11; };
 
@@ -76,6 +77,22 @@ test('no weapon shows through hair, and the valkyrie\'s spear keeps clear of her
     }
   }
 });
+test('in a stride the arms swing against each other and against the legs, the leading hand forward and up', () => {
+  for (const b of BODIES) for (const v of VIEWS) {
+    const stand = measure(b, v, 0).at, dir = v === 'front' ? -1 : 1;
+    for (const k of [1, 2]) {
+      const m = measure(b, v, k).at, dn = m.handNear[0] - stand.handNear[0], df = m.handFar[0] - stand.handFar[0];
+      assert.ok(dn && df && Math.sign(dn) === -Math.sign(df), `${b} ${v} ${k}: the hands swing opposite ways (${dn}, ${df})`);
+      /* the near arm leads in the first stride, when the far leg steps forward, and the far arm in the second */
+      const lead = k === 1 ? 'handNear' : 'handFar', trail = k === 1 ? 'handFar' : 'handNear';
+      assert.ok(Math.sign(m[lead][0] - stand[lead][0]) === dir, `${b} ${v} ${k}: the leading hand reaches toward the facing`);
+      assert.ok(m[lead][1] < stand[lead][1], `${b} ${v} ${k}: the leading hand rises though the body drops`);
+      assert.ok(m[trail][1] <= stand[trail][1], `${b} ${v} ${k}: the trailing hand rises a row with the body's drop`);
+    }
+    const travel = Math.abs(measure(b, v, 1).at.handNear[0] - measure(b, v, 2).at.handNear[0]);
+    assert.ok(travel >= 4, `${b} ${v}: the near hand travels ${travel} pixels between the strides`);
+  }
+});
 test('a staff or polearm is carried steady, and a staff stands on the ground', () => {
   for (const job of ROSTER.filter(j => j.outfit.steady)) for (const b of BODIES) {
     const hands = [0, 1, 2].map(k => measure(b, 'front', k, job.outfit).at.handFar[0]);
@@ -89,6 +106,49 @@ test('the strides move the figure and the views differ', () => {
   for (const job of ROSTER) {
     const f = render(job), same = (a, b) => a.every((v, i) => v === b[i]);
     assert.ok(!same(f.front[0], f.front[1]) && !same(f.front[1], f.front[2]) && !same(f.front[0], f.back[0]), job.id);
+  }
+});
+test('the black mage wears a robe to the floor, with bell sleeves and a high collar', () => {
+  const bm = ROSTER.find(j => j.id === 'blackmage'), wide = rows => rows.map(r => r.replace(/\./g, '').length);
+  for (const b of BODIES) for (const v of VIEWS) for (let k = 0; k < POSES; k++) {
+    const bt = BODY_TYPES[b], m = measure(b, v, k, bm.outfit), f = frame(bm, v, k, b).mat, at = `${b} ${v} ${k}`;
+    /* no trousers and no belt: one garment from the shoulders to the hem */
+    assert.ok(!f.includes('P') && !f.includes('L'), `${at}: no trousers or belt`);
+    /* the skirt flares as it falls, its hem trimmed and wider than the chest */
+    const skirt = wide(m.parts.legs.rows.slice(0, -1));
+    assert.ok(skirt[skirt.length - 1] >= bt.chest + 4 && skirt[skirt.length - 1] > skirt[0], `${at}: the robe flares to the hem`);
+    assert.ok(f.slice((BASE - 1) * W, BASE * W).filter(c => c === 'C').length >= bt.chest, `${at}: a trimmed hem just off the ground`);
+    /* beneath the hem only the toes show: a little of one shoe in a stride, of both standing */
+    const toes = f.slice(BASE * W, (BASE + 1) * W).filter(c => c === 'O').length;
+    assert.ok(toes >= 2 && toes <= (k ? 3 : 6), `${at}: ${toes} pixels of toe`);
+    /* bell sleeves: each arm is two pixels wider at its trimmed mouth than at the upper arm */
+    for (const arm of [m.parts.armNear, m.parts.armFar]) {
+      const w = wide(arm.rows), mouth = arm.rows.findIndex(r => r.includes('C'));
+      assert.ok(w[mouth] >= w[1] + 2, `${at}: a bell sleeve`);
+    }
+  }
+  /* the collar stands over the chin, so less of the shadowed face shows than on the bare head */
+  const face = j => frame(j, 'front', 0).mat.filter(c => c === 'Z').length, bare = { ...bm, parts: { ...bm.parts, front: { ...bm.parts.front, mantle: null } } };
+  assert.ok(face(bm) < face(bare) - 6);
+  assert.equal(frame(bm, 'front', 0).mat.filter(c => c === 'N').length, 4, 'both eyes, two pixels each, still glow above it');
+});
+test('the figures sit in the tile set\'s palette: washed toward its paper and inked in its umber', () => {
+  assert.equal(OUTLINE, INK);
+  /* a wash takes away chroma and moves toward the paper's lightness */
+  for (const c of ['#4f66a6', '#c0473a', '#1e1a2a']) {
+    const [L0, C0] = rgbLch(hexRgb(c)), [L1, C1] = rgbLch(hexRgb(wash(c))), Lp = rgbLch(hexRgb(PAPER))[0];
+    assert.ok(C1 < C0 * 0.8 && Math.abs(Lp - L1) < Math.abs(Lp - L0), c);
+  }
+  /* no pixel of any figure is more saturated than the tiles' gold, and on the whole they are softer still */
+  const tileGold = rgbLch(hexRgb('#c9a24f'))[1];
+  for (const job of ROSTER) {
+    let max = 0, sum = 0, n = 0;
+    for (const v of VIEWS) for (let k = 0; k < POSES; k++) {
+      const px = render(job)[v][k], mat = frame(job, v, k).mat;
+      for (let u = 0; u < W * H; u++) if (mat[u]) { const C = rgbLch([px[u * 4], px[u * 4 + 1], px[u * 4 + 2]])[1]; max = Math.max(max, C); sum += C; n++; }
+    }
+    assert.ok(max <= tileGold, `${job.id}: chroma ${max.toFixed(3)} beyond the tiles' gold`);
+    assert.ok(sum / n < 0.06, `${job.id}: mean chroma ${(sum / n).toFixed(3)}`);
   }
 });
 test('a ramp runs from highlight to deep shadow around its base colour', () => {
@@ -150,6 +210,16 @@ test('the archer and valkyrie wear different hairstyles: a ponytail and a low bu
 });
 test('the font has a full 5×7 glyph for each label character', () => {
   for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-·') { const g = glyph(ch); assert.ok(g.length > 0, ch); for (const [x, y] of g) assert.ok(x < GLYPH_W && y < GLYPH_H); }
+});
+test('the walk steps stride, upright, stride, upright, and encodes as a looping animated PNG', () => {
+  assert.deepEqual(WALK, [1, 0, 2, 0]);
+  const walk = buildWalk(ROSTER.slice(0, 2), 2), same = (a, b) => a.every((v, i) => v === b[i]);
+  assert.equal(walk.frames.length, 4);
+  for (const f of walk.frames) assert.equal(f.length, walk.width * walk.height * 4);
+  assert.ok(!same(walk.frames[0], walk.frames[1]) && !same(walk.frames[0], walk.frames[2]) && same(walk.frames[1], walk.frames[3]));
+  const png = encodeAPNG(walk.width, walk.height, walk.frames, 170), count = t => png.toString('latin1').split(t).length - 1;
+  assert.equal(png.readUInt32BE(16), walk.width); assert.equal(count('acTL'), 1); assert.equal(count('fcTL'), 4); assert.equal(count('fdAT'), 3);
+  const actl = png.indexOf('acTL') + 4; assert.equal(png.readUInt32BE(actl), 4); assert.equal(png.readUInt32BE(actl + 4), 0, 'loops forever');
 });
 test('the sheet is a valid PNG of the expected size', () => {
   const s = buildSheet(ROSTER.slice(0, 2), 2); assert.equal(s.rgba.length, s.width * s.height * 4);

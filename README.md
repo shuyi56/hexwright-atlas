@@ -89,13 +89,23 @@ stack as every other edit. The automation API has `listSprites`, `listCharacters
 ### Tactics sprite sheet
 
 `src/tactics/` holds a separate character style made from scratch, after Final Fantasy Tactics and Tactics Ogre: nine
-jobs (squire, knight, archer, thief, lancer, valkyrie, black mage, white mage, summoner) as big-headed 32×48 figures
-with hue-shifted shading and a selective umber outline, in four facings, standing and in two strides. Bodies come in
-four builds (slim, standard, stocky, tall) cut from measurements, and any job can be drawn in any build. `npm run sheet`
-draws them into `docs/images/tactics-sprite-sheet.png` (add `--strips` for one 1× strip per job), in plain Node.
+jobs (squire, knight, archer, thief, lancer, valkyrie, black mage, white mage, summoner) as big-headed 32×48 figures,
+in four facings, standing and in two strides.
+
+- **Palette.** Painted in the tile set's soft palette: each colour is picked from the tiles' own and washed toward
+  their paper, then shaded in gentle steps and outlined in the tiles' umber ink.
+- **Walking.** The arms swing with the legs. `docs/images/tactics-walk.png` shows the roster walking in all four
+  facings.
+- **Builds.** Bodies come in four builds (slim, standard, stocky, tall) cut from measurements, and any job can be
+  drawn in any build.
+
+`npm run sheet` draws the sheet into `docs/images/tactics-sprite-sheet.png`, with every figure on the editor's grass
+tile, and the walk into `docs/images/tactics-walk.png` (add `--strips` for one 1× strip per job), in plain Node.
 See [docs/tactics-sprites.md](docs/tactics-sprites.md).
 
 ![The tactics roster](docs/images/tactics-sprite-sheet.png)
+
+![The tactics roster walking](docs/images/tactics-walk.png)
 
 ### Test scenes
 

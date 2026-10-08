@@ -244,12 +244,13 @@ const LANCE = both(({ hand: [hx, hy], dir }) => {
   return cellsToPart(cells);
 });
 /* a longbow held by its grip in the fist, carried at the side with its limbs sweeping outward to recurved tips
-   and the string stretched straight between them, all clear of the body */
+   and the string stretched straight between them, all clear of the body. Swung out near the frame's edge it
+   turns toward the viewer, so its sweep narrows to fit. */
 const BOW = both(({ hand: [hx, hy], dir }) => {
-  const cells = [], R = 9, bend = r => Math.round(3 * (r / R) ** 2);
-  for (let r = -R + 1; r <= R - 1; r++) cells.push([hx + dir * 4, hy + r, 'F']);
+  const cells = [], R = 9, reach = Math.max(2, Math.min(4, dir < 0 ? hx - 1 : W - 2 - hx)), bend = r => Math.round((reach - 1) * (r / R) ** 2);
+  for (let r = -R + 1; r <= R - 1; r++) cells.push([hx + dir * reach, hy + r, 'F']);
   for (let r = -R; r <= R; r++) cells.push([hx + dir * bend(r), hy + r, Math.abs(r) <= 1 ? 'L' : 'T']);
-  for (const r of [-R - 1, R + 1]) cells.push([hx + dir * 4, hy + r, 'T']);
+  for (const r of [-R - 1, R + 1]) cells.push([hx + dir * reach, hy + r, 'T']);
   return cellsToPart(cells);
 });
 /* a kite shield on the near arm; from behind, its rim shows past the body */
