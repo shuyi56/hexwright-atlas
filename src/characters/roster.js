@@ -1,7 +1,7 @@
 import { BODY_TYPES, REF, measure } from './body.js';
 import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, recolor, staff } from './parts.js';
 import { BANDANA, FEATHER_CAP, WIZARD_HAT } from './hats.js';
-import { finish, frameBuf, mixHex, ramp, stamp } from './pixels.js';
+import { UP, finish, frameBuf, mixHex, ramp, stamp, upsample } from './pixels.js';
 import { TOWNSFOLK } from './townsfolk.js';
 
 /* ================= character sprites: the roster =================
@@ -26,8 +26,9 @@ const WALK = [1, 0, 2, 0];
 /* slots that meet without a contour: the head with its hair and hat, the torso with what is worn over it */
 const GROUP = { head: 1, hair: 1, hairOver: 1, hat: 1, torso: 2, overTorso: 2 };
 
-/* the build a job is drawn in: its own unless the caller names another */
-function frame(job, view, pose, body = job.body) {
+/* The layout of a frame, in the build a job is drawn in (its own unless the caller names another). Given fine, a
+   part with a fine version (hi) is left out of the layout and listed there with where it goes, for render. */
+function frame(job, view, pose, body = job.body, fine = null) {
   const m = measure(body, view, pose, job.outfit), buf = frameBuf();
   const head = { ...((job.head && job.head[view]) || (view === 'front' ? HEAD_FRONT : HEAD_BACK)), anchor: 'head' };
   const own = (job.parts && job.parts[view]) || {};
@@ -43,8 +44,10 @@ function frame(job, view, pose, body = job.body) {
       let dx = at ? m.at[at][0] - REF[at][0] : 0, dy = at ? m.at[at][1] - REF[at][1] : 0;
       /* a weapon is made for the fist that holds it, its outward side away from the body */
       if (part.make) { const [hx, hy] = m.at[at]; part = part.make({ hand: [hx, hy], dir: hx < 16 ? -1 : 1, face: view === 'front' ? m.at.head : null }); dx = dy = 0; }
-      const g = part.group || GROUP[slot];
-      stamp(buf, part.rows, part.x + dx, part.y + dy, layer, g ? 1000 + g : layer); layer++;
+      const g = part.group || GROUP[slot], group = g ? 1000 + g : layer;
+      if (fine && part.hi) fine.push({ rows: part.hi, x: (part.x + dx) * UP, y: (part.y + dy) * UP, layer, group });
+      else stamp(buf, part.rows, part.x + dx, part.y + dy, layer, group);
+      layer++;
     }
   }
   return buf;
@@ -56,10 +59,16 @@ function palette(job) {
   if (typeof out.K === 'string') out.K = { ramp: out.K, clean: true, cel: true };          /* skin: solid, cel-shaded, never inked inside */
   return out;
 }
-/* every frame of a job: { front: [rgba x3], back: [rgba x3] }, in its own build or the one named */
+/* a frame's material map at full resolution: the layout doubled, then the fine parts stamped in their layers */
+function fineFrame(job, view, pose, body = job.body) {
+  const fine = [], buf = upsample(frame(job, view, pose, body, fine));
+  for (const p of fine) stamp(buf, p.rows, p.x, p.y, p.layer, p.group, false, true);
+  return buf;
+}
+/* every frame of a job, FW×FH: { front: [rgba x3], back: [rgba x3] }, in its own build or the one named */
 function render(job, body = job.body) {
   const pal = palette(job), out = {};
-  for (const v of VIEWS) out[v] = Array.from({ length: POSES }, (_, k) => finish(frame(job, v, k, body), pal));
+  for (const v of VIEWS) out[v] = Array.from({ length: POSES }, (_, k) => finish(fineFrame(job, v, k, body), pal));
   return out;
 }
 
@@ -431,4 +440,4 @@ const ROSTER = [...TOWNSFOLK, ...JOBS];
 const BY_ID = new Map(ROSTER.map(c => [c.id, c]));
 const byId = id => BY_ID.get(id) || null;
 
-export { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render };
+export { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, fineFrame, frame, palette, render };

@@ -58,7 +58,7 @@ and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `ge
 
 ### Characters
 
-The **Characters** tab lists the roster: sixteen pixel-art figures, 32×48 and big-headed, in the manner of
+The **Characters** tab lists the roster: sixteen pixel-art figures, 64×96 and big-headed, in the manner of
 Final Fantasy Tactics and Tactics Ogre.
 
 - **Townsfolk:** a villager in a vest, a farmer in a straw hat and overalls, a guard with a kettle helm, cape and

@@ -6,8 +6,8 @@ import { INK } from '../render/palette.js';
 import { BASE, BODY_TYPES, measure, profile } from './body.js';
 import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
-import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
-import { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render } from './roster.js';
+import { FH, FW, H, OUTLINE, PAPER, UP, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, upsample, wash } from './pixels.js';
+import { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, fineFrame, frame, palette, render } from './roster.js';
 import { APPLIES, CHOICES, COLOURS, cleanSpec, fromSpec } from './custom.js';
 import * as hats from './hats.js';
 import { TOWNSFOLK } from './townsfolk.js';
@@ -247,18 +247,18 @@ test('creases shade darker and every figure gets an outline', () => {
 });
 test('the outline is solid ink all round every figure', () => {
   for (const job of ROSTER) for (const v of VIEWS) {
-    const buf = frame(job, v, 0), px = render(job)[v][0];
-    for (let u = 0; u < W * H; u++) {
+    const buf = fineFrame(job, v, 0), px = render(job)[v][0];
+    for (let u = 0; u < FW * FH; u++) {
       if (buf.mat[u] !== null || !px[u * 4 + 3]) continue;
       const l = px[u * 4] * 0.3 + px[u * 4 + 1] * 0.59 + px[u * 4 + 2] * 0.11;
-      assert.ok(l < 75, `${job.id} ${v}: outline pixel ${u % W},${(u / W) | 0} is too light (${l | 0})`);
+      assert.ok(l < 75, `${job.id} ${v}: outline pixel ${u % FW},${(u / FW) | 0} is too light (${l | 0})`);
     }
   }
 });
 test('faces are solid shapes: one lit tone and one shadow tone of skin', () => {
   for (const job of ROSTER) for (const v of VIEWS) {
-    const buf = frame(job, v, 0), px = render(job)[v][0], top = measure(job.body, v, 0, job.outfit).at.head[1], tones = new Set();
-    for (let u = 0; u < W * H; u++) { const y = (u / W) | 0; if (buf.mat[u] === 'K' && y >= top && y < top + 14) tones.add(px.slice(u * 4, u * 4 + 3).join()); }
+    const buf = fineFrame(job, v, 0), px = render(job)[v][0], top = measure(job.body, v, 0, job.outfit).at.head[1] * UP, tones = new Set();
+    for (let u = 0; u < FW * FH; u++) { const y = (u / FW) | 0; if (buf.mat[u] === 'K' && y >= top && y < top + 14 * UP) tones.add(px.slice(u * 4, u * 4 + 3).join()); }
     assert.ok(tones.size <= 3, `${job.id} ${v}: ${tones.size} skin tones in the face`);       /* lit, shadow, and ink where a part crosses it */
     if (job.id === 'squire' && v === 'front') assert.equal(tones.size, 2);
   }
@@ -310,4 +310,44 @@ test('the sheet is a valid PNG of the expected size', () => {
   assert.deepEqual([...png.subarray(1, 4)], [80, 78, 71]); assert.equal(png.readUInt32BE(16), s.width); assert.equal(png.readUInt32BE(20), s.height);
   const start = png.indexOf('IDAT') + 4, len = png.readUInt32BE(start - 8);
   assert.equal(inflateSync(png.subarray(start, start + len)).length, (s.width * 4 + 1) * s.height);
+});
+
+test('every fine part is exactly twice its layout grid each way', () => {
+  const each = (v, name) => {
+    if (v && Array.isArray(v.rows) && v.hi) {
+      assert.equal(v.hi.length, v.rows.length * UP, `${name}: rows`);
+      assert.deepEqual([...new Set(v.hi.map(r => r.length))], [v.rows[0].length * UP], `${name}: columns`);
+    } else if (v && typeof v === 'object' && !Array.isArray(v.rows)) for (const [k, p] of Object.entries(v)) each(p, `${name}.${k}`);
+  };
+  for (const [name, v] of Object.entries(parts)) if (typeof v !== 'function') each(v, name);
+  for (const p of [parts.HEAD_FRONT, parts.HEAD_BACK, parts.HAIR_SHORT.front, parts.HAIR_LONG.back, parts.HAIR_BUN.back, parts.HAIR_BRAID.front]) assert.ok(p.hi);
+});
+test('upsampling doubles each layout pixel and redraws a crease one fine pixel wide', () => {
+  const buf = frameBuf(); stamp(buf, ['AAAA', 'AaAA', 'AAaA', 'AAAa'], 0, 0, 0);
+  const up = upsample(buf);
+  assert.deepEqual([up.w, up.h, up.up], [W * UP, H * UP, UP]);
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) assert.equal(up.mat[y * up.w + x], 'A');
+  /* the diagonal crease from (1,1) to (3,3) is the fine diagonal (2,2), (3,3) ... (6,6), nothing beside it */
+  const line = []; for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (up.line[y * up.w + x]) line.push([x, y]);
+  assert.deepEqual(line, [[2, 2], [3, 3], [4, 4], [5, 5], [6, 6]]);
+  assert.ok(up.crease[7 * up.w + 7], 'the crease material itself still covers the whole block');
+});
+test('a fine part goes into its own layer: what stands in front of the head still covers it', () => {
+  for (const job of ROSTER) for (const v of VIEWS) {
+    const parts = [], lay = frame(job, v, 0), fine = fineFrame(job, v, 0); frame(job, v, 0, job.body, parts);
+    assert.equal(fine.clipped, 0, `${job.id} ${v}: the fine parts stay in the frame`);
+    /* every layout pixel of a layer in front of the fine parts keeps its whole block */
+    const top = Math.max(-1, ...parts.map(p => p.layer));
+    for (let u = 0; u < W * H; u++) {
+      if (lay.layer[u] <= top) continue;
+      const x = u % W, y = (u / W) | 0;
+      for (const [i, j] of [[0, 0], [1, 0], [0, 1], [1, 1]]) assert.equal(fine.layer[(y * UP + j) * FW + x * UP + i], lay.layer[u], `${job.id} ${v}: ${x},${y}`);
+    }
+  }
+});
+test('the fine faces keep both eyes and a mouth', () => {
+  for (const job of ROSTER.filter(j => !j.head)) {
+    const m = fineFrame(job, 'front', 0).mat, n = c => m.filter(x => x === c).length;
+    assert.ok(n('E') >= 20 && n('W') === 4 && n('M') >= 3, `${job.id}: ${n('E')} eye, ${n('W')} white, ${n('M')} mouth`);
+  }
 });

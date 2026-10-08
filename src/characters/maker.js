@@ -3,7 +3,7 @@ import { $ } from '../ui/state.js';
 import { APPLIES, CHOICES, COLOURS, SWATCHES, cleanSpec, describe, fromSpec, newId } from './custom.js';
 import { BASE } from './body.js';
 import * as library from './library.js';
-import { H, W, hexRgb } from './pixels.js';
+import { FH, FW, H, UP, W, hexRgb } from './pixels.js';
 import { VIEWS, WALK, frame, render } from './roster.js';
 import { TOWNSFOLK } from './townsfolk.js';
 
@@ -97,8 +97,8 @@ function crisp(view, pose) {
   const key = view + pose; let c = MK.crisp.get(key);
   if (!c) {
     if (!MK.frames) MK.frames = render(fromSpec(MK.spec));
-    c = document.createElement('canvas'); c.width = W; c.height = H;
-    const cg = c.getContext('2d'), im = cg.createImageData(W, H); im.data.set(MK.frames[view][pose]); cg.putImageData(im, 0, 0); MK.crisp.set(key, c);
+    c = document.createElement('canvas'); c.width = FW; c.height = FH;
+    const cg = c.getContext('2d'), im = cg.createImageData(FW, FH); im.data.set(MK.frames[view][pose]); cg.putImageData(im, 0, 0); MK.crisp.set(key, c);
   }
   return c;
 }
@@ -115,7 +115,8 @@ function tile(x, y, k) {
 function draw() {
   if (!MK.open || !MK.spec) return;
   const stage = cv.parentElement, dpr = Math.min(2, window.devicePixelRatio || 1), sw = stage.clientWidth - 24, sh = stage.clientHeight - 70;
-  const k = Math.max(1, Math.floor(Math.min(sw * dpr / (FACINGS.length * (W + 6)), sh * dpr / (H + 14)))), cellW = (W + 6) * k;
+  /* k is screen pixels to a layout pixel: a whole number of them to each of the frame's fine pixels when there is room */
+  const fit = Math.min(sw * dpr / (FACINGS.length * (W + 6)), sh * dpr / (H + 14)), k = fit >= UP ? Math.floor(fit / UP) * UP : Math.max(1, Math.floor(fit)), cellW = (W + 6) * k;
   cv.width = FACINGS.length * cellW; cv.height = (H + 14) * k; cv.style.width = `${cv.width / dpr}px`; cv.style.height = `${cv.height / dpr}px`;
   g.clearRect(0, 0, cv.width, cv.height); g.imageSmoothingEnabled = false;
   const pose = MK.walking ? WALK[MK.beat % WALK.length] : 0;

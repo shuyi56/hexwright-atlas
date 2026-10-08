@@ -40,8 +40,12 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 
 ## Format
 
-- **Frame.** 32×48 pixels. Every build stands with its soles on row 46, so figures line up on a battlefield;
-  the rows above the tallest head leave room for plumes, horns and polearms.
+- **Frame.** 64×96 pixels, laid out on a 32×48 grid. Every part is placed on the grid, and every build stands
+  with its soles on its row 46, so figures line up on a battlefield; the rows above the tallest head leave room for
+  plumes, horns and polearms. A frame is finished at twice the grid's size: the grid's materials are doubled
+  (a crease redrawn one fine pixel wide), the heads and hair, which have fine versions drawn at 64×96, are stamped
+  in at full resolution in their own layers, and the light, contours and outline are worked out on the fine
+  pixels, so the line work is half as thick as the grid's pixels. Sizes below are in grid pixels.
 - **Proportions.** The head is 14 pixels wide on every build and about as tall as the torso: roughly three
   heads to the figure, the squat, readable build of the genre.
 - **Facings.** Two are drawn: front (south-west, three-quarters on, the face to the viewer's left) and back
@@ -379,11 +383,12 @@ Below that, a window per build shows everyone standing in it, townsfolk and jobs
 walk is the roster walking in place in each facing, in the same blocks, written as an animated PNG (`encodeAPNG` in `tools/png.mjs`) that browsers loop; a viewer without APNG
 support shows its first frame. The labels use a 5×7 pixel font
 (`font.js`). A strip is one character's six drawn frames at 1×, left to right: front standing, front strides, back
-standing, back strides, 32×48 each on a clear background, ready to slice into a game.
+standing, back strides, 64×96 each on a clear background, ready to slice into a game.
 
 Everything is plain JavaScript with no DOM and no dependencies; `tools/png.mjs` writes the PNG and the APNG with
 Node's own zlib. `src/characters/characters.test.js` (under `npm test`) checks that every part is rectangular, every
-frame stays inside 32×48 in every build, every letter a character draws has a colour, the strides and views differ, the
+frame stays inside the 32×48 grid in every build, every fine part is exactly twice its grid each way and goes
+into its own layer, every letter a character draws has a colour, the strides and views differ, the
 builds differ in height and breadth on one ground line, and hands hang clear of the body. In a stride the arms
 must swing opposite ways, the leading hand forward and up, the near hand travelling at least four pixels between
 the strides.

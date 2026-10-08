@@ -17,6 +17,11 @@
      an inked edge wherever two materials meet within one piece (hair against the brow, a brim against the face,
      a vest against the shirt); and creases inked as lines rather than shaded. */
 const W = 32, H = 48;
+/* The parts are laid out on that 32×48 grid, but a frame is finished at UP times its size (FW×FH): the grid's
+   materials are doubled, the hand-drawn parts that have a fine version (hi) are stamped over them at full
+   resolution, and the light, contours and outline are worked out on the fine pixels, so the line work is half as
+   thick as the layout's pixels. */
+const UP = 2, FW = W * UP, FH = H * UP;
 /* the tiles' ink and paper (render/palette.js INK and VEL) */
 const OUTLINE = '#2b2116', PAPER = '#f0e6cb';
 /* how far each kind of line is pushed from its material's deepest tone to the outline ink */
@@ -63,18 +68,46 @@ function wash(hex) {
 }
 
 /* ---------- composing ---------- */
-/* clipped counts pixels that fell outside the frame, so a test can catch a part drawn off the edge */
-const frameBuf = () => ({ mat: new Array(W * H).fill(null), crease: new Uint8Array(W * H), layer: new Int16Array(W * H).fill(-1), group: new Int16Array(W * H).fill(-1), clipped: 0 });
+/* A material map w×h, each pixel up× the layout's. clipped counts pixels that fell outside the frame, so a test
+   can catch a part drawn off the edge. line marks the pixels of a crease drawn as a line (see upsample). */
+const frameBuf = (w = W, h = H, up = 1) => ({ w, h, up, mat: new Array(w * h).fill(null), crease: new Uint8Array(w * h), line: null, layer: new Int16Array(w * h).fill(-1), group: new Int16Array(w * h).fill(-1), clipped: 0 });
 /* stamp a grid with its top-left at (x, y). Parts of one group (a head, its hair and its hat) meet without a
-   contour between them. flip mirrors the grid itself. */
-function stamp(buf, rows, x, y, layer, group = layer, flip = false) {
+   contour between them. flip mirrors the grid itself. under: only over pixels of earlier layers, so a part
+   stamped after the rest still goes behind what was meant to stand in front of it. */
+function stamp(buf, rows, x, y, layer, group = layer, flip = false, under = false) {
+  const { w, h } = buf;
   rows.forEach((row, j) => {
     for (let i = 0; i < row.length; i++) {
       const ch = row[flip ? row.length - 1 - i : i]; if (ch === '.' || ch === ' ') continue;
-      const X = x + i, Y = y + j; if (X < 0 || Y < 0 || X >= W || Y >= H) { buf.clipped++; continue; }
-      const u = Y * W + X, up = ch.toUpperCase(); buf.mat[u] = up; buf.crease[u] = ch !== up ? 1 : 0; buf.layer[u] = layer; buf.group[u] = group;
+      const X = x + i, Y = y + j; if (X < 0 || Y < 0 || X >= w || Y >= h) { buf.clipped++; continue; }
+      const u = Y * w + X, up = ch.toUpperCase(); if (under && buf.layer[u] > layer) continue;
+      buf.mat[u] = up; buf.crease[u] = ch !== up ? 1 : 0; buf.layer[u] = layer; buf.group[u] = group;
+      if (buf.line) buf.line[u] = buf.crease[u];
     }
   });
+}
+/* The layout's map at UP× its size, each pixel a block. A crease is a line, not a band, so it is redrawn one fine
+   pixel wide: from each crease pixel to each creased neighbour of the same material (right, below and the two
+   diagonals below) through the fine pixel between them, and a lone crease pixel keeps its whole block. line marks
+   those fine pixels; a cel-shaded material's lowercase is a shadow shape rather than a line, and finish keeps it
+   whole. */
+function upsample(buf) {
+  const k = UP, out = frameBuf(buf.w * k, buf.h * k, buf.up * k), { w, h } = buf, W2 = out.w;
+  out.line = new Uint8Array(out.w * out.h); out.clipped = buf.clipped;
+  const creased = (x, y, v) => x >= 0 && y >= 0 && x < w && y < h && buf.crease[y * w + x] && buf.mat[y * w + x] === v;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = y * w + x; if (buf.mat[u] === null) continue;
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) {
+      const o = (y * k + j) * W2 + x * k + i; out.mat[o] = buf.mat[u]; out.crease[o] = buf.crease[u]; out.layer[o] = buf.layer[u]; out.group[o] = buf.group[u];
+    }
+    if (!buf.crease[u]) continue;
+    const v = buf.mat[u], at = (i, j) => { out.line[(y * k + j) * W2 + x * k + i] = 1; }, links = [[1, 0], [0, 1], [1, 1], [-1, 1]].filter(([dx, dy]) => creased(x + dx, y + dy, v));
+    const linked = links.length || [[-1, 0], [0, -1], [-1, -1], [1, -1]].some(([dx, dy]) => creased(x + dx, y + dy, v));
+    if (!linked) { for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) at(i, j); continue; }
+    at(0, 0);
+    for (const [dx, dy] of links) { if (dx < 0) out.line[(y * k + 1) * W2 + x * k - 1] = 1; else at(dx, dy); }
+  }
+  return out;
 }
 
 /* ---------- finishing: the light, the contours and the outline ---------- */
@@ -83,7 +116,7 @@ function stamp(buf, rows, x, y, layer, group = layer, flip = false) {
    or brim against it carries the line) and cel means shaded as solid shapes: uppercase one flat lit tone, lowercase
    one shadow tone, plus a shadow band wherever another part of the same piece hangs over it (a fringe, a brim) */
 function finish(buf, pal) {
-  const ramps = {}, flat = {}, clean = {}, cel = {};
+  const { w: W, h: H } = buf, up = buf.up || 1, ramps = {}, flat = {}, clean = {}, cel = {};
   for (const [k, v] of Object.entries(pal)) {
     if (typeof v === 'string') ramps[k] = ramp(wash(v)); else if (v.flat) flat[k] = wash(v.flat); else { ramps[k] = ramp(wash(v.ramp)); clean[k] = !!v.clean; cel[k] = !!v.cel; }
   }
@@ -92,41 +125,65 @@ function finish(buf, pal) {
   /* each layer's row span, for the turn of the whole figure */
   const span = new Map(); const key = (l, y) => l * H + y;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (ok(x, y)) { const k = key(lay(x, y), y), s = span.get(k); if (!s) span.set(k, [x, x]); else s[1] = x; }
-  const rgba = new Uint8ClampedArray(W * H * 4), put = (u, hex) => { const c = hexRgb(hex); rgba.set([c[0], c[1], c[2], 255], u * 4); };
+  /* a frame uses a few dozen colours, so each is parsed and each ink mix worked out once */
+  const rgb = new Map(), inks = new Map(), rgba = new Uint8ClampedArray(W * H * 4);
+  const put = (u, hex) => { let c = rgb.get(hex); if (!c) rgb.set(hex, c = [...hexRgb(hex), 255]); rgba.set(c, u * 4); };
+  const ink = (a, b, t) => { const k = `${a}${b}${t}`; let c = inks.get(k); if (!c) inks.set(k, c = mixHex(a, b, t)); return c; };
   const turn = t => (t < 0.22 ? 0.85 : t < 0.48 ? 0.35 : t < 0.72 ? -0.25 : -0.8);
+  /* each pixel's run along its row: the stretch of the same material in the same layer it lies in */
+  const runA = new Int16Array(W * H), runB = new Int16Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W;) {
+    const u = y * W + x, v = buf.mat[u], L = buf.layer[u]; let e = x;
+    while (e + 1 < W && buf.mat[u + e + 1 - x] === v && buf.layer[u + e + 1 - x] === L) e++;
+    for (let i = x; i <= e; i++) { runA[y * W + i] = x; runB[y * W + i] = e; }
+    x = e + 1;
+  }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = y * W + x, v = buf.mat[u]; if (v === null) continue;
     if (flat[v]) { put(u, flat[v]); continue; }
     const R = ramps[v]; if (!R) throw new Error(`no colour for material "${v}"`);
-    const L = buf.layer[u], same = (i, j) => m(i, j) === v && lay(i, j) === L;
-    let a = x, b = x; while (same(a - 1, y)) a--; while (same(b + 1, y)) b++;
+    const L = buf.layer[u], a = runA[u], b = runB[u];
     const [s0, s1] = span.get(key(L, y)), run = b - a + 1, body = s1 - s0 + 1;
     let light = (run >= 3 ? 0.45 * turn((x - a) / (run - 1)) : 0) + (body >= 3 ? 0.6 * turn((x - s0) / (body - 1)) : 0);
-    if (!ok(x, y - 1)) light += 0.7; else if (m(x, y - 1) !== v && lay(x, y - 1) <= L) light -= 0.55;
-    if (!ok(x, y + 1) || m(x, y + 1) !== v) light -= 0.3;
-    if (!ok(x - 1, y)) light += 0.3;
-    if (!ok(x + 1, y)) light -= 0.45;
+    /* the edges light and shade as deep as one of the layout's pixels, however fine the frame */
+    let open = 0, under = 0, foot = 0, left = 0, right = 0, overhung = false;
+    for (let d = 1; d <= up; d++) {
+      if (!ok(x, y - d)) open = 1; else if (m(x, y - d) !== v && lay(x, y - d) <= L) under = 1;
+      if (lay(x, y - d) > L || lay(x - 1, y - d) > L) overhung = true;
+      if (!ok(x, y + d) || m(x, y + d) !== v) foot = 1;
+      if (!ok(x - d, y)) left = 1;
+      if (!ok(x + d, y)) right = 1;
+    }
+    light += open ? 0.7 : under ? -0.55 : 0;
+    light += -0.3 * foot + 0.3 * left - 0.45 * right;
     let tone = Math.max(0, Math.min(4, Math.round(2 - light)));
     /* a part behind another: a dark contour where the front part stands beside or below it, and only its shadow
        where the front part hangs over it from above (hair over a brow, a tunic over the legs) */
-    const G = buf.group[u]; if ([[x - 1, y], [x + 1, y], [x, y + 1]].some(([i, j]) => lay(i, j) > L && grp(i, j) !== G)) { put(u, mixHex(R[4], OUTLINE, INK.contour)); continue; }
-    if (cel[v]) { put(u, R[buf.crease[u] || lay(x, y - 1) > L || lay(x - 1, y - 1) > L ? 3 : 1]); continue; }
-    if (buf.crease[u]) { put(u, mixHex(R[4], OUTLINE, INK.crease)); continue; }
+    const G = buf.group[u], before = (i, j) => lay(i, j) > L && grp(i, j) !== G;
+    if (before(x - 1, y) || before(x + 1, y) || before(x, y + 1)) { put(u, ink(R[4], OUTLINE, INK.contour)); continue; }
+    if (cel[v]) { put(u, R[buf.crease[u] || overhung ? 3 : 1]); continue; }
+    if (buf.line ? buf.line[u] : buf.crease[u]) { put(u, ink(R[4], OUTLINE, INK.crease)); continue; }
     /* within one piece, where this material ends against another below it or to its right (the shadow sides),
        its last pixel is inked; a run only one pixel deep (a belt, a trim) is left alone so it keeps its colour */
     const piece = (i, j) => ok(i, j) && (lay(i, j) === L || grp(i, j) === G), other = (i, j) => piece(i, j) && m(i, j) !== v && !flat[m(i, j)];
-    if (!clean[v] && ((other(x, y + 1) && m(x, y - 1) === v) || (other(x + 1, y) && m(x - 1, y) === v))) { put(u, mixHex(R[4], OUTLINE, INK.edge)); continue; }
-    if (lay(x, y - 1) > L || lay(x - 1, y - 1) > L) tone = Math.max(tone, 3);
+    if (!clean[v] && ((other(x, y + 1) && m(x, y - up) === v) || (other(x + 1, y) && m(x - up, y) === v))) { put(u, ink(R[4], OUTLINE, INK.edge)); continue; }
+    if (overhung) tone = Math.max(tone, 3);
     put(u, R[tone]);
   }
   /* the selective outline */
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (ok(x, y)) continue;
-    const nb = [[x + 1, y, 1], [x, y + 1, 1], [x - 1, y, 0], [x, y - 1, 0]].filter(([i, j]) => ok(i, j)); if (!nb.length) continue;
     /* the part in front decides the colour; an outline above or left of the figure faces the light */
-    const [i, j] = nb.reduce((p, q) => (lay(q[0], q[1]) > lay(p[0], p[1]) ? q : p)), lit = nb.every(n => n[2] === 1);
-    const v = m(i, j), base = flat[v] ? mixHex(flat[v], OUTLINE, 0.5) : ramps[v][4];
-    put(y * W + x, mixHex(base, OUTLINE, lit ? INK.outlineLit : INK.outline));
+    let i = -1, j = -1, lit = true;
+    for (let n = 0; n < 4; n++) {
+      const a = x + (n === 0 ? 1 : n === 2 ? -1 : 0), b = y + (n === 1 ? 1 : n === 3 ? -1 : 0);
+      if (!ok(a, b)) continue;
+      if (n >= 2) lit = false;
+      if (i < 0 || lay(a, b) > lay(i, j)) { i = a; j = b; }
+    }
+    if (i < 0) continue;
+    const v = m(i, j), base = flat[v] ? ink(flat[v], OUTLINE, 0.5) : ramps[v][4];
+    put(y * W + x, ink(base, OUTLINE, lit ? INK.outlineLit : INK.outline));
   }
   return rgba;
 }
@@ -140,4 +197,4 @@ function cellsToPart(cells) {
   return { x, y, rows: g.map(r => r.join('')) };
 }
 
-export { H, OUTLINE, PAPER, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, rgbLch, stamp, wash };
+export { FH, FW, H, OUTLINE, PAPER, UP, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, rgbLch, stamp, upsample, wash };

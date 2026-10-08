@@ -1,5 +1,5 @@
 import { ADVANCE, GLYPH_H, glyph, textWidth } from './font.js';
-import { H, OUTLINE, W, hexRgb, mixHex } from './pixels.js';
+import { FH, FW, H, OUTLINE, W, hexRgb, mixHex } from './pixels.js';
 import { BASE, BODY_TYPES } from './body.js';
 import { BODIES, ROSTER, WALK, render } from './roster.js';
 import { TOWNSFOLK } from './townsfolk.js';
@@ -26,11 +26,12 @@ function canvas(w, h) {
   };
   const rect = (x, y, rw, rh, hex, a = 1) => { const rgb = hexRgb(hex); for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) set(i, j, rgb, a); };
   const text = (s, x, y, k, hex) => { const rgb = hexRgb(hex); [...s].forEach((ch, n) => { for (const [gx, gy] of glyph(ch)) for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) set(x + (n * ADVANCE + gx) * k + i, y + gy * k + j, rgb); }); };
-  /* a sprite frame at k× with its pixels' alpha respected, optionally mirrored */
+  /* a sprite frame (FW×FH) filling W×H layout pixels at k×, with its pixels' alpha respected, optionally mirrored */
   const blit = (rgba, x, y, k, flip) => {
-    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-      const u = (j * W + (flip ? W - 1 - i : i)) * 4; if (!rgba[u + 3]) continue;
-      for (let b = 0; b < k; b++) for (let a = 0; a < k; a++) set(x + i * k + a, y + j * k + b, [rgba[u], rgba[u + 1], rgba[u + 2]]);
+    const ow = W * k, oh = H * k;
+    for (let j = 0; j < oh; j++) for (let i = 0; i < ow; i++) {
+      const si = Math.floor(i * FW / ow), sj = Math.floor(j * FH / oh), u = (sj * FW + (flip ? FW - 1 - si : si)) * 4; if (!rgba[u + 3]) continue;
+      set(x + i, y + j, [rgba[u], rgba[u + 1], rgba[u + 2]]);
     }
   };
   /* a window: a vertical gradient, a brass rim inside a dark one, corners cut */
