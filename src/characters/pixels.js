@@ -1,23 +1,26 @@
-/* ================= tactics sprites: the pixel engine =================
+/* ================= character sprites: the pixel engine =================
    Figures in the manner of the squad tacticians (Final Fantasy Tactics, Tactics Ogre): big-headed, 32×48,
    drawn as hand-authored grids of material letters and finished here. No DOM, so Node and the browser share it.
 
    A grid is an array of strings. Each character is a material letter ('.' or ' ' is clear). Uppercase is the
    material as lit; lowercase is the same material in a crease (a fold, a seam, the line between two plates).
    Parts are stamped back to front, each on its own layer. Finishing a frame:
-   - every material is a five-step ramp made from one colour, hue-shifted: highlights warm toward gold, shadows
-     cool toward violet, the way painted sprites of that era are shaded;
+   - every colour is first washed toward the tiles' paper (a little paler, a good deal less saturated), so the
+     figures sit in the tile set's chalky palette rather than glowing on it;
+   - every material is a five-step ramp made from one colour, gently hue-shifted: highlights warm toward gold,
+     shadows a touch cooler, in soft steps like the tiles' own faces;
    - each pixel's step comes from light at the upper left: the figure turns like a cylinder across its width,
      tops facing the sky catch light, undersides and anything tucked under another part fall into shade, and a
      part sitting behind another gets a dark contour where they meet;
-   - the line work is solid ink: a near-black umber outline all round (a touch warmer where the light falls),
+   - the line work is solid ink: the tiles' umber outline all round (a touch warmer where the light falls),
      left off diagonal corners so curves stay round; a dark contour where one part stands in front of another;
      an inked edge wherever two materials meet within one piece (hair against the brow, a brim against the face,
      a vest against the shirt); and creases inked as lines rather than shaded. */
 const W = 32, H = 48;
-const OUTLINE = '#21160f';
+/* the tiles' ink and paper (render/palette.js INK and VEL) */
+const OUTLINE = '#2b2116', PAPER = '#f0e6cb';
 /* how far each kind of line is pushed from its material's deepest tone to the outline ink */
-const INK = { outline: 0.95, outlineLit: 0.82, contour: 0.75, edge: 0.62, crease: 0.4 };
+const INK = { outline: 0.9, outlineLit: 0.78, contour: 0.6, edge: 0.48, crease: 0.3 };
 
 /* ---------- colour ---------- */
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -38,14 +41,26 @@ function lchRgb([L, C, h]) {
 }
 /* turn hue h toward target by at most deg degrees, the short way round */
 const toward = (h, target, deg) => { const d = ((target - h + 540) % 360) - 180; return (h + Math.sign(d) * Math.min(Math.abs(d), deg) + 360) % 360; };
-/* five steps, brightest first: highlight, light, base, shade, deep. Highlights warm toward gold, shadows cool
-   toward violet; a near-grey keeps its hue */
-const STEPS = [[0.11, 0.78, 95, 10], [0.055, 0.92, 95, 5], [0, 1, 0, 0], [-0.085, 1, 290, 9], [-0.17, 0.92, 290, 18]];
+/* five steps, brightest first: highlight, light, base, shade, deep. The steps are gentle, like the tiles' lit
+   and shaded faces. Highlights warm toward gold and lose a little colour; shadows turn only slightly cool, so
+   they stay in the tiles' warm family; a near-grey keeps its hue */
+const STEPS = [[0.085, 0.8, 90, 8], [0.045, 0.92, 90, 4], [0, 1, 0, 0], [-0.07, 0.94, 290, 4], [-0.14, 0.86, 290, 8]];
 function ramp(hex) {
   const [L, C, h] = rgbLch(hexRgb(hex));
   return STEPS.map(([dl, kc, to, deg], i) => (i === 2 ? hex.toLowerCase() : rgbHex(lchRgb([Math.max(0, Math.min(1, L + dl)), C * kc, C < 0.02 ? h : toward(h, to, deg)]))));
 }
 const mixHex = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return rgbHex(A.map((v, i) => v + (B[i] - v) * t)); };
+/* The tiles are pale, chalky colours on paper. A colour joins them by losing over a quarter of its chroma and
+   moving an eighth of the way toward the paper's lightness and warmth (the map's townsfolk are washed the same
+   way). */
+const PAPER_LCH = rgbLch(hexRgb(PAPER));
+function wash(hex) {
+  const [L, C, h] = rgbLch(hexRgb(hex)), t = 0.12, k = 0.72;
+  const A = C * Math.cos(h * Math.PI / 180) * k, B = C * Math.sin(h * Math.PI / 180) * k;
+  const pa = PAPER_LCH[1] * Math.cos(PAPER_LCH[2] * Math.PI / 180), pb = PAPER_LCH[1] * Math.sin(PAPER_LCH[2] * Math.PI / 180);
+  const a = A + (pa - A) * t, b = B + (pb - B) * t;
+  return rgbHex(lchRgb([L + (PAPER_LCH[0] - L) * t, Math.hypot(a, b), (Math.atan2(b, a) * 180 / Math.PI + 360) % 360]));
+}
 
 /* ---------- composing ---------- */
 /* clipped counts pixels that fell outside the frame, so a test can catch a part drawn off the edge */
@@ -70,7 +85,7 @@ function stamp(buf, rows, x, y, layer, group = layer, flip = false) {
 function finish(buf, pal) {
   const ramps = {}, flat = {}, clean = {}, cel = {};
   for (const [k, v] of Object.entries(pal)) {
-    if (typeof v === 'string') ramps[k] = ramp(v); else if (v.flat) flat[k] = v.flat; else { ramps[k] = ramp(v.ramp); clean[k] = !!v.clean; cel[k] = !!v.cel; }
+    if (typeof v === 'string') ramps[k] = ramp(wash(v)); else if (v.flat) flat[k] = wash(v.flat); else { ramps[k] = ramp(wash(v.ramp)); clean[k] = !!v.clean; cel[k] = !!v.cel; }
   }
   const ok = (x, y) => x >= 0 && y >= 0 && x < W && y < H && buf.mat[y * W + x] !== null;
   const m = (x, y) => (ok(x, y) ? buf.mat[y * W + x] : null), lay = (x, y) => (ok(x, y) ? buf.layer[y * W + x] : -1), grp = (x, y) => (ok(x, y) ? buf.group[y * W + x] : -1);
@@ -125,4 +140,4 @@ function cellsToPart(cells) {
   return { x, y, rows: g.map(r => r.join('')) };
 }
 
-export { H, OUTLINE, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, stamp };
+export { H, OUTLINE, PAPER, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, rgbLch, stamp, wash };

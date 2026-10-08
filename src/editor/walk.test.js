@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { save as saveCustom } from '../characters/library.js';
 import { blankModel, cloneModel, fits, fromJSON, toJSON } from './model.js';
 import { findPath, isFree, placeChar, reachable, walkChar } from './walk.js';
 import { placePiece } from './ops.js';
 import { TERRAIN } from '../tiles/index.js';
 
 const water = TERRAIN.findIndex(t => t.water);
-function map() { const M = blankModel(8, 'grass'); placeChar(M, { sprite: 'starter-villager', x: 0, y: 0 }); return M; }
+function map() { const M = blankModel(8, 'grass'); placeChar(M, { sprite: 'villager', x: 0, y: 0 }); return M; }
 
 test('characters stand only on free tiles', () => {
   const M = map(); M.terr[1 * 8 + 1] = water;
@@ -31,9 +32,29 @@ test('walking moves the character and turns it to face the last step', () => {
   assert.equal(walkChar(M, 0, [[5, 5]]).ok, false);
   assert.equal(reachable(M, 0).filter(Boolean).length, 64);
 });
-test('characters are saved and restored with their sprites', () => {
+test('characters are saved by their roster id and restored', () => {
   const M = map(); M.chars[0].face = 2;
-  const J = JSON.parse(JSON.stringify(toJSON(M))); assert.equal(J.characters.length, 1); assert.equal(J.sprites[0].id, 'starter-villager');
+  const J = JSON.parse(JSON.stringify(toJSON(M))); assert.deepEqual(J.characters, [{ sprite: 'villager', x: 0, y: 0, face: 2 }]); assert.equal(J.sprites, undefined, 'no pixels: every copy can draw the roster');
   const back = fromJSON(J); assert.deepEqual(back.chars, M.chars);
   assert.deepEqual(cloneModel(M).chars, M.chars); assert.notEqual(cloneModel(M).chars[0], M.chars[0]);
+});
+test('maps saved with the first character style bring their people into the current one', () => {
+  const J = toJSON(blankModel(8, 'grass'));
+  J.characters = [{ sprite: 'starter-farmer', x: 1, y: 1, face: 1 }, { sprite: 'starter-noble', x: 2, y: 1, face: 0, level: 0 }, { sprite: 'c1x2y3', x: 3, y: 1, face: 3 }];
+  J.sprites = [{ id: 'c1x2y3', name: 'Hand-drawn', size: 32, palette: ['#2b2116'], frames: {} }];
+  const back = fromJSON(J);
+  assert.deepEqual(back.chars.map(c => c.sprite), ['farmer', 'noble', 'villager'], 'starters keep their people, anyone else comes back as a villager');
+  assert.deepEqual(back.chars.map(c => [c.x, c.y, c.face]), [[1, 1, 1], [2, 1, 0], [3, 1, 3]], 'standing where they stood');
+  assert.equal(toJSON(back).sprites, undefined);
+});
+test('characters made in the maker go with the map and come back with it', () => {
+  const c = saveCustom({ name: 'Ferryman', clothes: 'robe', hat: 'straw', colours: { cloth: '#356a52' } });
+  const M = blankModel(8, 'grass'); placeChar(M, { sprite: c.id, x: 2, y: 2 }); placeChar(M, { sprite: 'villager', x: 3, y: 2 });
+  const J = JSON.parse(JSON.stringify(toJSON(M)));
+  assert.deepEqual(J.customCharacters, [c.spec], 'only the made characters, by their spec');
+  /* elsewhere, without the library: the spec comes in with the map */
+  const away = { ...J, customCharacters: [{ ...c.spec, id: 'custom-elsewhere1', name: 'Ferryman' }], characters: [{ ...J.characters[0], sprite: 'custom-elsewhere1' }, { sprite: 'custom-gone', x: 4, y: 2, face: 0 }] };
+  const back = fromJSON(away);
+  assert.deepEqual(back.chars.map(x => x.sprite), ['custom-elsewhere1', 'villager'], 'a made character with no spec comes back as a villager');
+  assert.equal(toJSON(back).customCharacters[0].name, 'Ferryman');
 });

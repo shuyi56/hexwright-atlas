@@ -1,8 +1,10 @@
 import { BODY_TYPES, REF, measure } from './body.js';
-import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SWORD, recolor, staff } from './parts.js';
+import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, recolor, staff } from './parts.js';
+import { BANDANA, FEATHER_CAP, WIZARD_HAT } from './hats.js';
 import { finish, frameBuf, mixHex, ramp, stamp } from './pixels.js';
+import { TOWNSFOLK } from './townsfolk.js';
 
-/* ================= tactics sprites: the roster =================
+/* ================= character sprites: the roster =================
    Each job is a build, an outfit, a palette and a stack of hand-drawn parts. The body (torso, arms, legs, a
    cloak) is cut for the build by body.js; the rest hangs on its landmarks. A frame is built back to front
    through fixed slots; a job fills the slots it needs. Views: 'front' (south-west) and 'back' (north-east);
@@ -19,6 +21,8 @@ const ANCHOR = {
   front: { head: 'head', hair: 'head', hat: 'head', weapon: 'handFar', staff: 'handFar', shield: 'handNear', armNear: 'shoulderNear', armFar: 'shoulderFar' },
   back: { head: 'head', hair: 'head', hairOver: 'head', hat: 'head', weapon: 'handNear', staff: 'handNear', shield: 'handFar', armNear: 'shoulderNear', armFar: 'shoulderFar' } };
 const POSES = 3, VIEWS = ['front', 'back'], BODIES = Object.keys(BODY_TYPES);
+/* the walk cycle, as the poses play: a stride, passing upright, the other stride, upright again */
+const WALK = [1, 0, 2, 0];
 /* slots that meet without a contour: the head with its hair and hat, the torso with what is worn over it */
 const GROUP = { head: 1, hair: 1, hairOver: 1, hat: 1, torso: 2, overTorso: 2 };
 
@@ -63,20 +67,19 @@ function render(job, body = job.body) {
    Shared letters are listed in parts.js. Jobs add: X hat or hood, R a bright accent (plume, scarf, pennant),
    V cape, F feather, bone or white, D a dark accent, U a shield's face, J a jewel, Z a face lost in shadow and
    N eyes glowing out of it. */
-const SKIN = '#ecc39a', TAN = '#d9a77c';
 /* pauldrons riding over the arms */
 const PAULDRONS = { armNear: { x: 19, y: 17, rows: ['.SSS.', 'SSSSS', 'SSSSS', 'sssss'], hand: 'near' }, armFar: { x: 7, y: 18, rows: ['.SS.', 'SSSS', 'ssss'], hand: 'far' } };
 
 const SQUIRE = {
   id: 'squire', name: 'Squire', blurb: 'Every recruit starts here: a padded jerkin and a borrowed blade.',
   body: 'standard', outfit: { torso: 'tunic', strap: 1 }, hair: HAIR_SHORT, weapon: SWORD,
-  pal: { K: SKIN, H: '#8a5a30', A: '#bf8a52', B: '#ece0c6', C: '#93653d', L: '#6b4a30', G: '#d9b257', P: '#7b6c55', O: '#5c4231', S: '#c9cdd1' }
+  pal: { K: SKIN, H: '#8a5a30', A: '#bb8d5c', B: '#ece0c6', C: '#93653d', L: '#6b4a30', G: '#c9a24f', P: '#7b6c55', O: '#5c4231', S: '#c8c9c2' }
 };
 
 const KNIGHT = {
   id: 'knight', name: 'Knight', blurb: 'Plate, a kite shield and a long cloak: the line that holds.',
   body: 'stocky', outfit: { torso: 'plate', sleeves: { A: 'S', C: 'S' }, hands: 'D', cloak: true }, hair: HAIR_SHORT, weapon: SWORD, shield: KITE,
-  pal: { K: SKIN, H: '#c9a05a', A: '#4d6aa3', C: '#d9b257', L: '#5c4231', G: '#d9b257', P: '#a9b1b8', O: '#6d7883', S: '#c3cad0', D: '#7f8a96', R: '#c0473a', V: '#3f5a92', U: '#4d6aa3' },
+  pal: { K: SKIN, H: '#c9a05a', A: '#5f7c9c', C: '#c9a24f', L: '#5c4231', G: '#c9a24f', P: '#aeb0aa', O: '#6d747a', S: '#c8c8c0', D: '#858a8c', R: '#b0503c', V: '#536d8c', U: '#5f7c9c' },
   parts: {
     front: {
       armNear: PAULDRONS.armNear, armFar: PAULDRONS.armFar,
@@ -116,108 +119,108 @@ const ARCHER = {
   id: 'archer', name: 'Archer', blurb: 'A feathered cap, a quiver at her back and a longbow in hand.',
   body: 'slim', outfit: { torso: 'tunic', strap: -1 }, hair: HAIR_PONYTAIL,
   weapon: BOW,
-  pal: { K: SKIN, H: '#a5532f', A: '#7f9a4f', B: '#e8dcc0', C: '#5f7a3a', L: '#7a5434', G: '#d9b257', P: '#6e6048', O: '#5c4231', T: '#8a6238', F: '#efe6d2', X: '#5f8a45', R: '#c9503c' },
+  pal: { K: SKIN, H: '#a6533b', A: '#87a05a', B: '#e8dcc0', C: '#637d43', L: '#7a5434', G: '#c9a24f', P: '#6e6048', O: '#5c4231', T: '#8a6238', F: '#efe6d2', X: '#6c8549', R: '#b8483a' },
   parts: {
     front: {
       behind: { x: 6, y: 12, rows: ['.R.R', 'RFRF', '.LL.', '.LL.', '.LL.'] },
-      hat: { x: 7, y: 0, rows: [
-        '..............R.',
-        '.........XXXXRR.',
-        '.......XXXXXXXRR',
-        '.....XXXXXXXXXXR',
-        '....XXXXXXXXXXXX',
-        '...XXXXXXXXXXXXX',
-        '..xxxxxxxxxxxXXX',
-        '...........XXXX.',
-        '............XX..'] } },
+      hat: FEATHER_CAP.front },
     back: {
       behind: { x: 11, y: 12, rows: ['.......RFR.', '......RFRF.', '.......LLL.', '......LLL..', '......LLL..', '.....LLL...', '.....LLL...', '....LLL....', '....LLL....', '...LLL.....', '...LLL.....', '..LLL......', '..lll......'] },
-      hat: { x: 7, y: 0, rows: [
-        '.R..............',
-        'RR.XXXXX........',
-        'RXXXXXXXXXX.....',
-        'RXXXXXXXXXXXX...',
-        'XXXXXXXXXXXXXX..',
-        '.XXXXXXXXXXXXXX.',
-        '.xxxxxxxxxxxxxx.'] } } }
+      hat: FEATHER_CAP.back } }
 };
 
 const THIEF = {
   id: 'thief', name: 'Thief', blurb: 'Bandana, scarf and a dirk held low: in and out before the dust settles.',
   body: 'slim', outfit: { torso: 'tunic', vest: true }, hair: HAIR_SHORT, weapon: DAGGER, shield: DAGGER,
-  pal: { K: TAN, H: '#4f3c2e', A: '#5f7480', B: '#d8ccb0', C: '#4c5d68', L: '#4a3526', G: '#c9a24f', P: '#4e4a58', O: '#3e3029', S: '#c9cdd1', D: '#6e4a32', R: '#b8403a' },
+  pal: { K: TAN, H: '#4f3c2e', A: '#66727e', B: '#d8ccb0', C: '#4d5862', L: '#4a3526', G: '#c9a24f', P: '#55525a', O: '#3e3029', S: '#c8c9c2', D: '#7a5a3a', R: '#a8483a' },
   parts: {
     front: {
       overTorso: { x: 11, y: 16, rows: ['..RRRRRR.....', '.RRRRRRRRRR..', '..rrRRrrRRRR.', '...RR....RRR.', '...R......RR.'] },
-      hat: { x: 8, y: 3, rows: [
-        '....RRRRRRR.....',
-        '..RRRRRRRRRRRR..',
-        '.RRRRRRRRRRRRRR.',
-        '.rrrrrrrrrRRRRRR',
-        '..........RRRRRR',
-        '............RRRR',
-        '.............RR.',
-        '.............RR.',
-        '..............R.'] } },
+      hat: BANDANA.front },
     back: {
       overTorso: { x: 11, y: 16, rows: ['..RRRRRRR..', '.RRRRRRRRRR', '..RRRRRRRR.', '....RR.....', '....RR.....', '....RRR....', '.....RR....'] },
-      hat: { x: 8, y: 3, rows: [
-        '.....RRRRRR.....',
-        '..RRRRRRRRRRRR..',
-        '.RRRRRRRRRRRRRR.',
-        '.rrrrrrrrrrrrrr.',
-        '......RRR.......',
-        '.......RR.......',
-        '.......RRR......',
-        '........RR......',
-        '........R.......'] } } }
+      hat: BANDANA.back } }
 };
 
-const LANCER = {
-  id: 'lancer', name: 'Lancer', blurb: 'Dragon-crested and armoured in indigo: the lance that falls from the sky.',
-  body: 'tall', outfit: { torso: 'plate', sleeves: { A: 'S', C: 'S' }, hands: 'D', steady: true }, hair: HAIR_SHORT,
+/* The dragoon: a dragon helm, its snout jutting forward over the brow with two fangs beneath, a crest of spikes
+   swept back along its crown, a horn sweeping back from the temple, and a cheek guard down to a point; layered
+   pauldrons each thrown up into a spike; a ridged cuirass over mail with pointed tassets, spiked couters, flared
+   gauntlets, greaves with spiked knee cops and pointed sabatons; a short cape dagged into points like a wing; and
+   the winged lance (parts.js). Crimson-lacquered plate over black iron and mail, a black iron crest, gauntlets and
+   cape, brass trim, bone horns and fangs, an amber eye and a gold tuft on the lance. */
+const DRAGOON_PAULDRONS = {
+  armNear: { x: 19, y: 13, rows: [
+    '.......S.',
+    '......SS.',
+    '.....SSS.',
+    '..SSSSSS.',
+    '.SSSSSSSS',
+    'SSSSSSSS.',
+    'GGGGGGG..',
+    'SSSSSS...',
+    'sssss....'] },
+  armFar: { x: 3, y: 15, rows: [
+    'S......',
+    '.SS....',
+    '.SSSSS.',
+    'SSSSSSS',
+    '.GGGGGG',
+    '..SSSSS'] } };
+const DRAGOON = {
+  id: 'dragoon', name: 'Dragoon', blurb: 'Dragon-helmed and spiked from crest to sabaton: the lance that falls from the sky.',
+  body: 'standard', outfit: { torso: 'dragon', tassets: 3, greaves: true, cloak: 'dagged', sleeves: { A: 'S', C: 'G', spike: true }, hands: 'D', steady: true }, hair: HAIR_SHORT,
   weapon: LANCE,
-  pal: { K: SKIN, H: '#3e2e26', A: '#5a4f7a', C: '#d9b257', L: '#4a3526', G: '#d9b257', P: '#6f6c99', O: '#4e4c72', S: '#8784b8', D: '#55527e', T: '#6b4a30', R: '#c0473a', F: '#ece2cc', J: '#c0473a' },
+  pal: { K: SKIN, H: '#3e2e26', S: '#a0503f', D: '#3f3a3d', A: '#5d5a62', P: '#5d5a62', O: '#8c4a3d', C: '#c9a24f', G: '#c9a24f', L: '#4a3526', T: '#8a6238', R: '#c9a24f', V: '#34303a', F: '#e6dcc4', J: '#e0c060' },
   parts: {
     front: {
-      armNear: PAULDRONS.armNear, armFar: PAULDRONS.armFar,
-      hat: { x: 6, y: 0, rows: [
-        '...............FFF',
-        '........SSSS..FFF.',
-        '......SSSSSSSSFF..',
-        '.....SSSSSSSSSSF..',
-        '...SSJSSSSSSSSSSS.',
-        'SSSSSSSSSSSSSSSSS.',
-        '.sSSSSSSSSSSSSSSSS',
-        '...ssssssssssSSSSS',
-        '...S.........SSSSS',
-        '...S..........SSSS',
-        '...S..........SSS.',
-        '..............SSS.',
-        '..............SS..'] } },
+      armNear: DRAGOON_PAULDRONS.armNear, armFar: DRAGOON_PAULDRONS.armFar,
+      hat: { x: 2, y: 0, rows: [
+        '...........D...D...D......',
+        '..........DD..DD..DD.....F',
+        '........SDDSSDDSSDD.....FF',
+        '......SSSSSSSSSSSSS.....FF',
+        '.....SSSssssssssSSSS...FF.',
+        '.....SJJSSSSSSSSSSSSSFFF..',
+        '...SSSSSSSSSSSSSSSSFFFF...',
+        '..SsSSSsssssssssSSSSSS....',
+        '.SSSSSSSSSSSSSSSSSSSSS....',
+        '..sssGGGGGGGGGGGSSSSSS....',
+        '...F.F..........SSSSSS....',
+        '.................SSSSS....',
+        '.................SSSSS....',
+        '.................sssss....',
+        '.................SSSSS....',
+        '.................GSSS.....',
+        '.................GSS......',
+        '..................S.......'] } },
     back: {
-      armNear: PAULDRONS.armNear, armFar: PAULDRONS.armFar,
-      hat: { x: 7, y: 0, rows: [
-        '..FF.........FF..',
-        '..FF..SSSSS..FF..',
-        '...FSSSSSSSSSF...',
-        '...SSSSSJSSSSS...',
-        '..SSSSSSJSSSSSS..',
-        '.SSSSSSSJSSSSSSS.',
-        '.SSSSSSSJSSSSSSS.',
-        '.SSSSSSSSSSSSSSS.',
-        '.sssssssssssssss.',
-        '..SSSSSSSSS..SSS.',
-        '..SSSSSSSSS..SS..',
-        '...SSSSSSSS......',
-        '....SSSSSS.......'] } } }
+      armNear: DRAGOON_PAULDRONS.armNear, armFar: DRAGOON_PAULDRONS.armFar,
+      hat: { x: 4, y: 0, rows: [
+        '...........D............',
+        '..F........D............',
+        '..FF......DDD.......F...',
+        '...FF..SSSSDSSSS...FF...',
+        '...FFFSSSSDDDSSSSFFF....',
+        '....FFFSSSSDSSSSSFFF....',
+        '....SFFSSSSDSSSSSFFS....',
+        '....SSSSSSDDDSSSSSSSSS..',
+        '....SSSSSSSDSSSSSSSSSS..',
+        '....GGGGGGGGGGGGGGGGGs..',
+        '....SSSSSSSSSSSSSSSSF.F.',
+        '.....SSSSSSSSSSSSSS.....',
+        '.....ssssssssssssss.....',
+        '.....SSSSSSSSSSSSSS.....',
+        '......ssssssssssss......',
+        '.......SSSSSSSSSS.......',
+        '.........SSSSSS.........',
+        '...........SS...........'] } } }
 };
 
 const VALKYRIE = {
   id: 'valkyrie', name: 'Valkyrie', blurb: 'Winged helm, crimson skirts, spear and buckler: a shield-maiden.',
   body: 'tall', outfit: { torso: 'plate', skirt: 3, sleeves: { A: 'S', C: 'S' }, steady: true }, hair: HAIR_BUN, shield: BUCKLER,
   weapon: staff(['..S..', '.SSS.', '.SSS.', '.SSS.', '..S..', '.GGG.'], 27, { lean: 5, behind: true }),
-  pal: { K: SKIN, H: '#e3bf5c', A: '#b8463c', C: '#d9b257', L: '#5c4231', G: '#d9b257', P: '#a9b1b8', O: '#6b4a34', S: '#c9d0d6', T: '#7a5434', F: '#f4efe4', U: '#b8463c', J: '#5a8ec0' },
+  pal: { K: SKIN, H: '#dcc070', A: '#a84a3c', C: '#c9a24f', L: '#5c4231', G: '#c9a24f', P: '#aeb0aa', O: '#6b4a34', S: '#ccccc4', T: '#7a5434', F: '#f4efe4', U: '#a84a3c', J: '#6f8faa' },
   parts: {
     front: {
       armNear: PAULDRONS.armNear,
@@ -243,36 +246,31 @@ const VALKYRIE = {
 
 /* the black mage's head: a face lost in the hat's shadow, two eyes glowing out of it */
 const SHADOW_FACE = { x: 9, y: 4, rows: HEAD_FRONT.rows.map((r, j) => r.replace(/[A-Z]/gi, 'Z').replace(/./g, (c, i) => (c === 'Z' && (j === 7 || j === 8) && (i === 2 || i === 6) ? 'N' : c))) };
+/* the robe's high collar, standing up round the jaw: in front it hides the chin, so the face is a band of
+   shadow between the brim and the collar; behind, it rises over the nape. It hangs on the neck. */
+const BM_COLLAR = {
+  front: { anchor: 'neck', x: 9, y: 14, rows: [
+    'AA..........AA',
+    'AAA........AAA',
+    'AAAAA....AAAAA',
+    'AAAAAAACAAAAAa',
+    '.aAAAAACAAAAa.',
+    '..AAAAACAAAA..'] },
+  back: { anchor: 'neck', x: 9, y: 14, rows: [
+    'A............A',
+    'AA..........AA',
+    'AAAAAAAAAAAAAA',
+    'aAAAAAAAAAAAAa',
+    '.aaaaaaaaaaaa.',
+    '..AAAAAAAAAA..'] } };
 const BLACK_MAGE = {
-  id: 'blackmage', name: 'Black Mage', blurb: 'A wide-brimmed hat, a face of shadow and two burning eyes.',
-  body: 'stocky', outfit: { torso: 'robe', legs: 'robe', hands: 'D', steady: true }, head: { front: SHADOW_FACE, back: recolor(HEAD_BACK, { K: 'Z' }) },
+  id: 'blackmage', name: 'Black Mage', blurb: 'A wide-brimmed hat, a face of shadow and two burning eyes over a high collar.',
+  body: 'stocky', outfit: { torso: 'gown', legs: 'gown', sleeves: { bell: true }, hands: 'D', steady: true }, head: { front: SHADOW_FACE, back: recolor(HEAD_BACK, { K: 'Z' }) },
   weapon: staff(['T...T', 'TT.TT', '.TTT.', '..T..', '..T..'], 19),
-  pal: { K: SKIN, A: '#4f66a6', C: '#d3ad55', L: '#6b4a30', G: '#d3ad55', O: '#5c3d2c', T: '#8a6238', X: '#5e5a8a', D: '#3a3550', Z: { flat: '#1e1a2a' }, N: { flat: '#ffd75e' } },
+  pal: { K: SKIN, A: '#56688f', C: '#c9a24f', L: '#6b4a30', G: '#c9a24f', O: '#5c3d2c', T: '#8a6238', X: '#5d5a74', D: '#45404f', Z: { flat: '#251f2b' }, N: { flat: '#f2c460' } },
   parts: {
-    front: { hat: { x: 4, y: 0, rows: [
-      '..............XXx.......',
-      '............XXXx........',
-      '...........XXXX.........',
-      '..........XXXXXX........',
-      '.........XXXXXXXX.......',
-      '........XXXXXXXXXX......',
-      '.......GGGGGGGGGGGG.....',
-      '......XXXXXXXXXXXXXX....',
-      '..XXXXXXXXXXXXXXXXXXXXX.',
-      '.XXXXXXXXXXXXXXXXXXXXXXX',
-      '..xxxxxxxxxxxxxxxxxxxx..'] } },
-    back: { hat: { x: 4, y: 0, rows: [
-      '.......xXX..............',
-      '........xXXX............',
-      '.........XXXX...........',
-      '........XXXXXX..........',
-      '.......XXXXXXXX.........',
-      '......XXXXXXXXXX........',
-      '.....GGGGGGGGGGGG.......',
-      '....XXXXXXXXXXXXXX......',
-      '..XXXXXXXXXXXXXXXXXXXXX.',
-      '.XXXXXXXXXXXXXXXXXXXXXXX',
-      '..XXXXXXXXXXXXXXXXXXXX..'] } } }
+    front: { hat: WIZARD_HAT.front, mantle: BM_COLLAR.front },
+    back: { mantle: BM_COLLAR.back, hat: WIZARD_HAT.back } }
 };
 
 /* The hoods are a fitted cowl over the head (hat slot) and what falls from it over the shoulders (mantle slot,
@@ -415,7 +413,7 @@ const WHITE_MAGE = {
   id: 'whitemage', name: 'White Mage', blurb: 'A white hooded robe edged in red teeth, and a staff crowned with an orb.',
   body: 'slim', outfit: { torso: 'robe', legs: 'robe', teeth: true, steady: true }, hair: HAIR_SHORT,
   weapon: staff(['..J..', '.JJJ.', 'GJJJG', '.GGG.', '..G..'], 22),
-  pal: { K: SKIN, H: '#9a6238', A: '#efe8d8', C: '#c0473a', L: '#c0473a', G: '#d9b257', O: '#8a6a4a', T: '#a8865e', X: '#f2ece0', J: '#d24a3c' },
+  pal: { K: SKIN, H: '#9a6238', A: '#efe6d4', C: '#b8483a', L: '#b8483a', G: '#c9a24f', O: '#8a6a4a', T: '#a8865e', X: '#f2eadb', J: '#c0503c' },
   parts: { front: { hat: WM_HOOD_FRONT, mantle: WM_MANTLE_FRONT }, back: { hat: WM_HOOD_BACK, mantle: [WM_MANTLE_BACK, WM_TAIL] } }
 };
 
@@ -423,10 +421,14 @@ const SUMMONER = {
   id: 'summoner', name: 'Summoner', blurb: 'A horned hood, robes of moss green, and a rod set with a calling stone.',
   body: 'standard', outfit: { torso: 'robe', legs: 'robe', steady: true }, hair: HAIR_LONG,
   weapon: staff(['..J..', '.JJJ.', 'FJJJF', 'F.J.F', '.FGF.', '..G..'], 20),
-  pal: { K: SKIN, H: '#6b3f2a', A: '#6d915c', C: '#d9b257', L: '#8a6238', G: '#d9b257', O: '#5c4231', T: '#8a6238', X: '#5a804c', F: '#ece2cc', J: '#58b4c4' },
+  pal: { K: SKIN, H: '#6b3f2a', A: '#738f5a', C: '#c9a24f', L: '#8a6238', G: '#c9a24f', O: '#5c4231', T: '#8a6238', X: '#5f7c49', F: '#ece2cc', J: '#6fb0b4' },
   parts: { front: { hat: SM_HOOD_FRONT, mantle: SM_LAPPETS }, back: { hat: SM_HOOD_BACK, mantle: SM_TAIL } }
 };
 
-const ROSTER = [SQUIRE, KNIGHT, ARCHER, THIEF, LANCER, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
+const JOBS = [SQUIRE, KNIGHT, ARCHER, THIEF, DRAGOON, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
+/* everyone who can be drawn: the townsfolk (townsfolk.js), then the jobs */
+const ROSTER = [...TOWNSFOLK, ...JOBS];
+const BY_ID = new Map(ROSTER.map(c => [c.id, c]));
+const byId = id => BY_ID.get(id) || null;
 
-export { BODIES, POSES, ROSTER, VIEWS, frame, palette, render };
+export { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render };

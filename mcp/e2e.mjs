@@ -51,6 +51,15 @@ try {
   await json('undo', { steps: 1 }); assert.equal((await json('getTile', { x: 10, y: 2 })).piece, null);
   await json('redo'); assert.equal((await json('getTile', { x: 10, y: 2 })).piece.id, 'rowboat');
 
+  /* the character maker's choices, through the API: make a character, find it in the roster, stand it on the map */
+  const made = await json('makeCharacter', { name: 'E2E smith', build: 'stocky', clothes: 'tunic', held: 'sword', colours: { cloth: '#a6533b' } });
+  assert.match(made.id, /^custom-/); assert.equal(made.kind, 'custom'); assert.equal(made.spec.colours.cloth, '#a6533b');
+  assert.ok((await json('listSprites')).sprites.some(x => x.id === made.id && x.name === 'E2E smith'));
+  r = await json('placeCharacter', { sprite: made.id, x: 2, y: 9 }); assert.ok(r.placed, r.reason); assert.equal(r.character.sprite, made.id);
+  assert.equal((await json('makeCharacter', { id: made.id, hat: 'straw' })).spec.hat, 'straw', 'changing a made character keeps the rest');
+  await bad('makeCharacter', { clothes: 'armour' }, /clothes must be one of/);
+  assert.ok((await json('getMap')).customCharacters.some(c => c.id === made.id), 'the map carries its made characters');
+
   const s = await json('tileToScreen', { x: 3, y: 3 }); assert.ok(s.visible);
   const back = await json('screenToTile', { sx: s.canvas.x, sy: s.canvas.y }); assert.deepEqual([back.x, back.y], [3, 3]);
   await json('setView', { rot: 1, zoom: 1.5, center: { x: 7, y: 7 }, grid: false });

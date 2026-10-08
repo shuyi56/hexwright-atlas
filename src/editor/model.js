@@ -1,11 +1,11 @@
-import { get as getSprite, merge as mergeSprites } from '../characters/library.js';
-import { spriteFromJSON, spriteToJSON } from '../characters/sprite.js';
+import { characterById, get as getCustom, merge as mergeCustom } from '../characters/library.js';
 import { ASSET_BY_ID, TERRAIN, TERRAIN_BY_ID, footprint } from '../tiles/index.js';
 
 /* ================= tile editor: the map model =================
    terr holds an index into TERRAIN per tile, elev a height level 0..MAX_ELEV,
    objs the placed assets as { id, x, y, face, v } with (x, y) the top-left of the footprint.
-   chars are the characters standing on the map as { sprite, x, y, face }, one tile each.
+   chars are the characters standing on the map as { sprite, x, y, face }, one tile each, sprite being the id of a
+   character in the roster (characters/roster.js) or one made in the character maker (characters/library.js).
    Storeys: the ground is level 0. floors[L - 1] holds upper floor L as one byte per tile, 0 where there is no
    floor and 1 + a TERRAIN index where there is; it stands STOREY height levels above the ground under it.
    Pieces and characters carry level (absent means 0) and only meet things on their own level. */
@@ -34,12 +34,18 @@ function floorsJSON(M) {
   });
   return out.length ? { floors: out } : {};
 }
-/* characters are written with the sprites they use, so a saved map does not depend on the library */
+/* characters are written by their id. Every copy of the app can draw the roster; the specs of any made in the
+   character maker go with the map (customCharacters), so it opens anywhere with them */
 function charsJSON(M) {
   const chars = M.chars || []; if (!chars.length) return {};
-  const used = [...new Set(chars.map(c => c.sprite))].map(getSprite).filter(Boolean);
-  return { characters: chars.map(({ sprite, x, y, face, level }) => (level ? { sprite, x, y, face, level } : { sprite, x, y, face })), sprites: used.map(spriteToJSON) };
+  const custom = [...new Set(chars.map(c => c.sprite))].map(getCustom).filter(Boolean).map(c => c.spec);
+  return { characters: chars.map(({ sprite, x, y, face, level }) => (level ? { sprite, x, y, face, level } : { sprite, x, y, face })), ...(custom.length ? { customCharacters: custom } : {}) };
 }
+/* Maps saved with the first character style name their people 'starter-villager' and so on, and carry the pixels
+   of every sprite they used. The starters come back as the same people in the current style; anyone else it cannot
+   find (a character painted in the old sprite editor, or a made one whose spec is missing) comes back as a
+   villager, standing where they stood. */
+const characterId = id => (characterById(id) ? id : characterById(id.replace(/^starter-/, '')) ? id.replace(/^starter-/, '') : 'villager');
 function fromJSON(J) {
   if (!J || J.format !== 'hexwright-tiles' || !(J.size >= 4 && J.size <= 96)) throw new Error('Not a Hexwright tile map');
   const S = J.size | 0, M = blankModel(S, 'grass', String(J.name || 'Imported survey').slice(0, 60));
@@ -52,9 +58,8 @@ function fromJSON(J) {
     for (let u = 0; u < S * S; u++) { const c = F.cells[u] | 0, id = c ? F.palette[c - 1] : null; f[u] = id && TI[id] != null ? TI[id] + 1 : 0; }
   }
   M.objs = (J.objects || []).filter(o => ASSET_BY_ID[o.id]).map(o => { const r = { id: o.id, x: o.x | 0, y: o.y | 0, face: (o.face | 0) & 3, v: +o.v || 0 }; if (lv(o.level)) r.level = lv(o.level); return r; });
-  const sprites = []; for (const sj of J.sprites || []) { try { sprites.push(spriteFromJSON(sj)); } catch { /* skip a damaged sprite */ } }
-  mergeSprites(sprites);
-  M.chars = (J.characters || []).filter(c => c && typeof c.sprite === 'string' && Number.isInteger(c.x) && Number.isInteger(c.y) && c.x >= 0 && c.y >= 0 && c.x < S && c.y < S).map(c => { const r = { sprite: c.sprite, x: c.x, y: c.y, face: (c.face | 0) & 3 }; if (lv(c.level)) r.level = lv(c.level); return r; });
+  mergeCustom(Array.isArray(J.customCharacters) ? J.customCharacters : []);
+  M.chars = (J.characters || []).filter(c => c && typeof c.sprite === 'string' && Number.isInteger(c.x) && Number.isInteger(c.y) && c.x >= 0 && c.y >= 0 && c.x < S && c.y < S).map(c => { const r = { sprite: characterId(c.sprite), x: c.x, y: c.y, face: (c.face | 0) & 3 }; if (lv(c.level)) r.level = lv(c.level); return r; });
   return M;
 }
 
