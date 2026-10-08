@@ -1,5 +1,7 @@
-import { FACES, FIGURE, drawFigure, figureBox, figureThumb, footShadow } from '../characters/draw.js';
-import { JOBS, ROSTER, WALK, byId } from '../characters/roster.js';
+import { FACES, FIGURE, drawFigure, figureBox, figureThumb, footShadow, lookOf } from '../characters/draw.js';
+import { characterById, list as customList, onChange as onLibraryChange } from '../characters/library.js';
+import { makerOpen, openMaker } from '../characters/maker.js';
+import { JOBS, ROSTER, WALK } from '../characters/roster.js';
 import { TOWNSFOLK } from '../characters/townsfolk.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
@@ -126,7 +128,7 @@ function charAtScreen(sx, sy) {
   for (let i = views.length - 1; i >= 0; i--) { const v = views[i]; if (v.level !== ED.level) continue; const [px, py] = R.P(v.X, v.Y, v.z); if (wx >= px - half && wx <= px + half && wy >= py - FIG_H - 2 && wy <= py + 5) return v.k; }
   return -1;
 }
-const spriteOf = c => byId(c.sprite);
+const spriteOf = c => characterById(c.sprite);
 /* Draw one character (with its ground shadow) onto the overlay, cut away wherever the map stands in front of
    it. The figure is drawn into a scratch canvas at screen resolution, the mask of the pieces and raised
    tiles in front (render.js frontMask, cached while the character stays inside its box and depth band) is
@@ -274,7 +276,7 @@ function draw() {
     if (fill) { g.fillStyle = fill; g.fill(); } g.strokeStyle = stroke; g.lineWidth = 1.6 / ED.z; g.stroke();
   };
   if (ED.hover && ED.tool === 'character') {
-    const { x, y } = ED.hover, ok = isFreeTile(x, y), z = zAt(x, y, ED.level), [X, Y] = viewPt(x + 0.5, y + 0.5), s = byId(ED.char);
+    const { x, y } = ED.hover, ok = isFreeTile(x, y), z = zAt(x, y, ED.level), [X, Y] = viewPt(x + 0.5, y + 0.5), s = characterById(ED.char);
     outline([[x, y]], ok ? 'rgba(255,240,200,0.9)' : '#b8483a', ok ? 'rgba(255,240,200,0.18)' : 'rgba(184,72,58,0.25)');
     if (s) drawChar(g, R, { X, Y, z, ground: z }, s, FACES[faceIn(ED.face)], 0, 'ghost', ok ? 0.85 : 0.4, ED.level);
   }
@@ -361,7 +363,7 @@ function setLevel(L) {
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }
 function setTab(t) { ED.tab = t; for (const b of root.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === t)); buildPalette(); }
 function status() {
-  const nc = (ED.M.chars || []).length, cname = c => (byId(c.sprite) || { name: 'Unknown character' }).name;
+  const nc = (ED.M.chars || []).length, cname = c => (characterById(c.sprite) || { name: 'Unknown character' }).name;
   if (walkNote) { const n = walkNote; walkNote = ''; statusEl.textContent = n; return; }
   const L = ED.level, where = L ? ` · ${LEVEL_NAME(L)}` : '';
   if (!ED.hover) { statusEl.textContent = `${ED.M.S}×${ED.M.S} tiles · ${ED.M.objs.length} pieces${nc ? ` · ${nc} character${nc > 1 ? 's' : ''}` : ''}${where}`; return; }
@@ -390,24 +392,48 @@ function buildPalette() {
   }
   syncPalette();
 }
-/* the Characters tab lists the roster (characters/roster.js), the townsfolk and then the jobs, each standing on a
-   grass block; clicking one arms the Person tool */
+/* The Characters tab lists everyone who can stand on the map, each on a grass block: the townsfolk, the jobs
+   (characters/roster.js) and the characters made in the character maker. Clicking one arms the Person tool.
+   New character… opens the maker on a new character; Edit… opens it on a made one, or on a copy of one of the
+   townsfolk (the jobs are drawn by hand, so the maker cannot make them). */
 const charThumbs = new Map();
+function editLabel() {
+  const mine = ED.char && ED.char.startsWith('custom-'), town = TOWNSFOLK.some(t => t.id === ED.char);
+  return mine ? ['Edit…', 'Change this character in the character maker'] : town ? ['Copy and edit…', 'Start a new character from this one'] : ['Edit…', 'The jobs are drawn by hand; start a new character or copy one of the townsfolk'];
+}
+function maker(what) {
+  const back = id => { if (id) ED.char = id; setTab('Characters'); setTool('character'); req(); cv.focus({ preventScroll: true }); };
+  const canDelete = id => { const n = (ED.M.chars || []).filter(c => c.sprite === id).length; return n ? `${n} on this map ${n > 1 ? 'are' : 'is'} this character; take ${n > 1 ? 'them' : 'it'} off the map first.` : null; };
+  openMaker(what, { back, canDelete });
+}
 function buildCharacters(box) {
-  for (const [gn, list] of [['Townsfolk', TOWNSFOLK], ['Jobs', JOBS]]) {
+  const row = document.createElement('div'); row.className = 'ed-charbar'; box.appendChild(row);
+  const [label, title] = editLabel(), editable = ED.char && (ED.char.startsWith('custom-') || TOWNSFOLK.some(t => t.id === ED.char));
+  for (const [text, tip, fn, ok] of [['New character…', 'Make a character in the character maker', () => maker('new'), true], [label, title, () => maker(ED.char), editable]]) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = text; b.title = tip; b.disabled = !ok; b.addEventListener('click', fn); row.appendChild(b);
+  }
+  const mine = customList();
+  for (const [gn, list] of [['Townsfolk', TOWNSFOLK], ['Jobs', JOBS], ...(mine.length ? [['Made here', mine]] : [])]) {
     const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h);
     const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
     for (const s of list) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-item'; b.dataset.kind = 'char'; b.dataset.id = s.id; b.title = `${s.name}: ${s.blurb}`;
-      if (!charThumbs.has(s.id)) charThumbs.set(s.id, figureThumb(s, 60));
-      const src = charThumbs.get(s.id), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); b.appendChild(c);
+      const key = lookOf(s); if (!charThumbs.has(key)) { if (charThumbs.size > 120) charThumbs.clear(); charThumbs.set(key, figureThumb(s, 60)); }
+      const src = charThumbs.get(key), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); b.appendChild(c);
       const t = document.createElement('span'); t.textContent = s.name; b.appendChild(t);
-      b.addEventListener('click', () => { ED.char = s.id; setTool('character'); syncPalette(); });
+      b.addEventListener('click', () => { ED.char = s.id; setTool('character'); syncPalette(); syncEdit(); });
       grid.appendChild(b);
     }
   }
   syncPalette();
 }
+/* the Edit… button follows the selected character */
+function syncEdit() {
+  const b = root.querySelector('.ed-charbar .btn:nth-child(2)'); if (!b) return;
+  const [label, title] = editLabel(); b.textContent = label; b.title = title; b.disabled = !(ED.char && (ED.char.startsWith('custom-') || TOWNSFOLK.some(t => t.id === ED.char)));
+}
+/* a change to the library (the maker, the API, a map bringing its characters) redraws the map and the list */
+onLibraryChange(() => { if (ED.open && ED.tab === 'Characters' && !makerOpen()) buildPalette(); req(); });
 function syncPalette() { for (const b of root.querySelectorAll('.ed-item')) b.setAttribute('aria-pressed', String(b.dataset.kind === 'terrain' ? b.dataset.id === ED.terrain : b.dataset.kind === 'char' ? b.dataset.id === ED.char : b.dataset.id === ED.asset)); $('edFace').textContent = `Facing ${['south-west', 'south-east', 'north-east', 'north-west'][ED.face]}`; }
 
 /* ---------- input ---------- */
@@ -445,7 +471,7 @@ function turnView(dir) {
   const sx = ED.R.OX + (nx - ny) * TWH, sy = ED.R.OY + (nx + ny) * THH; ED.ox = ED.cw / 2 - sx * ED.z; ED.oy = ED.ch / 2 - sy * ED.z; req();
 }
 function turnPiece() { ED.face = (ED.face + 1) % 4; syncPalette(); req(); }
-document.addEventListener('keydown', e => { if (ED.open && e.key === ' ' && e.target.tagName !== 'INPUT') { spaceDown = true; e.preventDefault(); } });
+document.addEventListener('keydown', e => { if (ED.open && !makerOpen() && e.key === ' ' && e.target.tagName !== 'INPUT') { spaceDown = true; e.preventDefault(); } });
 document.addEventListener('keyup', e => { if (e.key === ' ') spaceDown = false; });
 root.addEventListener('keydown', e => {
   if (!ED.open || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -493,7 +519,7 @@ function buildChrome() {
 
 /* back: label of the screen the editor returns to (the one left showing underneath it) */
 function openEditor(M, back = 'Atlas') {
-  ensureModel(); if (!byId(ED.char)) ED.char = ROSTER[0].id;
+  ensureModel(); if (!characterById(ED.char)) ED.char = ROSTER[0].id;
   root.hidden = false; ED.open = true; ED.rot = 0; $('edBack').textContent = `← ${back}`;
   if (M) { if (ED.M) checkpoint(); ED.M = M; autosave(); }
   $('edName').value = ED.M.name; showSize(ED.M.S);

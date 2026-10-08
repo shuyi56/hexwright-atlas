@@ -8,7 +8,8 @@ import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
 import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
 import { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render } from './roster.js';
-import * as townsfolk from './townsfolk.js';
+import { APPLIES, CHOICES, COLOURS, cleanSpec, fromSpec } from './custom.js';
+import * as hats from './hats.js';
 import { TOWNSFOLK } from './townsfolk.js';
 import { buildSheet, buildWalk } from './sheet.js';
 
@@ -20,7 +21,7 @@ test('every shared part is a rectangle of rows', () => {
     else if (Array.isArray(v)) v.forEach((p, i) => each(p, `${name}[${i}]`));
     else if (v && typeof v === 'object') for (const [k, p] of Object.entries(v)) each(p, `${name}.${k}`);
   };
-  for (const [name, v] of Object.entries({ ...parts, ...townsfolk })) if (typeof v !== 'function' && name !== 'TOWNSFOLK') each(v, name);
+  for (const [name, v] of Object.entries({ ...parts, ...hats })) if (typeof v !== 'function') each(v, name);
 });
 test('every job in every build draws all its frames inside the frame, in colours it defines', () => {
   assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 7); assert.equal(ROSTER.length, 16);
@@ -149,6 +150,39 @@ test('the townsfolk keep what made each of them recognisable, on every build', (
     assert.ok(monk.above('X') && !monk.back.some(x => x === 'H') && monk.torso('L'), `${b}: the monk's cowl hides his hair, and his rope belt hangs`);
     assert.ok(healer.has('U') && healer.has('R') && healer.below('H'), `${b}: the healer's satchel with its cross, and her long hair`);
     assert.ok(noble.below('H') && noble.has('J') && noble.torso('K') && !noble.has('P'), `${b}: the lady's braid, circlet jewel, neckline and gown`);
+  }
+});
+test('every choice the character maker offers draws inside the frame on every build, alone and mixed', () => {
+  const check = (spec, what) => {
+    const c = fromSpec(spec), pal = palette(c);
+    for (const b of BODIES) for (const v of VIEWS) for (let k = 0; k < POSES; k++) {
+      const buf = frame(c, v, k, b); assert.equal(buf.clipped, 0, `${what} ${b} ${v} ${k} runs off the frame`);
+      for (const m of new Set(buf.mat.filter(Boolean))) assert.ok(pal[m], `${what} uses "${m}" without a colour`);
+    }
+  };
+  for (const [key, opts] of Object.entries(CHOICES)) for (const [v] of opts) check({ [key]: v, ...(key === 'neckline' || key === 'rope' ? { clothes: 'gown' } : {}) }, `${key} ${v}`);
+  /* and sixty characters with every choice at random */
+  let seed = 7; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  for (let i = 0; i < 60; i++) { const spec = Object.fromEntries(Object.entries(CHOICES).map(([k, o]) => [k, o[rnd(o.length)][0]])); check(spec, JSON.stringify(spec)); }
+});
+test('a spec cleans whatever it is given, and survives JSON', () => {
+  const s = cleanSpec({ id: 'Bad Id!', name: '  ', clothes: 'armour', hat: 'kettle', colours: { cloth: 'red', hair: '#ABCDEF' } });
+  assert.match(s.id, /^custom-/); assert.equal(s.name, 'New character'); assert.equal(s.clothes, CHOICES.clothes[0][0]); assert.equal(s.hat, 'kettle');
+  assert.equal(s.colours.hair, '#abcdef'); assert.match(s.colours.cloth, /^#[0-9a-f]{6}$/); assert.deepEqual(Object.keys(s.colours), COLOURS.map(c => c[0]));
+  assert.deepEqual(cleanSpec(JSON.parse(JSON.stringify(s))), s);
+  /* choices that only mean something with some clothes leave the others alone */
+  assert.equal(fromSpec({ clothes: 'tunic', neckline: 'square', rope: 'rope' }).outfit.neckline, undefined);
+  assert.ok(!APPLIES.shield({ held: 'daggers' }));
+  /* the townsfolk are specs too, so the maker can start from any of them */
+  for (const t of TOWNSFOLK) { assert.ok(t.spec); assert.equal(fromSpec(t.spec).look, t.look); }
+});
+test('the monk wears a robe to the floor, tied with a rope, like the black mage\'s', () => {
+  const monk = byId('monk');
+  for (const b of BODIES) for (let k = 0; k < POSES; k++) {
+    const f = frame(monk, 'front', k, b).mat, m = measure(b, 'front', k, monk.outfit);
+    assert.ok(!f.includes('P'), `${b} ${k}: no trousers`);
+    assert.ok(f.slice((BASE - 1) * W, BASE * W).filter(c => c === 'C').length >= BODY_TYPES[b].chest, `${b} ${k}: a hem just off the ground`);
+    assert.ok(m.parts.torso.rows.some(r => /^\.*L+G?L+\.*$/.test(r)), `${b} ${k}: a rope girdle round the waist`);
   }
 });
 test('the dragoon is armoured in crimson, spiked all over, and carries a winged lance', () => {

@@ -1,7 +1,8 @@
 import { ASSET_BY_ID, ASSETS, TERRAIN, footprint } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { METHODS } from './api-spec.js';
-import { ROSTER, byId } from '../characters/roster.js';
+import { characterById, get as getCustom, list as customList, save as saveCustom } from '../characters/library.js';
+import { ROSTER } from '../characters/roster.js';
 import { TOWNSFOLK } from '../characters/townsfolk.js';
 import { ED, LEVEL_NAME, characterBoxes, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
 import { BIOMES, generateScene } from './generate.js';
@@ -65,8 +66,10 @@ function targetTiles(M, p) {
   if (p.x != null && p.y != null) { tileOf(M, p.x, p.y); return brushTiles(M, p.x, p.y, p.brush || 1); }
   return fail('give a target: x and y, tiles, or rect');
 }
-const spriteId = id => { if (!byId(id)) fail(`unknown sprite "${id}".${guess(id, ROSTER.map(s => s.id))}`); return id; };
-const charInfo = (M, k) => { const c = M.chars[k], s = byId(c.sprite); return { index: k, sprite: c.sprite, name: s ? s.name : null, x: c.x, y: c.y, level: levelOf(c), face: c.face }; };
+const everyone = () => [...ROSTER, ...customList()];
+const spriteId = id => { if (!characterById(id)) fail(`unknown sprite "${id}".${guess(id, everyone().map(s => s.id))}`); return id; };
+const spriteInfo = s => ({ id: s.id, name: s.name, kind: TOWNSFOLK.includes(s) ? 'townsfolk' : s.id.startsWith('custom-') ? 'custom' : 'job', build: s.body, about: s.blurb, ...(s.id.startsWith('custom-') ? { spec: s.spec } : {}) });
+const charInfo = (M, k) => { const c = M.chars[k], s = characterById(c.sprite); return { index: k, sprite: c.sprite, name: s ? s.name : null, x: c.x, y: c.y, level: levelOf(c), face: c.face }; };
 function charIndex(M, p) {
   const k = p.index != null ? p.index : p.at ? (tileOf(M, p.at.x, p.at.y), charAt(M, p.at.x, p.at.y, -1, p.at.level || 0)) : fail('give index or at to pick a character');
   if (k < 0 || k >= (M.chars || []).length) fail(p.index != null ? `no character with index ${p.index}; the map has ${(M.chars || []).length}` : `no character at ${p.at.x},${p.at.y}`);
@@ -184,7 +187,7 @@ function describe() {
     limits: { size: [4, 96], elevation: [0, MAX_ELEV], levels: [0, MAX_LEVEL], brush: [1, 3], facing: [0, 3] },
     storeys: `level 0 is the ground; levels 1-${MAX_LEVEL} are floors laid with paint (level), each ${STOREY} height levels (${SZ} px) above the ground below. Pieces and characters belong to one level; stairs (asset 'stairs') lead from their high end to the tile behind them one level up.`,
     tools: ['paint', 'fill', 'raise', 'lower', 'level', 'place', 'character', 'walk', 'erase', 'pick', 'pan'],
-    sprites: ROSTER.map(s => ({ id: s.id, name: s.name })),
+    sprites: everyone().map(s => ({ id: s.id, name: s.name })),
     biomes: Object.entries(BIOMES).map(([id, B]) => ({ id, label: B.label, climate: B.clim })),
     terrain: TERRAIN.map(t => ({ id: t.id, label: t.label, group: t.group, water: !!t.water, symbol: SYM[t.id] })),
     assets: ASSETS.map(a => ({ id: a.id, label: a.label, group: a.group, w: a.w, d: a.d, height: a.h, water: !!a.water, walkable: !!a.walk })),
@@ -294,7 +297,12 @@ const METHOD_IMPL = {
     if (p.rect) list = list.filter(o => o.x < p.rect.x + p.rect.w && o.y < p.rect.y + p.rect.h && o.x + o.w > p.rect.x && o.y + o.d > p.rect.y);
     return { count: list.length, objects: list };
   },
-  listSprites() { return { count: ROSTER.length, sprites: ROSTER.map(s => ({ id: s.id, name: s.name, kind: TOWNSFOLK.includes(s) ? 'townsfolk' : 'job', build: s.body, about: s.blurb })) }; },
+  listSprites() { const all = everyone(); return { count: all.length, sprites: all.map(spriteInfo) }; },
+  makeCharacter(p) {
+    if (p.id != null && !getCustom(p.id)) fail(`no made character "${p.id}" to change.${guess(p.id, customList().map(s => s.id))}`);
+    const { id, ...rest } = p, base = id ? getCustom(id).spec : {}, c = saveCustom({ ...base, ...rest, colours: { ...(base.colours || {}), ...(p.colours || {}) }, id: id || undefined });
+    return spriteInfo(c);
+  },
   listCharacters() { const M = ensureModel(); return { count: (M.chars || []).length, characters: (M.chars || []).map((c, k) => charInfo(M, k)) }; },
   undo(p) { ensureModel(); let n = 0; for (let i = 0; i < (p.steps || 1) && ED.undo.length; i++, n++) undo(); syncName(); return { undone: n, history: state().history }; },
   redo(p) { ensureModel(); let n = 0; for (let i = 0; i < (p.steps || 1) && ED.redo.length; i++, n++) redo(); syncName(); return { redone: n, history: state().history }; }

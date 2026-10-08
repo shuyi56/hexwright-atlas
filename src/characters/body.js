@@ -200,6 +200,8 @@ function torsoCells(bt, view, top, o = {}) {
         if (j >= belt) ch = 'D';
         else if (front ? (j < 2 ? brace : x >= fc - 2 && x <= fc + 3) : brace) ch = front && j === 2 && brace ? 'G' : front && j === 4 && x >= fc && x <= fc + 1 ? 'd' : 'D';
       }
+      /* a rope girdle tied round a gown at the waist (L), knotted (G) in front where its end hangs */
+      if (o.girdle && j === belt) ch = front && x === fc - 1 ? 'G' : 'L';
       /* a square neckline: the skin of the throat and chest, edged below in trim with a jewel at its middle */
       if (o.neckline && front) {
         if ((j === 0 && x >= fc - 2 && x <= fc + 3) || (j === 1 && x >= fc - 1 && x <= fc + 2)) ch = 'K';

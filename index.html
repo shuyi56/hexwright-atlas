@@ -126,6 +126,30 @@
     </aside>
   </div>
 </div>
+<div class="editor char-maker" id="charMaker" hidden tabindex="-1" aria-label="Character maker">
+  <header class="ed-bar">
+    <button class="btn" id="cmBack">← Tile editor</button>
+    <div class="ed-title"><span class="eyebrow">character maker</span><input id="cmName" maxlength="40" spellcheck="false" aria-label="Character name"></div>
+    <div class="ed-actions">
+      <label class="ed-field"><span>start from</span><select id="cmFrom" aria-label="Start from"></select></label>
+      <span class="ed-sep" aria-hidden="true"></span>
+      <button class="btn" id="cmUndo" title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="cmRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+      <span class="ed-sep" aria-hidden="true"></span>
+      <button class="btn" id="cmCopy">Duplicate</button>
+      <button class="btn" id="cmDelete">Delete</button>
+      <button class="btn btn-brass" id="cmDone">Done</button>
+    </div>
+  </header>
+  <div class="ed-body">
+    <div class="ed-stage cm-stage">
+      <canvas id="cmPreview" role="img" aria-label="The character in all four facings"></canvas>
+      <div class="ed-view"><button class="chip" id="cmWalk" aria-pressed="true" title="Walk in place, or stand">Walking</button></div>
+      <div class="ed-status" id="cmStatus" aria-live="polite">Changes save to your character library as you go.</div>
+    </div>
+    <aside class="ed-palette" aria-label="Choices"><div class="ed-items cm-choices" id="cmChoices"></div></aside>
+  </div>
+</div>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>

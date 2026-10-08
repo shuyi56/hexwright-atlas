@@ -6,6 +6,7 @@ painted in the tile set's own soft, chalky palette with gently hue-shifted ramps
 ink, so they belong on the editor's ground. The code lives in `src/characters/`.
 
 The roster is sixteen characters: seven townsfolk, the people of the map's towns and villages, and nine jobs.
+The character maker makes more from the same choices the townsfolk are built from.
 
 ![Every character in all four facings, standing and in both strides, each on the editor's grass tile, then everyone in every build](images/character-sprite-sheet.png)
 
@@ -21,7 +22,7 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 | Farmer (stocky) | A straw hat with a flat crown and a red band, a green shirt, blue bib-and-brace overalls with buckled braces and a pocket. |
 | Guard (standard) | A kettle helm with a comb and a turned-down brim, a steel breastplate over a red tunic, mail sleeves, a spear and a red cape. |
 | Merchant (stocky) | White hair and a full white beard falling to a point, a long blue robe edged in gold, a satchel on a strap. |
-| Monk (standard) | A deep plain cowl with the face in its shadow, a capelet over the shoulders, a robe of undyed wool, a rope belt with its end hanging. |
+| Monk (standard) | A deep plain cowl with the face in its shadow, a capelet over the shoulders, a robe of undyed wool to the floor with bell sleeves, tied with a rope whose end hangs. |
 | Healer (slim) | Long fair hair, a lilac tunic over white sleeves, a white satchel marked with a red cross. |
 | Noble Lady (slim) | A red braid over her shoulder, a gold circlet with a jewel, a green gown to the floor with a square neckline, bell sleeves and a gold hem. |
 
@@ -111,15 +112,16 @@ round.
 
 Two kinds of long garment, both cut from the build:
 
-- **Robe** (merchant, monk, white mage, summoner). A tunic-cut bodice belted at the waist over a skirt to the
-  ankles, with the shoes below it. The white mage's skirt is hemmed in red teeth; the monk's belt is a rope whose
-  end hangs to a tassel.
-- **Gown** (black mage, noble lady). One garment from the shoulders to the floor with no belt and no waist. It hangs straight
+- **Robe** (merchant, white mage, summoner). A tunic-cut bodice belted at the waist over a skirt to the ankles,
+  with the shoes below it. The white mage's skirt is hemmed in red teeth.
+- **Gown** (black mage, noble lady, monk). One garment from the shoulders to the floor with no belt and no waist. It hangs straight
   from the chest and flares from the lower chest in an A-line, its folds fanning out from the middle toward the
   hem. The robe's overlap runs down the front as a fold, and a seam runs down the back. The hem is trimmed in gold
   and rounds off at its corners, with only the toes showing beneath it. The sleeves are bell sleeves (`sleeves:
   { bell: true }`), widening below the elbow to a trimmed mouth with the gloved hand beneath. In a stride the hem
   swings: the leading foot kicks it forward, the back of it pulls in, and the lifted foot is hidden.
+- **The monk's habit** is a gown tied at the waist with a rope girdle (`girdle`), knotted in front where its end
+  hangs to a tassel (`cord`).
 - **The noble lady's gown** adds a square neckline, the throat and chest bare above a gold edge with a jewel at
   its middle.
 - **The black mage's collar.** A high collar stands up round his jaw and closes over his chin. His face is a band of
@@ -233,9 +235,9 @@ shoulders (the mantle slot, drawn over the arms, so the arms come out from under
 
 ## The townsfolk
 
-The townsfolk are built like the jobs (`townsfolk.js`): a build, an outfit cut by the body, a palette and
-hand-drawn parts. They are the seven people of the first, hand-painted character style, redrawn in this one with
-the same clothes, colours and props.
+The townsfolk (`townsfolk.js`) are the seven people of the first, hand-painted character style, redrawn in this one
+with the same clothes, colours and props. Each is a spec: the same choices and colours the character maker offers
+(below), so they are drawn like the jobs and the maker can start from any of them.
 
 - **Hats.** The farmer's straw hat has a flat crown, a red band and a broad brim, with its weave picked out in
   creases. The guard's kettle helm is a round steel crown with a comb along its top and a broad brim turned down
@@ -246,6 +248,27 @@ the same clothes, colours and props.
   is marked with a red cross.
 - **The guard's spear** is a plain leaf head on a socket. Like the valkyrie's, it is held in the hand and leans
   outward a pixel every five rows, and his arm keeps it steady.
+
+## The character maker
+
+New characters are made in the character maker, a screen over the tile editor. On the Characters tab,
+**New character…** opens it on a new character. **Edit…** opens it on one already made, or on a copy of one of
+the townsfolk. The jobs are drawn by hand, so the maker cannot make them.
+
+- **Specs.** A made character is a spec (`custom.js`): a choice for each of build, clothes (shirt and vest, tunic,
+  overalls, breastplate, belted robe, gown to the floor), sleeves (same cloth or a second colour; plain or bell),
+  neckline and rope belt (for long clothes), hair, hat (straw hat, kettle helm, circlet, cowl, feathered cap,
+  bandana, wizard hat), beard, what is held (sword, dagger, two daggers, spear, staff, bow), shield, cape and
+  satchel. It also holds a colour for each material. `fromSpec()` turns it into a character built exactly like the
+  jobs, wearing the headgear in `hats.js` and the gear in `parts.js`.
+- **The screen.** Choices are rows of chips; a choice that means nothing with the current clothes (a neckline on a
+  tunic) is hidden. Colours are rows for just the materials the character shows. Each is set from the tile set's
+  swatches or with any colour. **Start from** sets every choice and colour from one of the townsfolk. The preview is
+  the character in all four facings on grass, walking or standing. The maker also has undo and redo, duplicate
+  and delete, and **Done** goes back to the map with the character ready to place.
+- **The library.** Every change saves at once to the character library (`library.js`) in the browser. Made ids
+  start with `custom-`, so they never shadow anyone in the roster. A character standing on the map cannot be
+  deleted until it is taken off.
 
 ## Weapons
 
@@ -288,8 +311,9 @@ the same material in a crease: a fold, a seam, the line between two plates.
   landmarks.
 - **Shared parts.** `parts.js` holds the head, the five hairstyles, the skin tones and the gear: sword, dagger,
   lance, bow and a `staff()` maker for spears and staves, a kite shield and a buckler. `recolor()` swaps letters.
-- **Characters.** `roster.js` (the jobs) and `townsfolk.js` give each character a build, an outfit (torso and leg
-  style, sleeves, gauntlets, vest, strap, satchel, overalls, neckline, cord, skirt, tassets, greaves, cloak), a
+- **Characters.** `roster.js` (the jobs) and the specs (`custom.js`, the townsfolk and made characters, wearing
+  `hats.js`) give each character a build, an outfit (torso and leg
+  style, sleeves, gauntlets, vest, strap, satchel, overalls, neckline, girdle, cord, skirt, tassets, greaves, cloak), a
   palette, and parts in fixed slots, back to front: the cloak, things behind the body,
   the far arm, legs, torso, what is worn over it, head, hair, hat, the near arm, a mantle, a staff and the fist
   that grips it, and what the other hand holds. Jobs draw their own headgear and anything unique (the hoods, the
@@ -317,8 +341,8 @@ the same material in a crease: a fold, a seam, the line between two plates.
 
 The tile editor draws these characters (`draw.js`, the one module here that needs a canvas).
 
-- **Placing.** The Characters tab lists the roster, townsfolk and then jobs, each standing on a grass block.
-  Clicking one arms the Person tool.
+- **Placing.** The Characters tab lists the townsfolk, the jobs and the characters made here, each standing on a
+  grass block. Clicking one arms the Person tool.
 - **Facings and walking.** A character faces any of four ways: the two drawn views, plus their mirror images. Walking
   plays the strides in `WALK` order, a full cycle to every tile crossed.
 - **Every zoom.** Each frame becomes a master at 8×, every sprite pixel a crisp square, then is shrunk in halving
@@ -326,13 +350,16 @@ The tile editor draws these characters (`draw.js`, the one module here that need
   close, and never shimmers or aliases when zoomed out.
 - **Size.** One sprite pixel is 0.3 drawing units, so a standing figure is about as tall as a cottage's eaves. Each
   casts the same soft shadow to the right as the pieces do.
-- **Saving.** A saved map names each character by its roster id (`"sprite": "farmer"`), and every copy of the app
-  can draw them, so no pixels are stored.
+- **Saving.** A saved map names each character by its id (`"sprite": "farmer"`). Every copy of the app can draw
+  the roster. The specs of made characters standing on the map go with it (`customCharacters`); opened anywhere,
+  they join that browser's library, keeping any it already has under the same id.
 - **Older maps.** Maps saved with the first, hand-painted style named their people `starter-villager` and so on,
-  and carried each sprite's pixels. They open with the same people in this style. Anyone else (a character
-  painted by hand in the old sprite editor) comes back as a villager, standing where they stood.
-- **The automation API.** `listSprites` lists the roster (id, name, townsfolk or job, build), and `placeCharacter`
-  takes a roster id.
+  and carried each sprite's pixels. They open with the same people in this style. Anyone else it cannot find (a
+  character painted by hand in the old sprite editor, or a made one whose spec is missing) comes back as a
+  villager, standing where they stood.
+- **The automation API.** `listSprites` lists everyone (id, name, townsfolk, job or custom, build, and a made
+  character's spec). `makeCharacter` makes a character from the maker's choices and colours, or changes a made one,
+  and `placeCharacter` takes any id.
 
 ## Building it
 
@@ -367,7 +394,9 @@ with no trousers or belt, flaring to a trimmed hem with only toes beneath, bell 
 with both eyes still glowing. Each of the townsfolk must keep what made them recognisable on every build: the
 villager's vest, the farmer's straw hat and overalls, the guard's kettle helm, cape and spear, the merchant's beard
 and satchel, the monk's cowl and rope belt, the healer's satchel and cross, the lady's braid, circlet and gown. The
-dragoon must carry no violet, wear crimson plate, have the spikiest silhouette
+monk must wear a gown to the floor with a rope girdle and no trousers. Every choice the maker offers must draw
+inside the frame on every build in colours it defines, alone and in sixty random characters. A spec must clean
+whatever it is given and survive JSON, and the townsfolk must be specs. The dragoon must carry no violet, wear crimson plate, have the spikiest silhouette
 in the roster in both views (the most pixels ending in a single neighbour), and carry its lance with the point at
 the top of the frame, a ridged blade, barbed wings about a gold socket, a tuft and a butt spike on every build.
 Every figure must stay within the tile set's palette: outlined in the tiles' ink, no
@@ -376,6 +405,5 @@ a looping APNG, and the sheet encodes to a valid PNG.
 
 ## Not yet done
 
-- There is no character maker. The first style's pixel editor is gone, so a new character means a new entry in
-  `townsfolk.js` or `roster.js`. A maker that picks a build, an outfit and colours would fit this style.
+- The character maker cannot make the jobs: their helms, hoods and gear are drawn for them alone.
 - There are no attack, cast or hurt poses yet.

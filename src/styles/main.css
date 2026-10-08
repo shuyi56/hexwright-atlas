@@ -143,6 +143,26 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
   .ed-items{max-height:46vh}
 }
 
+/* Character maker: reuses the tile editor's bar, stage and palette */
+.char-maker{z-index:40}
+.cm-stage{display:grid;place-items:center}
+#cmPreview{display:block;max-width:100%;max-height:100%;image-rendering:pixelated}
+.cm-choices .ed-group:first-child{margin-top:6px}
+.cm-choice{padding:0 0 8px}
+.cm-choice .ed-lbl{display:block;margin:0 0 4px}
+.cm-chips{display:flex;flex-wrap:wrap;gap:4px}
+.cm-chips .chip{font-size:12.5px;padding:3px 9px}
+.cm-colour{display:flex;align-items:center;gap:8px;width:100%;background:none;border:1px solid transparent;border-radius:3px;padding:3px 4px;color:var(--vellum);font:500 13px var(--ui);cursor:pointer;text-align:left}
+.cm-colour:hover{border-color:var(--line)}
+.cm-colour[aria-pressed="true"]{border-color:var(--brass);background:#2a2a1f}
+.cm-colour input{width:30px;height:22px;padding:0;border:1px solid var(--line);border-radius:3px;background:none;cursor:pointer;flex:none}
+.cm-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(22px,1fr));gap:4px;margin:8px 0 4px}
+.cm-swatch{aspect-ratio:1;border:1px solid var(--line);border-radius:3px;cursor:pointer;padding:0}
+.cm-swatch:hover,.cm-swatch:focus-visible{outline:2px solid var(--brass-2);outline-offset:1px}
+.ed-charbar{display:flex;flex-wrap:wrap;gap:6px;padding-top:8px}
+.ed-charbar .btn{padding:5px 10px;font-size:13.5px}
+.ed-charbar .btn:disabled{opacity:.4;cursor:default}
+
 .ed-palette .tabs{flex-wrap:wrap}
 .ed-palette .tab{padding:9px 8px 7px;font-size:13px;letter-spacing:.05em}
 /* bottom-left of the stage: the storey switch, stacked like the building (top floor uppermost), over the status line */

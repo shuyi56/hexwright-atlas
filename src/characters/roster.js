@@ -1,5 +1,6 @@
 import { BODY_TYPES, REF, measure } from './body.js';
 import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, recolor, staff } from './parts.js';
+import { BANDANA, FEATHER_CAP, WIZARD_HAT } from './hats.js';
 import { finish, frameBuf, mixHex, ramp, stamp } from './pixels.js';
 import { TOWNSFOLK } from './townsfolk.js';
 
@@ -122,26 +123,10 @@ const ARCHER = {
   parts: {
     front: {
       behind: { x: 6, y: 12, rows: ['.R.R', 'RFRF', '.LL.', '.LL.', '.LL.'] },
-      hat: { x: 7, y: 0, rows: [
-        '..............R.',
-        '.........XXXXRR.',
-        '.......XXXXXXXRR',
-        '.....XXXXXXXXXXR',
-        '....XXXXXXXXXXXX',
-        '...XXXXXXXXXXXXX',
-        '..xxxxxxxxxxxXXX',
-        '...........XXXX.',
-        '............XX..'] } },
+      hat: FEATHER_CAP.front },
     back: {
       behind: { x: 11, y: 12, rows: ['.......RFR.', '......RFRF.', '.......LLL.', '......LLL..', '......LLL..', '.....LLL...', '.....LLL...', '....LLL....', '....LLL....', '...LLL.....', '...LLL.....', '..LLL......', '..lll......'] },
-      hat: { x: 7, y: 0, rows: [
-        '.R..............',
-        'RR.XXXXX........',
-        'RXXXXXXXXXX.....',
-        'RXXXXXXXXXXXX...',
-        'XXXXXXXXXXXXXX..',
-        '.XXXXXXXXXXXXXX.',
-        '.xxxxxxxxxxxxxx.'] } } }
+      hat: FEATHER_CAP.back } }
 };
 
 const THIEF = {
@@ -151,28 +136,10 @@ const THIEF = {
   parts: {
     front: {
       overTorso: { x: 11, y: 16, rows: ['..RRRRRR.....', '.RRRRRRRRRR..', '..rrRRrrRRRR.', '...RR....RRR.', '...R......RR.'] },
-      hat: { x: 8, y: 3, rows: [
-        '....RRRRRRR.....',
-        '..RRRRRRRRRRRR..',
-        '.RRRRRRRRRRRRRR.',
-        '.rrrrrrrrrRRRRRR',
-        '..........RRRRRR',
-        '............RRRR',
-        '.............RR.',
-        '.............RR.',
-        '..............R.'] } },
+      hat: BANDANA.front },
     back: {
       overTorso: { x: 11, y: 16, rows: ['..RRRRRRR..', '.RRRRRRRRRR', '..RRRRRRRR.', '....RR.....', '....RR.....', '....RRR....', '.....RR....'] },
-      hat: { x: 8, y: 3, rows: [
-        '.....RRRRRR.....',
-        '..RRRRRRRRRRRR..',
-        '.RRRRRRRRRRRRRR.',
-        '.rrrrrrrrrrrrrr.',
-        '......RRR.......',
-        '.......RR.......',
-        '.......RRR......',
-        '........RR......',
-        '........R.......'] } } }
+      hat: BANDANA.back } }
 };
 
 /* The dragoon: a dragon helm, its snout jutting forward over the brow with two fangs beneath, a crest of spikes
@@ -302,30 +269,8 @@ const BLACK_MAGE = {
   weapon: staff(['T...T', 'TT.TT', '.TTT.', '..T..', '..T..'], 19),
   pal: { K: SKIN, A: '#56688f', C: '#c9a24f', L: '#6b4a30', G: '#c9a24f', O: '#5c3d2c', T: '#8a6238', X: '#5d5a74', D: '#45404f', Z: { flat: '#251f2b' }, N: { flat: '#f2c460' } },
   parts: {
-    front: { hat: { x: 4, y: 0, rows: [
-      '..............XXx.......',
-      '............XXXx........',
-      '...........XXXX.........',
-      '..........XXXXXX........',
-      '.........XXXXXXXX.......',
-      '........XXXXXXXXXX......',
-      '.......GGGGGGGGGGGG.....',
-      '......XXXXXXXXXXXXXX....',
-      '..XXXXXXXXXXXXXXXXXXXXX.',
-      '.XXXXXXXXXXXXXXXXXXXXXXX',
-      '..xxxxxxxxxxxxxxxxxxxx..'] }, mantle: BM_COLLAR.front },
-    back: { mantle: BM_COLLAR.back, hat: { x: 4, y: 0, rows: [
-      '.......xXX..............',
-      '........xXXX............',
-      '.........XXXX...........',
-      '........XXXXXX..........',
-      '.......XXXXXXXX.........',
-      '......XXXXXXXXXX........',
-      '.....GGGGGGGGGGGG.......',
-      '....XXXXXXXXXXXXXX......',
-      '..XXXXXXXXXXXXXXXXXXXXX.',
-      '.XXXXXXXXXXXXXXXXXXXXXXX',
-      '..XXXXXXXXXXXXXXXXXXXX..'] } } }
+    front: { hat: WIZARD_HAT.front, mantle: BM_COLLAR.front },
+    back: { mantle: BM_COLLAR.back, hat: WIZARD_HAT.back } }
 };
 
 /* The hoods are a fitted cowl over the head (hat slot) and what falls from it over the shoulders (mantle slot,

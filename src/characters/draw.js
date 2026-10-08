@@ -14,14 +14,15 @@ import { render } from './roster.js';
 const FACES = ['sw', 'se', 'ne', 'nw'], FACING = { sw: ['front', false], se: ['front', true], ne: ['back', false], nw: ['back', true] };
 const MASTER = 8;
 
-/* every finished frame of a character, rendered once */
-const frames = new Map();
-function framesOf(c) { let f = frames.get(c.id); if (!f) { f = render(c); frames.set(c.id, f); } return f; }
+/* every finished frame of a character, rendered once for each look (a custom character keeps its id as it is
+   changed in the maker, so the cache goes by its look) */
+const frames = new Map(), lookOf = c => c.look || c.id;
+function framesOf(c) { let f = frames.get(lookOf(c)); if (!f) { if (frames.size > 64) frames.clear(); f = render(c); frames.set(lookOf(c), f); } return f; }
 function canvasOf(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 /* the master and its halvings for one view and pose */
 const mips = new Map();
 function mipFor(c, view, pose) {
-  const key = `${c.id}|${view}|${pose}`; let levels = mips.get(key);
+  const key = `${lookOf(c)}|${view}|${pose}`; let levels = mips.get(key);
   if (levels) return levels;
   if (mips.size > 160) mips.clear();
   const rgba = framesOf(c)[view][pose], one = canvasOf(W, H), og = one.getContext('2d'), im = og.createImageData(W, H);
@@ -78,4 +79,4 @@ function figureThumb(c, size = 60, face = 'sw', pose = 0) {
   return can;
 }
 
-export { FACES, FIGURE, drawFigure, figureBox, figureThumb, footShadow };
+export { FACES, FIGURE, drawFigure, figureBox, figureThumb, footShadow, lookOf, tileBlock };

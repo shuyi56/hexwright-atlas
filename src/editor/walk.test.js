@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { save as saveCustom } from '../characters/library.js';
 import { blankModel, cloneModel, fits, fromJSON, toJSON } from './model.js';
 import { findPath, isFree, placeChar, reachable, walkChar } from './walk.js';
 import { placePiece } from './ops.js';
@@ -45,4 +46,15 @@ test('maps saved with the first character style bring their people into the curr
   assert.deepEqual(back.chars.map(c => c.sprite), ['farmer', 'noble', 'villager'], 'starters keep their people, anyone else comes back as a villager');
   assert.deepEqual(back.chars.map(c => [c.x, c.y, c.face]), [[1, 1, 1], [2, 1, 0], [3, 1, 3]], 'standing where they stood');
   assert.equal(toJSON(back).sprites, undefined);
+});
+test('characters made in the maker go with the map and come back with it', () => {
+  const c = saveCustom({ name: 'Ferryman', clothes: 'robe', hat: 'straw', colours: { cloth: '#356a52' } });
+  const M = blankModel(8, 'grass'); placeChar(M, { sprite: c.id, x: 2, y: 2 }); placeChar(M, { sprite: 'villager', x: 3, y: 2 });
+  const J = JSON.parse(JSON.stringify(toJSON(M)));
+  assert.deepEqual(J.customCharacters, [c.spec], 'only the made characters, by their spec');
+  /* elsewhere, without the library: the spec comes in with the map */
+  const away = { ...J, customCharacters: [{ ...c.spec, id: 'custom-elsewhere1', name: 'Ferryman' }], characters: [{ ...J.characters[0], sprite: 'custom-elsewhere1' }, { sprite: 'custom-gone', x: 4, y: 2, face: 0 }] };
+  const back = fromJSON(away);
+  assert.deepEqual(back.chars.map(x => x.sprite), ['custom-elsewhere1', 'villager'], 'a made character with no spec comes back as a villager');
+  assert.equal(toJSON(back).customCharacters[0].name, 'Ferryman');
 });

@@ -78,10 +78,21 @@ strides. Clicking a character with Person also picks it up for walking. A tile i
 and holds neither a piece nor another character; a step may climb or drop one height level at most. Characters
 walk behind and in front of buildings correctly, and are on the same undo stack as every other edit.
 
-The map JSON names each character by its roster id. Maps saved with the first, hand-painted character style still
+**New character…** opens the **character maker**. A character is built from choices:
+
+- **Body:** build, clothes, sleeves.
+- **Head:** hair, hat, beard.
+- **Gear:** what they hold, a shield, a cape, a satchel.
+
+Each material gets a colour from the tile set's swatches or any colour. The preview walks the character in all four
+facings. Characters can start from any of the townsfolk, and **Edit…** changes a made one or a copy of a
+townsperson. Made characters save to your character library in the browser as you go, appear under **Made here**,
+and travel inside any map they stand on.
+
+The map JSON names each character by its id. Maps saved with the first, hand-painted character style still
 open: their starters come back as the same people in this style, and characters painted in the old sprite editor
-come back as villagers. The automation API has `listSprites`, `listCharacters`, `placeCharacter`, `walkCharacter`
-and `removeCharacter`. See [docs/character-design.md](docs/character-design.md).
+come back as villagers. The automation API has `listSprites`, `makeCharacter`, `listCharacters`,
+`placeCharacter`, `walkCharacter` and `removeCharacter`. See [docs/character-design.md](docs/character-design.md).
 
 ### Character sprite sheet
 
