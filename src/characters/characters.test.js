@@ -6,7 +6,7 @@ import { INK } from '../render/palette.js';
 import { BASE, BODY_TYPES, measure, profile } from './body.js';
 import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
-import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, scale2xOutline, stamp, wash } from './pixels.js';
+import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
 import { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render } from './roster.js';
 import { APPLIES, CHOICES, COLOURS, cleanSpec, fromSpec } from './custom.js';
 import * as hats from './hats.js';
@@ -310,21 +310,4 @@ test('the sheet is a valid PNG of the expected size', () => {
   assert.deepEqual([...png.subarray(1, 4)], [80, 78, 71]); assert.equal(png.readUInt32BE(16), s.width); assert.equal(png.readUInt32BE(20), s.height);
   const start = png.indexOf('IDAT') + 4, len = png.readUInt32BE(start - 8);
   assert.equal(inflateSync(png.subarray(start, start + len)).length, (s.width * 4 + 1) * s.height);
-});
-
-test('scale2xOutline rounds the silhouette off and leaves the inside as drawn', () => {
-  const ink = [43, 33, 22, 255], tan = [200, 170, 120, 255], clear = [0, 0, 0, 0];
-  const img = rows => new Uint8ClampedArray(rows.flat().flat()), px = (a, w, x, y) => [...a.slice((y * w + x) * 4, (y * w + x) * 4 + 4)];
-  /* a 2×2 stair: ink on the diagonal from bottom left */
-  const stair = scale2xOutline(img([[clear, ink], [ink, ink]]), 2, 2);
-  assert.equal(stair.length, 4 * 4 * 4);
-  assert.deepEqual(px(stair, 4, 1, 1), ink, 'the inner corner of the clear pixel fills in along the diagonal');
-  assert.deepEqual(px(stair, 4, 0, 0), clear, 'the outer corner stays clear');
-  /* a lone pixel comes back as a plain 2×2 block */
-  const lone = scale2xOutline(img([[clear, clear, clear], [clear, ink, clear], [clear, clear, clear]]), 3, 3);
-  for (const [x, y] of [[2, 2], [3, 2], [2, 3], [3, 3]]) assert.deepEqual(px(lone, 6, x, y), ink);
-  assert.equal([...lone].filter((v, i) => i % 4 === 3 && v).length, 4);
-  /* a diagonal colour step inside a solid figure is not smoothed: every pixel is a plain 2×2 block */
-  const inside = [[ink, ink, ink], [ink, tan, ink], [tan, tan, ink]], wob = scale2xOutline(img(inside), 3, 3);
-  for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) assert.deepEqual(px(wob, 6, x, y), inside[y >> 1][x >> 1]);
 });
