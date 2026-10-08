@@ -1,14 +1,15 @@
 import { INK } from '../render/palette.js';
 import { TERRAIN_BY_ID } from '../tiles/terrain.js';
 import { BASE } from './body.js';
-import { H, W, scale2x } from './pixels.js';
+import { H, W, scale2xOutline } from './pixels.js';
 import { render } from './roster.js';
 
 /* ================= character sprites: drawing them on the map =================
    The finished frames (roster.js render) are 32×48 pixel art. On the map the four facings are the two drawn
    views, the south-east and north-west ones mirrored, and a walk plays the poses in WALK order. Every zoom draws
-   from one master per frame: the frame doubled three times over with Scale2x (8×), which rounds the stair steps
-   of diagonal edges off as it goes, then shrunk in halving steps. Each zoom uses the smallest step that still has at least as many pixels as the screen will show, drawn
+   from one master per frame: the frame doubled three times over (8×) with Scale2x on the silhouette, which rounds
+   the stair steps of the outer edge off and leaves the inside as crisp squares, then shrunk in halving steps.
+   Each zoom uses the smallest step that still has at least as many pixels as the screen will show, drawn
    smoothed, so a figure keeps its pixel art up close and never shimmers or aliases zoomed out. This module needs
    a canvas; the rest of characters/ does not. */
 const FACES = ['sw', 'se', 'ne', 'nw'], FACING = { sw: ['front', false], se: ['front', true], ne: ['back', false], nw: ['back', true] };
@@ -26,7 +27,7 @@ function mipFor(c, view, pose) {
   if (levels) return levels;
   if (mips.size > 160) mips.clear();
   let rgba = framesOf(c)[view][pose], up = 1;
-  for (; up < MASTER; up *= 2) rgba = scale2x(rgba, W * up, H * up);
+  for (; up < MASTER; up *= 2) rgba = scale2xOutline(rgba, W * up, H * up);
   const master = canvasOf(W * MASTER, H * MASTER), mg = master.getContext('2d'), im = mg.createImageData(master.width, master.height);
   im.data.set(rgba); mg.putImageData(im, 0, 0);
   levels = [{ up: MASTER, can: master }];
