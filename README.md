@@ -86,6 +86,17 @@ buildings correctly, are saved inside the map JSON together with their sprites, 
 stack as every other edit. The automation API has `listSprites`, `listCharacters`, `placeCharacter`,
 `walkCharacter` and `removeCharacter`.
 
+### Tactics sprite sheet
+
+`src/tactics/` holds a separate character style made from scratch, after Final Fantasy Tactics and Tactics Ogre: nine
+jobs (squire, knight, archer, thief, lancer, valkyrie, black mage, white mage, summoner) as big-headed 32×48 figures
+with hue-shifted shading and a selective umber outline, in four facings, standing and in two strides. Bodies come in
+four builds (slim, standard, stocky, tall) cut from measurements, and any job can be drawn in any build. `npm run sheet`
+draws them into `docs/images/tactics-sprite-sheet.png` (add `--strips` for one 1× strip per job), in plain Node.
+See [docs/tactics-sprites.md](docs/tactics-sprites.md).
+
+![The tactics roster](docs/images/tactics-sprite-sheet.png)
+
 ### Test scenes
 
 `scenes/` holds self-contained HTML test pages. Each one is the whole app inlined into a single file that
@@ -170,6 +181,7 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run preview` | Serve the production build      |
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
 | `npm run scene -- <map.json>` | Build a self-contained HTML test page for a scene into `scenes/` |
+| `npm run sheet`   | Draw the tactics sprite sheet into `docs/images/` |
 | `npm test`        | Unit tests (no browser needed)  |
 | `npm run test:e2e`| MCP end-to-end test (Chromium)  |
 | `npm run perf`    | Editor latency budget (Chromium)|
@@ -197,9 +209,12 @@ src/
   city/               City districts: generation, architecture solids, 2.5D rendering
   tiles/              Shared isometric tile set: terrain tiles, buildings, props and nature,
                       drawn procedurally with a small iso kit (used by the city view and the editor)
+  tactics/            Tactics sprite sheet: pixel engine, body builds, shared parts, the nine jobs, sheet layout,
+                      pixel font
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
-tools/                Vite plugin that relays HTTP calls to the editor page (dev server only)
+tools/                Vite plugin that relays HTTP calls to the editor page (dev server only),
+                      the tactics sheet writer and a minimal PNG encoder
 mcp/                  MCP server, backend launcher and end-to-end test
   ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view
 legacy/               The original single-file artifact, kept for reference
