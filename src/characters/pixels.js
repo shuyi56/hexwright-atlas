@@ -140,4 +140,24 @@ function cellsToPart(cells) {
   return { x, y, rows: g.map(r => r.join('')) };
 }
 
-export { H, OUTLINE, PAPER, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, rgbLch, stamp, wash };
+/* Scale2x (EPX): an RGBA image of w×h doubled to 2w×2h, rounding off the stair steps of diagonal edges instead of
+   blowing each pixel up to a square. A pixel's corner takes its two neighbours' colour where they agree and the
+   other two do not, so lines and curves come out smooth while flat runs, single pixels and straight edges stay as
+   drawn. Every clear pixel counts as one colour, whatever its rgb. */
+function scale2x(rgba, w, h) {
+  const src = new Uint32Array(rgba.buffer, rgba.byteOffset, w * h), out = new Uint32Array(w * h * 4), W2 = w * 2;
+  const key = new Uint32Array(w * h); for (let i = 0; i < w * h; i++) key[i] = rgba[i * 4 + 3] ? src[i] : 0;
+  const at = (x, y) => key[Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, e = src[i], b = at(x, y - 1), d = at(x - 1, y), f = at(x + 1, y), hh = at(x, y + 1), o = y * 2 * W2 + x * 2;
+    /* the neighbour's own pixel (not its key) so a corner keeps that pixel's exact colour */
+    const nb = (nx, ny) => src[Math.max(0, Math.min(h - 1, ny)) * w + Math.max(0, Math.min(w - 1, nx))];
+    out[o] = d === b && b !== f && d !== hh ? nb(x - 1, y) : e;
+    out[o + 1] = b === f && b !== d && f !== hh ? nb(x + 1, y) : e;
+    out[o + W2] = d === hh && d !== b && hh !== f ? nb(x - 1, y) : e;
+    out[o + W2 + 1] = hh === f && d !== hh && b !== f ? nb(x + 1, y) : e;
+  }
+  return new Uint8ClampedArray(out.buffer);
+}
+
+export { H, OUTLINE, PAPER, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, rgbLch, scale2x, stamp, wash };
