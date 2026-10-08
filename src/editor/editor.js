@@ -20,7 +20,7 @@ const TOOLS = [
 ];
 const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, level: 0, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), occ: new Map(), lastT: 0, preview: null };
 /* one sprite pixel in drawing units: a figure stands about as tall as a cottage's eaves and chimney */
-const WALK_SPEED = 3.2, SPRITE_PX = 0.3, FIG_H = FIGURE * SPRITE_PX;
+const WALK_SPEED = 3.2, SPRITE_PX = 0.42, FIG_H = FIGURE * SPRITE_PX;
 
 /* ---------- persistence ---------- */
 let saveT = 0;
