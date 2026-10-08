@@ -7,8 +7,10 @@ import { BASE, BODY_TYPES, measure, profile } from './body.js';
 import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
 import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
-import { BODIES, POSES, ROSTER, VIEWS, frame, palette, render } from './roster.js';
-import { WALK, buildSheet, buildWalk } from './sheet.js';
+import { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render } from './roster.js';
+import * as townsfolk from './townsfolk.js';
+import { TOWNSFOLK } from './townsfolk.js';
+import { buildSheet, buildWalk } from './sheet.js';
 
 const lum = hex => { const [r, g, b] = hexRgb(hex); return r * 0.3 + g * 0.59 + b * 0.11; };
 
@@ -18,10 +20,11 @@ test('every shared part is a rectangle of rows', () => {
     else if (Array.isArray(v)) v.forEach((p, i) => each(p, `${name}[${i}]`));
     else if (v && typeof v === 'object') for (const [k, p] of Object.entries(v)) each(p, `${name}.${k}`);
   };
-  for (const [name, v] of Object.entries(parts)) if (typeof v !== 'function') each(v, name);
+  for (const [name, v] of Object.entries({ ...parts, ...townsfolk })) if (typeof v !== 'function' && name !== 'TOWNSFOLK') each(v, name);
 });
 test('every job in every build draws all its frames inside the frame, in colours it defines', () => {
-  assert.equal(ROSTER.length, 9); assert.equal(new Set(ROSTER.map(j => j.id)).size, ROSTER.length);
+  assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 7); assert.equal(ROSTER.length, 16);
+  assert.equal(new Set(ROSTER.map(j => j.id)).size, ROSTER.length); for (const j of ROSTER) assert.equal(byId(j.id), j);
   for (const job of ROSTER) {
     const pal = palette(job); assert.ok(BODY_TYPES[job.body], `${job.id} has a build`);
     for (const b of BODIES) for (const v of VIEWS) for (let k = 0; k < POSES; k++) {
@@ -132,6 +135,22 @@ test('the black mage wears a robe to the floor, with bell sleeves and a high col
   assert.ok(face(bm) < face(bare) - 6);
   assert.equal(frame(bm, 'front', 0).mat.filter(c => c === 'N').length, 4, 'both eyes, two pixels each, still glow above it');
 });
+test('the townsfolk keep what made each of them recognisable, on every build', () => {
+  for (const b of BODIES) {
+    const at = id => { const c = byId(id), m = measure(b, 'front', 0, c.outfit), front = frame(c, 'front', 0, b).mat, back = frame(c, 'back', 0, b).mat;
+      const below = ch => front.some((x, u) => x === ch && ((u / W) | 0) >= m.at.head[1] + 14), above = ch => front.some((x, u) => x === ch && ((u / W) | 0) < m.at.head[1]);
+      return { front, back, below, above, has: ch => front.includes(ch), torso: ch => m.parts.torso.rows.some(r => r.includes(ch)) }; };
+    const villager = at('villager'), farmer = at('farmer'), guard = at('guard'), merchant = at('merchant'), monk = at('monk'), healer = at('healer'), noble = at('noble');
+    assert.ok(villager.torso('D'), `${b}: the villager's vest`);
+    assert.ok(farmer.above('X') && farmer.has('R') && farmer.torso('D'), `${b}: the farmer's straw hat, its band and the overalls`);
+    assert.equal(byId('farmer').pal.P, byId('farmer').pal.D, 'the overalls run down the legs');
+    assert.ok(guard.above('S') && guard.back.includes('V') && byId('guard').weapon.grounded, `${b}: the guard's kettle helm, cape and spear`);
+    assert.ok(merchant.below('H') && merchant.has('U') && merchant.torso('L'), `${b}: the merchant's beard and satchel`);
+    assert.ok(monk.above('X') && !monk.back.some(x => x === 'H') && monk.torso('L'), `${b}: the monk's cowl hides his hair, and his rope belt hangs`);
+    assert.ok(healer.has('U') && healer.has('R') && healer.below('H'), `${b}: the healer's satchel with its cross, and her long hair`);
+    assert.ok(noble.below('H') && noble.has('J') && noble.torso('K') && !noble.has('P'), `${b}: the lady's braid, circlet jewel, neckline and gown`);
+  }
+});
 test('the dragoon is armoured in crimson, spiked all over, and carries a winged lance', () => {
   const dragoon = ROSTER.find(j => j.id === 'dragoon');
   /* no violet anywhere in its colours: the plate is a warm crimson */
@@ -217,7 +236,7 @@ test('every face shows both whole eyes, whatever hair, headgear or weapon is bes
   }
 });
 test('hair is drawn in locks with strand lines and a sheen, front and back', () => {
-  for (const hair of [parts.HAIR_SHORT, parts.HAIR_LONG, parts.HAIR_BUN, parts.HAIR_PONYTAIL]) for (const v of VIEWS) {
+  for (const hair of [parts.HAIR_SHORT, parts.HAIR_LONG, parts.HAIR_BUN, parts.HAIR_PONYTAIL, parts.HAIR_BRAID]) for (const v of VIEWS) {
     const all = hair[v].rows.join('');
     assert.ok((all.match(/Q/g) || []).length >= 10 && (all.match(/I/g) || []).length >= 4, v);
   }

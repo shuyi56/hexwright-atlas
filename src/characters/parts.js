@@ -1,7 +1,7 @@
 import { BASE } from './body.js';
 import { W, cellsToPart } from './pixels.js';
 
-/* ================= tactics sprites: hand-drawn parts =================
+/* ================= character sprites: hand-drawn parts =================
    The grids every figure shares: heads, hair and gear. Each part is { x, y, rows }: its top-left in the 32×48
    frame as authored against the reference layout in body.js (REF), and its rows of material letters (see
    pixels.js). The frame moves each part to its landmark on the actual body. The torso, arms and legs are cut
@@ -11,6 +11,9 @@ import { W, cellsToPart } from './pixels.js';
 
    Letters: K skin (k its shadow), H hair, I the hair's sheen, Q brow and strand line, E eye, M mouth, A main cloth, B undershirt, C cuff or trim, L leather,
    G gold, P legs, O boots, S steel, Y a blade's bright steel, T wood. Characters add their own (see roster.js). */
+
+/* the skin tones every figure is drawn in: fair, and a warmer tan */
+const SKIN = '#ecc39a', TAN = '#d9a77c';
 
 /* ---------- heads ---------- */
 /* Faces are cel-shaded: skin takes one flat lit tone (K) and one shadow tone (k), drawn as a deliberate shape
@@ -185,6 +188,51 @@ const BUN_BACK = { x: 9, y: 1, rows: [
   '....HHQQHH.....',
   '.....HHHH......'] };
 const HAIR_BUN = { front: BUN_FRONT, back: BUN_BACK };
+/* A braid: in front the fringe and crown of long hair, the far side tucked behind the ear and the near side
+   gathered into a braid over the near shoulder and down the chest; from behind every strand drawn to the nape and
+   plaited down the middle of the back. The plait is three pixels of two-row lobes leaning alternately, each lit on
+   its upper edge (I) and parted from the next by a strand line, tied off with a ribbon (R) above a tuft. */
+const PLAIT = ['IHH', 'HHQ', 'HHI', 'QHH'];
+const plait = (pad, n, w) => Array.from({ length: n }, (_, j) => (pad + PLAIT[j % 4]).padEnd(w, '.'));
+const HAIR_BRAID = {
+  front: { x: 8, y: 1, rows: [
+    '......HHHH......',
+    '....HHHHHHHH....',
+    '...HHHIIIHHHHH..',
+    '..HHIIHHHHHHQHH.',
+    '.HHIHHHHHQHHHQHH',
+    '.HHHHHHHQHHHHHQH',
+    '.HHHHQHHHHQHHHQH',
+    '.HHHQHHHHQHHHHHH',
+    '.HHQ.HHHQ.HHHQHH',
+    'HH...HH...HHHQHH',
+    'HQ........H.HQHH',
+    '.H..........HQHH',
+    '............HHQH',
+    '...........HHQH.',
+    ...plait('...........', 10, 16),
+    '...........RRR..',
+    '...........HQH..',
+    '............H...'] },
+  back: { x: 8, y: 1, rows: [
+    '......HHHH......',
+    '....HHHHHHHH....',
+    '...HHIIIIHHHHH..',
+    '..HIIHHHHQHHHHH.',
+    '.HHHHQHHHQHHHHHH',
+    '.HHHHQHHQHHHHHHH',
+    '.HHHHHQHQHHHHHHH',
+    '.HHHHHQHQHHHHHHH',
+    '.HHHHHHQHHHHHHHH',
+    '.HHHHHHQHHHHHHHH',
+    '.HHHHHHQHHHH.HHH',
+    '..HHHHHQHHHH.HH.',
+    '....HHHQHHH.....',
+    '.....HHHHH......',
+    ...plait('......', 10, 16),
+    '......RRR.......',
+    '......HQH.......',
+    '.......H........'] } };
 /* a style may add a piece drawn over what is slung on the back (over, for the ponytail falling over a quiver) */
 const HAIR_PONYTAIL = { front: HAIR_SHORT.front, back: HAIR_SHORT.back, over: { back: PONYTAIL_TAIL_BACK } };
 
@@ -303,4 +351,4 @@ function recolor(part, map) {
   const sw = ch => { const up = ch.toUpperCase(), to = map[up]; return to ? (ch === up ? to : to.toLowerCase()) : ch; };
   return { ...part, rows: part.rows.map(r => [...r].map(sw).join('')) };
 }
-export { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SWORD, flipPart, recolor, staff };
+export { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, flipPart, recolor, staff };

@@ -14,7 +14,7 @@
     "perf": "node tools/perf.js",
     "mcp": "node mcp/server.mjs",
     "scene": "node tools/scene-html.mjs",
-    "sheet": "node tools/tactics-sheet.mjs"
+    "sheet": "node tools/character-sheet.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

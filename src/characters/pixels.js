@@ -1,4 +1,4 @@
-/* ================= tactics sprites: the pixel engine =================
+/* ================= character sprites: the pixel engine =================
    Figures in the manner of the squad tacticians (Final Fantasy Tactics, Tactics Ogre): big-headed, 32×48,
    drawn as hand-authored grids of material letters and finished here. No DOM, so Node and the browser share it.
 

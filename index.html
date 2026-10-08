@@ -126,57 +126,6 @@
     </aside>
   </div>
 </div>
-<div class="editor sprite-editor" id="spriteEditor" hidden tabindex="-1" aria-label="Character sprite editor">
-  <header class="ed-bar">
-    <button class="btn" id="spBack">← Tile editor</button>
-    <div class="ed-title"><span class="eyebrow">character editor</span><input id="spName" maxlength="40" spellcheck="false" aria-label="Character name"></div>
-    <div class="ed-actions">
-      <label class="ed-field"><span>character</span><select id="spPick"></select></label>
-      <button class="btn btn-brass" id="spNew">New</button>
-      <button class="btn" id="spCopy">Duplicate</button>
-      <button class="btn" id="spDelete">Delete</button>
-      <span class="ed-sep" aria-hidden="true"></span>
-      <button class="btn" id="spUndo" title="Undo (Ctrl+Z)">Undo</button>
-      <button class="btn" id="spRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
-      <span class="ed-sep" aria-hidden="true"></span>
-      <button class="btn" id="spSave">Export</button>
-      <button class="btn" id="spLoad">Import…</button>
-      <input type="file" id="spFile" accept=".json,application/json" hidden>
-    </div>
-  </header>
-  <div class="ed-body">
-    <div class="ed-stage sp-stage">
-      <canvas id="spCanvas" width="512" height="512" role="img" aria-label="16 by 16 pixel drawing area. Click or drag to draw with the current tool."></canvas>
-      <div class="ed-status" id="spStatus" aria-live="polite">Changes save to your character library as you draw.</div>
-    </div>
-    <aside class="ed-palette" aria-label="Sprite tools">
-      <div class="ed-tools sp-tools" id="spTools" role="toolbar" aria-label="Tools"></div>
-      <div class="ed-row"><span class="ed-lbl">facing</span></div>
-      <div class="tabs" id="spFaces" role="tablist"></div>
-      <div class="ed-row"><span class="ed-lbl">frame</span></div>
-      <div class="tabs" id="spFrames" role="tablist"></div>
-      <div class="ed-row sp-gap">
-        <button class="chip" id="spSym" aria-pressed="false" title="Draw each pixel on both sides of the middle">Symmetry</button>
-        <button class="chip" id="spOnion" aria-pressed="true" title="Show the other frame faintly">Ghost</button>
-        <button class="chip" id="spInked" aria-pressed="false" title="Show the frame outlined and shaded as it is drawn on the map">Shaded</button>
-      </div>
-      <div class="ed-row">
-        <button class="chip" id="spMirror" title="Copy this facing, flipped, to its opposite side">Mirror to other side</button>
-        <button class="chip" id="spCopyFrame" title="Copy this frame over the other frame">Copy to other frame</button>
-        <button class="chip" id="spFlip">Flip</button>
-        <button class="chip" id="spClear">Clear</button>
-      </div>
-      <div class="ed-row">
-        <span class="ed-lbl">shift</span>
-        <button class="chip" id="spLeft" aria-label="Shift left">←</button><button class="chip" id="spUp" aria-label="Shift up">↑</button><button class="chip" id="spDown" aria-label="Shift down">↓</button><button class="chip" id="spRight" aria-label="Shift right">→</button>
-      </div>
-      <div class="ed-row"><span class="ed-lbl">colour</span><input type="color" id="spColor" aria-label="Edit the selected colour"><button class="chip" id="spAddColor">+ New colour</button></div>
-      <div class="sp-swatches" id="spSwatches"></div>
-      <div class="ed-row"><span class="ed-lbl">on the map</span></div>
-      <canvas id="spPreview" class="sp-preview" width="600" height="190" aria-label="Animated preview of all four facings"></canvas>
-    </aside>
-  </div>
-</div>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>

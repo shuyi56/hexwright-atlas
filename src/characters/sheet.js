@@ -1,21 +1,20 @@
 import { ADVANCE, GLYPH_H, glyph, textWidth } from './font.js';
 import { H, OUTLINE, W, hexRgb, mixHex } from './pixels.js';
 import { BASE, BODY_TYPES } from './body.js';
-import { BODIES, ROSTER, render } from './roster.js';
+import { BODIES, ROSTER, WALK, render } from './roster.js';
+import { TOWNSFOLK } from './townsfolk.js';
 import { TERRAIN_BY_ID } from '../tiles/terrain.js';
 
-/* ================= tactics sprites: the sprite sheet =================
-   Every job in one image laid out like a tactics game's unit menu, in the tile editor's own colours (its dark
-   table, brass rims and vellum labels): a window per job with its name, then the four facings (south-west,
+/* ================= character sprites: the sprite sheet =================
+   Every character in one image laid out like a tactics game's unit menu, in the tile editor's own colours (its dark
+   table, brass rims and vellum labels): a window per character with its name, then the four facings (south-west,
    south-east, north-east, north-west), each standing and in both strides. Every figure stands on the editor's
    grass tile, drawn as a pixel tile in the tile set's colours, so the sheet shows the figures against the ground
-   they will walk on. South-east and north-west are the drawn views mirrored, as the games do. Below, every job
-   in every build, so any job can be read on any body. A second image (buildWalk) is the roster walking, as the
-   frames of an animation. Pure RGBA, so Node can write it (tools/tactics-sheet.mjs) and a test can check it. */
+   they will walk on. South-east and north-west are the drawn views mirrored, as the games do. Below, everyone
+   in every build, so anyone can be read on any body. A second image (buildWalk) is the roster walking, as the
+   frames of an animation. Pure RGBA, so Node can write it (tools/character-sheet.mjs) and a test can check it. */
 const FACINGS = [['SW', 'front', false], ['SE', 'front', true], ['NE', 'back', false], ['NW', 'back', true]];
 const C = { page: '#121819', win: ['#1d2829', '#141c1d'], rim: '#c9a45a', rimD: '#0b1011', text: '#ece2c8', dim: '#a39b86', shadow: '#4a341a' };
-/* the walk cycle: a stride, passing upright, the other stride, upright again */
-const WALK = [1, 0, 2, 0];
 /* the ground tile reaches this many sprite rows below the frame */
 const TILE_DROP = 12;
 
@@ -63,13 +62,25 @@ function groundTile(cv, x, y, k) {
   }
 }
 
+/* the roster in blocks for rows of figures: the townsfolk and the jobs apart, each split evenly into rows of at
+   most nine so a row stays readable. Each block is { name, list }. */
+function blocks(roster) {
+  const out = [];
+  for (const [name, list] of [['TOWNSFOLK', roster.filter(c => TOWNSFOLK.includes(c))], ['JOBS', roster.filter(c => !TOWNSFOLK.includes(c))]]) {
+    const n = Math.ceil(list.length / 9), size = Math.ceil(list.length / n);
+    for (let b = 0; b < n; b++) out.push({ name, list: list.slice(b * size, (b + 1) * size) });
+  }
+  return out;
+}
+
 function buildSheet(roster = ROSTER, k = 4) {
-  const label = 230, cell = W * k, gap = 18, margin = 28, rowH = (H + TILE_DROP) * k + 12, head = 186;
+  const label = 230, cell = W * k, gap = 18, margin = 28, rowH = (H + TILE_DROP) * k + 12, head = 186, groups = blocks(roster);
+  const blockH = 110 + BODIES.length * (rowH + 10) + 20;
   const w = margin * 2 + label + FACINGS.length * (3 * cell + gap) - gap, builds = head + roster.length * (rowH + 10) + 40;
-  const h = builds + 110 + BODIES.length * (rowH + 10) + margin;
+  const h = builds + 70 + groups.length * blockH + margin;
   const cv = canvas(w, h); cv.rect(0, 0, w, h, C.page);
-  cv.text('TACTICS ROSTER', margin, margin, 5, C.text);
-  cv.text(`${roster.length} JOBS · ${BODIES.length} BUILDS · 4 FACINGS · STAND AND STRIDE`, margin, margin + GLYPH_H * 5 + 14, 2, C.dim);
+  cv.text('CHARACTER ROSTER', margin, margin, 5, C.text);
+  cv.text(`${roster.length} CHARACTERS · ${BODIES.length} BUILDS · 4 FACINGS · STAND AND STRIDE`, margin, margin + GLYPH_H * 5 + 14, 2, C.dim);
   FACINGS.forEach(([name], f) => {
     const gx = margin + label + f * (3 * cell + gap), y = head - 62;
     cv.text(name, gx + (3 * cell - textWidth(name) * 3) / 2, y, 3, C.text);
@@ -84,39 +95,45 @@ function buildSheet(roster = ROSTER, k = 4) {
       groundTile(cv, x, top, k); cv.blit(rgba, x, top, k, flip);
     }));
   });
-  /* the builds: each job standing, facing south-west, in each body type */
+  /* the builds: each character standing, facing south-west, in each body type, a block of them at a time */
   cv.text('BODY TYPES', margin, builds, 4, C.text);
-  cv.text('ANY JOB ON ANY BUILD', margin, builds + GLYPH_H * 4 + 12, 2, C.dim);
-  const step = Math.min(cell + 24, Math.floor((w - margin * 2 - label) / roster.length));
-  roster.forEach((job, c) => { const n = job.name.toUpperCase(), x = margin + label + c * step; cv.text(n, x + (cell - textWidth(n) * 2) / 2, builds + 82, 2, C.dim); });
-  BODIES.forEach((b, r) => {
-    const y = builds + 110 + r * (rowH + 10);
-    cv.win(margin - 10, y - 6, w - margin * 2 + 20, rowH);
-    cv.text(BODY_TYPES[b].name.toUpperCase(), margin + 8, y + rowH / 2 - 16, 3, C.text);
-    roster.forEach((job, c) => { const x = margin + label + c * step, top = y + 2; groundTile(cv, x, top, k); cv.blit(render(job, b).front[0], x, top, k, false); });
+  cv.text('ANYONE ON ANY BUILD', margin, builds + GLYPH_H * 4 + 12, 2, C.dim);
+  groups.forEach(({ name, list: group }, g) => {
+    const by = builds + 70 + g * blockH, step = Math.min(cell + 24, Math.floor((w - margin * 2 - label) / group.length));
+    cv.text(name, margin, by + 12, 2, C.text);
+    group.forEach((job, c) => { const n = job.name.toUpperCase(), x = margin + label + c * step; cv.text(n, x + (cell - textWidth(n) * 2) / 2, by + 12, 2, C.dim); });
+    BODIES.forEach((b, r) => {
+      const y = by + 40 + r * (rowH + 10);
+      cv.win(margin - 10, y - 6, w - margin * 2 + 20, rowH);
+      cv.text(BODY_TYPES[b].name.toUpperCase(), margin + 8, y + rowH / 2 - 16, 3, C.text);
+      group.forEach((job, c) => { const x = margin + label + c * step, top = y + 2; groundTile(cv, x, top, k); cv.blit(render(job, b).front[0], x, top, k, false); });
+    });
   });
   return { width: w, height: h, rgba: cv.px };
 }
 
-/* The roster walking in place: a window per facing, every job on its tile, as the frames of an animation that
-   steps through WALK. Returns { width, height, frames: [rgba, ...] }. */
+/* The roster walking in place, a block of characters at a time: a window per facing with everyone in the block on
+   their tiles, as the frames of an animation that steps through WALK. Returns { width, height, frames: [rgba, ...] }. */
 function buildWalk(roster = ROSTER, k = 3) {
-  const cell = W * k, step = Math.max(cell + 20, ...roster.map(j => textWidth(j.name.toUpperCase()) * 2 + 16));
-  const margin = 24, label = 70, head = 40, rowH = (H + TILE_DROP) * k + 12;
-  const w = margin * 2 + label + roster.length * step, h = head + FACINGS.length * (rowH + 10) + margin;
-  const all = roster.map(job => render(job));
+  const cell = W * k, step = Math.max(cell + 20, ...roster.map(j => textWidth(j.name.toUpperCase()) * 2 + 28)), groups = blocks(roster);
+  const margin = 24, label = 70, head = 40, rowH = (H + TILE_DROP) * k + 12, blockH = head + FACINGS.length * (rowH + 10) + 14;
+  const w = margin * 2 + label + Math.max(...groups.map(g => g.list.length)) * step, h = groups.length * blockH + margin;
+  const all = new Map(roster.map(job => [job, render(job)]));
   const frames = WALK.map(pose => {
     const cv = canvas(w, h); cv.rect(0, 0, w, h, C.page);
-    roster.forEach((job, c) => { const n = job.name.toUpperCase(); cv.text(n, margin + label + c * step + (step - textWidth(n) * 2) / 2, margin - 6, 2, C.dim); });
-    FACINGS.forEach(([name, view, flip], r) => {
-      const y = head + r * (rowH + 10);
-      cv.win(margin - 10, y - 6, w - margin * 2 + 20, rowH);
-      cv.text(name, margin + 6, y + rowH / 2 - 12, 3, C.text);
-      roster.forEach((job, c) => { const x = margin + label + c * step + (step - cell) / 2, top = y + 2; groundTile(cv, x, top, k); cv.blit(all[c][view][pose], x, top, k, flip); });
+    groups.forEach(({ list: group }, g) => {
+      const top0 = g * blockH;
+      group.forEach((job, c) => { const n = job.name.toUpperCase(); cv.text(n, margin + label + c * step + (step - textWidth(n) * 2) / 2, top0 + margin - 6, 2, C.dim); });
+      FACINGS.forEach(([name, view, flip], r) => {
+        const y = top0 + head + r * (rowH + 10);
+        cv.win(margin - 10, y - 6, w - margin * 2 + 20, rowH);
+        cv.text(name, margin + 6, y + rowH / 2 - 12, 3, C.text);
+        group.forEach((job, c) => { const x = margin + label + c * step + (step - cell) / 2, top = y + 2; groundTile(cv, x, top, k); cv.blit(all.get(job)[view][pose], x, top, k, flip); });
+      });
     });
     return cv.px;
   });
   return { width: w, height: h, frames };
 }
 
-export { FACINGS, WALK, buildSheet, buildWalk };
+export { FACINGS, buildSheet, buildWalk };

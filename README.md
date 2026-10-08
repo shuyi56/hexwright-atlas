@@ -57,55 +57,49 @@ and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `ge
 `setView({ level })` switches the storey.
 
 ### Characters
- The **Characters** tab lists your character library. Seven detailed starters come with it: a villager in a vest, a
-farmer in a straw hat and apron, a guard with helmet, cape and spear, a bearded merchant with a satchel, a hooded
-monk with a rope belt, a healer, and a red-haired noble lady in a green gown and gold circlet. **Draw new
-character…** opens the **character editor**: a 32×32 pixel canvas with pencil, eraser, fill and pick, a symmetry
-mode, a ghost of the other frame, shift/flip/clear, and a colour list that starts from the tile set's own palette.
-Each character has four facings (front/back, left/right), each with a standing frame and a stride frame. **Mirror
-to other side** copies a facing, flipped. Every stroke saves to the library at once, and characters can be exported
-and imported as `.character.json`.
 
-On the map, characters are crisp pixel art in the tiles' pale palette. The renderer washes each colour
-slightly toward the paper tone and adds the map's faint grain. It draws a one-pixel outline in the tiles' ink,
-softened by the colour it borders, and lights each part from the left in gentle pixel steps, the way the pieces
-are lit. On the map, every zoom draws from one master per frame. The
-master is rendered at 8×, with its staircases rounded off by Scale2x and a fine outline, and pre-shrunk in halving
-steps. Each zoom uses the smallest step that still has enough pixels, so the character looks the same zoomed out
-or in, and stays sharp up close. A figure stands about as tall as a cottage's eaves. Characters drawn
-at 16×16 in an earlier version are doubled to 32×32 when they load. **Shaded** in the character editor and
-the **On the map** preview, which shows each facing on a grass block, display that finished look while you
-draw.
+The **Characters** tab lists the roster: sixteen pixel-art figures, 32×48 and big-headed, in the manner of
+Final Fantasy Tactics and Tactics Ogre.
 
-Movement is by clicking. Pick a sprite and click a free tile with **Person** (`C`) to stand it there (`R`
+- **Townsfolk:** a villager in a vest, a farmer in a straw hat and overalls, a guard with a kettle helm, cape and
+  spear, a bearded merchant with a satchel, a hooded monk with a rope belt, a healer with a satchel marked with a
+  cross, and a red-haired noble lady in a green gown and gold circlet.
+- **Jobs:** squire, knight, archer, thief, dragoon, valkyrie, black mage, white mage and summoner.
+
+Each character faces four ways, standing or walking, and is painted in the tile set's own soft palette and
+outlined in the tiles' ink. On the map every zoom draws from one master per frame, rendered at 8× with each sprite
+pixel a crisp square and pre-shrunk in halving steps. So a figure keeps its pixel art up close and stays clean
+zoomed out. A figure stands about as tall as a cottage's eaves.
+
+Movement is by clicking. Pick a character and click a free tile with **Person** (`C`) to stand it there (`R`
 turns it). With **Walk** (`W`), click a character, then click a tile. The ground it can reach is tinted, the
-route to the tile under the pointer is traced, and it walks the shortest way there. Clicking a character with
-Person also picks it up for walking. A tile is free when it is dry, not lava, and holds neither a piece nor
-another character; a step may climb or drop one height level at most. Characters walk behind and in front of
-buildings correctly, are saved inside the map JSON together with their sprites, and are on the same undo
-stack as every other edit. The automation API has `listSprites`, `listCharacters`, `placeCharacter`,
-`walkCharacter` and `removeCharacter`.
+route to the tile under the pointer is traced, and it walks the shortest way there, its arms swinging with its
+strides. Clicking a character with Person also picks it up for walking. A tile is free when it is dry, not lava,
+and holds neither a piece nor another character; a step may climb or drop one height level at most. Characters
+walk behind and in front of buildings correctly, and are on the same undo stack as every other edit.
 
-### Tactics sprite sheet
+The map JSON names each character by its roster id. Maps saved with the first, hand-painted character style still
+open: their starters come back as the same people in this style, and characters painted in the old sprite editor
+come back as villagers. The automation API has `listSprites`, `listCharacters`, `placeCharacter`, `walkCharacter`
+and `removeCharacter`. See [docs/character-design.md](docs/character-design.md).
 
-`src/tactics/` holds a separate character style made from scratch, after Final Fantasy Tactics and Tactics Ogre: nine
-jobs (squire, knight, archer, thief, dragoon, valkyrie, black mage, white mage, summoner) as big-headed 32×48 figures,
-in four facings, standing and in two strides.
+### Character sprite sheet
 
-- **Palette.** Painted in the tile set's soft palette: each colour is picked from the tiles' own and washed toward
-  their paper, then shaded in gentle steps and outlined in the tiles' umber ink.
-- **Walking.** The arms swing with the legs. `docs/images/tactics-walk.png` shows the roster walking in all four
+`src/characters/` draws the roster in plain Node, with no DOM.
+
+- **Palette.** Each colour is picked from the tiles' own and washed toward their paper, then shaded in gentle steps
+  and outlined in the tiles' umber ink.
+- **Walking.** The arms swing with the legs. `docs/images/character-walk.png` shows everyone walking in all four
   facings.
-- **Builds.** Bodies come in four builds (slim, standard, stocky, tall) cut from measurements, and any job can be
+- **Builds.** Bodies come in four builds (slim, standard, stocky, tall), cut from measurements, and anyone can be
   drawn in any build.
 
-`npm run sheet` draws the sheet into `docs/images/tactics-sprite-sheet.png`, with every figure on the editor's grass
-tile, and the walk into `docs/images/tactics-walk.png` (add `--strips` for one 1× strip per job), in plain Node.
-See [docs/tactics-sprites.md](docs/tactics-sprites.md).
+`npm run sheet` draws the sheet into `docs/images/character-sprite-sheet.png`, with every figure on the editor's grass
+tile, and the walk into `docs/images/character-walk.png`. Add `--strips` for one 1× strip per character.
 
-![The tactics roster](docs/images/tactics-sprite-sheet.png)
+![The character roster](docs/images/character-sprite-sheet.png)
 
-![The tactics roster walking](docs/images/tactics-walk.png)
+![The character roster walking](docs/images/character-walk.png)
 
 ### Test scenes
 
@@ -191,7 +185,7 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run preview` | Serve the production build      |
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
 | `npm run scene -- <map.json>` | Build a self-contained HTML test page for a scene into `scenes/` |
-| `npm run sheet`   | Draw the tactics sprite sheet into `docs/images/` |
+| `npm run sheet`   | Draw the character sprite sheet and walk into `docs/images/` |
 | `npm test`        | Unit tests (no browser needed)  |
 | `npm run test:e2e`| MCP end-to-end test (Chromium)  |
 | `npm run perf`    | Editor latency budget (Chromium)|
@@ -219,12 +213,12 @@ src/
   city/               City districts: generation, architecture solids, 2.5D rendering
   tiles/              Shared isometric tile set: terrain tiles, buildings, props and nature,
                       drawn procedurally with a small iso kit (used by the city view and the editor)
-  tactics/            Tactics sprite sheet: pixel engine, body builds, shared parts, the nine jobs, sheet layout,
-                      pixel font
+  characters/         Characters: pixel engine, body builds, shared parts, the townsfolk and the jobs, drawing
+                      them on the map, the sprite sheet layout and its pixel font
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
 tools/                Vite plugin that relays HTTP calls to the editor page (dev server only),
-                      the tactics sheet writer and a minimal PNG encoder
+                      the character sheet writer and a minimal PNG and APNG encoder
 mcp/                  MCP server, backend launcher and end-to-end test
   ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view
 legacy/               The original single-file artifact, kept for reference

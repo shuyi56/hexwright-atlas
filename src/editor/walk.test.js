@@ -6,7 +6,7 @@ import { placePiece } from './ops.js';
 import { TERRAIN } from '../tiles/index.js';
 
 const water = TERRAIN.findIndex(t => t.water);
-function map() { const M = blankModel(8, 'grass'); placeChar(M, { sprite: 'starter-villager', x: 0, y: 0 }); return M; }
+function map() { const M = blankModel(8, 'grass'); placeChar(M, { sprite: 'villager', x: 0, y: 0 }); return M; }
 
 test('characters stand only on free tiles', () => {
   const M = map(); M.terr[1 * 8 + 1] = water;
@@ -31,9 +31,18 @@ test('walking moves the character and turns it to face the last step', () => {
   assert.equal(walkChar(M, 0, [[5, 5]]).ok, false);
   assert.equal(reachable(M, 0).filter(Boolean).length, 64);
 });
-test('characters are saved and restored with their sprites', () => {
+test('characters are saved by their roster id and restored', () => {
   const M = map(); M.chars[0].face = 2;
-  const J = JSON.parse(JSON.stringify(toJSON(M))); assert.equal(J.characters.length, 1); assert.equal(J.sprites[0].id, 'starter-villager');
+  const J = JSON.parse(JSON.stringify(toJSON(M))); assert.deepEqual(J.characters, [{ sprite: 'villager', x: 0, y: 0, face: 2 }]); assert.equal(J.sprites, undefined, 'no pixels: every copy can draw the roster');
   const back = fromJSON(J); assert.deepEqual(back.chars, M.chars);
   assert.deepEqual(cloneModel(M).chars, M.chars); assert.notEqual(cloneModel(M).chars[0], M.chars[0]);
+});
+test('maps saved with the first character style bring their people into the current one', () => {
+  const J = toJSON(blankModel(8, 'grass'));
+  J.characters = [{ sprite: 'starter-farmer', x: 1, y: 1, face: 1 }, { sprite: 'starter-noble', x: 2, y: 1, face: 0, level: 0 }, { sprite: 'c1x2y3', x: 3, y: 1, face: 3 }];
+  J.sprites = [{ id: 'c1x2y3', name: 'Hand-drawn', size: 32, palette: ['#2b2116'], frames: {} }];
+  const back = fromJSON(J);
+  assert.deepEqual(back.chars.map(c => c.sprite), ['farmer', 'noble', 'villager'], 'starters keep their people, anyone else comes back as a villager');
+  assert.deepEqual(back.chars.map(c => [c.x, c.y, c.face]), [[1, 1, 1], [2, 1, 0], [3, 1, 3]], 'standing where they stood');
+  assert.equal(toJSON(back).sprites, undefined);
 });

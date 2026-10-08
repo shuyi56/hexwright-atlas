@@ -1,8 +1,9 @@
 import { BODY_TYPES, REF, measure } from './body.js';
-import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SWORD, recolor, staff } from './parts.js';
+import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, recolor, staff } from './parts.js';
 import { finish, frameBuf, mixHex, ramp, stamp } from './pixels.js';
+import { TOWNSFOLK } from './townsfolk.js';
 
-/* ================= tactics sprites: the roster =================
+/* ================= character sprites: the roster =================
    Each job is a build, an outfit, a palette and a stack of hand-drawn parts. The body (torso, arms, legs, a
    cloak) is cut for the build by body.js; the rest hangs on its landmarks. A frame is built back to front
    through fixed slots; a job fills the slots it needs. Views: 'front' (south-west) and 'back' (north-east);
@@ -19,6 +20,8 @@ const ANCHOR = {
   front: { head: 'head', hair: 'head', hat: 'head', weapon: 'handFar', staff: 'handFar', shield: 'handNear', armNear: 'shoulderNear', armFar: 'shoulderFar' },
   back: { head: 'head', hair: 'head', hairOver: 'head', hat: 'head', weapon: 'handNear', staff: 'handNear', shield: 'handFar', armNear: 'shoulderNear', armFar: 'shoulderFar' } };
 const POSES = 3, VIEWS = ['front', 'back'], BODIES = Object.keys(BODY_TYPES);
+/* the walk cycle, as the poses play: a stride, passing upright, the other stride, upright again */
+const WALK = [1, 0, 2, 0];
 /* slots that meet without a contour: the head with its hair and hat, the torso with what is worn over it */
 const GROUP = { head: 1, hair: 1, hairOver: 1, hat: 1, torso: 2, overTorso: 2 };
 
@@ -63,7 +66,6 @@ function render(job, body = job.body) {
    Shared letters are listed in parts.js. Jobs add: X hat or hood, R a bright accent (plume, scarf, pennant),
    V cape, F feather, bone or white, D a dark accent, U a shield's face, J a jewel, Z a face lost in shadow and
    N eyes glowing out of it. */
-const SKIN = '#ecc39a', TAN = '#d9a77c';
 /* pauldrons riding over the arms */
 const PAULDRONS = { armNear: { x: 19, y: 17, rows: ['.SSS.', 'SSSSS', 'SSSSS', 'sssss'], hand: 'near' }, armFar: { x: 7, y: 18, rows: ['.SS.', 'SSSS', 'ssss'], hand: 'far' } };
 
@@ -478,6 +480,10 @@ const SUMMONER = {
   parts: { front: { hat: SM_HOOD_FRONT, mantle: SM_LAPPETS }, back: { hat: SM_HOOD_BACK, mantle: SM_TAIL } }
 };
 
-const ROSTER = [SQUIRE, KNIGHT, ARCHER, THIEF, DRAGOON, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
+const JOBS = [SQUIRE, KNIGHT, ARCHER, THIEF, DRAGOON, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
+/* everyone who can be drawn: the townsfolk (townsfolk.js), then the jobs */
+const ROSTER = [...TOWNSFOLK, ...JOBS];
+const BY_ID = new Map(ROSTER.map(c => [c.id, c]));
+const byId = id => BY_ID.get(id) || null;
 
-export { BODIES, POSES, ROSTER, VIEWS, frame, palette, render };
+export { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render };

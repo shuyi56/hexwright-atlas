@@ -1,6 +1,6 @@
 import { cellsToPart } from './pixels.js';
 
-/* ================= tactics sprites: bodies =================
+/* ================= character sprites: bodies =================
    The torso, arms and legs are cut from a body type's measurements, so any job can wear any build. Clothing is
    a set of rules over the cut shape (where the collar, belt, ridge or front panel falls) rather than fixed
    grids. The hand-drawn heads, hats and gear in parts.js are hung on the body's landmarks (measure()): the
@@ -193,11 +193,31 @@ function torsoCells(bt, view, top, o = {}) {
       if (o.vest && j < belt && ch !== 'L' && (!front || x < fc - 1 || x > fc + 2 || j > 2 && (x < fc || x > fc + 1))) ch = 'D';
       /* a strap from one shoulder across to the other hip */
       if (o.strap && j < belt && x === ((o.strap > 0) === front ? cl + 1 + j : cr - 1 - j)) ch = 'L';
+      /* bib-and-brace overalls (D): two braces over the shoulders, buckled to a bib on the chest with a pocket,
+         and the trousers' top from the waist down; from behind, the braces down the back */
+      if (o.bib) {
+        const brace = x === fc - 2 || x === fc + 3;
+        if (j >= belt) ch = 'D';
+        else if (front ? (j < 2 ? brace : x >= fc - 2 && x <= fc + 3) : brace) ch = front && j === 2 && brace ? 'G' : front && j === 4 && x >= fc && x <= fc + 1 ? 'd' : 'D';
+      }
+      /* a square neckline: the skin of the throat and chest, edged below in trim with a jewel at its middle */
+      if (o.neckline && front) {
+        if ((j === 0 && x >= fc - 2 && x <= fc + 3) || (j === 1 && x >= fc - 1 && x <= fc + 2)) ch = 'K';
+        else if (j === 2 && x >= fc - 2 && x <= fc + 3) ch = x === fc + 1 ? 'J' : 'C';
+      }
       cells.push([x, top + j, ch]);
     }
   });
   /* a skirt carried on below the hem, over the legs */
   for (let k = 0; k < (o.skirt || 0); k++) { const [l, r] = span(bt.hem + (k ? 2 : 0)); for (let x = l; x <= r; x++) cells.push([x, top + T + k, k === o.skirt - 1 ? 'C' : (x - l) % 4 === 2 ? 'a' : 'A']); }
+  /* the end of a rope belt hanging from its knot, with a tassel (front only) */
+  if (o.cord && front) { for (let k = 1; k <= o.cord; k++) cells.push([fc - 1, top + belt + k, k === o.cord ? 'G' : 'L']); }
+  /* a satchel on the hip where the strap ends: a bag (U) under its flap, and a cross on it for a healer's */
+  if (o.satchel && o.strap) {
+    const bx = (o.strap > 0) === front ? cl + belt - 2 : cr - belt - 1;
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) cells.push([bx + i, top + belt - 1 + j, j === 0 ? 'L' : j === 1 ? 'u' : 'U']);
+    if (o.satchel === 'cross') cells.push([bx + 1, top + belt + 1, 'R'], [bx + 2, top + belt + 1, 'R'], [bx + 1, top + belt + 2, 'R'], [bx + 2, top + belt + 2, 'R']);
+  }
   /* plate tassets hung below the hem over the thighs, four pixels to a plate, each cut down to a point */
   for (let k = 0; k < (o.tassets || 0); k++) {
     const [l, r] = span(bt.hem + 2);
