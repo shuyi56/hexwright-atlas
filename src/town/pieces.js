@@ -541,6 +541,8 @@ const DRAW = { ...BUILD, ...NATURE, ...PROPS, ...INTERIOR };
 /* how far a piece's shadow falls east of it, in art pixels */
 const FLAT = new Set(['flowers', 'mushrooms', 'rocks', 'rowboat', 'reeds', 'fence']);
 const TREES = new Set(['oak', 'beech', 'birch', 'poplar', 'pine', 'snowpine', 'palm', 'deadtree']);
+/* how far a tree stands off its tile's middle: [east, north] in art pixels (collision follows it) */
+const treeOffset = o => { const v = Math.floor((o.v ?? 0.5) * 1e4); return [Math.round((h2(v, 1) - 0.5) * 18), Math.round(h2(v, 2) * 8)]; };
 const ROOM = new Set(['iwall', 'iwindow', 'idoor', 'post', 'stairs', 'hearth']);
 const shadowOf = a => (a.group === 'Interior' ? 0 : Math.min(16, 4 + a.h * 0.3));
 /* the sprite for placed piece o ({ id, face, v, links }), trimmed to what is drawn:
@@ -561,7 +563,7 @@ function pieceSprite(o) {
   const s = trim(K);
   if (small) { s.ox -= (fw * T - FW) / 2; s.oy -= fd * T - FD; }
   /* trees stand a little off the grid, each its own way, so a wood does not grow in rows */
-  if (TREES.has(o.id)) { const v = o.v ?? 0.5; s.ox -= Math.round((h2(Math.floor(v * 1e4), 1) - 0.5) * 18); s.oy += Math.round(h2(Math.floor(v * 1e4), 2) * 8); }
+  if (TREES.has(o.id)) { const [dx, dy] = treeOffset(o); s.ox -= dx; s.oy += dy; }
   return s;
 }
 function trim(K) {
@@ -574,4 +576,4 @@ function trim(K) {
 }
 const DESIGNED = new Set(Object.keys(DRAW));
 
-export { DESIGNED, pieceSprite };
+export { DESIGNED, MID, ROOM, SMALL, TREES, pieceSprite, treeOffset };

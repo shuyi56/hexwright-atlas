@@ -5,11 +5,12 @@ import { H, W } from '../characters/pixels.js';
 import { WALK, renderScaled } from '../characters/roster.js';
 import { unitFor } from '../data/units.js';
 import { ED } from '../editor/editor.js';
-import { MAX_LEVEL, cloneModel, levelOf } from '../editor/model.js';
-import { FACE_DELTA, findPath, isFree, neighbours } from '../editor/walk.js';
+import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf } from '../editor/model.js';
+import { FACE_DELTA, findPath, neighbours, stairsAt } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $, state } from '../ui/state.js';
-import { CHUNK, LIFT, TILE, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
+import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
+import { hits, shapesOf } from './collide.js';
 import { pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
 
@@ -28,7 +29,11 @@ const root = $('town'), cv = $('twCanvas'), g = cv.getContext('2d');
 /* figures at three quarters of their sprite, as in the tactical view: about 30 pixels tall, so a one-tile cottage
    still stands over them */
 const FIGURE_SCALE = 0.75;
-const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 2.6, RUN = 1.9, STRIDES = 2, FOOT = T / 2 + 6;
+/* The hero walks HERO_SPEED art pixels a second (about three of their own heights; RUN times that with Shift) and
+   takes a stride every STRIDE pixels, so the feet plant on the ground instead of gliding over it. The others stroll
+   NPC_SPEED tiles a second, STRIDES strides to a tile. A walker's feet are a circle FOOT_R across. */
+const HERO_SPEED = 84, RUN = 1.85, STRIDE = 7, NPC_SPEED = 0.8, STRIDES = 8, FOOT_R = 5;
+const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], FOOT = T / 2 + 6;
 const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, F: null, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, homes: [], rest: [], pending: [], banner: 0 };
 
 /* ---------- caches: the painted ground, cliffs, pieces and figures as canvases ---------- */
@@ -69,6 +74,7 @@ const S = () => TW.M.S;
 /* how high the surface stands at map pixel (gx, gy), in art pixels */
 const lift = (gx, gy) => heightAt(TW.F, Math.round(gx), Math.round(gy)) * LIFT;
 function charPos(k) {
+  if (k === TW.hero && TW.me) { const m = TW.me; return { fx: m.x, fy: m.y - heightOn(m.L, m.x, m.y) * LIFT, gy: Math.round(m.y), L: m.L, face: m.face, moving: m.moving, dist: m.dist }; }
   const c = TW.M.chars[k], st = TW.steps.get(k);
   if (!st) { const gx = c.x * T + T / 2, gy = c.y * T + FOOT; return { fx: gx, fy: gy - lift(gx, gy), gy, L: levelOf(c), face: c.face, moving: false, d: 0 }; }
   const f = Math.min(1, st.t), ax = st.from[0] * T + T / 2, ay = st.from[1] * T + FOOT, bx = st.to[0] * T + T / 2, by = st.to[1] * T + FOOT, gx = ax + (bx - ax) * f, gy = ay + (by - ay) * f;
@@ -93,19 +99,94 @@ function stepToward(k, dir) {
   return ok.find(n => n[2] !== L) || ok[0] || null;
 }
 const DIRS = { ArrowDown: 0, s: 0, ArrowRight: 1, d: 1, ArrowUp: 2, w: 2, ArrowLeft: 3, a: 3 };
-function heroNext() {
-  const k = TW.hero, c = TW.M.chars[k]; if (!c) return;
-  if (TW.held.length) {
-    TW.path = []; const dir = TW.held[TW.held.length - 1], to = stepToward(k, dir);
-    if (to) beginStep(k, to); else if (c.face !== dir) { c.face = dir; TW.dirty = true; }
-    return;
+/* ---------- the hero walks freely ----------
+   The hero has a position in map pixels (x east, y south, at their feet) and a storey. A move is taken in small
+   steps; each must land on dry ground of the hero's storey, no more than a few pixels up or down from where they
+   stand (so slopes climb and cliffs stop them), clear of every piece's shape and every other walker. Blocked
+   along one axis, the hero slides along the other, so they skirt a trunk or a wall instead of sticking to it.
+   Stairs carry them up or down a storey: crossing from a flight onto the tile behind its top goes up, and back
+   down the same way. */
+/* the height the hero stands at on storey L, at map pixel (x, y), in levels: the ground (or the floor), raised
+   along a flight of stairs from its foot to its top; null where storey L has no floor */
+function heightOn(L, x, y) {
+  const M = TW.M, n = M.S, tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || ty < 0 || tx >= n || ty >= n) return null;
+  const u = ty * n + tx; let h;
+  if (L) { if (!floorAt(M, L, u)) return null; h = M.elev[u] + STOREY * L; } else h = heightAt(TW.G0, Math.round(x), Math.round(y));
+  const st = stairsAt(M, tx, ty, L);
+  if (st) { const dx = st.up[0] - tx, dy = st.up[1] - ty, lx = x / T - tx, ly = y / T - ty; h += STOREY * (dx > 0 ? lx : dx < 0 ? 1 - lx : dy > 0 ? ly : 1 - ly); }
+  return h;
+}
+const dry = (L, x, y) => { if (L) return true; const k = cellAt(TW.G0, Math.round(x), Math.round(y)); return k >= 0 && !INFO[k].water && INFO[k].face !== 'lava'; };
+/* the storey a step from (ax, ay) to (bx, by) on storey L lands on: up or down a flight, else the same */
+function storeyAfter(L, ax, ay, bx, by) {
+  const M = TW.M, A = [Math.floor(ax / T), Math.floor(ay / T)], B = [Math.floor(bx / T), Math.floor(by / T)];
+  if (A[0] === B[0] && A[1] === B[1]) return L;
+  const st = stairsAt(M, A[0], A[1], L); if (st && L < MAX_LEVEL && st.up[0] === B[0] && st.up[1] === B[1]) return L + 1;
+  if (L > 0) { const dn = stairsAt(M, B[0], B[1], L - 1); if (dn && dn.up[0] === A[0] && dn.up[1] === A[1]) return L - 1; }
+  return L;
+}
+/* can the hero stand at (x, y) on storey L, coming from a spot h levels high? */
+function standable(L, x, y, h) {
+  const n = TW.M.S * T; if (x < FOOT_R || y < FOOT_R || x > n - FOOT_R || y > n - FOOT_R) return false;
+  for (const [dx, dy] of [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3]]) if (!dry(L, x + dx, y + dy)) return false;
+  /* a cliff jumps two levels or more; anything under one level is a slope or a seam a foot steps over */
+  const nh = heightOn(L, x, y); if (nh == null || Math.abs(nh - h) > 0.9) return false;
+  if (hits(TW.shapes.get(L), x, y, FOOT_R)) return false;
+  for (let k = 0; k < TW.M.chars.length; k++) { if (k === TW.hero) continue; const q = charPos(k); if (q.L === L && Math.hypot(q.fx - x, q.gy - y) < FOOT_R + 6) return false; }
+  return true;
+}
+/* move the hero by (dx, dy), a pixel or so at a time, sliding along whatever stops them; returns the distance gone */
+function moveHero(dx, dy) {
+  const m = TW.me, steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 1.2)), sx = dx / steps, sy = dy / steps; let gone = 0;
+  for (let i = 0; i < steps; i++) {
+    const h = heightOn(m.L, m.x, m.y);
+    let moved = false;
+    /* straight on; else each axis alone; else turned a little either way, to ease round a trunk or a corner */
+    const c1 = Math.cos(0.7), s1 = Math.sin(0.7), c2 = Math.cos(1.2), s2 = Math.sin(1.2);
+    for (const [ex, ey] of [[sx, sy], [sx, 0], [0, sy], [sx * c1 - sy * s1, sx * s1 + sy * c1], [sx * c1 + sy * s1, -sx * s1 + sy * c1], [sx * c2 - sy * s2, sx * s2 + sy * c2], [sx * c2 + sy * s2, -sx * s2 + sy * c2]]) {
+      if (!ex && !ey) continue;
+      const nx = m.x + ex, ny = m.y + ey, L = storeyAfter(m.L, m.x, m.y, nx, ny);
+      if (standable(L, nx, ny, h)) { m.x = nx; m.y = ny; gone += Math.hypot(ex, ey); moved = true; if (L !== m.L) { m.L = L; setTop(L); } break; }
+    }
+    if (!moved) break;
   }
-  if (TW.path.length) {
-    const to = TW.path.shift();
-    if (neighbours(TW.M, c.x, c.y, levelOf(c), k).some(n => n[0] === to[0] && n[1] === to[1] && n[2] === to[2])) { beginStep(k, to); return; }
-    TW.path = [];
+  /* the hero's tile, so the others step round it and talk finds them */
+  const c = TW.M.chars[TW.hero]; c.x = Math.floor(m.x / T); c.y = Math.floor(m.y / T); c.face = m.face; if (m.L) c.level = m.L; else delete c.level;
+  return gone;
+}
+const FACE_OF = (vx, vy) => (Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 1 : 3) : (vy > 0 ? 0 : 2));
+function heroTick(dt) {
+  const m = TW.me; if (!m) return;
+  let vx = 0, vy = 0;
+  for (const d of TW.held) { vx += FACE_DELTA[d][0]; vy += FACE_DELTA[d][1]; }
+  if (vx || vy) TW.path = [];
+  else if (TW.path.length) {
+    /* following a route: toward the next point, dropping it once there or once stuck on it */
+    const [px, py] = TW.path[0], ex = px - m.x, ey = py - m.y, d = Math.hypot(ex, ey);
+    if (d < 1.5) { TW.path.shift(); TW.stuck = 0; } else { vx = ex / d; vy = ey / d; }
   }
-  if (TW.talkTo >= 0 && !TW.steps.has(k)) { const j = TW.talkTo; TW.talkTo = -1; const o = TW.M.chars[j]; if (o && Math.abs(o.x - c.x) + Math.abs(o.y - c.y) === 1) { c.face = FACE_DELTA.findIndex(([a, b]) => a === o.x - c.x && b === o.y - c.y); talk(); } }
+  if (vx || vy) {
+    const len = Math.hypot(vx, vy), sp = HERO_SPEED * (TW.run ? RUN : 1) * dt;
+    m.face = FACE_OF(vx, vy);
+    const gone = moveHero(vx / len * sp, vy / len * sp);
+    m.dist += gone; m.moving = gone > 0.05;
+    if (!m.moving && TW.path.length) { TW.stuck = (TW.stuck || 0) + dt; if (TW.stuck > 0.4) TW.path = []; }
+    TW.dirty = true;
+  } else if (m.moving) { m.moving = false; TW.dirty = true; place(); }
+  /* walked up to someone to talk to them */
+  if (TW.talkTo >= 0) {
+    const q = charPos(TW.talkTo), d = Math.hypot(q.fx - m.x, q.gy - m.y);
+    if (q.L === m.L && (d < 24 || (!TW.path.length && d < T + 10))) { const j = TW.talkTo; m.face = FACE_OF(q.fx - m.x, q.gy - m.y); TW.path = []; TW.talkTo = -1; TW.chase = 0; m.moving = false; talk(j); }
+    /* they strolled off: follow a little way, then give up */
+    else if (!TW.path.length) { if (q.L === m.L && d < 4 * T && (TW.chase = (TW.chase || 0) + 1) < 4) TW.path = routeTo(q.fx, q.gy + (m.y > q.gy ? 14 : -14), q.L); else { TW.talkTo = -1; TW.chase = 0; } }
+  }
+}
+/* a route for the hero to (x, y) in map pixels on storey L: through the middles of the tiles on the editor's
+   walking route, then to the point itself; or straight there if there is no route */
+function routeTo(x, y, L) {
+  const M = TW.M, k = TW.hero, tx = Math.floor(x / T), ty = Math.floor(y / T), tiles = findPath(M, k, tx, ty, L);
+  const pts = (tiles || []).slice(0, -1).map(([a, b]) => [a * T + T / 2, b * T + FOOT]);
+  pts.push([x, y]); return pts;
 }
 /* the others stroll: now and then one takes a step, staying within two tiles of where it was put */
 function stroll(dt) {
@@ -121,19 +202,22 @@ function stroll(dt) {
 }
 
 /* ---------- talking and looking ---------- */
-function talk() {
+/* talk to `to` (someone the hero walked up to), else whoever stands just in front of the hero, else look at the piece
+   or ground there */
+function talk(to = -1) {
   if (TW.say) { closeSay(); return; }
-  const M = TW.M, k = TW.hero, c = M.chars[k]; if (!c) return;
-  const [dx, dy] = FACE_DELTA[c.face], x = c.x + dx, y = c.y + dy, L = levelOf(c);
-  const j = M.chars.findIndex((o, i) => i !== k && o.x === x && o.y === y && levelOf(o) === L);
+  const M = TW.M, k = TW.hero, m = TW.me; if (!m) return;
+  const [fx, fy] = FACE_DELTA[m.face], px = m.x + fx * 18, py = m.y + fy * 18, L = m.L;
+  let j = to, best = 20;
+  if (j < 0) M.chars.forEach((o, i) => { if (i === k) return; const q = charPos(i), d = Math.hypot(q.fx - px, q.gy - py); if (q.L === L && d < best) { best = d; j = i; } });
   if (j >= 0) {
     const o = M.chars[j], ch = characterById(o.sprite);
-    if (!TW.steps.has(j)) o.face = (c.face + 2) % 4;
+    if (!TW.steps.has(j)) o.face = (m.face + 2) % 4;
     TW.say = { k: j, who: ch ? ch.name : o.sprite, line: lineFor(o.sprite, unitFor(o.sprite).group, M.name, (TW.talks = (TW.talks || 0) + 1)) };
   } else {
-    if (x < 0 || y < 0 || x >= M.S || y >= M.S) return;
+    const x = Math.floor(px / T), y = Math.floor(py / T); if (x < 0 || y < 0 || x >= M.S || y >= M.S) return;
     const piece = M.objs.find(o => (o.level || 0) === L && x >= o.x && y >= o.y && x < o.x + footprint(o)[0] && y < o.y + footprint(o)[1]);
-    const ground = L ? (M.floors[L - 1] && M.floors[L - 1][y * M.S + x] ? TERRAIN[M.floors[L - 1][y * M.S + x] - 1] : null) : TERRAIN[M.terr[y * M.S + x]];
+    const ground = L ? (M.floors[L - 1] && M.floors[L - 1][y * M.S + x] ? TERRAIN[M.floors[L - 1][y * M.S + x] - 1] : null) : TERRAIN[cellAt(TW.G0, Math.round(px), Math.round(py))];
     const line = sightFor(piece ? ASSET_BY_ID[piece.id] : null, ground, M.name); if (!line) return;
     TW.say = { k: -1, who: '', line };
   }
@@ -221,7 +305,7 @@ function covers(s, X, Y, b) {
 }
 const figCan = canvasOf(W, H), figG = figCan.getContext('2d');
 function drawChar(k, q, vx0, vy0, vx1, vy1) {
-  const c = TW.M.chars[k], ch = characterById(c.sprite) || characterById('villager'), pose = q.moving ? WALK[Math.floor(q.d * STRIDES) % WALK.length] : 0;
+  const c = TW.M.chars[k], ch = characterById(c.sprite) || characterById('villager'), pose = !q.moving ? 0 : q.dist != null ? WALK[Math.floor(q.dist / STRIDE) % WALK.length] : WALK[Math.floor(q.d * STRIDES) % WALK.length];
   const view = q.face === 2 ? 'back' : 'front', flip = q.face === 1, x = Math.round(q.fx), y = Math.round(q.fy), X = x - W / 2, Y = y - BASE - 1;
   if (X > vx1 || Y > vy1 || X + W < vx0 || Y + H < vy0) return;
   /* the figure and its shadow, cut away wherever the ground shown lies in front of where it stands */
@@ -246,15 +330,8 @@ let raf = 0;
 function loop(now) {
   raf = 0; if (!TW.open) return;
   const dt = Math.min(0.1, (now - (TW.lastT || now)) / 1000); TW.lastT = now;
-  for (const [k, st] of TW.steps) {
-    st.t += dt * WALK_SPEED * (k === TW.hero && TW.run ? RUN : k === TW.hero ? 1 : 0.55);
-    if (st.t >= 1) {
-      TW.steps.delete(k);
-      if (k === TW.hero) { heroNext(); const nx = TW.steps.get(k); if (nx) { nx.t = st.t - 1; nx.d = st.d + 1; } else place(); }
-    }
-    TW.dirty = true;
-  }
-  if (!TW.steps.has(TW.hero) && (TW.held.length || TW.path.length || TW.talkTo >= 0)) { heroNext(); TW.dirty = true; }
+  for (const [k, st] of TW.steps) { st.t += dt * NPC_SPEED; if (st.t >= 1) TW.steps.delete(k); TW.dirty = true; }
+  heroTick(dt);
   stroll(dt);
   /* the ripples, the fire and the hero's marker tick over a few times a second */
   const tick = Math.floor(now / 260); if (tick !== TW.tick) { TW.tick = tick; TW.dirty = true; }
@@ -272,20 +349,17 @@ function tileAt(e) {
   const wx = ((e.clientX - r.left) * state.dpr - tx) / sc, wy = ((e.clientY - r.top) * state.dpr - ty) / sc, d = depthAt(wx, wy);
   /* the ground under the point is the row its pixel shows */
   if (!d) return null;
-  const x = Math.floor(wx / T), y = Math.floor((d - 1) / T); return [x, y, TW.F.lev[y * S() + x]];
+  const x = Math.floor(wx / T), y = Math.floor((d - 1) / T); return [x, y, TW.F.lev[y * S() + x], wx, d - 1];
 }
 cv.addEventListener('pointerdown', e => {
-  const t = tileAt(e), M = TW.M, k = TW.hero; if (!t || !M.chars[k]) return;
+  const t = tileAt(e), M = TW.M, k = TW.hero; if (!t || !M.chars[k] || !TW.me) return;
   if (TW.say) closeSay();
+  TW.moved = true; TW.stuck = 0;
+  /* a click on someone walks up to them and talks; anywhere else walks there */
   const j = M.chars.findIndex((o, i) => i !== k && o.x === t[0] && o.y === t[1] && levelOf(o) === t[2]);
-  let path;
-  if (j >= 0) {
-    /* walk up to them and talk */
-    const o = M.chars[j]; let best = null;
-    for (const [dx, dy] of FACE_DELTA) { const nx = o.x + dx, ny = o.y + dy; if (nx < 0 || ny < 0 || nx >= M.S || ny >= M.S) continue; const c = M.chars[k]; const p = c.x === nx && c.y === ny && levelOf(c) === t[2] ? [] : isFree(M, nx, ny, k, t[2]) ? findPath(M, k, nx, ny, t[2]) : null; if (p && (!best || p.length < best.length)) best = p; }
-    path = best; if (path) TW.talkTo = j;
-  } else path = findPath(M, k, t[0], t[1], t[2]);
-  if (path) { TW.path = path; TW.moved = true; req(); }
+  if (j >= 0) { const q = charPos(j); TW.path = routeTo(q.fx, q.gy + (TW.me.y > q.gy ? 14 : -14), t[2]); TW.talkTo = j; }
+  else { TW.path = routeTo(t[3], t[4], t[2]); TW.talkTo = -1; }
+  req();
 });
 cv.addEventListener('wheel', e => { e.preventDefault(); const i = ZOOMS.indexOf(TW.zoom); setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + (e.deltaY < 0 ? 1 : -1)))]); req(); }, { passive: false });
 root.addEventListener('keydown', e => {
@@ -305,7 +379,13 @@ root.addEventListener('blur', () => { TW.held = []; TW.run = false; });
 function nextHero(d = 1) {
   const n = TW.M.chars.length; if (n < 2) return;
   TW.hero = (TW.hero + d + n) % n; TW.path = []; TW.talkTo = -1; if (TW.say) closeSay();
-  setTop(levelOf(TW.M.chars[TW.hero])); place(); req();
+  takeHero(); setTop(TW.me.L); place(); req();
+}
+
+/* the hero's free position, from the tile the character stands on */
+function takeHero() {
+  const c = TW.M.chars[TW.hero]; TW.steps.delete(TW.hero);
+  TW.me = c ? { x: c.x * T + T / 2, y: c.y * T + FOOT, L: levelOf(c), face: c.face | 0, dist: 0, moving: false } : null;
 }
 
 /* ---------- open and close ---------- */
@@ -316,7 +396,8 @@ function openTown(opts = {}) {
   TW.open = true; root.hidden = false; TW.steps.clear(); TW.path = []; TW.held = []; TW.talkTo = -1; TW.moved = false; TW.lastT = 0; TW.rest = [];
   TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs);
   TW.hero = opts.hero ?? (ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0);
-  const c0 = TW.M.chars[TW.hero]; TW.top = c0 ? levelOf(c0) : 0;
+  TW.G0 = fieldOf(TW.M, 0); TW.shapes = shapesOf(TW.M.objs, TW.links); takeHero();
+  TW.top = TW.me ? TW.me.L : 0;
   buildField(); size();
   setZoom(opts.zoom || Math.max(2, Math.min(5, Math.round(TW.cw / (15 * T)))));
   $('twName').textContent = TW.M.name;
@@ -334,6 +415,6 @@ $('edTown').addEventListener('click', () => openTown());
 $('editor').addEventListener('keydown', e => { if (ED.open && !TW.open && (e.key === 'o' || e.key === 'O') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTown(); } });
 new ResizeObserver(() => { if (TW.open) { size(); req(); } }).observe(root);
 /* test hook */
-window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, walkTo: (x, y, L = 0) => { const p = findPath(TW.M, TW.hero, x, y, L); if (p) { TW.path = p; TW.moved = true; req(); } return !!p; } };
+window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
 
 export { closeTown, openTown };

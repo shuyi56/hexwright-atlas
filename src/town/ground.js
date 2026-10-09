@@ -83,7 +83,13 @@ function fieldOf(M, top = 0) {
   /* tiles with a slope round them (a neighbour one level off), where the ground is shaded by how it faces */
   const slope = new Uint8Array(NN);
   for (let u = 0; u < NN; u++) { const x = u % S, y = (u / S) | 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < S && Y < S && Math.abs(hgt[Y * S + X] - hgt[u]) === 1) slope[u] = 1; } }
-  return { S, top, terr, hgt, lev, maxH, slope, cells: new Map() };
+  /* which way each tile slopes toward its edge-neighbours one level off: 1 north-south, 2 east-west, 3 both */
+  const axis = new Uint8Array(NN);
+  for (let u = 0; u < NN; u++) {
+    const x = u % S, y = (u / S) | 0, one = (X, Y) => X >= 0 && Y >= 0 && X < S && Y < S && Math.abs(hgt[Y * S + X] - hgt[u]) === 1;
+    axis[u] = (one(x, y - 1) || one(x, y + 1) ? 1 : 0) | (one(x - 1, y) || one(x + 1, y) ? 2 : 0);
+  }
+  return { S, top, terr, hgt, lev, maxH, slope, axis, cells: new Map() };
 }
 const at = (G, x, y) => (x < 0 || y < 0 || x >= G.S || y >= G.S ? -1 : y * G.S + x);
 const terrAt = (G, x, y) => { const u = at(G, x, y); return u < 0 ? -1 : G.terr[u]; };
@@ -177,9 +183,13 @@ function heightAt(F, gx, gy, u = ownTile(F, gx, gy)) {
   if (u < 0) return 0;
   const own = F.hgt[u], t = F.terr[u]; if (t >= 0 && WET[t]) return own;
   const fx = gx / TILE - 0.5, fy = gy / TILE - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), ax = smooth(fx - x0), ay = smooth(fy - y0), S = F.S;
-  /* paving and roads climb only along the north-south line of their own tiles, so their courses and edges stay
-     straight on a slope */
-  if (t >= 0 && (INFO[t].crisp || INFO[t].road)) { const ux = u % S, a1 = corner(F, ux, y0, own, S), d1 = corner(F, ux, y0 + 1, own, S); return a1 + (d1 - a1) * ay; }
+  /* paving and roads climb only along one line through their own tiles (north-south, or east-west where that is
+     the way they slope), so their courses and edges stay straight on a slope */
+  if (t >= 0 && (INFO[t].crisp || INFO[t].road) && F.axis[u] !== 3) {
+    const ux = u % S, uy = (u / S) | 0;
+    if (F.axis[u] === 2) { const a1 = corner(F, x0, uy, own, S), b1 = corner(F, x0 + 1, uy, own, S); return a1 + (b1 - a1) * ax; }
+    const a1 = corner(F, ux, y0, own, S), d1 = corner(F, ux, y0 + 1, own, S); return a1 + (d1 - a1) * ay;
+  }
   const a = corner(F, x0, y0, own, S), b = corner(F, x0 + 1, y0, own, S), d = corner(F, x0, y0 + 1, own, S), e = corner(F, x0 + 1, y0 + 1, own, S);
   return a + (b - a) * ax + (d - a) * ay + (a - b - d + e) * ax * ay;
 }

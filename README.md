@@ -250,10 +250,17 @@ solid surface rather than a grid of blocks.
   pines are tiers of slanting needles with drooping tips, and props and furniture keep the figures' scale in the
   middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
   front of the hero fades so they are never lost behind it.
-- **Walking:** the arrow keys or `WASD` walk the hero a tile at a time (`Shift` runs), turning to face a way that is
-  blocked; clicking a tile walks them there by the editor's walking rules, up and down stairs. Only the storeys up
-  to the hero's own are shown, so stepping indoors upstairs takes the roof off. `Tab` (or **Next hero**) walks as
-  the next character. Everyone else strolls about near where they were put; enemies hold their ground.
+- **Walking:** the hero walks freely, not tile by tile: the arrow keys or `WASD` (diagonals too, `Shift` runs) move
+  them at a figure's pace, about three of their own heights a second, with a stride every few pixels so the feet plant
+  instead of gliding. Clicking a tile walks them there along the editor's walking route, up and down stairs. Only the
+  storeys up to the hero's own are shown, so stepping indoors upstairs takes the roof off. `Tab` (or **Next hero**)
+  walks as the next character. Everyone else strolls about near where they were put; enemies hold their ground.
+- **Collision:** each piece blocks only the ground it is drawn standing on: a tree its trunk, a bush, well or
+  haystack its round base, a house its walls (the doorstep stays open), a fence a strip along its rails, an interior
+  wall its band, joined to its neighbours. Flowers, toadstools, reeds, doorways and stairs block nothing. Water stops
+  the hero exactly at its painted edge, a cliff wherever the ground jumps two levels or more, and other walkers by a
+  small circle round their feet. Blocked one way, the hero slides along the other and eases round trunks and corners
+  (`src/town/collide.js`).
 - **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a classic blue window),
   or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
 - **A stroll, not an edit:** the town view walks a copy of the map, so nothing it does changes the map or its undo

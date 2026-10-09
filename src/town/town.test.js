@@ -103,3 +103,19 @@ test('a chain of water tiles stepping diagonally flows as one river, with no sta
   assert.equal(classify(F, 2 * TILE + 4, 3 * TILE - 4), TI.grass);
   assert.equal(classify(F, 3 * TILE - 4, 2 * TILE + 4), TI.grass);
 });
+
+test('collision shapes match the drawings: a trunk for a tree, the walls for a house, nothing for flowers', async () => {
+  const { hits, shapesOf } = await import('./collide.js');
+  const objs = [{ id: 'oak', x: 1, y: 1, face: 0, v: 0.5 }, { id: 'cottage', x: 3, y: 1, face: 0, v: 0.5 }, { id: 'flowers', x: 5, y: 1, face: 0, v: 0.5 }];
+  const sh = shapesOf(objs).get(0);
+  /* the oak blocks only round its trunk: most of its tile is open */
+  let open = 0, total = 0;
+  for (let y = TILE; y < 2 * TILE; y += 4) for (let x = TILE; x < 2 * TILE; x += 4) { total++; if (!hits(sh, x, y, 5)) open++; }
+  assert.ok(open / total > 0.9, `an oak's tile is mostly open (${open}/${total})`);
+  assert.ok(sh.some(s => 'r' in s && s.r <= 6 && s.x > TILE && s.x < 2 * TILE), 'a small trunk circle');
+  /* the cottage blocks its walls, but the step before its door is open */
+  assert.ok(hits(sh, 3.5 * TILE, 1.5 * TILE, 5));
+  assert.ok(!hits(sh, 3.5 * TILE, 2 * TILE - 1, 2), 'the doorstep is open');
+  /* flowers block nothing */
+  assert.ok(!hits(sh, 5.5 * TILE, 1.5 * TILE, 5));
+});
