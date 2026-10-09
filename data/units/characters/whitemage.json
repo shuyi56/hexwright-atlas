@@ -3,7 +3,8 @@
   "name": "White Mage",
   "stats": {
     "hp": 32,
-    "attack": 4
+    "attack": 4,
+    "range": 3
   },
   "movement": {
     "move": 3,

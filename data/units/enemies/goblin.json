@@ -3,7 +3,8 @@
   "name": "Goblin",
   "stats": {
     "hp": 22,
-    "attack": 7
+    "attack": 7,
+    "range": 1
   },
   "movement": {
     "move": 5,

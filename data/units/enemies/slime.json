@@ -3,7 +3,8 @@
   "name": "Slime",
   "stats": {
     "hp": 44,
-    "attack": 6
+    "attack": 6,
+    "range": 1
   },
   "movement": {
     "move": 3,

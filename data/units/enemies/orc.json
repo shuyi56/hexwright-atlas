@@ -3,7 +3,8 @@
   "name": "Orc",
   "stats": {
     "hp": 66,
-    "attack": 15
+    "attack": 15,
+    "range": 1
   },
   "movement": {
     "move": 4,

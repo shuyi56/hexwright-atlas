@@ -3,7 +3,8 @@
   "name": "Healer",
   "stats": {
     "hp": 30,
-    "attack": 3
+    "attack": 3,
+    "range": 2
   },
   "movement": {
     "move": 4,

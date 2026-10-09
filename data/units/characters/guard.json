@@ -3,7 +3,8 @@
   "name": "Guard",
   "stats": {
     "hp": 48,
-    "attack": 11
+    "attack": 11,
+    "range": 2
   },
   "movement": {
     "move": 4,

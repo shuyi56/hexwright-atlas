@@ -3,7 +3,8 @@
   "name": "Knight",
   "stats": {
     "hp": 58,
-    "attack": 13
+    "attack": 13,
+    "range": 1
   },
   "movement": {
     "move": 3,

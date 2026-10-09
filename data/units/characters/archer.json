@@ -3,7 +3,8 @@
   "name": "Archer",
   "stats": {
     "hp": 40,
-    "attack": 12
+    "attack": 12,
+    "range": 4
   },
   "movement": {
     "move": 4,

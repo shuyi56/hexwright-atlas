@@ -124,16 +124,16 @@ data/units/
   enemies/     bandit.json  goblin.json  orc.json  skeleton.json  slime.json  wolf.json
 ```
 
-A file is named by the unit's id, which is the id of the sprite it plays as, and holds its name, HP, Attack,
-movement (Move: tiles a turn; Jump: height levels a step can climb or drop). `src/data/units.js`
+A file is named by the unit's id, which is the id of the sprite it plays as, and holds its name, HP, Attack, Range
+(how many tiles away it can strike), movement (Move: tiles a turn; Jump: height levels a step can climb or drop). `src/data/units.js`
 defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite with no file, such
 as a custom character from the maker, plays with the defaults. The tactical view moves units by their Move and
-Jump and shows their HP and Attack; adding a field means adding a line to `FIELDS` there.
+Jump and shows their HP, Attack and Range; adding a field means adding a line to `FIELDS` there.
 
 **Unit data** in the atlas header opens `units.html`, an editor for these files:
 
 - **Cards:** the list of units down the side, filterable, and a card for the picked one: its sprite walking (turn
-  it with ⟲ ⟳), name and group, and HP, Attack, Move and Jump listed on the right, each with a bar against the strongest unit.
+  it with ⟲ ⟳), name and group, and HP, Attack, Range, Move and Jump listed on the right, each with a bar against the strongest unit.
   Changed values are outlined in brass.
 - **Table:** everyone in one sortable grid for balancing numbers side by side, every cell editable.
 - **Saving:** changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes the
@@ -349,7 +349,7 @@ src/
                       automation API (api-spec, api, bridge)
 tools/                Vite plugin that relays HTTP calls to the editor page and saves unit data (dev server only),
                       the character sheet writer and a minimal PNG and APNG encoder
-data/units/           One JSON file per character and enemy: HP, Attack, Move, Jump
+data/units/           One JSON file per character and enemy: HP, Attack, Range, Move, Jump
 mcp/                  MCP server, backend launcher and end-to-end test
   ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view
 legacy/               The original single-file artifact, kept for reference

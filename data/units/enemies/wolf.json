@@ -3,7 +3,8 @@
   "name": "Wolf",
   "stats": {
     "hp": 32,
-    "attack": 11
+    "attack": 11,
+    "range": 1
   },
   "movement": {
     "move": 7,

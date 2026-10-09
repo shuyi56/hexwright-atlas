@@ -32,7 +32,7 @@ test('the unit files are valid and in canonical form', () => {
 test('a unit is clamped and filled out, and its faults are named', () => {
   const u = normalizeUnit({ id: 'Imp', level: 400, stats: { hp: -3, attack: 7.6, mp: 9 }, movement: { jump: 9 }, extra: 1 });
   assert.equal(u.id, 'imp'); assert.equal(u.name, 'Imp');
-  assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'attack']);
+  assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'attack', 'range']); assert.equal(u.stats.range, 1);
   assert.equal(u.movement.jump, 6); assert.equal(u.movement.move, DEFAULT_UNIT.movement.move);
   assert.equal(u.level, undefined); assert.equal(u.extra, undefined);
   assert.deepEqual(validateUnit({ id: 'imp', stats: { hp: 30 } }), []);

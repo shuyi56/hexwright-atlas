@@ -3,7 +3,8 @@
   "name": "Valkyrie",
   "stats": {
     "hp": 48,
-    "attack": 13
+    "attack": 13,
+    "range": 2
   },
   "movement": {
     "move": 4,

@@ -1,10 +1,10 @@
 /* ================= unit data: what a character or enemy can do =================
    The roster (characters/) says how everyone looks; this says how they play: how much damage they take and deal,
-   how far they move and how high they jump. Each unit is one JSON file under data/units/,
+   how many tiles away they can strike, how far they move and how high they jump. Each unit is one JSON file under data/units/,
    in characters/ or enemies/, named by its id, which is the id of the sprite it plays as:
 
      data/units/enemies/goblin.json
-     { "id": "goblin", "name": "Goblin", "stats": { "hp": 22, "attack": 7 }, "movement": { "move": 5, "jump": 2 } }
+     { "id": "goblin", "name": "Goblin", "stats": { "hp": 22, "attack": 7, "range": 1 }, "movement": { "move": 5, "jump": 2 } }
 
    Pure (no DOM, no Vite), so Node tools, tests and the browser share it. In the browser data/unit-files.js loads
    the files into the registry below; on the dev server the unit data page (units.html) writes them back through
@@ -16,7 +16,8 @@ const GROUP_LABEL = { characters: 'Characters', enemies: 'Enemies' };
 const FIELDS = {
   stats: [
     ['hp', 'HP', 1, 999, 30],
-    ['attack', 'Attack', 0, 99, 8]],
+    ['attack', 'Attack', 0, 99, 8],
+    ['range', 'Range', 1, 8, 1]],
   movement: [
     ['move', 'Move', 1, 12, 5],
     ['jump', 'Jump', 0, 6, 1]] };
