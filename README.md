@@ -61,7 +61,7 @@ and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `ge
 The **Characters** tab lists the roster: sixteen pixel-art figures, 32×48 and big-headed, in the manner of
 Final Fantasy Tactics and Tactics Ogre.
 
-- **Townsfolk:** a villager in an open vest over a laced shirt, a farmer in a straw hat, rolled sleeves and overalls, a guard with a kettle helm, cape and
+- **Townsfolk:** a villager in an open vest over a laced shirt, a farmer in rolled sleeves and overalls, a guard with a kettle helm, cape and
   spear, a bearded merchant in a long gold-faced coat with a sash and a satchel, a hooded monk with a rope belt, a healer with a satchel marked with a
   cross, and a red-haired noble lady in a green gown and gold circlet.
 - **Jobs:** squire, knight, archer, thief, dragoon, valkyrie, black mage, white mage and summoner.

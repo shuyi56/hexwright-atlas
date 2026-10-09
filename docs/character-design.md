@@ -19,7 +19,7 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 | Townsfolk | Read at a glance by |
 | --- | --- |
 | Villager (standard) | Short brown hair, an open green waistcoat falling to points over an oatmeal linen shirt laced at the throat and gathered at the cuffs, tan trousers bloused over the boots. |
-| Farmer (standard) | A straw hat with a flat crown and a red band, a green shirt rolled to the elbow, blue overalls with a pocketed bib buckled to braces that cross on his back, turned up over the boots. |
+| Farmer (standard) | Bareheaded with short brown hair, a green shirt rolled to the elbow, blue overalls with a pocketed bib buckled to braces that cross on his back, turned up over the boots. |
 | Guard (standard) | A kettle helm with a comb and a turned-down brim, a steel breastplate over a red tunic, mail sleeves, a spear and a red cape. |
 | Merchant (stocky) | Ash-grey hair and a full grey beard falling to a point, a long blue coat with a gold shawl collar and gold-faced edges, open over a russet under-robe, a sash knotted at the hip, bell sleeves, a satchel on a strap. |
 | Monk (standard) | A deep plain cowl with the face in its shadow, a capelet over the shoulders, a robe of undyed wool to the floor with bell sleeves, tied with a rope whose end hangs. |
@@ -273,8 +273,8 @@ drawn like the jobs and the maker can start from any of them.
   the far hip with its two ends hanging. From behind, a standing gold collar, a seam down the back and a pleat
   either side.
 
-- **Hats.** The farmer's straw hat has a flat crown, a red band and a broad brim, in solid shapes with a shadow
-  under the brim. The guard's kettle helm is a round steel crown with a comb along its top and a broad brim turned down
+- **Hats.** The straw hat (in the character maker) has a flat crown, a red band and a broad brim, in solid shapes
+  with a shadow under the brim. The guard's kettle helm is a round steel crown with a comb along its top and a broad brim turned down
   all round. The noble lady's circlet is a gold band round the brow with a jewel in front.
 - **The merchant's beard.** A moustache over the mouth and sideburns joining the hair, then a full beard falling in
   locks to a point on the chest. His mouth still shows.
@@ -427,7 +427,7 @@ every weapon shows and sits in its fist and never shows through hair, the valkyr
 hair carries strand lines and sheen, and ramps darken step by step. The black mage must wear a gown to the floor
 with no trousers or belt, flaring to a trimmed hem with only toes beneath, bell sleeves, and a collar over his chin
 with both eyes still glowing. Each of the townsfolk must keep what made them recognisable on every build: the
-villager's open vest over a laced shirt, the farmer's straw hat and overalls buckled to braces that cross his back,
+villager's open vest over a laced shirt, the farmer's overalls buckled to braces that cross his back,
 the guard's kettle helm, cape and spear, the merchant's beard, satchel, and gold-faced coat open over an under-robe
 with a sash, the monk's cowl and rope belt, the healer's satchel and cross, the lady's braid, circlet and gown. The
 villager, farmer and merchant must meet their outline no harder than the dragoon and black mage do, give or take

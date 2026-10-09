@@ -144,7 +144,7 @@ test('the townsfolk keep what made each of them recognisable, on every build', (
       return { front, back, below, above, coat, backCoat, has: ch => front.includes(ch), torso: ch => m.parts.torso.rows.some(r => r.includes(ch)) }; };
     const villager = at('villager'), farmer = at('farmer'), guard = at('guard'), merchant = at('merchant'), monk = at('monk'), healer = at('healer'), noble = at('noble');
     assert.ok(villager.coat('D') && villager.torso('L') && villager.torso('K'), `${b}: the villager's open vest over a shirt laced at the throat`);
-    assert.ok(farmer.above('X') && farmer.has('R') && farmer.coat('D') && farmer.coat('G'), `${b}: the farmer's straw hat, its band and the overalls buckled to their braces`);
+    assert.ok(!farmer.has('X') && farmer.has('H') && farmer.coat('D') && farmer.coat('G'), `${b}: the farmer bareheaded, in overalls buckled to their braces`);
     /* the braces cross the back to a buckle in the middle */
     assert.ok(farmer.backCoat.rows.slice(0, 4).some(r => /D\.+D/.test(r)) && farmer.backCoat.rows.some(r => r.includes('G')), `${b}: the braces cross the farmer's back`);
     assert.equal(byId('farmer').pal.P, byId('farmer').pal.D, 'the overalls run down the legs');
