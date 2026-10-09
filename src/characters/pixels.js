@@ -20,7 +20,7 @@ const W = 32, H = 48;
 /* the tiles' ink and paper (render/palette.js INK and VEL) */
 const OUTLINE = '#2b2116', PAPER = '#f0e6cb';
 /* how far each kind of line is pushed from its material's deepest tone to the outline ink */
-const INK = { outline: 0.9, outlineLit: 0.78, contour: 0.6, edge: 0.48, crease: 0.3 };
+const INK = { outline: 0.9, outlineLit: 0.78, outlineSkin: 0.72, contour: 0.6, edge: 0.48, crease: 0.3 };
 
 /* ---------- colour ---------- */
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -126,7 +126,9 @@ function finish(buf, pal) {
     /* the part in front decides the colour; an outline above or left of the figure faces the light */
     const [i, j] = nb.reduce((p, q) => (lay(q[0], q[1]) > lay(p[0], p[1]) ? q : p)), lit = nb.every(n => n[2] === 1);
     const v = m(i, j), base = flat[v] ? mixHex(flat[v], OUTLINE, 0.5) : ramps[v][4];
-    put(y * W + x, mixHex(base, OUTLINE, lit ? INK.outlineLit : INK.outline));
+    /* round bare skin (a clean material: a face, a hand) the ink is softer and warmer, a deep shade of the skin
+       rather than the full umber, so pale skin does not ring the figure in a hard dark line */
+    put(y * W + x, mixHex(base, OUTLINE, clean[v] ? INK.outlineSkin : lit ? INK.outlineLit : INK.outline));
   }
   return rgba;
 }

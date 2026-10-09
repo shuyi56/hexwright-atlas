@@ -11,8 +11,8 @@ import { ENEMIES } from './enemies.js';
    through fixed slots; a job fills the slots it needs. Views: 'front' (south-west) and 'back' (north-east);
    the other two facings are their mirror images. Poses: 0 standing, 1 and 2 the two strides. */
 const SLOTS = {
-  front: ['cloak', 'behind', 'weapon', 'armFar', 'legs', 'torso', 'overTorso', 'head', 'hair', 'hat', 'armNear', 'mantle', 'staff', 'fist', 'shield'],
-  back: ['shield', 'armFar', 'legs', 'torso', 'overTorso', 'cloak', 'weapon', 'head', 'hair', 'hat', 'behind', 'hairOver', 'armNear', 'mantle', 'staff', 'fist'] };
+  front: ['cloak', 'behind', 'weapon', 'armFar', 'legs', 'torso', 'coat', 'overTorso', 'head', 'hair', 'hat', 'armNear', 'mantle', 'staff', 'fist', 'shield'],
+  back: ['shield', 'armFar', 'legs', 'torso', 'coat', 'overTorso', 'cloak', 'weapon', 'head', 'hair', 'hat', 'behind', 'hairOver', 'armNear', 'mantle', 'staff', 'fist'] };
 /* From behind, a weapon held at the near side is on the figure's far side, so the back, the hair and the arm all
    cover it. */
 /* the landmark each slot's hand-drawn parts hang on; held things go with their hand. A mantle lies over the

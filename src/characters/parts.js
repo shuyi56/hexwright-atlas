@@ -89,6 +89,45 @@ const HAIR_SHORT = {
     '..HQHHQHHQH..H..',
     '...HHH.HHH......',
     '....HH..HH......'] } };
+/* tousled: worn longer and messier than the short cut. A cowlick lifts in a clump at the back of the crown; the
+   locks sweep down toward the facing in long strands, and the fringe falls in pieces of different lengths, one lock
+   between the eyes; over the ear the hair runs down into a sideburn. Behind, the locks fan out and down from the
+   crown and fall shaggy over the nape in uneven points. */
+const HAIR_TOUSLED = {
+  front: { x: 8, y: 1, rows: [
+    '..........HH....',
+    '.....HHHHHHH....',
+    '...HHHHHHHHHHH..',
+    '..HHHIIIHHHHQHH.',
+    '.HHIIHHHHQHHHQHH',
+    '.HHHHHHHQHHHQHQH',
+    'HHHHHHQHHHHQHHQH',
+    'HHHHHQHHHQHHHHQH',
+    '.HHHQHHHQHHHHQHH',
+    '.HHQ.HHQ..HHHQHH',
+    '.H...H.....HHQH.',
+    '...........HQHH.',
+    '...........HHQH.',
+    '............HQ..',
+    '............H...'] },
+  back: { x: 8, y: 1, rows: [
+    '..........HH....',
+    '.....HHHHHHH....',
+    '...HHIIIIHHHHH..',
+    '..HIIHHHHHHHHHH.',
+    '.HHHHHHHQQHHHHHH',
+    '.HHHHHHQHHQHHHHH',
+    '.HHQHHQHHHHQHHHH',
+    '.HQHHHQHHHHHQHHH',
+    '.HQHHHQHHHHQHQHH',
+    '.HQHHHQHHHQHHQHH',
+    '.HHQHHQHHHQHHQHH',
+    '.HHQHHHQHHQHHHQ.',
+    '..HQHHHQHHHQHHH.',
+    '..HHQHHHQHHHQHH.',
+    '...HQH.HQH.HQH..',
+    '...HH..HH..HH...',
+    '....H...H..H....'] } };
 const HAIR_LONG = {
   front: { x: 8, y: 1, rows: [
     '......HHHH......',
@@ -351,4 +390,4 @@ function recolor(part, map) {
   const sw = ch => { const up = ch.toUpperCase(), to = map[up]; return to ? (ch === up ? to : to.toLowerCase()) : ch; };
   return { ...part, rows: part.rows.map(r => [...r].map(sw).join('')) };
 }
-export { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, flipPart, recolor, staff };
+export { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, flipPart, recolor, staff };
