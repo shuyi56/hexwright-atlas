@@ -215,6 +215,40 @@ frames of an animated ground, then a left and right face two levels deep), with 
 
 ![The tactical tile sheet](docs/images/tactical-tile-sheet.png)
 
+### Town view
+
+**Town** (`O`) in the editor walks the map the way the old town RPGs do (Final Fantasy VI, Dragon Quest, Pokémon):
+seen from above and the south on square 32-pixel tiles, with the ground painted as one solid surface rather than a
+grid of blocks.
+
+- **Solid ground:** every mark (grass tufts, flowers, cobbles, boards, ripples) is laid out in map pixels, so a
+  ground runs across tile edges without a seam. Where soft grounds meet (grass, a dirt road, sand, the sea) the border
+  wanders on a smooth noise instead of following the grid; paving, floors and fields keep straight edges. The
+  higher-ranked ground is inked along its edge and shades the lower one: grass overhangs a path, and the shore shows
+  a strip of bank and a line of foam on the water. Water and lava ripple.
+- **Heights:** a raised tile sits 16 pixels higher per height level, with its cliff hanging below it to the south:
+  an earth bank with a grass lip for one level, broken rock for more, coursed blocks under paving, beams under floors.
+  Water falls over its edge. Cliff tops get a lit rim, and the ground at a cliff's foot and to its east is shaded.
+- **Pieces:** every building, prop, plant and piece of furniture is redrawn front-on: front walls (plaster,
+  timber framing, ashlar, planks) with doors and shuttered windows, under thatch, clay tile, slate or shingle roofs
+  that lean back over them, with chimneys and smoke; round towers with cones or battlements; trees as lit leaf
+  masses; and a shadow on the ground to the east. City and room walls join their neighbours. A piece standing in
+  front of the hero fades so they are never lost behind it.
+- **Walking:** the arrow keys or `WASD` walk the hero a tile at a time (`Shift` runs), turning to face a way that is
+  blocked; clicking a tile walks them there by the editor's walking rules, up and down stairs. Only the storeys up
+  to the hero's own are shown, so stepping indoors upstairs takes the roof off. `Tab` (or **Next hero**) walks as
+  the next character. Everyone else strolls about near where they were put; enemies hold their ground.
+- **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a classic blue window),
+  or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
+- **A stroll, not an edit:** the town view walks a copy of the map, so nothing it does changes the map or its undo
+  history, and it starts afresh each time it is opened.
+
+`src/town/` holds it: `ground.js` paints tile tops and cliffs from the map (no DOM), `pieces.js` draws the pieces
+(no DOM), `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
+in it.
+
+![The town view](docs/images/town-view.png)
+
 ### Test scenes
 
 `scenes/` holds self-contained HTML test pages. Each one is the whole app inlined into a single file that
@@ -227,13 +261,15 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   shows pass or fail, with the route's step count, heights and storey changes. **Re-run** repeats the checks,
   and clicking a check replays that walk on screen.
 - **Scripted browsers:** results are in `window.__sceneResults`.
-- **Editor and tactical view:** every scene page has both. The panel's **Editor** and **Tactical** buttons switch
-  between them, and what is edited in the editor shows in the tactical view when it is opened again.
+- **Editor, tactical and town views:** every scene page has all three. The panel's **Editor**, **Tactical** and
+  **Town** buttons switch between them, and what is edited in the editor shows in the tactical view when it is opened again.
 - **Tactical scenes:** `scenes/tactical/` holds pages that open straight in the tactical view.
   `scenes/tactical/scale-study.html` stands every kind of house, tower and tree on a flat green, with a figure in
   front of each, to judge their sizes against each other. Its map is `scenes/tactical/scale-study.json`, and
   `scale-study.scene.json` beside it gives the title, notes and the camera (`view: "tactical"`,
   `tactical: { zoom, center }`); a scene with nothing to check needs no checks file.
+  `scenes/town/saltmere-harbour.html` opens in the town view (`view: "town"`, `town: { zoom, hero }`), an island
+  harbour town to walk about in.
   `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
   villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
   clothes show, with the dragoon and the black mage beside them as the benchmark.
@@ -345,6 +381,8 @@ src/
   units/              The unit data page (units.html)
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen
+  town/               Town view: the solid painted ground and its cliffs, the front-on pieces, townsfolk's
+                      lines and the walking screen
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
 tools/                Vite plugin that relays HTTP calls to the editor page and saves unit data (dev server only),

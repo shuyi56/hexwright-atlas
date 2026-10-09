@@ -3,6 +3,7 @@ import './ui/input.js';
 import './editor/api.js';
 import './editor/bridge.js';
 import './tactical/view.js';
+import './town/view.js';
 import { state } from './ui/state.js';
 import { CX, CY, worldH } from './core/geometry.js';
 import { renderBase } from './render/base.js';

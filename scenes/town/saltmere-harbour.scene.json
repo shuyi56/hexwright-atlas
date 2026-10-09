@@ -1,0 +1,7 @@
+{
+  "title": "Saltmere harbour: walking a town",
+  "about": "An island harbour town in the town view: the ground painted solid, with grass running into the sandy shore and the harbour water rimmed with foam, cliffs dropping between the terraces, and the cottages and townhouses standing along the cobbled high street. Walk the villager with the arrow keys or by clicking a tile, Shift to run, and Space to talk to the townsfolk strolling about.",
+  "view": "town",
+  "town": { "zoom": 3, "hero": 0 },
+  "checks": []
+}

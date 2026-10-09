@@ -99,6 +99,7 @@
         <button class="chip" id="edRotR" title="Turn view (])">Turn ⟳</button>
         <button class="chip" id="edGrid" aria-pressed="true">Grid</button>
         <button class="chip" id="edTactical" title="Tactical view: a close-up pixel camera for moving units (T)">Tactical</button>
+        <button class="chip" id="edTown" title="Town view: walk the map from above, as in a classic RPG town (O)">Town</button>
       </div>
       <div class="zoom">
         <button class="btn" id="edIn" aria-label="Zoom in">+</button>
@@ -144,6 +145,21 @@
   <div class="tc-win tc-menu" id="tcMenu" hidden role="group" aria-label="Actions"><button id="tcActMove" aria-pressed="false">Move <kbd>1</kbd></button><button id="tcActAttack" aria-pressed="false">Attack <kbd>2</kbd></button><button id="tcActWait">Wait <kbd>3</kbd></button></div>
   <div class="tc-win tc-unit" id="tcUnit" hidden><canvas id="tcFace" width="72" height="72"></canvas><div><b id="tcUnitName"></b><span class="tc-hp" id="tcUnitHp" aria-hidden="true"><i></i></span><span id="tcUnitInfo"></span><span id="tcUnitMove"></span></div></div>
   <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · 1/2/3 move, attack, wait · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc back</span></div>
+</div>
+<div class="tactical town" id="town" hidden tabindex="-1" aria-label="Town view">
+  <canvas id="twCanvas" role="img" aria-label="Town view of the map, seen from above. Walk the hero with the arrow keys or by clicking a tile; Space talks to whoever they face."></canvas>
+  <div class="tc-bar">
+    <button class="btn" id="twBack">← Editor</button>
+    <div class="tc-title"><span class="eyebrow">town view</span><span id="twName"></span></div>
+    <div class="tc-chips">
+      <button class="chip" id="twNext" title="Walk as the next character (Tab)">Next hero</button>
+      <button class="chip" id="twOut" aria-label="Zoom out (−)">−</button><span class="tc-zoom" id="twZoom">×3</span><button class="chip" id="twIn" aria-label="Zoom in (+)">+</button>
+    </div>
+  </div>
+  <div class="tw-banner" id="twBanner" aria-hidden="true"></div>
+  <div class="tc-win tc-tile" id="twPlace" hidden><b id="twHero"></b><span id="twWhere"></span></div>
+  <div class="tc-win tw-say" id="twSay" hidden aria-live="polite"><b id="twWho"></b><span id="twLine"></span><i aria-hidden="true">▼</i></div>
+  <div class="tc-hint"><span id="twHint"></span><span class="tc-keys">arrows/WASD walk · Shift run · Space talk · click a tile to walk there · Tab next hero · +/− zoom · Esc back</span></div>
 </div>
 <div class="editor char-maker" id="charMaker" hidden tabindex="-1" aria-label="Character maker">
   <header class="ed-bar">
