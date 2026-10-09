@@ -43,7 +43,7 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 | --- | --- |
 | Goblin (small) | Sallow green and knee-high: long ears swept out and up to points from a bald head, yellow eyes under a dark brow, a rag of a tunic, bare feet, a nail-studded club. |
 | Bandit (standard) | A dusty hood and capelet, a red kerchief over the nose and mouth, a leather vest over a dun tunic, a sword. |
-| Orc (tall) | Dark green and bare-armed: tusks thrust up from a jutting jaw, burning red eyes over streaks of war paint, a heavy scowl, a black topknot, spiked iron pauldrons, a black leather jerkin, a great double-bitted axe. |
+| Orc (tall) | Dark green and bare-armed: tusks thrust up from a jutting jaw, burning red eyes over streaks of war paint, a heavy scowl, a bald head, spiked iron pauldrons, a black leather jerkin, a great double-bitted axe. |
 | Skeleton (slim) | A skull with embers in its sockets and a row of teeth, ribs over the dark of the chest, thin shins, a rag about the hips, a rusted sword and a cracked buckler. |
 | Wolf (beast) | A grey coat with a dark saddle and tall dark-backed ears, cream muzzle, throat, belly and socks, an amber eye, a bushy tail. |
 | Slime (beast) | A round ball of blue-green jelly on a flattened base, a shine on its upper left, two dot eyes and a small mouth. |

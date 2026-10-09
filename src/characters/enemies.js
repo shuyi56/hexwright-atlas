@@ -67,8 +67,8 @@ const BANDIT = {
 
 /* ---------- the orc ----------
    Tall, dark green and bare-armed: tusks thrust up from a jutting jaw, red eyes over streaks of war paint under
-   a heavy scowl, a black topknot tied with leather, spiked iron pauldrons on both shoulders, a black leather
-   jerkin and a great double-bitted axe. */
+   a heavy scowl, a bald head, spiked iron pauldrons on both shoulders, a black leather jerkin and a great
+   double-bitted axe. */
 /* a brutal face: a heavy brow slanting down to the nose, red eyes burning over streaks of war paint (R) run down
    the cheeks, a broad jutting jaw, and two tusks thrust up past the lip from a wide mouth */
 const ORC_FACE = { x: 9, y: 4, rows: [
@@ -86,12 +86,6 @@ const ORC_FACE = { x: 9, y: 4, rows: [
   'KFMMMMMFkkkkkk',
   '.KMMMMMkkkkkk.',
   '..kkkkkkkkkk..'] };
-const TOPKNOT = { x: 13, y: 0, rows: [
-  '.HHH..',
-  'HIHHQ.',
-  '.LLL..',
-  'HHQHH.',
-  'QHHHHQ'] };
 /* small pointed ears either side of the head: in front the far one peeks past the face */
 const ORC_EARS = {
   front: { x: 7, y: 9, rows: [
@@ -116,11 +110,10 @@ const SPIKED_PAULDRON = { x: 19, y: 14, rows: [
   'SSSSSS',
   'ssssss'] };
 const ORC = {
-  id: 'orc', name: 'Orc', blurb: 'Tusks, a topknot and a great axe: the warband\'s front rank.',
+  id: 'orc', name: 'Orc', blurb: 'Tusks, war paint and a great axe: the warband\'s front rank.',
   enemy: true, body: 'tall', outfit: { torso: 'tunic', strap: 1, sleeves: { A: 'K', C: 'L' }, steady: true }, head: { front: ORC_FACE, back: HEAD_BACK },
-  hair: { front: TOPKNOT, back: TOPKNOT },
   weapon: staff(['.S.T.S.', 'SS.T.SS', 'SSSTSSS', 'SSSTSSS', 'SSSTSSS', 'SS.T.SS', '.S.T.S.'], 23, { behind: true }),
-  pal: { K: '#6c8248', H: '#2e2620', R: '#8a3328', N: { flat: '#f2843a' }, M: { flat: '#2e1c18' }, Q: { flat: '#2a2a1e' }, A: '#4a3a30', B: '#6c8248', C: '#4a3526', L: '#4a3526', G: '#8a8478', P: '#5a4a3a', O: '#3e3029', S: '#8f908a', T: '#7a5434', F: '#ece2cc' },
+  pal: { K: '#6c8248', R: '#8a3328', N: { flat: '#f2843a' }, M: { flat: '#2e1c18' }, Q: { flat: '#2a2a1e' }, A: '#4a3a30', B: '#6c8248', C: '#4a3526', L: '#4a3526', G: '#8a8478', P: '#5a4a3a', O: '#3e3029', S: '#8f908a', T: '#7a5434', F: '#ece2cc' },
   parts: { front: { hat: ORC_EARS.front, armNear: SPIKED_PAULDRON, armFar: FAR_PAULDRON }, back: { hat: ORC_EARS.back, armNear: SPIKED_PAULDRON, armFar: FAR_PAULDRON } }
 };
 
