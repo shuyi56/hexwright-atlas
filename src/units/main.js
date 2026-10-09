@@ -10,7 +10,7 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 
 /* ================= the unit data page =================
    Every unit in data/units/ (src/data/units.js) to read and change: a list down the side, a card per unit with its
-   sprite walking, its HP and Attack, its movement and notes, and a table of everyone for balancing numbers side by
+   sprite walking, its HP, Attack, Move and Jump, and a table of everyone for balancing numbers side by
    side. Changes are drafts until saved. On the dev server Save writes the files through the Hexwright bridge
    (tools/vite-hexwright.js), and the tactical view in any open tab picks the new numbers up at once; a built copy
    of the site can read the units and download a unit's file, but not save. */
@@ -84,14 +84,13 @@ function renderList() {
 }
 
 /* ---------- the card ---------- */
-function field(sec, [k, label, lo, hi, , what], e) {
+function field(sec, [k, label, lo, hi], e) {
   const v = sec ? e.draft[sec][k] : e.draft[k], max = sec ? rosterMax(sec, k) : 0, saved = e.saved && (sec ? e.saved[sec]?.[k] : e.saved[k]);
   const changed = e.saved && saved !== v;
-  return `<label class="ub-stat${changed ? ' changed' : ''}" title="${esc(what)}">
+  return `<label class="ub-stat${changed ? ' changed' : ''}"${changed ? ` title="saved: ${saved}"` : ''}>
     <span class="ub-stat-name">${esc(label)}</span>
     <input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${v}" data-sec="${sec}" data-k="${k}" aria-label="${esc(label)}">
     ${sec ? `<span class="ub-meter" aria-hidden="true"><i style="width:${Math.round(100 * Math.min(1, v / max))}%"></i></span>` : ''}
-    <span class="ub-stat-what">${esc(what)}${changed ? ` <em>was ${saved}</em>` : ''}</span>
   </label>`;
 }
 function renderDetail() {
@@ -115,18 +114,15 @@ function renderDetail() {
           <label class="ub-field"><span>group</span><select id="group">${GROUPS.map(g => `<option value="${g}"${g === e.group ? ' selected' : ''}>${GROUP_LABEL[g]}</option>`).join('')}</select></label>
         </div>
         <p class="ub-file"><code>${esc(unitPath(e.group, d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}</p>
-        <p class="ub-dim">${sprite ? `Plays as the ${esc(sprite.name)} sprite${sprite.blurb ? `: ${esc(sprite.blurb)}` : '.'}` : `No sprite called “${esc(d.id)}” is in the roster or the character library, so nothing on a map uses these numbers yet.`}</p>
+        ${sprite ? '' : `<p class="ub-dim">No sprite called “${esc(d.id)}”.</p>`}
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
       </div>
     </div>
     ${SECTIONS.map(sec => `
       <section class="ub-sec"><h2>${SECTION_LABEL[sec]}</h2>
-        ${sec === 'movement' ? `<div class="ub-move"><div class="ub-stats">${FIELDS[sec].map(f => field(sec, f, e)).join('')}</div><canvas id="reach" width="264" height="160" aria-label="Tiles reachable on flat ground"></canvas></div>`
-    : `<div class="ub-stats">${FIELDS[sec].map(f => field(sec, f, e)).join('')}</div>`}
+        <div class="ub-stats">${FIELDS[sec].map(f => field(sec, f, e)).join('')}</div>
       </section>`).join('')}
-    <section class="ub-sec"><h2>Notes</h2><textarea id="notes" rows="3" maxlength="2000" placeholder="Tactics, weaknesses, where it turns up…">${esc(d.notes)}</textarea></section>
     <div class="ub-card-actions">
-      <details class="ub-json"><summary>File contents</summary><pre id="json">${esc(unitText(d, e.group))}</pre></details>
       <span class="ub-spacer"></span>
       <button class="btn" id="revertOne"${isDirty(e) && e.saved ? '' : ' disabled'}>Revert</button>
       <button class="btn ub-danger" id="deleteOne">Delete</button>
@@ -137,7 +133,6 @@ function renderDetail() {
     commit(e);
   }));
   $('name').addEventListener('change', () => { e.draft.name = $('name').value; commit(e); });
-  $('notes').addEventListener('change', () => { e.draft.notes = $('notes').value; commit(e); });
   $('group').addEventListener('change', () => { e.group = $('group').value; commit(e); });
   $('faceL').addEventListener('click', () => { V.face = (V.face + 3) % 4; });
   $('faceR').addEventListener('click', () => { V.face = (V.face + 1) % 4; });
@@ -145,7 +140,6 @@ function renderDetail() {
   $('revertOne').addEventListener('click', () => revert(e));
   $('deleteOne').addEventListener('click', () => remove(V.sel));
   if (sprite) startPreview(sprite); else $('preview').classList.add('ub-blank');
-  if ($('reach')) drawReach($('reach'), d.movement.move);
 }
 /* clamp what was typed into range, then redraw everything that shows it */
 function commit(e) { e.draft = normalizeUnit(e.draft); renderAll(); }
@@ -168,23 +162,6 @@ function startPreview(c) {
   anim = requestAnimationFrame(step);
 }
 function stopPreview() { if (anim) cancelAnimationFrame(anim); anim = 0; }
-/* the tiles a move reaches on open flat ground: a diamond of tiles within that many steps, drawn as the map does */
-function drawReach(can, move) {
-  const g = can.getContext('2d'), R = Math.max(4, move + 1), tw = (can.width - 8) / (2 * R + 1), th = tw / 2, cx = can.width / 2, cy = (can.height - 16) / 2;
-  g.clearRect(0, 0, can.width, can.height);
-  const tile = (i, j, fill, stroke) => {
-    const x = cx + (i - j) * tw / 2, y = cy + (i + j) * th / 2;
-    g.beginPath(); g.moveTo(x, y - th / 2); g.lineTo(x + tw / 2, y); g.lineTo(x, y + th / 2); g.lineTo(x - tw / 2, y); g.closePath();
-    g.fillStyle = fill; g.fill(); g.strokeStyle = stroke; g.lineWidth = 1; g.stroke();
-  };
-  for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
-    const d = Math.abs(i) + Math.abs(j); if (d > R) continue;
-    tile(i, j, d === 0 ? '#e4c684' : d <= move ? 'rgba(93,143,208,.55)' : 'rgba(44,58,58,.5)', d <= move ? '#cfe2ff55' : '#2c3a3a');
-  }
-  g.fillStyle = '#a39b86'; g.font = '500 12px "Alegreya Sans", system-ui, sans-serif'; g.textAlign = 'center';
-  g.fillText(`${move} tile${move === 1 ? '' : 's'} each way on flat ground`, can.width / 2, can.height - 3);
-}
-
 /* ---------- the table ---------- */
 const COLS = [['name', 'Name'], ['group', 'Group'], ...SECTIONS.flatMap(sec => FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]))];
 const LIMITS = Object.fromEntries(SECTIONS.flatMap(sec => FIELDS[sec].map(([k, , lo, hi]) => [`${sec}.${k}`, [lo, hi]])));
@@ -207,7 +184,7 @@ function renderTable() {
     return `<td class="${changed.trim()}"><input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${v}" data-k="${k}" aria-label="${esc(k)} of ${esc(nameOf(e))}"></td>`;
   }).join('')}</tr>`).join('');
   box.innerHTML = `<div class="ub-table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
-    <p class="ub-dim ub-table-hint">Click a column to sort, a name to open its card. Brass cells differ from the saved file.</p>`;
+`;
   box.querySelectorAll('[data-sort]').forEach(b => b.addEventListener('click', () => { const k = b.dataset.sort; V.sort = V.sort.key === k ? { key: k, dir: -V.sort.dir } : { key: k, dir: 1 }; renderTable(); }));
   box.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => { V.sel = b.dataset.open; setView('cards'); }));
   box.querySelectorAll('tbody input, tbody select').forEach(inp => inp.addEventListener('change', () => {
@@ -277,7 +254,7 @@ $('newDialog').addEventListener('close', () => {
   if ($('newDialog').returnValue !== 'ok') return;
   const id = $('newSprite').value, group = $('newGroup').value, from = E.get($('newFrom').value), c = spriteOf(id);
   const base = from ? structuredClone(from.draft) : structuredClone({ ...DEFAULT_UNIT, stats: { ...DEFAULT_UNIT.stats }, movement: { ...DEFAULT_UNIT.movement } });
-  const draft = { ...normalizeUnit({ ...base, id, name: c?.name || id, notes: from ? base.notes : '' }, group) };
+  const draft = normalizeUnit({ ...base, id, name: c?.name || id });
   E.set(id, { group, draft, saved: null, savedGroup: null }); V.sel = id; setView('cards');
 });
 

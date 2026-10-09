@@ -8,6 +8,5 @@
   "movement": {
     "move": 4,
     "jump": 1
-  },
-  "notes": "Undead. Shrugs off magic; weak to holy (not yet modelled)."
+  }
 }

@@ -8,6 +8,5 @@
   "movement": {
     "move": 3,
     "jump": 0
-  },
-  "notes": "Slow jelly that cannot climb. Soaks spells."
+  }
 }

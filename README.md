@@ -125,7 +125,7 @@ data/units/
 ```
 
 A file is named by the unit's id, which is the id of the sprite it plays as, and holds its name, HP, Attack,
-movement (Move: tiles a turn; Jump: height levels a step can climb or drop) and notes. `src/data/units.js`
+movement (Move: tiles a turn; Jump: height levels a step can climb or drop). `src/data/units.js`
 defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite with no file, such
 as a custom character from the maker, plays with the defaults. The tactical view moves units by their Move and
 Jump and shows their HP and Attack; adding a field means adding a line to `FIELDS` there.
@@ -133,8 +133,8 @@ Jump and shows their HP and Attack; adding a field means adding a line to `FIELD
 **Unit data** in the atlas header opens `units.html`, an editor for these files:
 
 - **Cards:** the list of units down the side, filterable, and a card for the picked one: its sprite walking (turn
-  it with ⟲ ⟳), name and group, HP and Attack with a bar against the strongest unit, movement with the tiles
-  its Move reaches on flat ground, notes and the file's contents. Changed values show what they were.
+  it with ⟲ ⟳), name and group, and HP, Attack, Move and Jump, each with a bar against the strongest unit.
+  Changed values are outlined in brass.
 - **Table:** everyone in one sortable grid for balancing numbers side by side, every cell editable.
 - **Saving:** changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes the
   files through the Hexwright bridge: `PUT` and `DELETE /__hexwright/units/<group>/<id>`, `GET /__hexwright/units`.

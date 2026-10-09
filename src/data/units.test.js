@@ -25,7 +25,7 @@ test('the unit files are valid and in canonical form', () => {
     assert.deepEqual(validateUnit(f.raw, f.group), [], f.file);
     assert.equal(f.file, `data/units/${f.group}/${f.unit.id}.json`, 'named by its id');
     assert.equal(readFileSync(join(ROOT, f.file), 'utf8'), unitText(f.raw), `${f.file} is as a save would write it`);
-    assert.deepEqual(Object.keys(f.raw), ['id', 'name', 'stats', 'movement', 'notes']);
+    assert.deepEqual(Object.keys(f.raw), ['id', 'name', 'stats', 'movement']);
   }
 });
 
