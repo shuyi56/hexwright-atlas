@@ -83,11 +83,11 @@ function renderList() {
 }
 
 /* ---------- the card ---------- */
-/* one number as a tile: its label, the value to edit, and a bar against the largest across every unit */
+/* one number as a row of the list: its label, the value to edit, and a bar against the largest across every unit */
 function tile(sec, [k, label, lo, hi], e) {
   const v = e.draft[sec][k], saved = e.saved?.[sec]?.[k], changed = e.saved && saved !== v;
-  return `<label class="ub-tile${changed ? ' changed' : ''}"${changed ? ` title="saved: ${saved}"` : ''}>
-    <span class="ub-tile-name">${esc(label)}</span>
+  return `<label class="ub-value${changed ? ' changed' : ''}"${changed ? ` title="saved: ${saved}"` : ''}>
+    <span class="ub-value-name">${esc(label)}</span>
     <input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${v}" data-sec="${sec}" data-k="${k}" aria-label="${esc(label)}">
     <span class="ub-meter" aria-hidden="true"><i style="width:${Math.round(100 * Math.min(1, v / rosterMax(sec, k)))}%"></i></span>
   </label>`;
@@ -99,14 +99,6 @@ function renderDetail() {
   const d = e.draft, sprite = spriteOf(d.id), errs = validateUnit(d, e.group);
   box.innerHTML = `
     <div class="ub-card">
-      <div class="ub-stage">
-        <canvas id="preview" width="${FW * 8}" height="${(BASE + 6) * 8}" aria-label="${esc(nameOf(e))} walking"></canvas>
-        <div class="ub-stage-chips">
-          <button class="chip" id="faceL" title="Turn left">⟲</button>
-          <button class="chip" id="play" aria-pressed="${V.playing}">Walk</button>
-          <button class="chip" id="faceR" title="Turn right">⟳</button>
-        </div>
-      </div>
       <div class="ub-body">
         <div class="ub-head">
           <input class="ub-name" id="name" value="${esc(d.name)}" maxlength="40" spellcheck="false" aria-label="Name">
@@ -114,10 +106,18 @@ function renderDetail() {
         </div>
         <p class="ub-file"><code>${esc(unitPath(e.group, d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}${sprite ? '' : ` <span class="ub-dim">no sprite called “${esc(d.id)}”</span>`}</p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
-        <div class="ub-tiles">${SECTIONS.flatMap(sec => FIELDS[sec].map(f => tile(sec, f, e))).join('')}</div>
+        <div class="ub-values">${SECTIONS.flatMap(sec => FIELDS[sec].map(f => tile(sec, f, e))).join('')}</div>
         <div class="ub-card-actions">
           <button class="btn" id="revertOne"${isDirty(e) && e.saved ? '' : ' disabled'}>Revert</button>
           <button class="btn ub-danger" id="deleteOne">Delete</button>
+        </div>
+      </div>
+      <div class="ub-stage">
+        <canvas id="preview" width="${FW * 8}" height="${(BASE + 6) * 8}" aria-label="${esc(nameOf(e))} walking"></canvas>
+        <div class="ub-stage-chips">
+          <button class="chip" id="faceL" title="Turn left">⟲</button>
+          <button class="chip" id="play" aria-pressed="${V.playing}">Walk</button>
+          <button class="chip" id="faceR" title="Turn right">⟳</button>
         </div>
       </div>
     </div>`;

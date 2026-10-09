@@ -133,7 +133,7 @@ Jump and shows their HP and Attack; adding a field means adding a line to `FIELD
 **Unit data** in the atlas header opens `units.html`, an editor for these files:
 
 - **Cards:** the list of units down the side, filterable, and a card for the picked one: its sprite walking (turn
-  it with ⟲ ⟳), name and group, and HP, Attack, Move and Jump, each with a bar against the strongest unit.
+  it with ⟲ ⟳), name and group, and HP, Attack, Move and Jump listed on the right, each with a bar against the strongest unit.
   Changed values are outlined in brass.
 - **Table:** everyone in one sortable grid for balancing numbers side by side, every cell editable.
 - **Saving:** changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes the
