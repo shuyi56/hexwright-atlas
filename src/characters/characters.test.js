@@ -140,17 +140,33 @@ test('the townsfolk keep what made each of them recognisable, on every build', (
   for (const b of BODIES) {
     const at = id => { const c = byId(id), m = measure(b, 'front', 0, c.outfit), front = frame(c, 'front', 0, b).mat, back = frame(c, 'back', 0, b).mat;
       const below = ch => front.some((x, u) => x === ch && ((u / W) | 0) >= m.at.head[1] + 14), above = ch => front.some((x, u) => x === ch && ((u / W) | 0) < m.at.head[1]);
-      return { front, back, below, above, has: ch => front.includes(ch), torso: ch => m.parts.torso.rows.some(r => r.includes(ch)) }; };
+      const coat = ch => !!m.parts.coat && m.parts.coat.rows.some(r => r.includes(ch)), backCoat = measure(b, 'back', 0, c.outfit).parts.coat;
+      return { front, back, below, above, coat, backCoat, has: ch => front.includes(ch), torso: ch => m.parts.torso.rows.some(r => r.includes(ch)) }; };
     const villager = at('villager'), farmer = at('farmer'), guard = at('guard'), merchant = at('merchant'), monk = at('monk'), healer = at('healer'), noble = at('noble');
-    assert.ok(villager.torso('D'), `${b}: the villager's vest`);
-    assert.ok(farmer.above('X') && farmer.has('R') && farmer.torso('D'), `${b}: the farmer's straw hat, its band and the overalls`);
+    assert.ok(villager.coat('D') && villager.torso('L') && villager.torso('K'), `${b}: the villager's open vest over a shirt laced at the throat`);
+    assert.ok(farmer.above('X') && farmer.has('R') && farmer.coat('D') && farmer.coat('G'), `${b}: the farmer's straw hat, its band and the overalls buckled to their braces`);
+    /* the braces cross the back to a buckle in the middle */
+    assert.ok(farmer.backCoat.rows.slice(0, 4).some(r => /D\.+D/.test(r)) && farmer.backCoat.rows.some(r => r.includes('G')), `${b}: the braces cross the farmer's back`);
     assert.equal(byId('farmer').pal.P, byId('farmer').pal.D, 'the overalls run down the legs');
     assert.ok(guard.above('S') && guard.back.includes('V') && byId('guard').weapon.grounded, `${b}: the guard's kettle helm, cape and spear`);
-    assert.ok(merchant.below('H') && merchant.has('U') && merchant.torso('L'), `${b}: the merchant's beard and satchel`);
+    assert.ok(merchant.below('H') && merchant.has('U') && merchant.coat('L') && merchant.coat('C') && merchant.has('D'), `${b}: the merchant's beard, satchel, and gold-faced coat open over an under-robe, with a sash`);
     assert.ok(monk.above('X') && !monk.back.some(x => x === 'H') && monk.torso('L'), `${b}: the monk's cowl hides his hair, and his rope belt hangs`);
     assert.ok(healer.has('U') && healer.has('R') && healer.below('H'), `${b}: the healer's satchel with its cross, and her long hair`);
     assert.ok(noble.below('H') && noble.has('J') && noble.torso('K') && !noble.has('P'), `${b}: the lady's braid, circlet jewel, neckline and gown`);
   }
+});
+test('the villager, farmer and merchant wear their clothes in layers, creased where the cloth folds', () => {
+  for (const id of ['villager', 'farmer', 'merchant']) for (const b of BODIES) for (const v of VIEWS) for (let k = 0; k < POSES; k++) {
+    const c = byId(id), m = measure(b, v, k, c.outfit), creased = p => p.rows.some(r => /[a-z]/.test(r));
+    assert.ok(m.parts.coat, `${id} ${b} ${v} ${k}: an outer piece of its own`);
+    assert.ok(creased(m.parts.coat) && creased(m.parts.armNear), `${id} ${b} ${v} ${k}: the outer piece and the sleeves are creased`);
+    /* the outer piece is its own layer over the torso, so the finish inks a contour where it meets what is under it */
+    const buf = frame(c, v, k, b), layerOf = p => { const ls = new Set(); p.rows.forEach((r, j) => [...r].forEach((ch, i) => { const u = (p.y + j) * W + p.x + i; if (ch !== '.' && buf.mat[u] && ch.toUpperCase() === buf.mat[u]) ls.add(buf.layer[u]); })); return [...ls]; };
+    const under = layerOf(m.parts.torso);
+    assert.ok(!under.length || Math.min(...layerOf(m.parts.coat)) > Math.min(...under), `${id} ${b} ${v} ${k}: the outer piece lies over the torso as a layer of its own`);
+  }
+  /* the farmer's shirt is rolled to the elbow: bare forearms above the fists */
+  for (const b of BODIES) assert.ok(measure(b, 'front', 0, byId('farmer').outfit).parts.armNear.rows.slice(7).every(r => !/[AaD]/.test(r)), `${b}: the farmer's forearms are bare`);
 });
 test('every choice the character maker offers draws inside the frame on every build, alone and mixed', () => {
   const check = (spec, what) => {

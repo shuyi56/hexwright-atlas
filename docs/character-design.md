@@ -18,10 +18,10 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 
 | Townsfolk | Read at a glance by |
 | --- | --- |
-| Villager (standard) | Short brown hair, a cream linen shirt under a green vest buttoned to a V at the collar, tan trousers. |
-| Farmer (stocky) | A straw hat with a flat crown and a red band, a green shirt, blue bib-and-brace overalls on broad braces. |
+| Villager (standard) | Short brown hair, an open green waistcoat falling to points over a cream linen shirt laced at the throat and gathered at the cuffs, tan trousers bloused over the boots. |
+| Farmer (standard) | A straw hat with a flat crown and a red band, a green shirt rolled to the elbow, blue overalls with a pocketed bib buckled to braces that cross on his back, turned up over the boots. |
 | Guard (standard) | A kettle helm with a comb and a turned-down brim, a steel breastplate over a red tunic, mail sleeves, a spear and a red cape. |
-| Merchant (stocky) | White hair and a full white beard falling to a point, a long blue robe edged in gold, a satchel on a strap. |
+| Merchant (stocky) | White hair and a full white beard falling to a point, a long blue coat with a gold shawl collar and gold-faced edges, open over a russet under-robe, a sash knotted at the hip, bell sleeves, a satchel on a strap. |
 | Monk (standard) | A deep plain cowl with the face in its shadow, a capelet over the shoulders, a robe of undyed wool to the floor with bell sleeves, tied with a rope whose end hangs. |
 | Healer (slim) | Long fair hair, a lilac tunic over white sleeves, a white satchel marked with a red cross. |
 | Noble Lady (slim) | A red braid over her shoulder, a gold circlet with a jewel, a green gown to the floor with a square neckline, bell sleeves and a gold hem. |
@@ -68,6 +68,12 @@ Four builds, set by a handful of measurements in `body.js` (`BODY_TYPES`):
   breastplate ridge or robe panel falls, or a vandyked robe hem. Others are added on as outfit options: an open
   vest, a strap from shoulder to hip with a satchel at its end (`satchel`), a skirt carried below the hem, bib-and-
   brace overalls (`bib`), a square neckline (`neckline`), and a rope belt's hanging end (`cord`).
+- **Garments in layers.** The townsfolk's everyday clothes (`garments.js`, chosen by `garment`) are cut in layers
+  instead: what is worn underneath fills the torso, and what is worn over it is a piece of its own in the `coat`
+  slot. Because the outer piece is a separate layer, the finish inks a contour where it stands over the shirt and
+  shades the shirt under its edge: the depth the dragoon's plates and the black mage's collar get from being
+  separate pieces. Each piece is creased where cloth folds: drawn in under the arms, gathered at a belt, fanning
+  out below it, broken at the knee. See The townsfolk below.
 - **Hung on landmarks.** The hand-drawn parts (heads, hair, hats, hoods, quivers, scarves, pauldrons, weapons,
   shields) were drawn once, against the standard build. Each hangs on a landmark: the head, the neck, a
   shoulder or a hand. It moves with that landmark on any other build.
@@ -122,7 +128,7 @@ round.
 
 Two kinds of long garment, both cut from the build:
 
-- **Robe** (merchant, white mage, summoner). A tunic-cut bodice belted at the waist over a skirt to the ankles,
+- **Robe** (white mage, summoner). A tunic-cut bodice belted at the waist over a skirt to the ankles,
   with the shoes below it. The white mage's skirt is hemmed in red teeth.
 - **Gown** (black mage, noble lady, monk). One garment from the shoulders to the floor with no belt and no waist. It hangs straight
   from the chest and flares from the lower chest in an A-line, its folds fanning out from the middle toward the
@@ -246,10 +252,26 @@ shoulders (the mantle slot, drawn over the arms, so the arms come out from under
 ## The townsfolk
 
 The townsfolk (`townsfolk.js`) are the seven people of the first, hand-painted character style, redrawn in this one
-with the same clothes, colours and props. Their clothes are kept to a few solid shapes, as the jobs' are, so they
-stay smooth at the tactical view's size: a vest buttoned up to a V at the collar rather than open down the chest,
-overalls as a plain bib on broad braces rather than thin straps, buckles and a pocket. Each is a spec: the same choices and colours the character maker offers
-(below), so they are drawn like the jobs and the maker can start from any of them.
+with the same colours and props. The villager, the farmer and the merchant wear garments built in layers
+(`garments.js`), each outer piece over what lies beneath it, so their clothes turn and overlap rather than reading
+as one flat colour. Each is a spec: the same choices and colours the character maker offers (below), so they are
+drawn like the jobs and the maker can start from any of them.
+
+- **Shirt and vest** (villager). An open waistcoat, its two fronts falling from a folded lapel to points below the
+  belt, with a welt pocket either side. Between the fronts the linen shirt shows, open at the throat and laced
+  across, and the belt is buckled in the gap; below, the shirt's tail falls in folds that fan out to its hem. From
+  behind, one panel with a seam down it and a half-belt buckled across the small of the back. The shirt's full
+  sleeves blouse a pixel over the forearm and gather into the cuff, creased at the elbow, and the trousers balloon
+  over the boot tops with a shadow beneath.
+- **Overalls** (farmer). A bib with a pocket on two braces buckled at its corners, buttoned at the sides, with a
+  fly down the front. From behind the braces cross to a buckle between the shoulder blades and the back bib widens
+  from it to the waist, over a seat seam and a pocket either side. The shirt beneath is open at the collar and rolled
+  to the elbow in a thick band, the bare forearm below; the trouser legs are turned up over the boots.
+- **Long coat and sash** (merchant). A coat to the floor, open down the front over an under-robe (`D`), its
+  edges faced in gold from a shawl collar over the shoulders to the hem. The opening widens below the waist, deep
+  pleats run down the skirt, and in a stride the hem swings like a gown's. A sash goes round the waist, knotted at
+  the far hip with its two ends hanging. From behind, a standing gold collar, a seam down the back and a pleat
+  either side.
 
 - **Hats.** The farmer's straw hat has a flat crown, a red band and a broad brim, in solid shapes with a shadow
   under the brim. The guard's kettle helm is a round steel crown with a comb along its top and a broad brim turned down
@@ -268,8 +290,8 @@ New characters are made in the character maker, a screen over the tile editor. O
 the townsfolk. The jobs are drawn by hand, so the maker cannot make them.
 
 - **Specs.** A made character is a spec (`custom.js`): a choice for each of build, clothes (shirt and vest, tunic,
-  overalls, breastplate, belted robe, gown to the floor), sleeves (same cloth or a second colour; plain or bell),
-  neckline and rope belt (for long clothes), hair, hat (straw hat, kettle helm, circlet, cowl, feathered cap,
+  overalls, breastplate, long coat and sash, gown to the floor), sleeves (same cloth or a second colour; plain or
+  bell), neckline and rope belt (for a gown), hair, hat (straw hat, kettle helm, circlet, cowl, feathered cap,
   bandana, wizard hat), beard, what is held (sword, dagger, two daggers, spear, staff, bow), shield, cape and
   satchel. It also holds a colour for each material. `fromSpec()` turns it into a character built exactly like the
   jobs, wearing the headgear in `hats.js` and the gear in `parts.js`.
@@ -320,14 +342,14 @@ the same material in a crease: a fold, a seam, the line between two plates.
 
 - **Body.** `body.js` cuts the torso (tunic, plate, robe, gown or the dragoon's cuirass), arms, legs (trousers,
   greaves, or a robe or gown skirt) and cloak (plain or dagged) for the build and pose, and reports the
-  landmarks.
+  landmarks. A garment (`garments.js`: vest, overalls, coat) brings its own torso, legs and outer piece instead.
 - **Shared parts.** `parts.js` holds the head, the five hairstyles, the skin tones and the gear: sword, dagger,
   lance, bow and a `staff()` maker for spears and staves, a kite shield and a buckler. `recolor()` swaps letters.
 - **Characters.** `roster.js` (the jobs) and the specs (`custom.js`, the townsfolk and made characters, wearing
   `hats.js`) give each character a build, an outfit (torso and leg
   style, sleeves, gauntlets, vest, strap, satchel, overalls, neckline, girdle, cord, skirt, tassets, greaves, cloak), a
   palette, and parts in fixed slots, back to front: the cloak, things behind the body,
-  the far arm, legs, torso, what is worn over it, head, hair, hat, the near arm, a mantle, a staff and the fist
+  the far arm, legs, torso, a garment's outer piece, what is worn over it, head, hair, hat, the near arm, a mantle, a staff and the fist
   that grips it, and what the other hand holds. Jobs draw their own headgear and anything unique (the hoods, the
   archer's quiver, the black mage's shadow face, the dragoon's helm and pauldrons, the townsfolk's hats and the
   merchant's beard). `ROSTER` is everyone, townsfolk first, and `byId()` finds one.
@@ -404,8 +426,11 @@ every weapon shows and sits in its fist and never shows through hair, the valkyr
 hair carries strand lines and sheen, and ramps darken step by step. The black mage must wear a gown to the floor
 with no trousers or belt, flaring to a trimmed hem with only toes beneath, bell sleeves, and a collar over his chin
 with both eyes still glowing. Each of the townsfolk must keep what made them recognisable on every build: the
-villager's vest, the farmer's straw hat and overalls, the guard's kettle helm, cape and spear, the merchant's beard
-and satchel, the monk's cowl and rope belt, the healer's satchel and cross, the lady's braid, circlet and gown. The
+villager's open vest over a laced shirt, the farmer's straw hat and overalls buckled to braces that cross his back,
+the guard's kettle helm, cape and spear, the merchant's beard, satchel, and gold-faced coat open over an under-robe
+with a sash, the monk's cowl and rope belt, the healer's satchel and cross, the lady's braid, circlet and gown. The
+villager's, farmer's and merchant's outer pieces must lie over the torso as layers of their own, creased like their
+sleeves, on every build, view and pose, and the farmer's forearms must be bare. The
 monk must wear a gown to the floor with a rope girdle and no trousers. Every choice the maker offers must draw
 inside the frame on every build in colours it defines, alone and in sixty random characters. A spec must clean
 whatever it is given and survive JSON, and the townsfolk must be specs. The dragoon must carry no violet, wear crimson plate, have the spikiest silhouette
