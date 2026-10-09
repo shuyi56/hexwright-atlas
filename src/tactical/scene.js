@@ -175,11 +175,12 @@ function withFigures(items, figs) {
 /* ---------- figures among pieces ----------
    The list is ordered by the centre of each item, which is right for anything a tile across but not for a figure
    beside a long or wide piece: a figure standing past a barn's front edge can sort before the barn's middle, and
-   one behind its far end after it. A figure and a piece are compared by the piece's own edges instead: the
-   figure stands in front when it is past the piece's +x or +y edge, behind when it is short of its -x or -y edge.
-   order() then says, for the merged list, what to draw again so each such pair comes out right (the figure again
-   after a piece it stands in front of, the piece again after a figure behind it), and which items hide part of
-   each figure, for its silhouette. */
+   one behind its far end after it. So the figures are not painted in the list: the renderer draws the scene first,
+   then each figure on top, back to front, with whatever hides it cut out. A figure and a piece are compared by the
+   piece's own edges: the figure stands in front when it is past the piece's +x or +y edge, behind when it is short
+   of its -x or -y edge. figureOrder says, for each figure in the merged list, which items hide part of it: the
+   pieces it stands behind, and anything else later in the list (a piece it is inside, a higher ground or floor)
+   that rises above its feet. */
 const figBox = f => { const [px, py] = P(f.X, f.Y, f.z); return [px - 12, py - FIGURE_H - 4, px + 12, py + 2]; };
 const overlap = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
 function relation(f, it) {
@@ -190,20 +191,18 @@ function relation(f, it) {
   return null;
 }
 function figureOrder(list) {
-  const after = new Map(), hiders = new Map(), add = (m, k, v) => { const a = m.get(k); if (a) a.push(v); else m.set(k, [v]); };
+  const hiders = new Map(), add = (k, v) => { const a = hiders.get(k); if (a) a.push(v); else hiders.set(k, [v]); };
   list.forEach((f, i) => {
     if (!f.c) return;
     const box = figBox(f);
     list.forEach((it, j) => {
       if (j === i || it.c || !overlap(box, it.box)) return;
       const rel = relation(f, it);
-      if (rel === 'front') { if (j > i) add(after, j, i); return; }
-      if (rel === 'behind') { if (j < i) add(after, i, j); add(hiders, i, j); return; }
-      /* anything else drawn later that rises above the figure's feet hides it */
-      if (j > i && (it.kind === 'piece' || it.z > f.ground + 3)) add(hiders, i, j);
+      if (rel === 'front') return;
+      if (rel === 'behind' || (j > i && (it.kind === 'piece' || it.z > f.ground + 3))) add(i, j);
     });
   });
-  return { after, hiders };
+  return { hiders };
 }
 
 /* The tile top under an art-space point, front-most first: { u, L } in view space, or null. Only the storeys up to

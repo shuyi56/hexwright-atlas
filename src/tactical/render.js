@@ -139,9 +139,9 @@ function figureCanvas(c, face, pose) {
 function drawScene(g, sc, k, tx, ty, view, opts = {}) {
   const frame = (opts.frame || 0) % FRAMES, [vx0, vy0, vx1, vy1] = view, S = sc.S;
   g.setTransform(k, 0, 0, k, tx, ty); g.imageSmoothingEnabled = false;
-  const items = withFigures(sc.items, opts.figs || []), mk = opts.marks, { after, hiders } = figureOrder(items);
+  const items = withFigures(sc.items, opts.figs || []), mk = opts.marks, { hiders } = figureOrder(items), faded = new Set();
   const seen = b => !(b[2] < vx0 || b[0] > vx1 || b[3] < vy0 || b[1] > vy1);
-  /* one item onto ctx (the screen, or a figure's silhouette mask); decor adds the ground's overlays and markers */
+  /* one item onto ctx (the screen, or a figure's layer); decor adds the ground's overlays and markers */
   const drawItem = (ctx, it, decor) => {
     if (it.draws) {
       for (const d of it.draws) ctx.drawImage(sprite(d.s, frame), d.x, d.y);
@@ -156,32 +156,32 @@ function drawScene(g, sc, k, tx, ty, view, opts = {}) {
       if (m) { const [px, py] = P(it.u % S, (it.u / S) | 0, it.z); ctx.drawImage(mark(m), px - 16, py - PAD); }
       if (opts.cursor && opts.cursor.u === it.u && opts.cursor.L === it.lv) { const [px, py] = P(it.u % S, (it.u / S) | 0, it.z); ctx.drawImage(mark(opts.tick % 2 ? 'cursor1' : 'cursor0'), px - 16, py - PAD); }
     } else if (it.kind === 'piece') {
-      const b = it.box, s = pieceSprite(it.o, it.lift, sc.model.clim, it.designed), [px, py] = P(it.o.x, it.o.y, it.o.z);
+      const b = it.box, s = pieceSprite(it.o, it.lift, sc.model.clim, it.designed), [px, py] = P(it.o.x, it.o.y, it.o.z), a0 = ctx.globalAlpha;
       /* a piece standing in front of the unit or tile in play fades, so they are never lost behind it */
-      if (decor && opts.focus && opts.focus.some(f => it.key > f.key && f.x > b[0] && f.x < b[2] && f.y > b[1] && f.y < b[3] && hides(s, px, py, f))) ctx.globalAlpha = 0.42;
+      if (decor && opts.focus && opts.focus.some(f => it.key > f.key && f.x > b[0] && f.x < b[2] && f.y > b[1] && f.y < b[3] && hides(s, px, py, f))) faded.add(it);
+      if (faded.has(it)) ctx.globalAlpha = a0 * 0.42;
       const can = it.shadow ? inShadow(s, it) : s.can;
       ctx.drawImage(can, Math.round(px - s.x), Math.round(py - s.y));
-      ctx.globalAlpha = 1;
-    } else if (it.c) {
-      const [px, py] = P(it.X, it.Y, it.z).map(Math.round), gy = Math.round(P(it.X, it.Y, it.ground)[1]);
-      ctx.drawImage(mark('shadow'), px - 8, gy - 2);
-      const [can, flip] = figureCanvas(it.c, it.face, it.pose);
-      if (it.ghost) ctx.globalAlpha = 0.55;
-      if (flip) { ctx.save(); ctx.translate(px, 0); ctx.scale(-1, 1); ctx.drawImage(can, -W / 2, py - BASE - 1); ctx.restore(); } else ctx.drawImage(can, px - W / 2, py - BASE - 1);
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = a0;
     }
   };
-  items.forEach((it, i) => {
-    if (!seen(it.c ? figBox(it) : it.box)) return;
-    drawItem(g, it, true);
-    /* what must come out on top of this item after all: a figure standing in front of it, or itself again after a
-       figure behind it */
-    for (const j of after.get(i) || []) drawItem(g, items[j], false);
-  });
-  /* silhouettes: the part of each figure that something in front of it hides, drawn through in its outline */
-  if (opts.xray !== false) items.forEach((f, i) => {
-    const hid = hiders.get(i); if (!f.c || !hid || !seen(figBox(f))) return;
-    const [px, py] = P(f.X, f.Y, f.z).map(Math.round), x0 = px - W / 2, y0 = py - BASE - 1;
+  /* the ground, the floors and the pieces, back to front */
+  items.forEach(it => { if (!it.c && seen(it.box)) drawItem(g, it, true); });
+  /* Then the figures, back to front, each with what stands in front of it cut out: a figure is never painted over
+     a piece it stands behind, nor a piece over a figure in front of it, and a nearer figure always covers a farther
+     one, silhouette and all. */
+  items.forEach((f, i) => {
+    if (!f.c || !seen(figBox(f))) return;
+    const [px, py] = P(f.X, f.Y, f.z).map(Math.round), gy = Math.round(P(f.X, f.Y, f.ground)[1]), x0 = px - W / 2, y0 = py - BASE - 1, hid = hiders.get(i);
+    lg.setTransform(1, 0, 0, 1, 0, 0); lg.globalCompositeOperation = 'source-over'; lg.clearRect(0, 0, W, LH);
+    lg.setTransform(1, 0, 0, 1, -x0, -y0);
+    lg.drawImage(mark('shadow'), px - 8, gy - 2);
+    drawFigure(lg, f);
+    if (hid) { lg.globalCompositeOperation = 'destination-out'; for (const j of hid) drawItem(lg, items[j], false); }
+    if (f.ghost) g.globalAlpha = 0.55;
+    g.drawImage(layer, x0, y0); g.globalAlpha = 1;
+    /* the part that is hidden, drawn through what hides it in the figure's outline */
+    if (!hid || opts.xray === false) return;
     xg.setTransform(1, 0, 0, 1, 0, 0); xg.globalCompositeOperation = 'source-over'; xg.clearRect(0, 0, W, H);
     xg.setTransform(1, 0, 0, 1, -x0, -y0);
     for (const j of hid) drawItem(xg, items[j], false);
@@ -196,8 +196,16 @@ function drawScene(g, sc, k, tx, ty, view, opts = {}) {
     g.drawImage(mark('arrow'), px - 4, py - lift - (opts.tick % 2 ? 2 : 0) - 7);
   }
 }
+/* a figure's frame (no shadow) onto ctx, flipped for the faces that look the other way */
+function drawFigure(ctx, it) {
+  const [px, py] = P(it.X, it.Y, it.z).map(Math.round), [can, flip] = figureCanvas(it.c, it.face, it.pose);
+  if (flip) { ctx.save(); ctx.translate(px, 0); ctx.scale(-1, 1); ctx.drawImage(can, -W / 2, py - BASE - 1); ctx.restore(); } else ctx.drawImage(can, px - W / 2, py - BASE - 1);
+}
 /* the silhouette a hidden figure shows through what stands in front of it: a pale fill inside a dark rim */
 const xray = canvasOf(W, H), xg = xray.getContext('2d'), sils = new WeakMap();
+/* a figure and its shadow, before what stands in front of it is cut out (taller than the frame: the shadow stays on
+   the ground while the figure hops) */
+const LH = H + 24, layer = canvasOf(W, LH), lg = layer.getContext('2d');
 function silhouette(can) {
   let s = sils.get(can); if (s) return s;
   const src = can.getContext('2d').getImageData(0, 0, W, H).data; s = canvasOf(W, H);
