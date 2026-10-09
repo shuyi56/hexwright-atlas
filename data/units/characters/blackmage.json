@@ -1,0 +1,13 @@
+{
+  "id": "blackmage",
+  "name": "Black Mage",
+  "stats": {
+    "hp": 30,
+    "attack": 4,
+    "range": 3
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

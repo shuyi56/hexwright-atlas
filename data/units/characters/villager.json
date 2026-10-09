@@ -1,0 +1,13 @@
+{
+  "id": "villager",
+  "name": "Villager",
+  "stats": {
+    "hp": 24,
+    "attack": 4,
+    "range": 1
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  }
+}

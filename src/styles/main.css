@@ -29,6 +29,7 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .seed input:focus-visible,.btn:focus-visible,.chip:focus-visible,.tab:focus-visible,.place:focus-visible,canvas:focus-visible{outline:2px solid var(--brass-2);outline-offset:2px}
 .btn{font:500 14px var(--ui);color:var(--vellum);background:var(--panel-2);border:1px solid var(--line);padding:7px 14px;border-radius:3px;cursor:pointer}
 .btn:hover{border-color:var(--brass)}
+.btn-link{text-decoration:none;display:inline-block}
 .btn-brass{background:var(--brass);color:#1b150c;border-color:var(--brass);font-weight:700}
 .btn-brass:hover{background:var(--brass-2)}
 .stage{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;min-height:0}

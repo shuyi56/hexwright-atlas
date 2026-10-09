@@ -21,6 +21,7 @@
       <button type="submit" class="btn">Redraw</button>
       <button type="button" class="btn btn-brass" id="newRealm">New realm</button>
       <button type="button" class="btn" id="openEditor">Tile editor</button>
+      <a class="btn btn-link" href="./units.html">Unit data</a>
     </form>
   </header>
   <main class="stage">
@@ -140,7 +141,7 @@
     </div>
   </div>
   <div class="tc-win tc-tile" id="tcTile" aria-live="polite"></div>
-  <div class="tc-win tc-unit" id="tcUnit" hidden><canvas id="tcFace" width="72" height="72"></canvas><div><b id="tcUnitName"></b><span id="tcUnitInfo"></span></div></div>
+  <div class="tc-win tc-unit" id="tcUnit" hidden><canvas id="tcFace" width="72" height="72"></canvas><div><b id="tcUnitName"></b><span id="tcUnitInfo"></span><span id="tcUnitMove"></span></div></div>
   <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc back</span></div>
 </div>
 <div class="editor char-maker" id="charMaker" hidden tabindex="-1" aria-label="Character maker">

@@ -1,0 +1,13 @@
+{
+  "id": "thief",
+  "name": "Thief",
+  "stats": {
+    "hp": 36,
+    "attack": 9,
+    "range": 1
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  }
+}

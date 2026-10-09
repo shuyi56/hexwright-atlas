@@ -33,7 +33,7 @@ const out = resolve(outArg || join(root, 'scenes', basename(mapPath).replace(/\.
 
 /* build into a scratch folder, then inline the stylesheet and the script into the page */
 const dist = mkdtempSync(join(tmpdir(), 'hexwright-scene-'));
-await build({ root, logLevel: 'warn', build: { outDir: dist, emptyOutDir: true, modulePreload: { polyfill: false }, assetsInlineLimit: 1e9, cssCodeSplit: false } });
+await build({ root, logLevel: 'warn', build: { outDir: dist, emptyOutDir: true, modulePreload: { polyfill: false }, assetsInlineLimit: 1e9, cssCodeSplit: false, rollupOptions: { input: join(root, 'index.html') } } });
 let html = readFileSync(join(dist, 'index.html'), 'utf8');
 const assets = readdirSync(join(dist, 'assets'));
 /* a closing script tag inside inlined code would end the element early */

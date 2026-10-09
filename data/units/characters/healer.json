@@ -1,0 +1,13 @@
+{
+  "id": "healer",
+  "name": "Healer",
+  "stats": {
+    "hp": 30,
+    "attack": 3,
+    "range": 2
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "summoner",
+  "name": "Summoner",
+  "stats": {
+    "hp": 30,
+    "attack": 3,
+    "range": 3
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

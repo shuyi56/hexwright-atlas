@@ -1,0 +1,13 @@
+{
+  "id": "merchant",
+  "name": "Merchant",
+  "stats": {
+    "hp": 26,
+    "attack": 3,
+    "range": 1
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

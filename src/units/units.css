@@ -1,0 +1,100 @@
+/* ================= the unit data page =================
+   The tile editor's dark table and brass rims (main.css supplies the colours, buttons and chips). */
+.ub{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px;padding:12px 16px 16px}
+.ub-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.ub-bar a.btn{text-decoration:none}
+.ub-title{display:flex;flex-direction:column;min-width:0;margin-right:auto}
+.ub-title h1{font-size:clamp(22px,2.6vw,30px)}
+.ub-views{display:flex;gap:6px}
+.ub-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ub-mode{font:500 13px var(--ui-sc);letter-spacing:.06em;color:var(--muted)}
+.ub-mode.warn{color:var(--brass-2)}
+.btn:disabled{opacity:.45;cursor:default;border-color:var(--line)}
+.btn-brass:disabled{background:var(--panel-2);color:var(--muted)}
+.ub-danger:hover{border-color:var(--wax);color:#f0b2a8}
+
+.ub-main{display:grid;grid-template-columns:290px minmax(0,1fr);gap:14px;min-height:0}
+.ub-main.tabled{grid-template-columns:minmax(0,1fr)}
+.ub-main.tabled .ub-list{display:none}
+.ub-list,.ub-detail,.ub-table{min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:4px}
+.ub-list{display:flex;flex-direction:column;overflow:hidden}
+.ub-search{margin:10px;background:var(--table);border:1px solid var(--line);color:var(--vellum);font:500 14px var(--ui);padding:7px 10px;border-radius:3px}
+.ub-search:focus-visible,.ub-detail input:focus-visible,.ub-detail select:focus-visible,.ub-table input:focus-visible,.ub-table select:focus-visible,.ub-row:focus-visible{outline:2px solid var(--brass-2);outline-offset:1px}
+.ub-rows{overflow:auto;padding:0 6px 10px}
+.ub-group{margin:12px 8px 4px;font:500 12.5px var(--ui-sc);letter-spacing:.1em;color:var(--brass)}
+.ub-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:3px;padding:3px 8px;color:var(--vellum);cursor:pointer;font:inherit}
+.ub-row:hover{background:var(--panel-2)}
+.ub-row[aria-current="true"]{background:var(--panel-2);border-color:var(--brass)}
+.ub-thumb{width:40px;height:40px;flex:none}
+.ub-nosprite{display:grid;place-items:center;border:1px dashed var(--line);border-radius:3px;color:var(--muted)}
+.ub-row-text{display:flex;flex-direction:column;min-width:0}
+.ub-row-text b{font-weight:500;font-size:15px}
+.ub-row-text span{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ub-dot{display:inline-block;width:7px;height:7px;margin-left:6px;border-radius:50%;background:var(--brass-2);vertical-align:2px}
+.ub-dim{color:var(--muted);margin:0}
+.ub-empty{padding:18px}
+
+.ub-detail{overflow:auto;padding:20px;display:flex;flex-direction:column}
+.ub-card{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,460px);gap:24px;align-items:stretch}
+.ub-stage{order:-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(ellipse at 50% 70%,#22302f,#141c1d 70%);border:1px solid var(--line);border-radius:4px;padding:12px}
+#preview{display:block;width:100%;max-width:300px;height:auto;image-rendering:pixelated}
+#preview.ub-blank{opacity:.2}
+.ub-stage-chips{display:flex;gap:6px}
+.ub-body{display:flex;flex-direction:column;gap:12px;min-width:0}
+.ub-head{display:flex;gap:14px;align-items:end}
+.ub-name{flex:1;min-width:0;background:none;border:0;border-bottom:1px solid var(--line);color:var(--vellum);font:400 32px/1.15 var(--display);padding:2px 0}
+.ub-name:hover{border-bottom-color:var(--brass)}
+.ub select,.ub input[type=number]{background:var(--table);border:1px solid var(--line);color:var(--vellum);font:500 14px var(--ui);padding:5px 8px;border-radius:3px}
+.ub input[type=number]{font-variant-numeric:tabular-nums;text-align:right}
+.ub-file{margin:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ub-file code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--brass-2);word-break:break-all}
+.ub-tag{font:500 11.5px var(--ui-sc);letter-spacing:.08em;color:#1b150c;background:var(--brass);border-radius:2px;padding:0 6px}
+.ub-errors{margin:0;color:#f0b2a8;font-size:13.5px}
+.ub-values{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.ub-value{display:grid;grid-template-columns:90px 96px minmax(0,1fr);gap:14px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line)}
+.ub-value-name{font:500 14px var(--ui-sc);letter-spacing:.1em;color:var(--muted)}
+.ub .ub-value input[type=number]{width:100%;font:500 22px/1.1 var(--ui);padding:5px 10px}
+.ub-value.changed input{border-color:var(--brass);color:var(--brass-2)}
+.ub-meter{height:8px;background:var(--table);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.ub-meter i{display:block;height:100%;background:linear-gradient(90deg,#8a6d36,var(--brass))}
+.ub-card-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:auto;padding-top:8px}
+.ub-field{display:flex;flex-direction:column;gap:3px}
+.ub-field span{font:500 12.5px var(--ui-sc);letter-spacing:.08em;color:var(--muted)}
+
+.ub-table{display:flex;flex-direction:column;overflow:hidden}
+.ub-table-scroll{overflow:auto;min-height:0;flex:1}
+.ub-table table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;width:max-content;min-width:100%}
+.ub-table th,.ub-table td{border-bottom:1px solid var(--line);padding:3px 4px;text-align:right;white-space:nowrap}
+.ub-table thead th{position:sticky;top:0;z-index:2;background:var(--panel-2)}
+.ub-table thead button{background:none;border:0;color:var(--muted);font:500 12.5px var(--ui-sc);letter-spacing:.06em;cursor:pointer;padding:6px 4px}
+.ub-table thead button:hover,.ub-table thead button[aria-sort="ascending"],.ub-table thead button[aria-sort="descending"]{color:var(--brass-2)}
+.ub-table .txt{text-align:left}
+.ub-table tbody th{position:sticky;left:0;z-index:1;background:var(--panel);font-weight:500}
+.ub-table thead th:first-child{left:0;z-index:3}
+.ub-table tbody tr:hover th,.ub-table tbody tr:hover td{background:var(--panel-2)}
+.ub-table tr.sel th{box-shadow:inset 3px 0 0 var(--brass)}
+.ub-table input[type=number]{width:62px;padding:3px 6px}
+.ub-table select{padding:3px 6px}
+.ub-table td.changed input,.ub-table td.changed select{border-color:var(--brass);color:var(--brass-2)}
+.ub-table td.na{color:var(--line);text-align:center}
+.ub-open{background:none;border:0;color:var(--vellum);font:500 15px var(--ui);cursor:pointer;padding:4px 6px}
+.ub-open:hover{color:var(--brass-2);text-decoration:underline}
+
+.ub-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));background:var(--panel-2);border:1px solid var(--brass);color:var(--vellum);padding:8px 14px;border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.45);font-size:14px}
+.ub-toast.bad{border-color:var(--wax);color:#f0b2a8}
+.ub-dialog{background:var(--panel);color:var(--vellum);border:2px solid var(--brass);border-radius:3px;padding:18px 22px;width:min(420px,calc(100vw - 32px));box-shadow:0 0 0 2px #0b1011,0 12px 40px rgba(0,0,0,.6)}
+.ub-dialog::backdrop{background:rgba(8,12,12,.6)}
+.ub-dialog h2{margin:0 0 6px;font:400 24px var(--display)}
+.ub-dialog form{display:flex;flex-direction:column;gap:12px}
+.ub-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+
+@media (max-width:760px){
+  .ub{height:auto;min-height:100%}
+  .ub-main{grid-template-columns:minmax(0,1fr)}
+  .ub-list{max-height:240px}
+  .ub-card{grid-template-columns:minmax(0,1fr)}
+  .ub-head{flex-wrap:wrap}
+  #preview{max-width:176px}
+  .ub-detail{padding:14px}
+  .ub-table{max-height:75vh}
+}

@@ -1,0 +1,13 @@
+{
+  "id": "dragoon",
+  "name": "Dragoon",
+  "stats": {
+    "hp": 50,
+    "attack": 14,
+    "range": 2
+  },
+  "movement": {
+    "move": 4,
+    "jump": 3
+  }
+}
