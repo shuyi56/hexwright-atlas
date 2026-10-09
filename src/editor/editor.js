@@ -1,7 +1,7 @@
 import { FACES, FIGURE, drawFigure, figureBox, figureThumb, footShadow, lookOf } from '../characters/draw.js';
 import { characterById, list as customList, onChange as onLibraryChange } from '../characters/library.js';
 import { makerOpen, openMaker } from '../characters/maker.js';
-import { JOBS, ROSTER, WALK } from '../characters/roster.js';
+import { ENEMIES, JOBS, ROSTER, WALK } from '../characters/roster.js';
 import { TOWNSFOLK } from '../characters/townsfolk.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
@@ -393,13 +393,14 @@ function buildPalette() {
   syncPalette();
 }
 /* The Characters tab lists everyone who can stand on the map, each on a grass block: the townsfolk, the jobs
-   (characters/roster.js) and the characters made in the character maker. Clicking one arms the Person tool.
-   New character… opens the maker on a new character; Edit… opens it on a made one, or on a copy of one of the
-   townsfolk (the jobs are drawn by hand, so the maker cannot make them). */
+   (characters/roster.js), the enemies (characters/enemies.js) and the characters made in the character maker.
+   Clicking one arms the Person tool. New character… opens the maker on a new character; Edit… opens it on a made
+   one, or on a copy of one of the townsfolk (the jobs and enemies are drawn by hand, so the maker cannot make
+   them). */
 const charThumbs = new Map();
 function editLabel() {
   const mine = ED.char && ED.char.startsWith('custom-'), town = TOWNSFOLK.some(t => t.id === ED.char);
-  return mine ? ['Edit…', 'Change this character in the character maker'] : town ? ['Copy and edit…', 'Start a new character from this one'] : ['Edit…', 'The jobs are drawn by hand; start a new character or copy one of the townsfolk'];
+  return mine ? ['Edit…', 'Change this character in the character maker'] : town ? ['Copy and edit…', 'Start a new character from this one'] : ['Edit…', 'The jobs and enemies are drawn by hand; start a new character or copy one of the townsfolk'];
 }
 function maker(what) {
   const back = id => { if (id) ED.char = id; setTab('Characters'); setTool('character'); req(); cv.focus({ preventScroll: true }); };
@@ -413,7 +414,7 @@ function buildCharacters(box) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = text; b.title = tip; b.disabled = !ok; b.addEventListener('click', fn); row.appendChild(b);
   }
   const mine = customList();
-  for (const [gn, list] of [['Townsfolk', TOWNSFOLK], ['Jobs', JOBS], ...(mine.length ? [['Made here', mine]] : [])]) {
+  for (const [gn, list] of [['Townsfolk', TOWNSFOLK], ['Jobs', JOBS], ['Enemies', ENEMIES], ...(mine.length ? [['Made here', mine]] : [])]) {
     const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h);
     const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
     for (const s of list) {

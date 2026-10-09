@@ -7,7 +7,7 @@ import { BASE, BODY_TYPES, measure, profile } from './body.js';
 import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
 import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
-import { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render } from './roster.js';
+import { BODIES, ENEMIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render } from './roster.js';
 import { APPLIES, CHOICES, COLOURS, cleanSpec, fromSpec } from './custom.js';
 import * as hats from './hats.js';
 import { TOWNSFOLK } from './townsfolk.js';
@@ -24,7 +24,7 @@ test('every shared part is a rectangle of rows', () => {
   for (const [name, v] of Object.entries({ ...parts, ...hats })) if (typeof v !== 'function') each(v, name);
 });
 test('every job in every build draws all its frames inside the frame, in colours it defines', () => {
-  assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 7); assert.equal(ROSTER.length, 16);
+  assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 7); assert.equal(ENEMIES.length, 6); assert.equal(ROSTER.length, 22);
   assert.equal(new Set(ROSTER.map(j => j.id)).size, ROSTER.length); for (const j of ROSTER) assert.equal(byId(j.id), j);
   for (const job of ROSTER) {
     const pal = palette(job); assert.ok(BODY_TYPES[job.body], `${job.id} has a build`);
@@ -32,7 +32,7 @@ test('every job in every build draws all its frames inside the frame, in colours
       const buf = frame(job, v, k, b), used = new Set(buf.mat.filter(Boolean));
       assert.equal(buf.clipped, 0, `${job.id} ${b} ${v} ${k} runs off the frame`);
       for (const m of used) assert.ok(pal[m], `${job.id} uses "${m}" without a colour`);
-      assert.ok(used.size > 5, `${job.id} ${b} ${v} ${k}`);
+      assert.ok(used.size > (job.beast ? 1 : 5), `${job.id} ${b} ${v} ${k}`);
     }
   }
 });
@@ -98,7 +98,7 @@ test('in a stride the arms swing against each other and against the legs, the le
   }
 });
 test('a staff or polearm is carried steady, and a staff stands on the ground', () => {
-  for (const job of ROSTER.filter(j => j.outfit.steady)) for (const b of BODIES) {
+  for (const job of ROSTER.filter(j => j.outfit.steady && !j.beast)) for (const b of BODIES) {
     const hands = [0, 1, 2].map(k => measure(b, 'front', k, job.outfit).at.handFar[0]);
     assert.equal(new Set(hands).size, 1, `${job.id} ${b}: the staff hand does not swing`);
     if (!job.weapon.grounded) continue;
@@ -193,7 +193,7 @@ test('the dragoon is armoured in crimson, spiked all over, and carries a winged 
     assert.ok(C < 0.03 || h < 270 || h > 340, `${m} ${c} is violet`);
   }
   assert.ok(rgbLch(hexRgb(dragoon.pal.S))[2] < 50, 'crimson plate');
-  /* the spikiest silhouette in the roster: more points (a pixel with at most one filled neighbour) than any
+  /* the spikiest silhouette of the townsfolk and jobs: more points (a pixel with at most one filled neighbour) than any
      other job, in both views */
   const points = mat => mat.filter((m, u) => {
     if (!m) return false;
@@ -202,7 +202,7 @@ test('the dragoon is armoured in crimson, spiked all over, and carries a winged 
   }).length;
   for (const v of VIEWS) {
     const mine = points(frame(dragoon, v, 0).mat);
-    for (const job of ROSTER.filter(j => j !== dragoon)) assert.ok(mine > points(frame(job, v, 0).mat), `${v}: ${job.id} is spikier`);
+    for (const job of [...TOWNSFOLK, ...JOBS].filter(j => j !== dragoon)) assert.ok(mine > points(frame(job, v, 0).mat), `${v}: ${job.id} is spikier`);
   }
   /* the lance: its point at the top of the frame, a ridged blade, barbed wings either side of a gold socket, a
      tuft beneath, and a steel spike at the butt */
@@ -264,7 +264,7 @@ test('faces are solid shapes: one lit tone and one shadow tone of skin', () => {
   }
 });
 test('every face shows both whole eyes, whatever hair, headgear or weapon is beside it', () => {
-  for (const job of ROSTER.filter(j => !j.head)) for (const b of BODIES) for (let k = 0; k < POSES; k++) {
+  for (const job of ROSTER.filter(j => !j.head && !j.beast)) for (const b of BODIES) for (let k = 0; k < POSES; k++) {
     const m = frame(job, 'front', k, b).mat, n = c => m.filter(x => x === c).length;
     assert.deepEqual([n('E'), n('W')], [6, 2], `${job.id} ${b} ${k}: lids and pupils, and whites`);
   }

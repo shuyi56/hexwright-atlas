@@ -2,6 +2,7 @@ import { ADVANCE, GLYPH_H, glyph, textWidth } from './font.js';
 import { H, OUTLINE, W, hexRgb, mixHex } from './pixels.js';
 import { BASE, BODY_TYPES } from './body.js';
 import { BODIES, ROSTER, WALK, render } from './roster.js';
+import { ENEMIES } from './enemies.js';
 import { TOWNSFOLK } from './townsfolk.js';
 import { TERRAIN_BY_ID } from '../tiles/terrain.js';
 
@@ -11,7 +12,7 @@ import { TERRAIN_BY_ID } from '../tiles/terrain.js';
    south-east, north-east, north-west), each standing and in both strides. Every figure stands on the editor's
    grass tile, drawn as a pixel tile in the tile set's colours, so the sheet shows the figures against the ground
    they will walk on. South-east and north-west are the drawn views mirrored, as the games do. Below, everyone
-   in every build, so anyone can be read on any body. A second image (buildWalk) is the roster walking, as the
+   but the beasts in every build, so anyone can be read on any body. A second image (buildWalk) is the roster walking, as the
    frames of an animation. Pure RGBA, so Node can write it (tools/character-sheet.mjs) and a test can check it. */
 const FACINGS = [['SW', 'front', false], ['SE', 'front', true], ['NE', 'back', false], ['NW', 'back', true]];
 const C = { page: '#121819', win: ['#1d2829', '#141c1d'], rim: '#c9a45a', rimD: '#0b1011', text: '#ece2c8', dim: '#a39b86', shadow: '#4a341a' };
@@ -62,11 +63,12 @@ function groundTile(cv, x, y, k) {
   }
 }
 
-/* the roster in blocks for rows of figures: the townsfolk and the jobs apart, each split evenly into rows of at
-   most nine so a row stays readable. Each block is { name, list }. */
+/* the roster in blocks for rows of figures: the townsfolk, the jobs and the enemies apart, each split evenly into
+   rows of at most nine so a row stays readable. Each block is { name, list }. */
 function blocks(roster) {
-  const out = [];
-  for (const [name, list] of [['TOWNSFOLK', roster.filter(c => TOWNSFOLK.includes(c))], ['JOBS', roster.filter(c => !TOWNSFOLK.includes(c))]]) {
+  const out = [], kind = c => (TOWNSFOLK.includes(c) ? 'TOWNSFOLK' : ENEMIES.includes(c) ? 'ENEMIES' : 'JOBS');
+  for (const name of ['TOWNSFOLK', 'JOBS', 'ENEMIES']) {
+    const list = roster.filter(c => kind(c) === name); if (!list.length) continue;
     const n = Math.ceil(list.length / 9), size = Math.ceil(list.length / n);
     for (let b = 0; b < n; b++) out.push({ name, list: list.slice(b * size, (b + 1) * size) });
   }
@@ -74,7 +76,8 @@ function blocks(roster) {
 }
 
 function buildSheet(roster = ROSTER, k = 4) {
-  const label = 230, cell = W * k, gap = 18, margin = 28, rowH = (H + TILE_DROP) * k + 12, head = 186, groups = blocks(roster);
+  /* the beasts have no body to change, so the builds leave them out */
+  const label = 230, cell = W * k, gap = 18, margin = 28, rowH = (H + TILE_DROP) * k + 12, head = 186, groups = blocks(roster.filter(c => !c.beast));
   const blockH = 110 + BODIES.length * (rowH + 10) + 20;
   const w = margin * 2 + label + FACINGS.length * (3 * cell + gap) - gap, builds = head + roster.length * (rowH + 10) + 40;
   const h = builds + 70 + groups.length * blockH + margin;

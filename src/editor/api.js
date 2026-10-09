@@ -2,7 +2,7 @@ import { ASSET_BY_ID, ASSETS, TERRAIN, footprint } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { METHODS } from './api-spec.js';
 import { characterById, get as getCustom, list as customList, save as saveCustom } from '../characters/library.js';
-import { ROSTER } from '../characters/roster.js';
+import { ENEMIES, ROSTER } from '../characters/roster.js';
 import { TOWNSFOLK } from '../characters/townsfolk.js';
 import { ED, LEVEL_NAME, characterBoxes, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
 import { BIOMES, generateScene } from './generate.js';
@@ -68,7 +68,7 @@ function targetTiles(M, p) {
 }
 const everyone = () => [...ROSTER, ...customList()];
 const spriteId = id => { if (!characterById(id)) fail(`unknown sprite "${id}".${guess(id, everyone().map(s => s.id))}`); return id; };
-const spriteInfo = s => ({ id: s.id, name: s.name, kind: TOWNSFOLK.includes(s) ? 'townsfolk' : s.id.startsWith('custom-') ? 'custom' : 'job', build: s.body, about: s.blurb, ...(s.id.startsWith('custom-') ? { spec: s.spec } : {}) });
+const spriteInfo = s => ({ id: s.id, name: s.name, kind: TOWNSFOLK.includes(s) ? 'townsfolk' : ENEMIES.includes(s) ? 'enemy' : s.id.startsWith('custom-') ? 'custom' : 'job', build: s.body, about: s.blurb, ...(s.id.startsWith('custom-') ? { spec: s.spec } : {}) });
 const charInfo = (M, k) => { const c = M.chars[k], s = characterById(c.sprite); return { index: k, sprite: c.sprite, name: s ? s.name : null, x: c.x, y: c.y, level: levelOf(c), face: c.face }; };
 function charIndex(M, p) {
   const k = p.index != null ? p.index : p.at ? (tileOf(M, p.at.x, p.at.y), charAt(M, p.at.x, p.at.y, -1, p.at.level || 0)) : fail('give index or at to pick a character');
