@@ -11,6 +11,7 @@ import { cellsToPart } from './pixels.js';
    they differ in shoulders, waist, limb thickness and how the height splits between torso and legs. */
 const BASE = 46, CX = 16;
 const BODY_TYPES = {
+  small: { name: 'Small', torso: 11, legs: 8, shoulder: 10, chest: 10, waist: 9, hem: 10, legW: 3, arm: 2, hand: 2 },
   slim: { name: 'Slim', torso: 12, legs: 13, shoulder: 10, chest: 10, waist: 8, hem: 10, legW: 3, arm: 2, hand: 2 },
   standard: { name: 'Standard', torso: 12, legs: 12, shoulder: 12, chest: 12, waist: 10, hem: 12, legW: 4, arm: 3, hand: 3, smooth: true },
   stocky: { name: 'Stocky', torso: 12, legs: 9, shoulder: 14, chest: 14, waist: 13, hem: 14, legW: 5, arm: 4, hand: 3 },
@@ -111,14 +112,17 @@ function legGeometry(bt, view, pose) {
 function pantsCells(bt, view, pose, o = {}) {
   const { dir, legs, y0 } = legGeometry(bt, view, pose), cells = [], boot = Math.round(bt.legs * 0.5), knee = BASE - boot;
   for (let x = legs[0][0][0]; x <= legs[1][0][1]; x++) { cells.push([x, y0, 'P']); cells.push([x, y0 + 1, x === CX - 1 ? 'p' : 'P']); }
+  if (o.bones) for (const c of cells) c[2] = 'L';                                  /* the rag hangs over the hips */
   for (const [[a, b], { dx, lift }] of legs) {
     const end = BASE - lift;
     for (let y = y0 + 2; y <= end; y++) {
       const cop = o.greaves && y >= knee - 1 && y <= knee + 1, inBoot = y > BASE - boot || cop, toe = y > BASE - 3 && !lift, sole = y === end;
       let l = a + dx, r = b + dx; if (toe) { if (dir < 0) l--; else r++; }
+      /* bones (o.bones): a shin a pixel thinner than the leg, its outer side dropped, with a knob at the knee */
+      if (o.bones && y > y0 + 2 && y !== knee && !toe) { if (a < CX) l++; else r--; }
       if (cop || (o.greaves && sole && !lift)) { if (dir < 0) l--; else r++; }     /* the knee cop and the sabaton's point */
       if (sole && lift) { if (dir < 0) r = l + 1; else l = r - 1; }                 /* a lifted heel: only the toe touches down */
-      for (let x = l; x <= r; x++) cells.push([x, y, sole ? 'o' : cop && y === knee + 1 ? 'G' : inBoot ? 'O' : 'P']);
+      for (let x = l; x <= r; x++) cells.push([x, y, sole ? (o.bones ? 'p' : 'o') : cop && y === knee + 1 ? 'G' : inBoot && !o.bones ? 'O' : 'P']);
       /* the knee cop's spike, standing forward and up from its point */
       if (o.greaves && y === knee - 1) { const f = dir < 0 ? l - 1 : r + 1; cells.push([f, y, 'O'], [f + dir, y - 1, 'O']); }
     }
@@ -201,6 +205,15 @@ const TORSO = {
     if (j > t.belt) return j === t.belt + 2 ? 'a' : 'A';
     if (j === 1 || j === t.belt - 1 || (j >= 2 && (d === 0 || d === k || d === k + 3))) return 's';
     return 'S';
+  },
+  /* a skeleton's ribcage: a collarbone, then ribs of bone (A) over the dark of the chest (D) on either side of a
+     breastbone or spine, a pelvis at the belt and a rag (L) about the hips below it */
+  ribs: (j, x, t) => {
+    const r = t.front ? fc + 1 : fc;
+    if (j === 0 || j === t.belt) return 'A';
+    if (j > t.belt) return 'L';
+    if (x === r) return t.front ? 'A' : 'a';
+    return j % 2 ? 'A' : 'D';
   } };
 /* a gown hangs straight from the chest instead of taking in at the waist, and widens a pixel either side over its
    last rows (beside the hands, clear of them), so the skirt's flare runs on from it */

@@ -10,7 +10,7 @@ import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, H
 
 /* each choice: its options as [value, label], the first being the default */
 const CHOICES = {
-  build: [['standard', 'Standard'], ['slim', 'Slim'], ['stocky', 'Stocky'], ['tall', 'Tall']],
+  build: [['standard', 'Standard'], ['slim', 'Slim'], ['stocky', 'Stocky'], ['tall', 'Tall'], ['small', 'Small']],
   clothes: [['vest', 'Shirt and vest'], ['tunic', 'Tunic'], ['overalls', 'Overalls'], ['plate', 'Breastplate'], ['robe', 'Long coat and sash'], ['gown', 'Gown to the floor']],
   sleeves: [['cloth', 'Same cloth'], ['second', 'Second colour']],
   cut: [['plain', 'Plain'], ['bell', 'Bell']],

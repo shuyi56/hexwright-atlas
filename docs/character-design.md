@@ -5,7 +5,8 @@ Final Fantasy Tactics and Tactics Ogre: chunky, big-headed figures that read by 
 painted in the tile set's own soft, chalky palette with gently hue-shifted ramps and an outline in the tiles' umber
 ink, so they belong on the editor's ground. The code lives in `src/characters/`.
 
-The roster is sixteen characters: seven townsfolk, the people of the map's towns and villages, and nine jobs.
+The roster is twenty-two characters: seven townsfolk, the people of the map's towns and villages, nine jobs, and
+six enemies.
 The character maker makes more from the same choices the townsfolk are built from.
 
 ![Every character in all four facings, standing and in both strides, each on the editor's grass tile, then everyone in every build](images/character-sprite-sheet.png)
@@ -38,6 +39,15 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 | White Mage (slim) | A white cowl whose peak droops back like a nightcap, a red band framing her face, a mantle and robe hemmed in red teeth, a staff with a red orb in a gold cup. |
 | Summoner (standard) | A moss-green cowl banded in gold with a jewel at the brow, ram's horns curling from its temples, gold-edged lappets down her chest and a long tail down her back; a rod with a blue crystal in bone claws. |
 
+| Enemy | Read at a glance by |
+| --- | --- |
+| Goblin (small) | Sallow green and knee-high: long ears swept out and up to points from a bald head, yellow eyes under a dark brow, a rag of a tunic, bare feet, a nail-studded club. |
+| Bandit (standard) | A dusty hood and capelet, a red kerchief over the nose and mouth, a leather vest over a dun tunic, a sword. |
+| Orc (tall) | Dark green and bare-armed: tusks thrust up from a jutting jaw, burning red eyes over streaks of war paint, a heavy scowl, a bald head, spiked iron pauldrons, a black leather jerkin, a great double-bitted axe. |
+| Skeleton (slim) | A skull with embers in its sockets and a row of teeth, ribs over the dark of the chest, thin shins, a rag about the hips, a rusted sword and a cracked buckler. |
+| Wolf (beast) | A grey coat with a dark saddle and tall dark-backed ears, cream muzzle, throat, belly and socks, an amber eye, a bushy tail. |
+| Slime (beast) | A round ball of blue-green jelly on a flattened base, a shine on its upper left, two dot eyes and a small mouth. |
+
 ## Format
 
 - **Frame.** 32×48 pixels. Every build stands with its soles on row 46, so figures line up on a battlefield;
@@ -54,7 +64,7 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 
 ## Body types
 
-Four builds, set by a handful of measurements in `body.js` (`BODY_TYPES`):
+Five builds, set by a handful of measurements in `body.js` (`BODY_TYPES`):
 
 | Build | Torso, legs (rows) | Shoulders, waist (px) | Legs, arms (px wide) | Height over standard |
 | --- | --- | --- | --- | --- |
@@ -62,6 +72,7 @@ Four builds, set by a handful of measurements in `body.js` (`BODY_TYPES`):
 | Standard | 12, 12 | 12, 10 | 4, 3 | 0 |
 | Stocky | 12, 9 | 14, 13 | 5, 4 | −3 |
 | Tall | 14, 15 | 13, 11 | 4, 3 | +5 |
+| Small | 11, 8 | 10, 9 | 3, 2 | −5 |
 
 - **Generated body.** The torso, arms, legs, robe skirts, gowns and cloaks are cut from these numbers rather than
   drawn as fixed grids. Clothing is a set of rules over the cut shape. Some follow the cut: where the collar, belt,
@@ -171,6 +182,42 @@ in `body.js`, so they fit any build and pose. The rest are hand-drawn in `roster
 - **Colours.** Crimson-lacquered plate (`S`, close to the tiles' roof terracotta) with lighter greaves (`O`),
   over grey mail (`A`, `P`). The crest, gauntlets and cape are black iron (`D`, `V`), with brass trim, bone horns
   and fangs (`F`), an amber eye (`J`) and a gold tuft on the lance (`R`).
+
+## Enemies
+
+The enemies (`enemies.js`) are what a party meets on the road. The goblin, bandit, orc and skeleton are drawn like
+the jobs: a build, an outfit cut by `body.js`, and hand-drawn parts on its landmarks, so each can be drawn in any
+build. The goblin stands on the small build, the shortest, so it reads as small beside anyone.
+
+- **Faces.** The goblin wears the standard head with its long ears and brow drawn over it. The orc's face and the
+  skeleton's skull are heads of their own (`head` on the character): the orc's brow slants to its nose over red
+  eyes that glow (`N`, a flat mark) above streaks of war paint, with tusks up past the lip; the skull has two
+  embers in dark sockets (`Z`) and a row of teeth.
+- **Bare arms.** The orc's sleeves are its skin (`sleeves: { A: 'K' }`), cel-shaded like a face, with leather
+  bracers at the cuff.
+- **Bones.** The skeleton wears a ribcage (`torso: 'ribs'`): a collarbone, then ribs of bone over the dark of the
+  chest either side of a breastbone (a spine from behind), a pelvis at the belt and a rag below it. Its legs
+  (`bones: true`) are a pixel thinner than a leg, the outer side dropped, with a knob at the knee and bare bone to
+  the foot.
+- **Gear.** The goblin's club is made for its fist like a sword: a grip, then a knotted head swelling outward and
+  studded with nails. The orc's great axe is a `staff()` with a double-bitted head, held in the hand.
+
+**Beasts.** The wolf and the slime have no body to wear. Each draws its own frames (`draw(view, pose)`, which
+`frame()` calls in place of building a figure) from parts authored facing left; the back view mirrors them, with
+the head seen from behind. They are drawn the same in any build, so the sheet's builds leave them out.
+
+- **The wolf.** A head with tall pointed ears (cream inside, dark behind), a deep chest tucking up to the belly, a
+  dark saddle down its back and a bushy tail. Its legs are cut like a body's: a foreleg straight to the paw, a hind
+  leg sloping back to the hock and forward to the paw, cream below. It trots: in each stride one diagonal pair
+  reaches with a paw lifted while the other pushes back, the body drops a pixel and the tail swings. The far legs
+  stand a row higher, behind. Everything else is one coat, lit and outlined as one piece (its parts share a layer)
+  with clean fur colours (no ink between grey, saddle and cream), so the fur is even; light creases mark the back
+  of the cheek and the curve of the haunch.
+- **The slime.** A round ball of jelly sat on a flattened base, with a shine high on the upper left and, in
+  front, two dot eyes and a mouth. The engine lights figures like upright cylinders, which would band a ball into
+  a jar, so the slime is lit as a sphere instead: each pixel takes one of five flat tones of its jelly by how far
+  its surface faces the light from the upper left. It heaves rather than walks: squashed wide in one stride and drawn up tall in
+  the other.
 
 ## Palette
 
@@ -396,7 +443,7 @@ The tile editor draws these characters (`draw.js`, the one module here that need
   and carried each sprite's pixels. They open with the same people in this style. Anyone else it cannot find (a
   character painted by hand in the old sprite editor, or a made one whose spec is missing) comes back as a
   villager, standing where they stood.
-- **The automation API.** `listSprites` lists everyone (id, name, townsfolk, job or custom, build, and a made
+- **The automation API.** `listSprites` lists everyone (id, name, townsfolk, job, enemy or custom, build, and a made
   character's spec). `makeCharacter` makes a character from the maker's choices and colours, or changes a made one,
   and `placeCharacter` takes any id.
 
@@ -448,5 +495,6 @@ a looping APNG, and the sheet encodes to a valid PNG.
 
 ## Not yet done
 
-- The character maker cannot make the jobs: their helms, hoods and gear are drawn for them alone.
+- The character maker cannot make the jobs or the enemies: their helms, hoods, faces and gear are drawn for them
+  alone, and the beasts have no body to dress.
 - There are no attack, cast or hurt poses yet.

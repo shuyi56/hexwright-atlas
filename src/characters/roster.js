@@ -3,6 +3,7 @@ import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, H
 import { BANDANA, FEATHER_CAP, WIZARD_HAT } from './hats.js';
 import { finish, frameBuf, mixHex, ramp, shrink, stamp } from './pixels.js';
 import { TOWNSFOLK } from './townsfolk.js';
+import { ENEMIES } from './enemies.js';
 
 /* ================= character sprites: the roster =================
    Each job is a build, an outfit, a palette and a stack of hand-drawn parts. The body (torso, arms, legs, a
@@ -28,6 +29,7 @@ const GROUP = { head: 1, hair: 1, hairOver: 1, hat: 1, torso: 2, overTorso: 2 };
 
 /* the build a job is drawn in: its own unless the caller names another */
 function frame(job, view, pose, body = job.body) {
+  if (job.draw) return job.draw(view, pose);                                    /* a beast draws its own (enemies.js) */
   const m = measure(body, view, pose, job.outfit), buf = frameBuf();
   const head = { ...((job.head && job.head[view]) || (view === 'front' ? HEAD_FRONT : HEAD_BACK)), anchor: 'head' };
   const own = (job.parts && job.parts[view]) || {};
@@ -433,9 +435,9 @@ const SUMMONER = {
 };
 
 const JOBS = [SQUIRE, KNIGHT, ARCHER, THIEF, DRAGOON, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
-/* everyone who can be drawn: the townsfolk (townsfolk.js), then the jobs */
-const ROSTER = [...TOWNSFOLK, ...JOBS];
+/* everyone who can be drawn: the townsfolk (townsfolk.js), the jobs, then the enemies (enemies.js) */
+const ROSTER = [...TOWNSFOLK, ...JOBS, ...ENEMIES];
 const BY_ID = new Map(ROSTER.map(c => [c.id, c]));
 const byId = id => BY_ID.get(id) || null;
 
-export { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render, renderScaled };
+export { BODIES, ENEMIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render, renderScaled };

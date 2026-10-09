@@ -1,0 +1,7 @@
+{
+  "title": "Road ambush: the enemies in the tactical view",
+  "about": "A party on the high road (knight, squire, archer, white mage, black mage) walks into an ambush. Bandits and an orc block the road from their camp, goblins come down from the northern woods, wolves close from the south, skeletons stir among the graves on the rise, and two slimes heave in the grass.",
+  "view": "tactical",
+  "tactical": { "zoom": 2, "center": "map" },
+  "checks": []
+}
