@@ -142,14 +142,16 @@ test('a figure beside a long piece is drawn on the right side of it, and what hi
   const fig = (x, y) => ({ key: x + y + 1, lv: 0, pri: 2, X: x + 0.5, Y: y + 0.5, z: 0, ground: 0, c: {}, k: 0 });
   /* behind the church (short of its -y edge) though it sorts with it */
   let list = withFigures(sc.items, [fig(4, 2)]), f = list.findIndex(it => it.c), b = list.findIndex(it => it.kind === 'piece');
-  let { after, hiders } = figureOrder(list);
-  assert.ok(f > b && (after.get(f) || []).includes(b), 'the church is drawn again after the figure behind it');
-  assert.ok((hiders.get(f) || []).includes(b), 'and hides it');
+  let { hiders } = figureOrder(list);
+  assert.ok(f > b && (hiders.get(f) || []).includes(b), 'the church hides the figure behind it, though the figure sorts after it');
   /* past its +y edge, though it sorts before the church */
   list = withFigures(sc.items, [fig(0, 5)]); f = list.findIndex(it => it.c); b = list.findIndex(it => it.kind === 'piece');
-  ({ after, hiders } = figureOrder(list));
-  assert.ok(f < b && (after.get(b) || []).includes(f), 'the figure is drawn again after the church');
-  assert.ok(!(hiders.get(f) || []).includes(b), 'and the church does not hide it');
+  ({ hiders } = figureOrder(list));
+  assert.ok(f < b && !(hiders.get(f) || []).includes(b), 'the church does not hide the figure in front of it, though it sorts after it');
+  /* a figure behind the church whose box another figure and the church both cross: only the church hides it */
+  list = withFigures(sc.items, [fig(4, 2), fig(4, 3)]);
+  ({ hiders } = figureOrder(list));
+  for (const [i, h] of hiders) assert.ok(h.every(j => !list[j].c), `figure ${i}: figures never hide figures, the nearer is drawn later`);
 });
 
 test('a shrunk face keeps both eyes as drawn: pupil and glint, apart, inside the face', async () => {
