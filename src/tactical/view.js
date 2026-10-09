@@ -19,8 +19,8 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    range lights up in blue; the route to the tile under the cursor is traced in gold; click a lit tile (or Enter)
    and it walks there, hopping up and down ledges, while the camera follows. Moves are edits of the map, on the
    editor's undo stack. A picked unit has an actions window: Move, Attack (its pattern and range light up in red;
-   pick a unit of the other side there to strike it for its Attack) and Wait, beside the unit on screen. Every unit
-   standing has a health bar over its head. Each unit moves once and acts once a round; once every
+   pick a unit of the other side there to strike it for its Attack) and Wait, beside the unit on screen. A unit
+   struck shows its health bar over its head for a moment, draining. Each unit moves once and acts once a round; once every
    unit still standing has done both, a new round begins. Hit points are the battle's, not the map's: they start
    full each time the view opens, and a unit brought to 0 stays where it fell, faded. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
    + and - zoom, PgUp / PgDn change storey, Esc steps back. */
@@ -30,7 +30,7 @@ const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, range: null, reach: null, hp: new Map(), turn: new Map(), pop: null, note: '', walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
-const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2;
+const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
 
 /* ---------- the scene and where things are ---------- */
 function rebuild() { TC.sc = buildScene(ED.M, { rot: TC.rot, top: TC.top }); TC.bounds = bounds(TC.sc); TC.dirty = true; }
@@ -160,9 +160,9 @@ function finish(k) {
   if ((ED.M.chars || []).every((c, j) => !alive(j) || done(j))) { TC.turn.clear(); TC.note = 'A new round begins'; panels(); }
 }
 function attack(a, d) {
-  const dmg = statsOf(a).attack, hp = Math.max(0, hpOf(d) - dmg);
+  const dmg = statsOf(a).attack, was = hpOf(d), hp = Math.max(0, was - dmg), max = Math.max(1, statsOf(d).hp);
   TC.hp.set(d, hp); spend(a, 'acted');
-  TC.pop = { k: d, text: String(dmg), t: 0 };
+  TC.pop = { k: d, text: String(dmg), t: 0, from: was / max, to: hp / max };
   const note = `${nameOf(a)} hits ${nameOf(d)} for ${dmg}${hp ? '' : `. ${nameOf(d)} falls`}`;
   finish(a); TC.note = note; panels();
 }
@@ -244,8 +244,8 @@ function loop(now) {
     if (f >= 1) { TC.cam.x = gx; TC.cam.y = gy; TC.goal = null; TC.glide = null; }
     TC.dirty = true;
   }
-  /* the damage number over a struck unit rises and fades over a second */
-  if (TC.pop) { TC.pop.t += dt; if (TC.pop.t >= 1) TC.pop = null; TC.dirty = true; }
+  /* the damage number over a struck unit rises and fades over a second; its health bar stays a little longer */
+  if (TC.pop) { TC.pop.t += dt; if (TC.pop.t >= POP_TIME) TC.pop = null; TC.dirty = true; }
   /* water ripples and the cursor's bob tick over a few times a second */
   const tick = Math.floor(now / 220); if (tick !== TC.tick) { TC.tick = tick; TC.dirty = true; }
   if (TC.dirty) { TC.dirty = false; paint(); }
@@ -275,19 +275,18 @@ function paint() {
   drawScene(g, TC.sc, k, tx, ty, view, { frame: TC.tick >> 1, tick: TC.tick >> 1, figs: TC.figs, marks, cursor, focus, ...TC.debug });
   TC.view = { k, tx, ty };
   g.setTransform(1, 0, 0, 1, 0, 0);
-  /* a health bar over every unit still standing, in whole art pixels like the sprites */
-  for (const f of TC.figs) {
-    if (!alive(f.k)) continue;
-    const [x, y] = P(f.X, f.Y, f.z), frac = hpOf(f.k) / Math.max(1, statsOf(f.k).hp), w = 12, bx = Math.round(x - w / 2) * k + tx, by = Math.round(y - figureHeight(f) - 4) * k + ty;
-    g.fillStyle = '#0b1011'; g.fillRect(bx - k, by - k, (w + 2) * k, 3 * k);
-    g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, k);
-    g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, k);
-  }
   placeMenu();
   const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);
   if (pf) {
-    const [x, y] = P(pf.X, pf.Y, pf.z), t = TC.pop.t, sx = Math.round(x * k + tx), sy = Math.round((y - figureHeight(pf) - 7 - 10 * t) * k + ty);
-    g.globalAlpha = Math.min(1, 3 * (1 - t)); g.font = `700 ${Math.round(9 * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
+    /* a struck unit's health bar shows only while it is hit: it drains from the old HP to the new, then fades */
+    const { t, from, to } = TC.pop, [x, y] = P(pf.X, pf.Y, pf.z), head = y - figureHeight(pf);
+    const frac = from + (to - from) * ease(Math.max(0, Math.min(1, (t - 0.15) / 0.5))), w = 12, bx = Math.round(x - w / 2) * k + tx, by = Math.round(head - 4) * k + ty;
+    g.globalAlpha = Math.max(0, Math.min(1, (POP_TIME - t) / 0.3));
+    g.fillStyle = '#0b1011'; g.fillRect(bx - k, by - k, (w + 2) * k, 3 * k);
+    g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, k);
+    if (frac > 0) { g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, k); }
+    const sx = Math.round(x * k + tx), sy = Math.round((head - 7 - 10 * Math.min(1, t)) * k + ty);
+    g.globalAlpha = Math.max(0, Math.min(1, 3 * (1 - t))); g.font = `700 ${Math.round(9 * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
     g.lineWidth = Math.max(2, Math.round(1.5 * k)); g.strokeStyle = '#0b1011'; g.strokeText(TC.pop.text, sx, sy); g.fillStyle = '#ffd2c4'; g.fillText(TC.pop.text, sx, sy);
     g.globalAlpha = 1; g.textAlign = 'start';
   }
