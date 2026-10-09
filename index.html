@@ -97,6 +97,7 @@
         <button class="chip" id="edRotL" title="Turn view ([)">⟲ Turn</button>
         <button class="chip" id="edRotR" title="Turn view (])">Turn ⟳</button>
         <button class="chip" id="edGrid" aria-pressed="true">Grid</button>
+        <button class="chip" id="edTactical" title="Tactical view: a close-up pixel camera for moving units (T)">Tactical</button>
       </div>
       <div class="zoom">
         <button class="btn" id="edIn" aria-label="Zoom in">+</button>
@@ -125,6 +126,22 @@
       <div class="ed-items" id="edItems"></div>
     </aside>
   </div>
+</div>
+<div class="tactical" id="tactical" hidden tabindex="-1" aria-label="Tactical view">
+  <canvas id="tcCanvas" role="img" aria-label="Tactical view of the map. Click a unit, then a blue tile, to move it; drag to pan; scroll to zoom."></canvas>
+  <div class="tc-bar">
+    <button class="btn" id="tcBack">← Editor</button>
+    <div class="tc-title"><span class="eyebrow">tactical view</span><span id="tcName"></span></div>
+    <div class="tc-chips">
+      <button class="chip" id="tcRotL" title="Turn view (Q)">⟲ Turn</button>
+      <button class="chip" id="tcRotR" title="Turn view (E)">Turn ⟳</button>
+      <button class="chip" id="tcFast" aria-pressed="false" title="Fast-forward walking (F)">▶▶ 2×</button>
+      <button class="chip" id="tcOut" aria-label="Zoom out (−)">−</button><span class="tc-zoom" id="tcZoom">×3</span><button class="chip" id="tcIn" aria-label="Zoom in (+)">+</button>
+    </div>
+  </div>
+  <div class="tc-win tc-tile" id="tcTile" aria-live="polite"></div>
+  <div class="tc-win tc-unit" id="tcUnit" hidden><canvas id="tcFace" width="72" height="72"></canvas><div><b id="tcUnitName"></b><span id="tcUnitInfo"></span></div></div>
+  <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc back</span></div>
 </div>
 <div class="editor char-maker" id="charMaker" hidden tabindex="-1" aria-label="Character maker">
   <header class="ed-bar">

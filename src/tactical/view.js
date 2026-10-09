@@ -1,0 +1,285 @@
+import { characterById } from '../characters/library.js';
+import { FACES } from '../characters/draw.js';
+import { WALK } from '../characters/roster.js';
+import { ED, LEVEL_NAME, mutate } from '../editor/editor.js';
+import { MAX_LEVEL, levelOf } from '../editor/model.js';
+import { walkChar } from '../editor/walk.js';
+import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
+import { $, state } from '../ui/state.js';
+import { MOVE, moveRange, placeId, routeTo } from './move.js';
+import { drawScene, figureHit, portrait } from './render.js';
+import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
+
+/* ================= tactical view: the screen =================
+   The editor's map seen through a tactics game's camera: zoomed in close, whole-pixel scaling, the camera gliding
+   after the cursor and the unit on the move. Pick a unit (click it, Enter on it, or Tab through them) and its move
+   range lights up in blue; the route to the tile under the cursor is traced in gold; click a lit tile (or Enter)
+   and it walks there, hopping up and down ledges, while the camera follows. Moves are edits of the map, on the
+   editor's undo stack. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
+   + and - zoom, PgUp / PgDn change storey, Esc steps back. */
+const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
+/* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
+   what an overlay changes */
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, range: null, walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+/* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
+   covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
+const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2;
+
+/* ---------- the scene and where things are ---------- */
+function rebuild() { TC.sc = buildScene(ED.M, { rot: TC.rot, top: TC.top }); TC.bounds = bounds(TC.sc); TC.dirty = true; }
+const S = () => ED.M.S;
+const toViewU = (x, y) => viewOf(S(), TC.rot)(y * S() + x);
+const toModel = u => TC.sc.back[u];
+/* a model tile's top on level L, in art pixels: [x, y] of its centre */
+function tileArt(x, y, L) { const u = toViewU(x, y), X = u % S(), Y = (u / S()) | 0; return P(X + 0.5, Y + 0.5, TC.sc.zAt(u, L)); }
+const zAt = (x, y, L) => TC.sc.zAt(toViewU(x, y), L);
+const ptOf = (x, y, L) => ({ x: x + 0.5, y: y + 0.5, z: zAt(x, y, L), L });
+
+/* ---------- walking ---------- */
+function walkerPos(w) {
+  let d = w.d;
+  for (let i = 0; i + 1 < w.pts.length; i++) {
+    const a = w.pts[i], b = w.pts[i + 1];
+    if (d <= 1 || i + 2 === w.pts.length) {
+      const f = Math.min(1, d), face = Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 1 : 3) : (b.y > a.y ? 0 : 2);
+      /* a step up or down a ledge is a hop: the height changes in the middle of the step, with a little arc */
+      let z = a.z + (b.z - a.z) * f;
+      if (a.L === b.L && a.z !== b.z) { const t = Math.max(0, Math.min(1, (f - 0.3) / 0.4)); z = a.z + (b.z - a.z) * t * t * (3 - 2 * t) + Math.sin(f * Math.PI) * 5; }
+      return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z, rail: a.z + (b.z - a.z) * f, ground: a.z + (b.z - a.z) * (f < 0.5 ? 0 : 1), L: f < 0.5 ? a.L : b.L, face, seg: [a, b] };
+    }
+    d -= 1;
+  }
+  const e = w.pts[w.pts.length - 1]; return Object.assign({ face: 0, ground: e.z, rail: e.z }, e);
+}
+function startWalk(k, path) {
+  const M = ED.M, c = M.chars[k], start = ptOf(c.x, c.y, levelOf(c));
+  const r = mutate(M2 => { const w = walkChar(M2, k, path); return { changed: w.ok && path.length ? 1 : 0, ok: w.ok }; });
+  if (!r || !r.ok) return false;
+  TC.walk = { k, pts: [start, ...path.map(([x, y, L]) => ptOf(x, y, L || 0))], d: 0 }; TC.locked = false; TC.free = false;
+  TC.range = null; rebuild();
+  return true;
+}
+
+/* ---------- figures for the scene ---------- */
+function figures() {
+  const M = ED.M, out = [], sz = S();
+  (M.chars || []).forEach((c, k) => {
+    const w = TC.walk && TC.walk.k === k ? TC.walk : null, p = w ? walkerPos(w) : Object.assign(ptOf(c.x, c.y, levelOf(c)), { face: c.face, ground: zAt(c.x, c.y, levelOf(c)) });
+    const L = w ? p.L : levelOf(c); if (L > TC.top) return;
+    const [X, Y] = viewPoint(sz, TC.rot, p.x, p.y);
+    /* the nearer of the two tiles it is stepping between decides when it is drawn */
+    const keyOf = q => { const [a, b] = viewPoint(sz, TC.rot, Math.floor(q.x) + 0.5, Math.floor(q.y) + 0.5); return a + b; };
+    const key = w && p.seg ? Math.max(keyOf(p.seg[0]), keyOf(p.seg[1])) : keyOf(p);
+    out.push({ key, lv: L, pri: 2, X, Y, z: p.z, ground: p.ground ?? p.z, c: characterById(c.sprite) || characterById('villager'), k, face: FACES[(p.face + 3 * TC.rot) % 4], pose: w ? WALK[Math.floor(w.d * STRIDES) % WALK.length] : 0 });
+  });
+  return out;
+}
+
+/* ---------- camera ---------- */
+const scale = () => Math.max(1, Math.round(TC.zoom * state.dpr));
+function size() {
+  const r = root.getBoundingClientRect(); TC.cw = r.width; TC.ch = r.height;
+  cv.width = Math.round(r.width * state.dpr); cv.height = Math.round(r.height * state.dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; TC.dirty = true;
+}
+/* The camera glides to a new place over a fixed time (about half a second to nine tenths with the distance),
+   easing gently in and out along a half sine, rather than slowing toward it for ever: on whole pixels an endless slow-down moves by uneven steps and ends in a long crawl of single-pixel hops.
+   A goal that moves a little while the glide is under way (a walker, the cursor at the edge) is followed by the
+   same glide; one that jumps somewhere new starts a fresh glide from where the camera is. */
+const ease = t => (1 - Math.cos(Math.PI * t)) / 2;
+function lookAt(x, y, now) {
+  TC.dirty = true;
+  if (now) { TC.cam.x = x; TC.cam.y = y; TC.goal = null; TC.glide = null; return; }
+  if (TC.goal && TC.glide && Math.hypot(x - TC.goal[0], y - TC.goal[1]) < 48) { TC.goal = [x, y]; return; }
+  const d = Math.hypot(x - TC.cam.x, y - TC.cam.y);
+  if (d < 0.5) { TC.cam.x = x; TC.cam.y = y; TC.goal = null; TC.glide = null; return; }
+  TC.goal = [x, y]; TC.glide = { from: [TC.cam.x, TC.cam.y], t: 0, dur: Math.min(0.55, 0.28 + d / 1600) };
+}
+/* keep the cursor inside the middle of the screen, as the games do, rather than chasing every step */
+function keepInView(x, y) {
+  const k = scale() / state.dpr, hw = TC.cw / k / 2 * 0.55, hh = TC.ch / k / 2 * 0.5, [cx, cy] = TC.goal || [TC.cam.x, TC.cam.y];
+  lookAt(Math.max(x - hw, Math.min(x + hw, cx)), Math.max(y - hh, Math.min(y + hh, cy)));
+}
+function setFast(on) { TC.fast = on; $('tcFast').setAttribute('aria-pressed', String(on)); }
+function setZoom(z) { TC.zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z)); $('tcZoom').textContent = `×${TC.zoom}`; TC.dirty = true; }
+
+/* ---------- the cursor, the unit and its range ---------- */
+function setCursor(x, y, L, follow) {
+  const M = ED.M; x = Math.max(0, Math.min(M.S - 1, x)); y = Math.max(0, Math.min(M.S - 1, y));
+  /* a storey with no floor there falls through to the floor or ground below */
+  while (L > 0 && !(M.floors && M.floors[L - 1] && M.floors[L - 1][y * M.S + x])) L--;
+  TC.cursor = { x, y, L }; if (follow) { const [ax, ay] = tileArt(x, y, L); keepInView(ax, ay - 16); }
+  TC.dirty = true; panels();
+}
+function select(k) {
+  TC.sel = k; TC.range = null; TC.dirty = true;
+  if (k >= 0) {
+    const c = ED.M.chars[k]; TC.range = moveRange(ED.M, k, MOVE);
+    if (levelOf(c) > TC.top) setTop(levelOf(c));
+    setCursor(c.x, c.y, levelOf(c)); const [ax, ay] = tileArt(c.x, c.y, levelOf(c)); lookAt(ax, ay - 20);
+  }
+  panels();
+}
+const unitAt = (x, y, L) => (ED.M.chars || []).findIndex(c => c.x === x && c.y === y && levelOf(c) === L);
+/* Enter or a click on (x, y, L): pick up the unit there, or send the picked unit there if it can reach it */
+function act(x, y, L) {
+  if (TC.walk) return;
+  const u = unitAt(x, y, L);
+  if (u >= 0 && u !== TC.sel) { select(u); return; }
+  if (TC.sel < 0) return;
+  if (u === TC.sel) { select(-1); return; }
+  const path = TC.range && routeTo(TC.range, placeId(ED.M, x, y, L));
+  if (path && path.length) startWalk(TC.sel, path); else select(-1);
+}
+function setTop(L) { L = Math.max(0, Math.min(MAX_LEVEL, L)); if (L === TC.top) return; TC.top = L; rebuild(); if (TC.cursor) setCursor(TC.cursor.x, TC.cursor.y, Math.min(TC.cursor.L, L)); panels(); }
+function turn(d) {
+  const keep = TC.cursor; TC.rot = (TC.rot + d + 4) % 4; rebuild();
+  if (keep) { const [ax, ay] = tileArt(keep.x, keep.y, keep.L); lookAt(ax, ay - 16, true); }
+}
+
+/* ---------- status windows ---------- */
+function panels() {
+  const M = ED.M, cur = TC.cursor;
+  if (cur) {
+    const u = cur.y * M.S + cur.x, T = cur.L ? TERRAIN[M.floors[cur.L - 1][u] - 1] : TERRAIN[M.terr[u]], piece = M.objs.find(o => (o.level || 0) === cur.L && cur.x >= o.x && cur.y >= o.y && cur.x < o.x + (o.face % 2 ? ASSET_BY_ID[o.id].d : ASSET_BY_ID[o.id].w) && cur.y < o.y + (o.face % 2 ? ASSET_BY_ID[o.id].w : ASSET_BY_ID[o.id].d));
+    $('tcTile').innerHTML = `<b>${T.label}</b><span>${piece ? ASSET_BY_ID[piece.id].label + ' · ' : ''}h ${M.elev[u]}${cur.L ? ' · ' + LEVEL_NAME(cur.L) : ''}</span><span class="tc-xy">${cur.x}, ${cur.y}</span>`;
+  }
+  const k = TC.sel >= 0 ? TC.sel : cur ? unitAt(cur.x, cur.y, cur.L) : -1, box = $('tcUnit');
+  box.hidden = k < 0;
+  if (k >= 0) {
+    const c = M.chars[k], s = characterById(c.sprite), f = $('tcFace'), fg = f.getContext('2d');
+    fg.clearRect(0, 0, f.width, f.height); fg.imageSmoothingEnabled = false; if (s) fg.drawImage(portrait(s), 0, 0, f.width, f.height);
+    $('tcUnitName').textContent = s ? s.name : c.sprite;
+    $('tcUnitInfo').textContent = `Move ${MOVE} · Jump 1${TC.sel === k ? ' · ready' : ''}`;
+  }
+  $('tcHint').textContent = TC.walk ? 'On the move…' : TC.sel >= 0 ? 'Pick a blue tile to move there · Esc to cancel' : (M.chars || []).length ? 'Click a unit or press Tab to pick one' : 'No one stands on this map: place characters in the editor first';
+}
+
+/* ---------- the frame ---------- */
+let raf = 0;
+function loop(now) {
+  raf = 0; if (!TC.open) return;
+  const dt = Math.min(0.1, (now - (TC.lastT || now)) / 1000); TC.lastT = now;
+  if (TC.walk) {
+    /* The camera rides along the walker's path on the ground, not its hops, and once it has caught up it holds the
+       walker exactly where it is on screen: camera and figure land on the same whole pixel every frame, so neither
+       shakes against the other. A drag lets go of the walker until the next walk. */
+    const w = TC.walk; w.d += dt * WALK_SPEED * (TC.fast ? 2 : 1); const p = walkerPos(w), [X, Y] = viewPoint(S(), TC.rot, p.x, p.y), [ax, ay] = P(X, Y, p.rail);
+    if (!TC.free) {
+      if (TC.locked) { TC.cam.x = ax; TC.cam.y = ay - 20; TC.goal = null; TC.glide = null; }
+      else { lookAt(ax, ay - 20); if (Math.abs(TC.cam.x - ax) < 1.5 && Math.abs(TC.cam.y - (ay - 20)) < 1.5) TC.locked = true; }
+    }
+    if (w.d >= w.pts.length - 1) { TC.walk = null; TC.locked = false; const k = w.k; TC.cam.x = ax; TC.cam.y = ay - 20; select(k); }
+    TC.dirty = true;
+  }
+  if (TC.goal && TC.glide) {
+    const g = TC.glide, [gx, gy] = TC.goal; g.t += dt; const f = Math.min(1, g.t / g.dur), e = ease(f);
+    TC.cam.x = g.from[0] + (gx - g.from[0]) * e; TC.cam.y = g.from[1] + (gy - g.from[1]) * e;
+    if (f >= 1) { TC.cam.x = gx; TC.cam.y = gy; TC.goal = null; TC.glide = null; }
+    TC.dirty = true;
+  }
+  /* water ripples and the cursor's bob tick over a few times a second */
+  const tick = Math.floor(now / 220); if (tick !== TC.tick) { TC.tick = tick; TC.dirty = true; }
+  if (TC.dirty) { TC.dirty = false; paint(); }
+  raf = requestAnimationFrame(loop);
+}
+function paint() {
+  /* While a unit walks the camera sits on whole art pixels, as every sprite does, so the ground and the figure walking
+     across it move together a pixel at a time instead of the figure hopping against a ground that glides. Otherwise
+     it moves by single screen pixels, so a glide is as smooth as the screen allows. */
+  const k = scale(), W2 = cv.width, H2 = cv.height, snap = v => (TC.walk ? Math.round(v) : v);
+  const tx = Math.round(W2 / 2 - snap(TC.cam.x) * k), ty = Math.round(H2 / 2 - snap(TC.cam.y) * k);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const bg = g.createLinearGradient(0, 0, 0, H2); bg.addColorStop(0, '#2c3a3c'); bg.addColorStop(0.55, '#172021'); bg.addColorStop(1, '#0e1414');
+  g.fillStyle = bg; g.fillRect(0, 0, W2, H2);
+  const view = [-tx / k, -ty / k, (W2 - tx) / k, (H2 - ty) / k], M = ED.M, marks = new Map();
+  if (TC.range && !TC.walk) {
+    for (const p of TC.range.values()) if (p.d && p.at[2] <= TC.top) marks.set(toViewU(p.at[0], p.at[1]) + ',' + p.at[2], 'move');
+    const cur = TC.cursor, path = cur && routeTo(TC.range, placeId(M, cur.x, cur.y, cur.L));
+    if (path) for (const [x, y, L] of path) marks.set(toViewU(x, y) + ',' + L, 'route');
+  }
+  let cursor = null;
+  if (TC.cursor && !TC.walk) { const c = TC.cursor, u = toViewU(c.x, c.y); cursor = { u, L: c.L, z: TC.sc.zAt(u, c.L), unit: unitAt(c.x, c.y, c.L) >= 0 }; }
+  TC.figs = figures();
+  const focus = TC.figs.filter(f => f.k === TC.sel || (TC.walk && f.k === TC.walk.k)).map(f => { const [x, y] = P(f.X, f.Y, f.z); return { x, y, key: f.key }; });
+  if (cursor) { const X = cursor.u % S(), Y = (cursor.u / S()) | 0, [x, y] = P(X + 0.5, Y + 0.5, cursor.z); focus.push({ x, y, key: X + Y + 1 }); }
+  drawScene(g, TC.sc, k, tx, ty, view, { frame: TC.tick >> 1, tick: TC.tick >> 1, figs: TC.figs, marks, cursor, focus, ...TC.debug });
+  TC.view = { k, tx, ty };
+}
+const req = () => { TC.dirty = true; if (!raf && TC.open) raf = requestAnimationFrame(loop); };
+
+/* ---------- input ---------- */
+function artAt(e) { const r = cv.getBoundingClientRect(), { k, tx, ty } = TC.view; return [((e.clientX - r.left) * state.dpr - tx) / k, ((e.clientY - r.top) * state.dpr - ty) / k]; }
+/* the place under the pointer: a unit's figure first (front-most), else the tile top */
+function placeAt(e) {
+  const [wx, wy] = artAt(e);
+  for (let i = (TC.figs || []).length - 1; i >= 0; i--) { const f = TC.figs[i]; if (figureHit(f, wx, wy)) { const c = ED.M.chars[f.k]; return [c.x, c.y, levelOf(c)]; } }
+  const hit = pickTile(TC.sc, wx, wy); if (!hit) return null;
+  const t = toModel(hit.u); return [t % S(), (t / S()) | 0, hit.L];
+}
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); TC.drag = { x: e.clientX, y: e.clientY, cam: [TC.cam.x, TC.cam.y], moved: false }; });
+cv.addEventListener('pointermove', e => {
+  const d = TC.drag;
+  if (d) {
+    const k = scale() / state.dpr, dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (d.moved || Math.hypot(dx, dy) > 5) { d.moved = true; TC.goal = null; TC.glide = null; TC.free = !!TC.walk; TC.locked = false; TC.cam.x = d.cam[0] - dx / k; TC.cam.y = d.cam[1] - dy / k; TC.dirty = true; cv.style.cursor = 'grabbing'; }
+    return;
+  }
+  const p = placeAt(e); if (p && (!TC.cursor || p[0] !== TC.cursor.x || p[1] !== TC.cursor.y || p[2] !== TC.cursor.L)) setCursor(p[0], p[1], p[2], false);
+});
+cv.addEventListener('pointerup', e => {
+  const d = TC.drag; TC.drag = null; cv.style.cursor = ''; if (!d || d.moved) return;
+  const p = placeAt(e); if (p) { setCursor(p[0], p[1], p[2], false); act(p[0], p[1], p[2]); }
+});
+cv.addEventListener('wheel', e => { e.preventDefault(); const i = ZOOMS.indexOf(TC.zoom); setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + (e.deltaY < 0 ? 1 : -1)))]); }, { passive: false });
+/* the arrow keys step along the grid as it is seen: up is up-right (view -y), right is down-right (view +x) */
+const STEPS = { ArrowUp: [0, -1], w: [0, -1], ArrowRight: [1, 0], d: [1, 0], ArrowDown: [0, 1], s: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0] };
+function stepCursor([dx, dy]) {
+  const c = TC.cursor || { x: 0, y: 0, L: 0 }, sz = S(), u = toViewU(c.x, c.y), X = Math.max(0, Math.min(sz - 1, u % sz + dx)), Y = Math.max(0, Math.min(sz - 1, ((u / sz) | 0) + dy)), t = TC.sc.back[Y * sz + X];
+  setCursor(t % sz, (t / sz) | 0, c.L, true);
+}
+root.addEventListener('keydown', e => {
+  if (!TC.open) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (STEPS[k]) stepCursor(STEPS[k]);
+  else if (k === 'Enter' || k === ' ') { if (TC.cursor) act(TC.cursor.x, TC.cursor.y, TC.cursor.L); }
+  else if (k === 'Tab') { const n = (ED.M.chars || []).length; if (n) select((TC.sel + (e.shiftKey ? n - 1 : 1)) % n); }
+  else if (k === 'Escape') { if (TC.sel >= 0) select(-1); else closeTactical(); }
+  else if (k === 'q' || k === '[') turn(-1); else if (k === 'e' || k === ']') turn(1);
+  else if (k === '+' || k === '=') setZoom(TC.zoom + 1); else if (k === '-' || k === '_') setZoom(TC.zoom - 1);
+  else if (k === 'f') setFast(!TC.fast);
+  else if (k === 'PageUp') setTop(TC.top + 1); else if (k === 'PageDown') setTop(TC.top - 1);
+  else return;
+  e.preventDefault(); req();
+});
+
+/* ---------- open and close ---------- */
+/* opts (for scene pages and scripts): zoom, a whole number of screen pixels to the art pixel; center, a model tile
+   [x, y] to look at, or 'map' for the middle of the whole map */
+function openTactical(opts = {}) {
+  if (!ED.M) return;
+  TC.open = true; root.hidden = false; TC.rot = ED.rot; TC.top = ED.level; TC.sel = -1; TC.walk = null; TC.range = null; TC.lastT = 0;
+  $('tcName').textContent = ED.M.name;
+  size(); rebuild();
+  /* a comfortable close-up: about a dozen tiles across */
+  setZoom(Math.max(2, Math.min(5, Math.round(TC.cw / (13 * 32)))));
+  const k0 = ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : (ED.M.chars || []).length ? 0 : -1;
+  if (k0 >= 0) { const c = ED.M.chars[k0]; TC.top = Math.max(TC.top, levelOf(c)); rebuild(); select(k0); select(-1); setCursor(c.x, c.y, levelOf(c)); const [ax, ay] = tileArt(c.x, c.y, levelOf(c)); lookAt(ax, ay - 20, true); }
+  else { const b = TC.bounds, m = Math.floor(S() / 2); setCursor(m, m, 0); lookAt((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, true); }
+  if (opts.zoom) setZoom(opts.zoom);
+  if (opts.center === 'map') { const b = TC.bounds; TC.cursor = null; lookAt((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, true); }
+  else if (Array.isArray(opts.center)) { const [x, y] = opts.center; setCursor(x, y, 0); const [ax, ay] = tileArt(x, y, 0); lookAt(ax, ay - 16, true); }
+  panels(); root.focus({ preventScroll: true }); req();
+}
+function closeTactical() { if (!TC.open) return; TC.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TC.walk = null; $('edCanvas').focus({ preventScroll: true }); }
+
+$('tcBack').addEventListener('click', closeTactical);
+$('tcRotL').addEventListener('click', () => { turn(-1); req(); }); $('tcRotR').addEventListener('click', () => { turn(1); req(); });
+$('tcFast').addEventListener('click', () => setFast(!TC.fast));
+$('tcIn').addEventListener('click', () => { setZoom(TC.zoom + 1); req(); }); $('tcOut').addEventListener('click', () => { setZoom(TC.zoom - 1); req(); });
+$('edTactical').addEventListener('click', () => openTactical());
+$('editor').addEventListener('keydown', e => { if (ED.open && !TC.open && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTactical(); } });
+new ResizeObserver(() => { if (TC.open) { size(); req(); } }).observe(root);
+/* test hook: the camera, cursor and units as the view has them */
+window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, select, setCursor, turn };
+
+export { closeTactical, openTactical };

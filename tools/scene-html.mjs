@@ -9,8 +9,13 @@
    step, at most one height level of climb, storeys changing only on stairs). Results land in
    window.__sceneResults for scripted browsers. Clicking a check replays that walk on screen.
 
-   Checks file: { title, about, checks: [{ name, who: sprite id, start?: {x, y, level}, edits?: [batch ops],
-   to: {x, y, level}, expect: 'reach' | 'blocked', storeys?: ['0->1', ...], heights?: '0123', minSteps?, via?: [[x, y]] }] } */
+   Checks file: { title, about, view?, tactical?, checks: [{ name, who: sprite id, start?: {x, y, level},
+   edits?: [batch ops], to: {x, y, level}, expect: 'reach' | 'blocked', storeys?: ['0->1', ...], heights?: '0123',
+   minSteps?, via?: [[x, y]] }] }. A scene with nothing to check can name its file <name>.scene.json instead.
+
+   Every scene page has the tile editor and the tactical view, and the panel switches between them. view:
+   'tactical' opens the page in the tactical view, with tactical: { zoom, center: [x, y] | 'map' } setting its
+   camera; edits made in the editor show in the tactical view when it is opened again. */
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -22,8 +27,8 @@ const [mapPath, outArg] = process.argv.slice(2);
 if (!mapPath) { console.error('usage: node tools/scene-html.mjs <map.json> [out.html]'); process.exit(1); }
 const map = JSON.parse(readFileSync(mapPath, 'utf8'));
 if (map.format !== 'hexwright-tiles') { console.error(`${mapPath} is not a hexwright-tiles map`); process.exit(1); }
-const checksPath = mapPath.replace(/\.json$/, '.checks.json');
-const suite = existsSync(checksPath) ? JSON.parse(readFileSync(checksPath, 'utf8')) : { checks: [] };
+const checksPath = [mapPath.replace(/\.json$/, '.checks.json'), mapPath.replace(/\.json$/, '.scene.json')].find(p => existsSync(p)) || '';
+const suite = checksPath ? JSON.parse(readFileSync(checksPath, 'utf8')) : { checks: [] };
 const out = resolve(outArg || join(root, 'scenes', basename(mapPath).replace(/\.json$/, '.html')));
 
 /* build into a scratch folder, then inline the stylesheet and the script into the page */
@@ -43,7 +48,7 @@ rmSync(dist, { recursive: true, force: true });
 /* the scene and the runner, after the app */
 const title = suite.title || map.name || 'Hexwright scene';
 html = html.replace(/<title>[^<]*<\/title>/, `<title>${title.replace(/</g, '&lt;')} · Hexwright</title>`);
-const data = safe(JSON.stringify({ title, about: suite.about || '', map, checks: suite.checks || [] }));
+const data = safe(JSON.stringify({ title, about: suite.about || '', map, checks: suite.checks || [], view: suite.view || 'editor', tactical: suite.tactical || {} }));
 html = html.replace('</body>', `<script>window.__HEXWRIGHT_SCENE__ = ${data};</script>\n<script type="module">\n${safe(RUNNER())}\n</script>\n</body>`);
 writeFileSync(out, html);
 console.log(`wrote ${out} (${(html.length / 1024).toFixed(0)} KB, ${(suite.checks || []).length} checks)`);
@@ -56,22 +61,29 @@ const h = await ready();
 
 /* ---------- the panel ---------- */
 const css = document.createElement('style');
-css.textContent = '.scene-panel{position:fixed;z-index:60;top:72px;right:16px;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 100px);overflow:auto;background:rgba(18,24,25,.94);color:#efe6cf;border:1px solid #4a4a3c;border-radius:6px;font:13px/1.4 "Alegreya Sans",system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.4)}'
+css.textContent = '.scene-panel{position:fixed;z-index:60;top:84px;left:28px;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 200px);overflow:auto;background:rgba(18,24,25,.94);color:#efe6cf;border:1px solid #4a4a3c;border-radius:6px;font:13px/1.4 "Alegreya Sans",system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.4)}'
   + '.scene-panel header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #3a3a30;position:sticky;top:0;background:rgba(18,24,25,.98)}'
   + '.scene-panel h2{margin:0;font:600 14px "Alegreya Sans SC",system-ui,sans-serif;letter-spacing:.06em;color:#e4c684;flex:1}'
   + '.scene-panel button{font:inherit;font-size:12px;color:#efe6cf;background:#2a2e2a;border:1px solid #4a4a3c;border-radius:12px;padding:3px 10px;cursor:pointer}.scene-panel button:hover{border-color:#e4c684}'
   + '.scene-panel .sum{padding:8px 12px 4px;color:#cfc4a8}.scene-panel .sum b{color:#efe6cf}.scene-panel .about{padding:0 12px 8px;color:#a59c86;font-size:12px}'
   + '.scene-panel ol{list-style:none;margin:0;padding:0 6px 8px}.scene-panel li{padding:7px 8px;border-radius:4px;cursor:pointer;display:grid;grid-template-columns:18px 1fr;gap:2px 6px}.scene-panel li:hover{background:#262b28}'
   + '.scene-panel .mark{font-weight:700}.scene-panel .ok .mark{color:#9fc27a}.scene-panel .bad .mark{color:#e07a5f}.scene-panel .run .mark{color:#a59c86}'
-  + '.scene-panel .detail{grid-column:2;color:#a59c86;font-size:12px}.scene-panel .bad .detail{color:#e0a08a}.scene-panel.min ol,.scene-panel.min .about{display:none}';
+  + '.scene-panel .detail{grid-column:2;color:#a59c86;font-size:12px}.scene-panel .bad .detail{color:#e0a08a}.scene-panel.min ol,.scene-panel.min .about,.scene-panel.min .sum{display:none}';
 document.head.appendChild(css);
 const panel = document.createElement('section'); panel.className = 'scene-panel'; panel.setAttribute('aria-label', 'Scene checks');
-panel.innerHTML = '<header><h2></h2><button data-a="rerun" title="Run every check again">Re-run</button><button data-a="min" title="Fold the list">–</button></header><div class="sum"></div><div class="about"></div><ol></ol>';
+panel.innerHTML = '<header><h2></h2><button data-a="editor" title="Edit the scene in the tile editor">Editor</button><button data-a="tactical" title="Look at the scene in the tactical view (T in the editor)">Tactical</button><button data-a="rerun" title="Run every check again">Re-run</button><button data-a="min" title="Fold the list">–</button></header><div class="sum"></div><div class="about"></div><ol></ol>';
 panel.querySelector('h2').textContent = S.title; panel.querySelector('.about').textContent = S.about + (S.checks.length ? ' Click a check to watch that walk.' : '');
 document.body.appendChild(panel);
 const list = panel.querySelector('ol'), sum = panel.querySelector('.sum');
 panel.querySelector('[data-a=min]').onclick = () => panel.classList.toggle('min');
 panel.querySelector('[data-a=rerun]').onclick = () => runAll();
+if (!S.checks.length) panel.querySelector('[data-a=rerun]').hidden = true;
+/* the editor and the tactical view of the same map: what is edited in one shows in the other */
+const T = () => window.__tactical;
+const tactical = () => { if (T().isOpen()) T().close(); T().open(S.tactical); };
+/* in the editor the panel folds to its header, out of the way of the map */
+panel.querySelector('[data-a=editor]').onclick = () => { if (T() && T().isOpen()) T().close(); panel.classList.add('min'); };
+panel.querySelector('[data-a=tactical]').onclick = () => { tactical(); panel.classList.remove('min'); };
 
 /* ---------- running a check ---------- */
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -139,6 +151,7 @@ async function watch(c) {
   await h.call('walkCharacter', { index: who.index, to: c.to });
 }
 window.__sceneRun = runAll;
-if (S.checks.length) await runAll(); else { sum.textContent = 'No checks for this scene.'; await show(S.map); }
+if (S.checks.length) await runAll(); else { sum.textContent = S.view === 'tactical' ? 'Editor: edit the scene. Tactical: look at it in the tactical view.' : 'No checks for this scene.'; await show(S.map); }
+if (S.view === 'tactical') tactical();
 `;
 }

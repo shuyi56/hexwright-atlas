@@ -136,4 +136,4 @@ function buildWalk(roster = ROSTER, k = 3) {
   return { width: w, height: h, frames };
 }
 
-export { FACINGS, buildSheet, buildWalk };
+export { C, FACINGS, buildSheet, buildWalk, canvas };

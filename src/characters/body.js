@@ -11,9 +11,9 @@ import { cellsToPart } from './pixels.js';
 const BASE = 46, CX = 16;
 const BODY_TYPES = {
   slim: { name: 'Slim', torso: 12, legs: 13, shoulder: 10, chest: 10, waist: 8, hem: 10, legW: 3, arm: 2, hand: 2 },
-  standard: { name: 'Standard', torso: 12, legs: 12, shoulder: 12, chest: 12, waist: 10, hem: 12, legW: 4, arm: 3, hand: 3 },
+  standard: { name: 'Standard', torso: 12, legs: 12, shoulder: 12, chest: 12, waist: 10, hem: 12, legW: 4, arm: 3, hand: 3, smooth: true },
   stocky: { name: 'Stocky', torso: 12, legs: 9, shoulder: 14, chest: 14, waist: 13, hem: 14, legW: 5, arm: 4, hand: 3 },
-  tall: { name: 'Tall', torso: 14, legs: 15, shoulder: 13, chest: 13, waist: 11, hem: 13, legW: 4, arm: 3, hand: 3 } };
+  tall: { name: 'Tall', torso: 14, legs: 15, shoulder: 13, chest: 13, waist: 11, hem: 13, legW: 4, arm: 3, hand: 3, smooth: true } };
 /* where the landmarks fell on the layout the hand-drawn parts were authored against; a part hung on a
    landmark moves by however far that landmark is from here */
 const REF = { head: [9, 4], neck: [16, 18], shoulderNear: [21, 18], shoulderFar: [10, 18], handNear: [22, 28], handFar: [9, 28] };
@@ -30,19 +30,23 @@ function profile(bt) {
    An arm hangs from a fixed shoulder: a rounded cap, the upper arm overlapping the body's edge by a column, an
    elbow where it steps a pixel further out, the forearm, a cuff and a fist. In a stride it swings from the
    shoulder like a pendulum, against the leg on its side: the leading arm leans forward (toward the facing) until
-   its hand is three pixels ahead and two rows up, the trailing arm leans back until its hand is two pixels
-   behind and a row up. Forward on screen is left in the front view and right in the back view, so in front the
+   its hand is four pixels ahead and three rows up, the trailing arm leans back until its hand is three pixels
+   behind and two rows up; a hand stops CLEAR pixels short of the frame's side, so a blade held out beyond it
+   stays in frame. Forward on screen is left in the front view and right in the back view, so in front the
    leading near arm crosses before the body. A far arm swinging in behind the body moves only a pixel: it is
    turning away from the viewer, and it keeps what it holds in sight. */
-const SWING = { fwd: [3, 2], back: [-2, 1] };                                   /* [hand reach toward the facing, rows it rises] */
+const SWING = { fwd: [4, 3], back: [-3, 2] }, CLEAR = 3, W_FRAME = 32;
+const SPLAY = 2;                                   /* [hand reach toward the facing, rows it rises] */
 function armPlan(bt, view, pose, side, steady) {
   const { rows } = profile(bt), w = bt.arm, s = side === 'near' ? 1 : -1, dir = view === 'front' ? -1 : 1;
   /* a hand carrying a staff or polearm keeps it upright: that arm rides with the body but does not swing */
   if (steady && side === (view === 'front' ? 'far' : 'near')) pose = 0;
   const edge = s > 0 ? rows[2][1] : rows[2][0];
   const fwd = pose && (pose === 1) === (side === 'near'), [reach, rise] = !pose ? [0, 0] : SWING[fwd ? 'fwd' : 'back'];
-  const sx = s < 0 && reach * dir > 0 ? 1 : reach * dir;
   const upper = s > 0 ? edge : edge - w + 1, lower = upper + s;                 /* left column of each section */
+  /* a swinging hand stops CLEAR pixels short of the frame's side, leaving room for a blade held out beyond it */
+  let sx = s < 0 && reach * dir > 0 ? 1 : reach * dir;
+  sx = Math.max(CLEAR - lower, Math.min(W_FRAME - 1 - CLEAR - (lower + w - 1), sx));
   const cuff = bt.torso - 4 - rise;
   /* how far row j has leaned: nothing at the shoulder cap, the full reach at the cuff */
   const lean = j => (j < 1 ? 0 : Math.round(sx * j / cuff));
@@ -52,8 +56,15 @@ function armPart(bt, view, pose, side, top, o = {}) {
   const sl = o.sleeves || {}, sleeve = sl.A || 'A', cuffL = sl.C || 'C', skin = o.hands || 'K';
   const a = armPlan(bt, view, pose, side, o.steady), cells = [];
   const put = (x, y, ch) => cells.push([x, y, ch]);
+  /* A smooth arm (bt.smooth) hangs at a gentle angle instead of stepping out at the elbow: it leaves the shoulder
+     against the body and moves a pixel outward at even intervals, SPLAY pixels by the wrist (one while it swings,
+     since the swing carries it out already), so its edges run as
+     straight lines and the gap under the arm opens gradually. Its cuff is the forearm's own width and the fist
+     sits centred under it. */
+  const spread = a.sx ? 1 : SPLAY, splay = j => (bt.smooth ? Math.round((j * spread) / a.cuff) : j >= 5 ? 1 : 0);
+  let cuffX = a.lower;
   for (let j = 0; j <= a.cuff; j++) {
-    const elbow = j >= 5, x0 = (elbow ? a.lower : a.upper) + a.lean(j);
+    const x0 = a.upper + a.s * splay(j) + a.lean(j); if (j === a.cuff) cuffX = x0 - a.lean(j);
     let n = j === 0 ? a.w - 1 : a.w, from = j === 0 && a.s < 0 ? x0 + 1 : x0;
     /* a bell sleeve widens below the elbow: a pixel outward over the forearm, and both ways at its mouth */
     if (sl.bell && j >= a.cuff - 2) { n++; if (a.s < 0) from--; }
@@ -65,11 +76,15 @@ function armPart(bt, view, pose, side, top, o = {}) {
       put(x, top + j, j === a.cuff ? cuffL : inner && j > 0 && j < 5 ? sleeve.toLowerCase() : sleeve);
     }
     /* and a spike stands out from the elbow, pointing out and up */
-    if (sl.spike && j === 5) { const out = a.s > 0 ? from + n : from - 1; put(out, top + j, sleeve); put(out + a.s, top + j - 1, sleeve); }
+    if (sl.spike && j === 5) {
+      const out = a.s > 0 ? from + n : from - 1; put(out, top + j, sleeve); put(out + a.s, top + j - 1, sleeve);
+      /* on a smooth arm there is no step at the elbow for the spike to stand from, so it runs a pixel further out */
+      if (bt.smooth) put(out + 2 * a.s, top + j - 2, sleeve);
+    }
   }
   /* the fist, its thumb on the side the figure faces */
-  const hw = Math.max(a.hand, 2), hx = a.lower + a.sx + Math.floor((a.w - hw) / 2), hy = top + a.cuff + 1;
-  const fist = hw === 2 ? ['KK', 'KK', a.dir < 0 ? 'K.' : '.K'] : ['KKK', 'KKK', a.dir < 0 ? 'KK.' : '.KK'];
+  const hw = Math.max(a.hand, 2), hx = (bt.smooth ? cuffX : a.lower) + a.sx + Math.floor((a.w - hw) / 2), hy = top + a.cuff + 1;
+  const fist = hw === 2 ? ['KK', 'KK', a.dir < 0 ? 'K.' : '.K'] : bt.smooth ? ['KKK', 'KKK', '.K.'] : ['KKK', 'KKK', a.dir < 0 ? 'KK.' : '.KK'];
   const fistCells = [];
   fist.forEach((r, j) => [...r].forEach((c, i) => { if (c !== '.') fistCells.push([hx + i, hy + j, j === 2 ? skin.toLowerCase() : skin]); }));
   return { cells: cells.concat(fistCells), fist: fistCells, hand: [hx + Math.floor(hw / 2), hy + 1] };
@@ -189,16 +204,16 @@ function torsoCells(bt, view, top, o = {}) {
     for (let x = l; x <= r; x++) {
       let ch = style(j, x, { T, belt, front });
       if (o.skirt && j === T - 1 && ch === 'C') ch = 'A';                     /* the trim moves down to the skirt's hem */
-      /* a leather vest left open down the front, a solid back from behind */
-      if (o.vest && j < belt && ch !== 'L' && (!front || x < fc - 1 || x > fc + 2 || j > 2 && (x < fc || x > fc + 1))) ch = 'D';
+      /* a vest, buttoned up: the shirt shows only in a V at the collar; a solid back from behind */
+      if (o.vest && j < belt && ch !== 'L' && (!front || j > 1 || x < fc || x > fc + 1) && (!front || j > 0 || x < fc - 1 || x > fc + 2)) ch = 'D';
       /* a strap from one shoulder across to the other hip */
       if (o.strap && j < belt && x === ((o.strap > 0) === front ? cl + 1 + j : cr - 1 - j)) ch = 'L';
-      /* bib-and-brace overalls (D): two braces over the shoulders, buckled to a bib on the chest with a pocket,
-         and the trousers' top from the waist down; from behind, the braces down the back */
+      /* bib-and-brace overalls (D): two broad braces over the shoulders into a plain bib on the chest, and the
+         trousers' top from the waist down; from behind, the braces down the back */
       if (o.bib) {
-        const brace = x === fc - 2 || x === fc + 3;
+        const brace = x === fc - 2 || x === fc - 1 || x === fc + 2 || x === fc + 3;
         if (j >= belt) ch = 'D';
-        else if (front ? (j < 2 ? brace : x >= fc - 2 && x <= fc + 3) : brace) ch = front && j === 2 && brace ? 'G' : front && j === 4 && x >= fc && x <= fc + 1 ? 'd' : 'D';
+        else if (front ? (j < 2 ? brace : x >= fc - 2 && x <= fc + 3) : brace) ch = 'D';
       }
       /* a rope girdle tied round a gown at the waist (L), knotted (G) in front where its end hangs */
       if (o.girdle && j === belt) ch = front && x === fc - 1 ? 'G' : 'L';

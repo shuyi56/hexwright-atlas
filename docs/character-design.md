@@ -18,8 +18,8 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 
 | Townsfolk | Read at a glance by |
 | --- | --- |
-| Villager (standard) | Short brown hair, a cream linen shirt under an open green vest, tan trousers. |
-| Farmer (stocky) | A straw hat with a flat crown and a red band, a green shirt, blue bib-and-brace overalls with buckled braces and a pocket. |
+| Villager (standard) | Short brown hair, a cream linen shirt under a green vest buttoned to a V at the collar, tan trousers. |
+| Farmer (stocky) | A straw hat with a flat crown and a red band, a green shirt, blue bib-and-brace overalls on broad braces. |
 | Guard (standard) | A kettle helm with a comb and a turned-down brim, a steel breastplate over a red tunic, mail sleeves, a spear and a red cape. |
 | Merchant (stocky) | White hair and a full white beard falling to a point, a long blue robe edged in gold, a satchel on a strap. |
 | Monk (standard) | A deep plain cowl with the face in its shadow, a capelet over the shoulders, a robe of undyed wool to the floor with bell sleeves, tied with a rope whose end hangs. |
@@ -78,6 +78,14 @@ Four builds, set by a handful of measurements in `body.js` (`BODY_TYPES`):
 
 ## Arms
 
+The standard and tall builds' arms are smooth (`smooth` in `BODY_TYPES`). Rather than hanging straight and stepping a
+pixel outward at the elbow, a smooth arm leaves the shoulder against the body and angles outward a pixel at even
+intervals, two pixels by the wrist (one while it swings in a stride, since the swing carries it out already),
+so its edges run as straight lines and the gap under the arm opens gradually.
+Its cuff is the forearm's own width and the fist hangs centred under it, its knuckles rounded. The step and the
+fist set off to one side made the old arm look squiggly, most of all once the tactical view shrinks a figure.
+A dragoon's elbow spike runs a pixel further out from a smooth arm, since there is no step for it to stand from.
+
 - **Shape.** Each arm hangs from a fixed shoulder: a rounded cap, the upper arm overlapping the torso's edge by
   one column, an elbow where it steps a pixel further out, the forearm, a cuff and a fist. The fist's thumb is
   on the side the figure faces. A slim build has two-pixel arms and fists.
@@ -94,9 +102,11 @@ on its side: in the first stride the far leg steps forward and the near arm lead
 round.
 
 - **Leading arm.** It leans forward, toward the facing, a little more each row from the shoulder cap down, until its
-  hand is three pixels ahead and two rows up: the arm rises as it leaves the vertical, and its hand rises even
+  hand is four pixels ahead and three rows up: the arm rises as it leaves the vertical, and its hand rises even
   though the body drops.
-- **Trailing arm.** It leans back until its hand is two pixels behind and a row up.
+- **Trailing arm.** It leans back until its hand is three pixels behind and two rows up.
+- **Room at the frame's sides.** A swinging hand stops three pixels short of the frame's side, so a sword or
+  dagger held out beyond it stays in the frame; only the stocky and tall builds' swords ever meet that limit.
 - **In three-quarter view.** Forward is left on screen in the front view and right from behind. So in front the
   leading near arm crosses before the body, and on the next stride the near arm swings out behind while the far arm
   swings out ahead. A far arm swinging in behind the body moves only a pixel, since it is turning away from the
@@ -236,11 +246,13 @@ shoulders (the mantle slot, drawn over the arms, so the arms come out from under
 ## The townsfolk
 
 The townsfolk (`townsfolk.js`) are the seven people of the first, hand-painted character style, redrawn in this one
-with the same clothes, colours and props. Each is a spec: the same choices and colours the character maker offers
+with the same clothes, colours and props. Their clothes are kept to a few solid shapes, as the jobs' are, so they
+stay smooth at the tactical view's size: a vest buttoned up to a V at the collar rather than open down the chest,
+overalls as a plain bib on broad braces rather than thin straps, buckles and a pocket. Each is a spec: the same choices and colours the character maker offers
 (below), so they are drawn like the jobs and the maker can start from any of them.
 
-- **Hats.** The farmer's straw hat has a flat crown, a red band and a broad brim, with its weave picked out in
-  creases. The guard's kettle helm is a round steel crown with a comb along its top and a broad brim turned down
+- **Hats.** The farmer's straw hat has a flat crown, a red band and a broad brim, in solid shapes with a shadow
+  under the brim. The guard's kettle helm is a round steel crown with a comb along its top and a broad brim turned down
   all round. The noble lady's circlet is a gold band round the brow with a jewel in front.
 - **The merchant's beard.** A moustache over the mouth and sideburns joining the hair, then a full beard falling in
   locks to a point on the chest. His mouth still shows.
