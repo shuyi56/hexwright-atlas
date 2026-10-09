@@ -258,7 +258,7 @@ function paint() {
   const k = scale(), W2 = cv.width, H2 = cv.height, snap = v => (TC.walk ? Math.round(v) : v);
   const tx = Math.round(W2 / 2 - snap(TC.cam.x) * k), ty = Math.round(H2 / 2 - snap(TC.cam.y) * k);
   g.setTransform(1, 0, 0, 1, 0, 0);
-  const bg = g.createLinearGradient(0, 0, 0, H2); bg.addColorStop(0, '#3a4430'); bg.addColorStop(0.55, '#262b1f'); bg.addColorStop(1, '#1b1d15');
+  const bg = g.createLinearGradient(0, 0, 0, H2); bg.addColorStop(0, '#2c3a3c'); bg.addColorStop(0.55, '#172021'); bg.addColorStop(1, '#0e1414');
   g.fillStyle = bg; g.fillRect(0, 0, W2, H2);
   const view = [-tx / k, -ty / k, (W2 - tx) / k, (H2 - ty) / k], M = ED.M, marks = new Map();
   if (TC.range && !TC.walk) {
