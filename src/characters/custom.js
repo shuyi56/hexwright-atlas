@@ -1,5 +1,5 @@
 import { BANDANA, BEARD, CAPELET, CIRCLET, COWL, COWL_POINT, FEATHER_CAP, KETTLE_HELM, STRAW_HAT, WIZARD_HAT } from './hats.js';
-import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, KITE, SKIN, SWORD, recolor, staff } from './parts.js';
+import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, KITE, SKIN, SWORD, recolor, staff } from './parts.js';
 
 /* ================= character sprites: characters made from choices =================
    A spec is a character described by a handful of choices (a build, clothes, sleeves, hair, a hat, a beard, a
@@ -16,7 +16,7 @@ const CHOICES = {
   cut: [['plain', 'Plain'], ['bell', 'Bell']],
   neckline: [['high', 'High'], ['square', 'Square']],
   rope: [['none', 'None'], ['rope', 'Rope belt']],
-  hair: [['short', 'Short'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['bun', 'Low bun'], ['braid', 'Braid']],
+  hair: [['short', 'Short'], ['tousled', 'Tousled'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['bun', 'Low bun'], ['braid', 'Braid']],
   hat: [['none', 'None'], ['straw', 'Straw hat'], ['kettle', 'Kettle helm'], ['circlet', 'Circlet'], ['cowl', 'Cowl'], ['cap', 'Feathered cap'], ['bandana', 'Bandana'], ['wizard', 'Wizard hat']],
   beard: [['none', 'None'], ['full', 'Full beard']],
   cape: [['none', 'None'], ['cape', 'Cape'], ['dagged', 'Dagged cape']],
@@ -47,7 +47,7 @@ const SWATCHES = [
   '#a6533b', '#b8483a', '#a84a3c', '#c27458', '#b0614a', '#8fa462', '#6c8549', '#356a52', '#a6b878',
   '#7f9cb4', '#6f8faa', '#8297b0', '#56688f', '#66727e', '#a898b8', '#8a7a9a', '#c4c8c6', '#3f3a3d'];
 
-const HAIRS = { short: HAIR_SHORT, long: HAIR_LONG, ponytail: HAIR_PONYTAIL, bun: HAIR_BUN, braid: HAIR_BRAID };
+const HAIRS = { short: HAIR_SHORT, tousled: HAIR_TOUSLED, long: HAIR_LONG, ponytail: HAIR_PONYTAIL, bun: HAIR_BUN, braid: HAIR_BRAID };
 /* a hat for each view; the cowl brings its capelet, and from behind its point */
 const HATS = {
   straw: { front: { hat: STRAW_HAT }, back: { hat: STRAW_HAT } },

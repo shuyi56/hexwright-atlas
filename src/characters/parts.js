@@ -89,6 +89,38 @@ const HAIR_SHORT = {
     '..HQHHQHHQH..H..',
     '...HHH.HHH......',
     '....HH..HH......'] } };
+/* a tousled crop: tufts standing up off the crown so the head's outline is broken rather than a smooth dome, a
+   ragged fringe falling in uneven points, cut shorter at the side so more of the ear and jaw show, and a short
+   jagged nape behind */
+const HAIR_TOUSLED = {
+  front: { x: 8, y: 1, rows: [
+    '...H...HH..H....',
+    '...HH.HHHHHHH...',
+    '..HHHHHIIHHHHH..',
+    '..HHIIHHHHHHQHH.',
+    '.HHIHHHHQHHHHQHH',
+    '.HHHHQHHHHQHHHQH',
+    '.HQHHHHQHHHHQHQH',
+    'HHHHQHHHHHQHHHHH',
+    'HQ.HHH.HHQ.HHQHH',
+    'H...H...H..HHHH.',
+    '...........HQHH.',
+    '............HH..',
+    '............H...'] },
+  back: { x: 8, y: 1, rows: [
+    '...H...HH..H....',
+    '...HH.HHHHHHH...',
+    '..HHHHIIIIHHHH..',
+    '..HIIHHHHQHHHHH.',
+    '.HHHHHHHQHHHQHHH',
+    '.HHHQHHQHHHQHHHH',
+    '.HHQHHHQHHHQHHHH',
+    '.HQHHHQHHHHHQHHH',
+    '.HQHHHQHHHQHHHHH',
+    '.HHHHHHHHHHHHHH.',
+    '.HQHHHQHHHQHHHH.',
+    '..HQH.HQHH.HQH..',
+    '..H....H....H...'] } };
 const HAIR_LONG = {
   front: { x: 8, y: 1, rows: [
     '......HHHH......',
@@ -351,4 +383,4 @@ function recolor(part, map) {
   const sw = ch => { const up = ch.toUpperCase(), to = map[up]; return to ? (ch === up ? to : to.toLowerCase()) : ch; };
   return { ...part, rows: part.rows.map(r => [...r].map(sw).join('')) };
 }
-export { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, flipPart, recolor, staff };
+export { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, flipPart, recolor, staff };

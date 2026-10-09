@@ -299,7 +299,7 @@ test('every face shows both whole eyes, whatever hair, headgear or weapon is bes
   }
 });
 test('hair is drawn in locks with strand lines and a sheen, front and back', () => {
-  for (const hair of [parts.HAIR_SHORT, parts.HAIR_LONG, parts.HAIR_BUN, parts.HAIR_PONYTAIL, parts.HAIR_BRAID]) for (const v of VIEWS) {
+  for (const hair of [parts.HAIR_SHORT, parts.HAIR_TOUSLED, parts.HAIR_LONG, parts.HAIR_BUN, parts.HAIR_PONYTAIL, parts.HAIR_BRAID]) for (const v of VIEWS) {
     const all = hair[v].rows.join('');
     assert.ok((all.match(/Q/g) || []).length >= 10 && (all.match(/I/g) || []).length >= 4, v);
   }

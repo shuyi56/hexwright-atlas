@@ -19,7 +19,7 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 | Townsfolk | Read at a glance by |
 | --- | --- |
 | Villager (standard) | Short brown hair, an open green waistcoat falling to points over an oatmeal linen shirt laced at the throat and gathered at the cuffs, tan trousers bloused over the boots. |
-| Farmer (standard) | Bareheaded with short brown hair, a green shirt rolled to the elbow, blue overalls with a pocketed bib buckled to braces that cross on his back, turned up over the boots. |
+| Farmer (standard) | Bareheaded, sandy hair in a tousled crop with tufts standing up off the crown, a green shirt rolled to the elbow, blue overalls with a pocketed bib buckled to braces that cross on his back, turned up over the boots. |
 | Guard (standard) | A kettle helm with a comb and a turned-down brim, a steel breastplate over a red tunic, mail sleeves, a spear and a red cape. |
 | Merchant (stocky) | Ash-grey hair and a full grey beard falling to a point, a long blue coat with a gold shawl collar and gold-faced edges, open over a russet under-robe, a sash knotted at the hip, bell sleeves, a satchel on a strap. |
 | Monk (standard) | A deep plain cowl with the face in its shadow, a capelet over the shoulders, a robe of undyed wool to the floor with bell sleeves, tied with a rope whose end hangs. |
@@ -205,10 +205,12 @@ the line.
 
 ## Hair
 
-Five hairstyles, all drawn in locks, front and back:
+Six hairstyles, all drawn in locks, front and back:
 
-- **Short** (villager, farmer, guard, merchant, monk, squire, knight, thief, dragoon, white mage): a crown, a
+- **Short** (villager, guard, merchant, monk, squire, knight, thief, dragoon, white mage): a crown, a
   pointed fringe and points at the nape.
+- **Tousled** (farmer): a crop with tufts standing up off the crown, breaking the head's round outline, a ragged
+  fringe in uneven points, cut shorter at the side so more of the ear and jaw show, and a short jagged nape.
 - **Long** (healer, summoner): falls behind the shoulders in vertical locks, its near lock beside the cheek.
 - **Braid** (noble lady): the crown and fringe of long hair. In front the far side is tucked behind the ear and the
   near side is gathered into a braid over the near shoulder and down the chest. From behind every strand is drawn
@@ -343,7 +345,7 @@ the same material in a crease: a fold, a seam, the line between two plates.
 - **Body.** `body.js` cuts the torso (tunic, plate, robe, gown or the dragoon's cuirass), arms, legs (trousers,
   greaves, or a robe or gown skirt) and cloak (plain or dagged) for the build and pose, and reports the
   landmarks. A garment (`garments.js`: vest, overalls, coat) brings its own torso, legs and outer piece instead.
-- **Shared parts.** `parts.js` holds the head, the five hairstyles, the skin tones and the gear: sword, dagger,
+- **Shared parts.** `parts.js` holds the head, the six hairstyles, the skin tones and the gear: sword, dagger,
   lance, bow and a `staff()` maker for spears and staves, a kite shield and a buckler. `recolor()` swaps letters.
 - **Characters.** `roster.js` (the jobs) and the specs (`custom.js`, the townsfolk and made characters, wearing
   `hats.js`) give each character a build, an outfit (torso and leg
