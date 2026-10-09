@@ -10,7 +10,9 @@ The **Tile editor** button opens an isometric workbench built on the same tile s
 districts. Paint 34 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
 turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
 builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
-fenland, ashlands). On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
+fenland, ashlands). The land is kept calm: the main ground covers most of it with the others in a few broad patches,
+heights rise in wide terraces, ponds, islets, plateaus and patches of only a few tiles are smoothed away, water
+deepens with distance from the shore, and woods gather in groves with only the odd tree in the open. On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
 generated from the atlas: its biome blended into its neighbours', coast or lake shore on the sides that touch
 water, rivers and roads crossing the same sides as on the map, farmland, and the village, town, keep, ruin or
 other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter

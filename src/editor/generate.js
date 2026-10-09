@@ -41,7 +41,8 @@ function generateScene(seed, S, biome = 'vale') {
   const sc = 3.2 / S;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const dc = Math.hypot(x - c, y - c) / (S / 2);
-    let h = fbm(nz, x * sc, y * sc, 3) * 0.9 + fbm(nz2, x * sc * 2.5 + 40, y * sc * 2.5, 2) * 0.12;
+    /* broad, smooth land: two slow octaves, no fine ripple, so heights come in wide terraces */
+    let h = fbm(nz, x * sc * 0.8, y * sc * 0.8, 2);
     if (B.island) h += 0.45 - dc * dc * 0.9;
     if (B.oasis) h += Math.max(0, dc - 0.2) * 0.3;
     H[id(x, y)] = h;
@@ -54,11 +55,12 @@ function generateScene(seed, S, biome = 'vale') {
   }
   for (let u = 0; u < NN; u++) {
     const x = u % S, y = (u / S) | 0, h = H[u], rv = riverD[u];
-    const lvl = Math.max(0, Math.min(MAX_ELEV - 2, Math.floor((h - B.wl) * (B.relief || 4.5))));
+    const lvl = Math.max(0, Math.min(MAX_ELEV - 2, Math.floor((h - B.wl) * (B.relief || 4.5) * 0.65)));
     if (h < B.wl || rv < 1.3) { wet[u] = 1; M.elev[u] = 0; M.terr[u] = TI[h < B.wl - 0.18 || rv < 0.6 ? B.deep : B.water]; continue; }
     M.elev[u] = rv < 4 ? Math.min(lvl, Math.floor((rv - 1.3) / 1.2)) : lvl;
-    const n2 = nz2(x / 5, y / 5), n3 = nz3(x / 3.5, y / 3.5);
-    let t = M.elev[u] >= (B.peak || 3) ? B.high[Math.floor((n3 + 1) * 1.5) % B.high.length] : B.ground[Math.floor((n2 + 1) * 2) % B.ground.length];
+    /* the main ground covers most of the land; the others lie in a few broad patches of it */
+    const n2 = nz2(x / 11, y / 11), n3 = nz3(x / 9, y / 9), gi = n2 < 0.15 ? 0 : n2 < 0.35 ? 1 : n2 < 0.55 ? 2 : 3;
+    let t = M.elev[u] >= (B.peak || 3) ? B.high[n3 < 0 ? 0 : n3 < 0.4 ? 1 % B.high.length : 2 % B.high.length] : B.ground[gi % B.ground.length];
     if (h < B.wl + 0.06 || rv < 2.2) t = B.beach && h < B.wl + 0.03 ? B.beach : B.shore;
     M.terr[u] = TI[t];
   }
@@ -71,10 +73,35 @@ function generateScene(seed, S, biome = 'vale') {
       nb.sort((a, b) => a - b); M.elev[u] = nb[nb.length >> 1];
     }
   }
-  for (let u = 0; u < NN; u++) if (!wet[u] && M.elev[u] < (B.peak || 3) && B.high.includes(TERRAIN[M.terr[u]].id) && !B.ground.includes(TERRAIN[M.terr[u]].id)) M.terr[u] = TI[B.ground[u % B.ground.length]];
-  /* shallows ring water edges */
-  if (B.water !== 'lava' && B.water !== 'ice') for (let u = 0; u < NN; u++) { if (!wet[u] || M.terr[u] !== TI[B.deep]) continue; const x = u % S, y = (u / S) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inb(x + dx, y + dy) && !wet[id(x + dx, y + dy)]) { M.terr[u] = TI[B.water]; break; } }
-  if (B.water === 'water') for (let u = 0; u < NN; u++) { if (M.terr[u] !== TI.water) continue; const x = u % S, y = (u / S) | 0; let n = 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inb(x + dx, y + dy) && !wet[id(x + dx, y + dy)]) n++; if (n >= 2) M.terr[u] = TI.shallows; }
+  for (let u = 0; u < NN; u++) if (!wet[u] && M.elev[u] < (B.peak || 3) && B.high.includes(TERRAIN[M.terr[u]].id) && !B.ground.includes(TERRAIN[M.terr[u]].id)) M.terr[u] = TI[B.ground[0]];
+  /* tidy the noise: ponds and islets of a few tiles go, so do plateaus and pits of a few tiles, and lone tiles of one
+     ground in a field of another take their neighbours' ground */
+  const regions = (same, fix, min) => {
+    const seen = new Uint8Array(NN);
+    for (let u = 0; u < NN; u++) {
+      if (seen[u]) continue; const q = [u]; seen[u] = 1;
+      for (let h = 0; h < q.length; h++) { const v = q[h], x = v % S, y = (v / S) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (!inb(X, Y)) continue; const w = id(X, Y); if (!seen[w] && same(u, w)) { seen[w] = 1; q.push(w); } } }
+      if (q.length < min) fix(q);
+    }
+  };
+  const around = (q, val) => { const inQ = new Set(q), count = new Map(); for (const v of q) { const x = v % S, y = (v / S) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (!inb(X, Y)) continue; const w = id(X, Y); if (!inQ.has(w)) { const k = val(w); count.set(k, (count.get(k) || 0) + 1); } } } let best = null, n = -1; for (const [k, c2] of count) if (c2 > n) { n = c2; best = k; } return best; };
+  /* small ponds dry out; small islets go under */
+  regions((u, w) => wet[u] === wet[w], q => { const w = around(q, v => v); if (w == null) return; for (const v of q) { wet[v] = wet[w]; M.terr[v] = M.terr[w]; M.elev[v] = M.elev[w]; } }, 4);
+  /* small plateaus and pits level with what is round them */
+  regions((u, w) => !wet[u] && !wet[w] && M.elev[u] === M.elev[w], q => { if (wet[q[0]]) return; const e = around(q, v => (wet[v] ? null : M.elev[v])); if (e != null) for (const v of q) M.elev[v] = e; }, 5);
+  /* lone patches of a ground (under four tiles) take the ground round them */
+  regions((u, w) => M.terr[u] === M.terr[w], q => { if (wet[q[0]]) return; const t = around(q, v => (wet[v] ? null : M.terr[v])); if (t != null) for (const v of q) M.terr[v] = t; }, 4);
+  /* water deepens with distance from the shore: shallows along it, open water beyond, deep water in the middle */
+  {
+    const dist = new Int16Array(NN).fill(-1), q = [];
+    for (let u = 0; u < NN; u++) if (!wet[u]) { dist[u] = 0; q.push(u); }
+    for (let h = 0; h < q.length; h++) { const v = q[h], x = v % S, y = (v / S) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (!inb(X, Y)) continue; const w = id(X, Y); if (dist[w] < 0) { dist[w] = dist[v] + 1; q.push(w); } } }
+    const real = B.water === 'water' || B.water === 'shallows';
+    for (let u = 0; u < NN; u++) {
+      if (!wet[u]) continue; const d = dist[u] < 0 ? 99 : dist[u];
+      M.terr[u] = TI[real && B.water === 'water' ? (d <= 1 ? 'shallows' : d <= 3 ? 'water' : B.deep) : d <= 2 ? B.water : B.deep];
+    }
+  }
 
   const objs = M.objs;
   const flat = (x, y, w, d) => { const e = M.elev[id(x, y)]; for (let yy = y; yy < y + d; yy++) for (let xx = x; xx < x + w; xx++) { if (!inb(xx, yy) || M.elev[id(xx, yy)] !== e || road[id(xx, yy)]) return false; } return true; };
@@ -131,9 +158,10 @@ function generateScene(seed, S, biome = 'vale') {
     if (wet[u]) { if ((T === TI.shallows || T === TI.swamp) && rng() < 0.25) place('reeds', x, y, 0, false); continue; }
     if (Math.hypot(x - tx, y - ty) < 2.5) continue;
     if (T === TI.marsh || T === TI.mud) { if (rng() < 0.3) place(pick(['reeds', 'reeds', 'deadtree', 'mushrooms']), x, y); continue; }
-    const p = forest > 0.25 ? 0.6 : forest > 0.1 ? 0.18 : 0.04;
+    /* woods where the forest noise is high, a light scatter at their edges, and only the odd tree in the open */
+    const p = forest > 0.22 ? 0.62 : forest > 0.1 ? 0.2 : 0.012;
     if (rng() < p) { place(pick(B.trees), x, y); continue; }
-    if (rng() < 0.03) place(pick(B.clim === 'arid' ? ['rocks', 'boulders', 'cactus'] : B.clim === 'cold' ? ['rocks', 'boulders', 'stump'] : ['rocks', 'boulders', 'bush', 'flowers', 'stump', 'logpile', 'mushrooms']), x, y);
+    if (rng() < 0.015) place(pick(B.clim === 'arid' ? ['rocks', 'boulders', 'cactus'] : B.clim === 'cold' ? ['rocks', 'boulders', 'stump'] : ['rocks', 'boulders', 'bush', 'flowers', 'stump', 'logpile', 'mushrooms']), x, y);
   }
   return M;
 }
