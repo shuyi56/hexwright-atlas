@@ -174,44 +174,52 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .ed-levels .chip{min-width:34px;padding:4px 8px;justify-content:center;text-align:center}
 .ed-levels .chip::before{content:none!important}
 
-/* Tactical view: the editor's map through a close-up pixel camera. Its windows are drawn like the tiles: parchment
-   and oak in the map's own earth tones, square cornered, with the tiles' ink outline and a lit inner edge */
+/* Tactical view: the editor's map through a close-up pixel camera. Its windows have no frame: a panel with a pixel
+   grain like the tiles' own, lit along its top edge and shaded along its foot as the tiles are, in the map's
+   colours. The look is a skin (data-skin on #tactical): moss, stone or parchment, each a set of colours below. */
 .tactical{position:fixed;inset:0;z-index:35;background:#1b1d15;overflow:hidden;
-  --tc-ink:#2b2116;--tc-paper:#e6d7b0;--tc-paper-2:#d5c193;--tc-lit:#f6edd4;--tc-wood:#7a5634;--tc-wood-2:#9c7449;--tc-text:#2b2116;--tc-dim:#6b5a40;--tc-pick:#c9ad78}
+  --tc-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='48' height='48' filter='url(%23n)'/%3E%3C/svg%3E");
+  --tc-ink:#2b2116;--tc-bg1:rgba(62,76,46,.93);--tc-bg2:rgba(38,48,30,.93);--tc-hi:rgba(214,230,160,.42);--tc-lo:rgba(10,14,6,.45);--tc-edge:rgba(16,20,10,.55);
+  --tc-text:#f1ead2;--tc-dim:#bfc6a0;--tc-pick:rgba(196,220,130,.26);--tc-mark:#dce8a6;--tc-off:#7f8a66;--tc-face:linear-gradient(#93a86a,#5f7444);--tc-trough:rgba(0,0,0,.35)}
+.tactical[data-skin=stone]{--tc-bg1:#7a7f6f;--tc-bg2:#5a5f52;--tc-hi:#a9ae9c;--tc-lo:#393d33;--tc-edge:rgba(30,32,24,.7);
+  --tc-text:#f5f0e0;--tc-dim:#d4d5c4;--tc-pick:rgba(250,240,200,.2);--tc-mark:#f0e2b0;--tc-off:#9a9d8c;--tc-face:linear-gradient(#a7b78a,#728455);--tc-trough:rgba(0,0,0,.3)}
+.tactical[data-skin=parchment]{--tc-bg1:#eee2bf;--tc-bg2:#d6c497;--tc-hi:#fdf7e4;--tc-lo:#a88f60;--tc-edge:rgba(43,33,22,.45);
+  --tc-text:#2b2116;--tc-dim:#6b5a40;--tc-pick:rgba(160,120,60,.22);--tc-mark:#2b2116;--tc-off:#a8946e;--tc-face:linear-gradient(#c9d4a4,#9fb07a);--tc-trough:rgba(70,50,20,.3)}
 .tactical:focus{outline:none}
 #tcCanvas{display:block;touch-action:none;cursor:pointer}
 .tc-bar{position:absolute;top:12px;left:14px;right:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;pointer-events:none}
 .tc-bar>*{pointer-events:auto}
-.tc-title{display:flex;flex-direction:column;min-width:0;flex:1 1 160px;color:var(--tc-lit);font:400 clamp(18px,2vw,24px)/1.1 var(--display);text-shadow:0 2px 0 var(--tc-ink)}
-.tc-title .eyebrow{color:var(--tc-pick);text-shadow:0 1px 0 var(--tc-ink)}
+.tc-title{display:flex;flex-direction:column;min-width:0;flex:1 1 160px;color:#f4ecd4;font:400 clamp(18px,2vw,24px)/1.1 var(--display);text-shadow:0 2px 0 var(--tc-ink)}
+.tc-title .eyebrow{color:#d6c79a;text-shadow:0 1px 0 var(--tc-ink)}
 .tc-chips{display:flex;align-items:center;gap:6px}
-.tc-zoom{font:600 13px var(--ui);color:var(--tc-lit);min-width:28px;text-align:center;text-shadow:0 1px 0 var(--tc-ink)}
-.tactical .tc-bar .chip,.tactical .tc-bar .btn{background:var(--tc-paper);color:var(--tc-text);border:2px solid var(--tc-ink);border-radius:0;box-shadow:inset 0 0 0 1px var(--tc-lit),0 2px 0 var(--tc-ink);backdrop-filter:none;font-weight:600}
-.tactical .tc-bar .chip:hover,.tactical .tc-bar .btn:hover{background:var(--tc-lit)}
-.tactical .tc-bar .chip[aria-pressed="true"]{background:var(--tc-pick);color:var(--tc-text)}
-.tc-win{position:absolute;background:linear-gradient(var(--tc-paper),var(--tc-paper-2));border:2px solid var(--tc-ink);border-radius:0;
-  box-shadow:inset 0 0 0 1px var(--tc-lit),inset 0 0 0 3px var(--tc-wood-2),inset 0 0 0 4px var(--tc-ink),0 3px 0 rgba(43,33,22,.55);
-  color:var(--tc-text);font:500 13px var(--ui);padding:9px 12px}
-.tc-win b{display:block;font:700 14px var(--ui);color:var(--tc-text)}
+.tc-zoom{font:600 13px var(--ui);color:#f4ecd4;min-width:28px;text-align:center;text-shadow:0 1px 0 var(--tc-ink)}
+/* the panel every window and button shares */
+.tc-win,.tactical .tc-bar .chip,.tactical .tc-bar .btn{background:var(--tc-grain) 0 0/96px 96px,linear-gradient(var(--tc-bg1),var(--tc-bg2));image-rendering:pixelated;border:0;border-radius:3px;
+  box-shadow:inset 0 2px 0 var(--tc-hi),inset 0 -2px 0 var(--tc-lo),0 0 0 1px var(--tc-edge),0 4px 10px rgba(0,0,0,.32);color:var(--tc-text)}
+.tactical .tc-bar .chip,.tactical .tc-bar .btn{backdrop-filter:none;font-weight:600;padding:5px 11px}
+.tactical .tc-bar .chip:hover,.tactical .tc-bar .btn:hover{filter:brightness(1.12)}
+.tactical .tc-bar .chip[aria-pressed="true"]{background:var(--tc-grain) 0 0/96px 96px,linear-gradient(var(--tc-pick),var(--tc-pick)),linear-gradient(var(--tc-bg1),var(--tc-bg2));color:var(--tc-mark)}
+.tc-win{position:absolute;font:500 13px var(--ui);padding:9px 12px}
+.tc-win b{display:block;font:700 14px var(--ui);color:var(--tc-text);text-shadow:0 1px 0 var(--tc-lo)}
 .tc-win span{display:block;color:var(--tc-dim);font-size:12px}
 .tc-tile{left:14px;bottom:40px;min-width:150px}
 .tc-xy{position:absolute;right:12px;top:9px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:10px;align-items:center;min-width:200px}
 .tc-unit[hidden]{display:none}
 /* the actions window, small beside the unit like a tactics game's command list */
-.tc-menu{display:flex;flex-direction:column;min-width:0;padding:6px;z-index:2}
+.tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
 .tc-menu[hidden]{display:none}
-.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:0;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative}
-.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:rgba(122,86,52,.16);outline:none}
-.tc-menu button[aria-pressed=true]{background:var(--tc-pick)}
-.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:3px;top:50%;margin-top:-3px;border:3px solid transparent;border-left:4px solid var(--tc-ink)}
-.tc-menu button:disabled{color:#a5916c;cursor:default}
+.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 var(--tc-lo)}
+.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
+.tc-menu button[aria-pressed=true]{background:var(--tc-pick);color:var(--tc-mark)}
+.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:3px;top:50%;margin-top:-3px;border:3px solid transparent;border-left:4px solid currentColor}
+.tc-menu button:disabled{color:var(--tc-off);cursor:default;text-shadow:none}
 .tc-menu kbd{font:600 10px var(--ui);color:var(--tc-dim)}
-.tc-win .tc-hp{display:block;width:130px;height:4px;margin:4px 0 5px;background:#b39d72;border:1px solid var(--tc-ink)}
+.tc-win .tc-hp{display:block;width:130px;height:4px;margin:4px 0 5px;background:var(--tc-trough);border-radius:2px;overflow:hidden}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
 .tc-hp i.low{background:#d9553f}
-#tcFace{width:56px;height:56px;image-rendering:pixelated;background:linear-gradient(#c9d4a4,#9fb07a);border:2px solid var(--tc-ink);box-shadow:inset 0 0 0 1px var(--tc-lit)}
-.tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(43,33,22,.9) 45%);display:flex;justify-content:space-between;gap:12px;font:600 12px var(--ui);color:var(--tc-lit);text-shadow:0 1px 0 var(--tc-ink);pointer-events:none;white-space:nowrap;overflow:hidden}
-.tc-keys{color:var(--tc-pick)}
+#tcFace{width:56px;height:56px;image-rendering:pixelated;background:var(--tc-face);border-radius:3px;box-shadow:inset 0 0 0 1px var(--tc-edge),inset 0 2px 0 rgba(255,255,255,.25)}
+.tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(20,24,14,.85) 45%);display:flex;justify-content:space-between;gap:12px;font:600 12px var(--ui);color:#f1ead2;text-shadow:0 1px 0 var(--tc-ink);pointer-events:none;white-space:nowrap;overflow:hidden}
+.tc-keys{color:#bfc6a0}
 @media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
