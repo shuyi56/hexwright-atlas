@@ -177,12 +177,12 @@ function house(K, o, p) {
   const wallH = Math.round(Math.min((p.wallH ?? 24) * HS, yb - Math.max(16, FD * 0.28))), rise = Math.round((p.rise ?? 16) * HS);
   const Wl = R(WALL[p.wall] || p.wall || WALL.plaster), Rf = R(ROOF[p.roof] || p.roof), floors = p.floors || 1, top = yb - wallH, floorH = wallH / floors;
   const ov = p.overhang ?? 4, ridgeX = p.ridge ? p.ridge === 'x' : FW >= FD, door = p.door !== false && o.face !== 2;
-  /* the east wall: sw wide, its far edge k higher, as it runs back */
-  const sw = Math.max(4, Math.round((x1 - x0) * 0.09)), k = Math.round(sw * 0.75), xf = x1 - sw;
+  /* the east wall: a strip sw wide beside the front, turned away from the light */
+  const sw = Math.max(4, Math.round((x1 - x0) * 0.09)), k = 0, xf = x1 - sw;
   const tex = (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, xf, floorH, top);
   if (p.lift) for (const sx of [x0 + 2, xf - 6, x1 - 3]) K.rect(sx, yb, sx + 4, yb + Math.round(p.lift * HS) - (sx > xf ? k : 0), R('#c4b99f')[sx < FW / 2 ? 2 : 3]);
   /* walls: the east one in shade, then the front with a lit west corner and a dark east one */
-  K.poly([[xf, yb], [x1, yb - k], [x1, top - k], [xf, top]], (x, y) => mix(wallTone(p.wallTex || p.wall, Wl, x, y + Math.round((x - xf) * k / sw), xf, x1, floorH, top), INK, 0.3));
+  K.poly([[xf, yb], [x1, yb - k], [x1, top], [xf, top]], (x, y) => mix(wallTone(p.wallTex || p.wall, Wl, x, y + Math.round((x - xf) * k / sw), xf, x1, floorH, top), INK, 0.3));
   K.rect(x0, top, xf, yb, tex);
   K.rect(x0, top, x0 + 1, yb, (x, y) => mix(tex(x, y), [255, 250, 235], 0.35));
   K.rect(xf - 1, top, xf, yb, (x, y) => mix(tex(x, y), INK, 0.3));
@@ -199,26 +199,27 @@ function house(K, o, p) {
   }
   if (door) doorAt(K, dx, yb, doorW, doorH, { col: p.doorCol, arch: p.arch, open: p.open });
   if (ridgeX) {
-    /* The roof fills the footprint above the wall: its south slope from the eave up to the ridge, a sliver of the
-       north slope beyond, and at the east end the roof's edge running back over the east wall. */
-    const ridge = Math.min(top - 10, 3), eave = top + ov, l = x0 - ov, rf = xf + ov, r = x1 + ov, hip = Math.min(rise, (eave - ridge) * 0.8);
-    const front = p.hip ? [[l, eave], [l + hip, ridge], [rf - hip, ridge], [rf, eave]] : [[l, eave], [l, ridge], [rf, ridge], [rf, eave]];
-    K.poly([[l + (p.hip ? hip : 0), ridge], [l + (p.hip ? hip : 0) + 2, ridge - 3], [r - (p.hip ? hip * 0.6 : 0), ridge - 3 - k], [r - (p.hip ? hip * 0.6 : 0), ridge - k], [rf, ridge]], (x, y) => roofTone(p.roof, Rf, x, y + 40, 2));
-    K.poly([[rf - (p.hip ? hip : 0), ridge], [r - (p.hip ? hip * 0.6 : 0), ridge - k], [r, eave - k], [rf, eave]], (x, y) => roofTone(p.roof, Rf, y, x, 1) || Rf[3]);
-    K.poly(front, (x, y) => roofTone(p.roof, Rf, x, eave - y, eave - y < 3 ? 1 : y < ridge + 3 ? -1 : 0) || Rf[1]);
-    K.rect(l + (p.hip ? hip : 0), ridge, rf - (p.hip ? hip : 0), ridge + 2, Rf[4]);
-    /* the fascia under the eave, lit along its top, and its shadow on the wall */
-    K.rect(l, eave - 1, rf, eave + 1, (x, y) => (y === eave - 1 ? Rf[1] : inked(Rf[4], 0.4)));
-    K.line(rf, eave + 0.5, r, eave - k + 0.5, inked(Rf[4], 0.4));
+    /* The roof fills the footprint above both walls: its south slope from the eave up to a capped ridge, straight
+       along every edge, lighter toward the ridge and darker toward the eave, its east end (over the east wall) in
+       shade. */
+    const ridge = Math.min(top - 10, 2), eave = top + ov, l = x0 - ov, r = x1 + ov, hip = Math.min(rise, (eave - ridge) * 0.8), span = eave - ridge;
+    const pts = p.hip ? [[l, eave], [l + hip, ridge], [r - hip, ridge], [r, eave]] : [[l, eave], [l, ridge], [r, ridge], [r, eave]];
+    K.poly(pts, (x, y) => { const v = eave - y, band = v < 3 ? 1 : v > span * 0.72 ? -1 : 0; return roofTone(p.roof, Rf, x, v, band + (x >= xf + ov - 1 ? 1 : 0)) || Rf[1]; });
+    /* the ridge cap: a row of capping tiles, lit along its top */
+    const c0 = l + (p.hip ? hip : 0), c1 = r - (p.hip ? hip : 0);
+    K.rect(c0, ridge, c1, ridge + 3, (x, y) => (y === ridge ? Rf[0] : y === ridge + 2 ? Rf[4] : (x - c0) % 5 === 0 ? Rf[3] : Rf[1]));
+    if (!p.hip) { K.rect(l, ridge, l + 1, eave, Rf[3]); K.rect(r - 1, ridge, r, eave, Rf[4]); }
+    /* the fascia under the eave, lit along its top, and its shadow on the walls */
+    K.rect(l, eave - 1, r, eave + 1, (x, y) => (y === eave - 1 ? Rf[1] : inked(Rf[4], 0.4)));
     K.rect(x0, eave + 1, xf, eave + 4, (x, y) => mix(tex(x, y), INK, y === eave + 1 ? 0.45 : 0.25));
-    if (p.chimney) chimney(K, Math.round(x0 + (xf - x0) * 0.7), Math.round(ridge + (eave - ridge) * 0.4), 10, p.chimney > 1);
-    if (p.dormer && eave - ridge > 18) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (xf - x0) * fx), cy = Math.round(ridge + (eave - ridge) * 0.5); K.poly([[cx - 8, cy + 2], [cx, cy - 7], [cx + 8, cy + 2]], Rf[1]); K.rect(cx - 6, cy + 2, cx + 6, cy + 10, Wl[2]); windowAt(K, cx - 3, cy + 3, 6, 6, {}); }
+    if (p.chimney) chimney(K, Math.round(x0 + (xf - x0) * 0.7), Math.round(ridge + span * 0.4), 10, p.chimney > 1);
+    if (p.dormer && span > 18) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (xf - x0) * fx), cy = Math.round(ridge + span * 0.5); K.poly([[cx - 8, cy + 2], [cx, cy - 7], [cx + 8, cy + 2]], Rf[1]); K.rect(cx - 6, cy + 2, cx + 6, cy + 10, Wl[2]); windowAt(K, cx - 3, cy + 3, 6, 6, {}); }
     return { ridge, eave, top, yb, x0, x1: xf };
   }
   /* ridge north-south: two slopes running back from the gable end in front, the east one in shade over the east wall */
   const cx = (x0 + xf) / 2, apex = Math.round(top - Math.min(rise, (xf - x0) * 0.45)), ridgeTop = 1, l = x0 - ov, r = x1 + ov, eaveTop = ridgeTop + Math.round((x1 - x0) * 0.3);
   K.poly([[l, eaveTop], [cx, ridgeTop], [cx, apex], [l, top + ov]], (x, y) => roofTone(p.roof, Rf, y, x - l, 0));
-  K.poly([[cx, ridgeTop], [r, eaveTop - k], [r, top + ov - k], [xf + ov, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1));
+  K.poly([[cx, ridgeTop], [r, eaveTop], [r, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1));
   K.rect(Math.floor(cx) - 1, ridgeTop, Math.floor(cx) + 1, apex, Rf[4]);
   K.poly([[x0, top + 1], [cx, apex + 3], [xf, top + 1]], tex);
   /* the bargeboards along the gable, standing proud */

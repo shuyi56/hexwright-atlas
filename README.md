@@ -240,8 +240,8 @@ solid surface rather than a grid of blocks.
   footprint, wider than it is tall, seen from the south and a little east: a front wall (plaster, timber framing,
   ashlar, planks) with its east wall receding beside it in shade, both on a stone plinth; a door set back in its
   frame with iron straps, a ring handle and a step, with windows placed symmetrically round it (lintels, sills,
-  glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof with a fascia board along the eave,
-  its east end running back over the side wall, chimneys and smoke. So a row of houses never
+  glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
+  capped ridge, a fascia board along the eave, its east end in shade, chimneys and smoke. So a row of houses never
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
   towers carry cones or battlements, trees are lit leaf masses, and props and furniture keep the figures' scale in the
   middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
