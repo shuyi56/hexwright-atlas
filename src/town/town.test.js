@@ -93,3 +93,13 @@ test('people have something to say, and things something to show', () => {
   assert.equal(sightFor(null, { water: true }, 'X'), 'The water is cool and clear.');
   assert.equal(sightFor(null, { id: 'grass' }, 'X'), null);
 });
+
+test('a chain of water tiles stepping diagonally flows as one river, with no staircase', () => {
+  const M = blankModel(6, 'grass'); for (const [x, y] of [[1, 1], [2, 2], [3, 3], [4, 4]]) M.terr[y * 6 + x] = TI.water;
+  const F = fieldOf(M);
+  /* the corner two diagonal tiles share is water, so the river does not break there */
+  for (const k of [2, 3, 4]) assert.equal(classify(F, k * TILE, k * TILE), TI.water, `corner ${k}`);
+  /* and the square corners of the steps are land again */
+  assert.equal(classify(F, 2 * TILE + 4, 3 * TILE - 4), TI.grass);
+  assert.equal(classify(F, 3 * TILE - 4, 2 * TILE + 4), TI.grass);
+});

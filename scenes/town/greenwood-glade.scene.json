@@ -1,0 +1,7 @@
+{
+  "title": "Greenwood glade: the trees and plants",
+  "about": "A woodland glade round a woodcutter's cottage, laid out to show every kind of tree and plant in the town view: an oak grove (a few turning) with copper beeches to the north-west, a birch copse on the heath to the south-east, poplars lining the road in from the east, pines climbing a hill to a snowy summit of firs, and a reed-fringed pond fed by a stream, with bushes, wildflowers and toadstools along the edges of the woods. Walk the villager about with the arrow keys or by clicking; Space talks to whoever is in front.",
+  "view": "town",
+  "town": { "zoom": 2, "hero": 0 },
+  "checks": []
+}

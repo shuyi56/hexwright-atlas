@@ -19,7 +19,7 @@ import { TERRAIN } from '../tiles/terrain.js';
    paving, beams under floors, falling water). Every screen pixel remembers which row of ground it shows, so
    figures and pieces standing behind a rise are hidden by it exactly. Upper floors that are shown join the
    surface STOREY levels above the ground under them. No DOM. */
-const TILE = 64, LIFT = 14, FRAMES = 4, WOBBLE = 18, ROAD_WOBBLE = 6, CLIFF_WOBBLE = 8, CHUNK = 128;
+const TILE = 64, LIFT = 14, FRAMES = 4, WOBBLE = 18, ROAD_WOBBLE = 6, CLIFF_WOBBLE = 16, CHUNK = 128;
 
 /* ---------- noise ---------- */
 const h2 = (x, y, s = 0) => { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(s + 0x9e37, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
@@ -29,6 +29,8 @@ function vnoise(x, y, s) {
   const a = h2(xi, yi, s), b = h2(xi + 1, yi, s), c = h2(xi, yi + 1, s), d = h2(xi + 1, yi + 1, s);
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
+/* a slower noise for borders: broad, gentle curves with no small-scale fray */
+const soft = (x, y, s) => 0.78 * vnoise(x / 26, y / 26, s) + 0.22 * vnoise(x / 13, y / 13, s + 7);
 const fbm = (x, y, s) => 0.62 * vnoise(x / 15, y / 15, s) + 0.38 * vnoise(x / 6, y / 6, s + 7);
 /* rock broken into boulders: the nearest and second-nearest of points jittered on a w × h grid */
 function worley(x, y, w, h, s) {
@@ -90,7 +92,7 @@ const cliff = (F, u, w) => Math.abs(F.hgt[u] - F.hgt[w]) >= 2;
    wobble, so cliff edges wander instead of running along the grid */
 function ownTile(F, gx, gy) {
   const tx = Math.floor(gx / TILE), ty = Math.floor(gy / TILE), u = at(F, tx, ty); if (u < 0) return -1;
-  const w = at(F, Math.floor((gx + (fbm(gx, gy, 13) - 0.5) * 2 * CLIFF_WOBBLE) / TILE), Math.floor((gy + (fbm(gx, gy, 14) - 0.5) * 2 * CLIFF_WOBBLE) / TILE));
+  const w = at(F, Math.floor((gx + (soft(gx, gy, 13) - 0.5) * 2 * CLIFF_WOBBLE) / TILE), Math.floor((gy + (soft(gx, gy, 14) - 0.5) * 2 * CLIFF_WOBBLE) / TILE));
   if (w < 0 || w === u || !cliff(F, u, w) || F.lev[u] || F.lev[w]) return u;
   /* built ground and floors keep their straight edges */
   const a = F.terr[u], b = F.terr[w]; return a < 0 || b < 0 || INFO[a].crisp || INFO[b].crisp ? u : w;
@@ -101,11 +103,51 @@ function ownTile(F, gx, gy) {
 function classify(F, gx, gy, u = ownTile(F, gx, gy)) {
   if (u < 0) return -1;
   const own = F.terr[u]; if (own < 0 || INFO[own].crisp) return own;
-  let s = at(F, Math.floor((gx + (fbm(gx, gy, 1) - 0.5) * 2 * WOBBLE) / TILE), Math.floor((gy + (fbm(gx, gy, 2) - 0.5) * 2 * WOBBLE) / TILE));
+  const b = wander(F, gx, gy, u, own), w = waterShape(F, gx, gy, u);
+  /* the water's shape decides wet or dry; the wander still picks which water or which ground */
+  if (w < 0) return b;
+  return INFO[b].water === INFO[w].water ? b : w;
+}
+function wander(F, gx, gy, u, own) {
+  let s = at(F, Math.floor((gx + (soft(gx, gy, 1) - 0.5) * 2 * WOBBLE) / TILE), Math.floor((gy + (soft(gx, gy, 2) - 0.5) * 2 * WOBBLE) / TILE));
   /* a road keeps a straighter edge: a smaller, slower wander */
   if (INFO[own].road || (s >= 0 && F.terr[s] >= 0 && INFO[F.terr[s]].road)) s = at(F, Math.floor((gx + (vnoise(gx / 40, gy / 40, 15) - 0.5) * 2 * ROAD_WOBBLE) / TILE), Math.floor((gy + (vnoise(gx / 40, gy / 40, 16) - 0.5) * 2 * ROAD_WOBBLE) / TILE));
   if (s < 0 || s === u) return own;
   const t = F.terr[s]; return t < 0 || INFO[t].crisp || cliff(F, u, s) ? own : t;
+}
+/* Water takes its shape from the tiles round it rather than their squares: each pixel weighs the water tiles of
+   the 3 × 3 round it (on its own level) by how near their centres are, and lies in the water where they outweigh
+   the land. A stream stepping diagonally from tile to tile so flows as one smooth ribbon instead of a staircase,
+   and a pond's corners round off. The point weighed wanders a little, as other borders do. Returns the ground for
+   pixels near water, or -1 to leave the pixel to the other rules. */
+const WATER_SIGMA2 = 2 * 0.62 * 0.62, CHANNEL2 = 0.4 * 0.4;
+function waterShape(F, gx, gy, u) {
+  const S = F.S, tx = u % S, ty = (u / S) | 0;
+  let any = INFO[F.terr[u]].water, dry = !any;
+  for (let dy = -1; dy <= 1 && !(any && dry); dy++) for (let dx = -1; dx <= 1; dx++) { const n = at(F, tx + dx, ty + dy); if (n < 0 || F.terr[n] < 0 || cliff(F, u, n)) continue; if (INFO[F.terr[n]].water) any = true; else dry = true; }
+  if (!any || !dry) return -1;
+  const px = (gx + (soft(gx, gy, 3) - 0.5) * WOBBLE) / TILE, py = (gy + (soft(gx, gy, 4) - 0.5) * WOBBLE) / TILE;
+  let wet = 0, all = 0, bestWet = -1, bestDry = -1, dWet = 9, dDry = 9;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const n = at(F, tx + dx, ty + dy); if (n < 0 || F.terr[n] < 0 || cliff(F, u, n)) continue;
+    const t = F.terr[n], cx = tx + dx + 0.5 - px, cy = ty + dy + 0.5 - py, d2 = cx * cx + cy * cy, k = Math.exp(-d2 / WATER_SIGMA2);
+    all += k;
+    if (INFO[t].water) { wet += k; if (d2 < dWet) { dWet = d2; bestWet = t; } }
+    else if (!INFO[t].crisp && d2 < dDry) { dDry = d2; bestDry = t; }
+  }
+  if (wet > all * 0.5) return bestWet;
+  /* channels: within reach of the line joining two neighbouring water tiles (diagonals too), so a chain of them
+     always flows as one river */
+  for (let a = 0; a < 9; a++) {
+    const ax = tx + (a % 3) - 1, ay = ty + ((a / 3) | 0) - 1, na = at(F, ax, ay); if (na < 0 || F.terr[na] < 0 || !INFO[F.terr[na]].water || cliff(F, u, na)) continue;
+    for (let b = a + 1; b < 9; b++) {
+      const bx = tx + (b % 3) - 1, by = ty + ((b / 3) | 0) - 1; if (Math.abs(bx - ax) > 1 || Math.abs(by - ay) > 1) continue;
+      const nb = at(F, bx, by); if (nb < 0 || F.terr[nb] < 0 || !INFO[F.terr[nb]].water || cliff(F, u, nb)) continue;
+      const vx = bx - ax, vy = by - ay, wx = px - ax - 0.5, wy = py - ay - 0.5, t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / (vx * vx + vy * vy))), ex = wx - vx * t, ey = wy - vy * t;
+      if (ex * ex + ey * ey < CHANNEL2) return F.terr[t < 0.5 ? na : nb];
+    }
+  }
+  return bestDry >= 0 ? bestDry : INFO[F.terr[u]].water ? -1 : F.terr[u];
 }
 /* the ground and height tile of every pixel, worked out a tile at a time and kept */
 function cellsOf(F, tx, ty) {
@@ -212,7 +254,7 @@ const TEX = {
   pasture: (R, x, y) => tuft(R, x, y, 12, 0.25, 131) || base(R, x, y, 0.1),
   heath: (R, x, y) => { const q = spot(x, y, 5, 0.45, 141); if (q && Math.abs(q[0]) + Math.abs(q[1]) <= (q[2] < 0.5 ? 0 : 1)) return FLOWERS[3][q[0] || q[1] ? 2 : 1]; return tuft(R, x, y, 9, 0.3, 142) || base(R, x, y, 0.18); },
   moor: (R, x, y) => tuft(R, x, y, 7, 0.45, 151) || pebble(PEBBLE, x, y, 16, 0.2, 152) || base(R, x, y, 0.2),
-  garden: (R, x, y) => flower(x, y, 5, 0.42, 161) || tuft(R, x, y, 9, 0.3, 162) || base(R, x, y),
+  garden: (R, x, y) => flower(x, y, 7, 0.2, 161) || tuft(R, x, y, 9, 0.3, 162) || base(R, x, y),
   scrub: (R, x, y) => { const q = spot(x, y, 14, 0.5, 171, 4); if (q) { const d = (q[0] * q[0]) / 9 + (q[1] * q[1]) / 4; if (d < 1) return BUSH[d > 0.6 ? (q[1] > 0 ? 4 : 3) : q[1] < 0 && q[0] < 0 ? 1 : 2]; } return pebble(R, x, y, 9, 0.2, 172) || base(R, x, y, 0.18); },
   dirt: (R, x, y) => pebble(R, x, y, 8, 0.22, 181) || base(R, x, y, 0.22),
   road: (R, x, y) => pebble(R, x, y, 7, 0.28, 191, 1) || base(R, x, y, 0.18),
@@ -274,7 +316,7 @@ function topColour(F, gx, gy, k, u, h, f) {
     for (let s = 1; s <= 3; s++) { const n = near(gx, gy - s); if (n >= 0 && n !== k && INFO[n].fam !== I.fam && INFO[n].rank > I.rank) { shade = s; over = n; break; } }
     if (shade && I.water) c = shade < 3 ? INFO[over].S[shade === 1 ? 2 : 3] : mix(FOAM, c, 0.25);
     else if (shade) c = dim(c, shade === 1 ? 0.74 : shade === 2 ? 0.84 : 0.93);
-    else if (I.water) for (const [dx, dy] of SHORE) { const n = near(gx + dx, gy + dy); if (n >= 0 && !INFO[n].water) { const close = Math.abs(dx) + Math.abs(dy) === 1; if (h2(gx, gy, 70) < (close ? 0.75 : 0.35)) c = mix(FOAM, c, close ? 0.2 : 0.55); break; } }
+    else if (I.water) for (const [dx, dy] of SHORE) { const n = near(gx + dx, gy + dy); if (n >= 0 && !INFO[n].water) { c = mix(FOAM, c, Math.abs(dx) + Math.abs(dy) === 1 ? 0.3 : 0.7); break; } }
   }
   if (!I.water && F.slope[u]) {
     /* slopes: lit facing the upper left, shaded facing away */

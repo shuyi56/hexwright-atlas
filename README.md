@@ -226,7 +226,8 @@ solid surface rather than a grid of blocks.
   wanders on a smooth noise instead of following the grid (a road only gently); paving, floors and fields keep
   straight edges, and paving and roads climb slopes along their length only, so their courses stay straight. The
   higher-ranked ground is inked along its edge and shades the lower one: grass overhangs a path, and the shore shows
-  a strip of bank and a line of foam on the water. Water and lava ripple.
+  a strip of bank and a line of foam on the water. Water takes its shape from the tiles round it rather than their
+  squares, and a chain of water tiles (diagonal steps too) flows as one smooth river. Water and lava ripple.
 - **Heights:** height is one continuous surface, 14 pixels up per level, drawn column by column from the south like
   a height-field. Between tiles one level apart (a step anyone can walk) the ground rises in a smooth slope, lit
   where it faces the upper left and shaded where it turns away. Only a jump of two levels or more (where no one can
@@ -243,8 +244,9 @@ solid surface rather than a grid of blocks.
   glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
   capped ridge, a fascia board along the eave, its east end in shade, chimneys and smoke. So a row of houses never
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
-  towers carry cones or battlements, trees are crowns of separate leaf clumps (each lit on its upper
-  left and rimmed in shade where it stands over the one behind, with leaf dabs inside) on tapered trunks with roots,
+  towers carry cones or battlements, trees are crowns of rounded leaf clumps, flatly lit (a sunlit band
+  along each clump's top, shade along its underside, a soft rim where it stands over the one behind) on tapered
+  trunks with roots, standing a little off the grid so a wood never grows in rows,
   pines are tiers of slanting needles with drooping tips, and props and furniture keep the figures' scale in the
   middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
   front of the hero fades so they are never lost behind it.
@@ -262,6 +264,8 @@ buffers (no DOM), `pieces.js` draws the pieces (no DOM), `talk.js` holds the lin
 in it.
 
 ![The town view](docs/images/town-view.png)
+
+![Greenwood glade, the foliage scene](docs/images/greenwood-glade.png)
 
 ### Test scenes
 
@@ -283,7 +287,9 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   `scale-study.scene.json` beside it gives the title, notes and the camera (`view: "tactical"`,
   `tactical: { zoom, center }`); a scene with nothing to check needs no checks file.
   `scenes/town/saltmere-harbour.html` opens in the town view (`view: "town"`, `town: { zoom, hero }`), an island
-  harbour town to walk about in.
+  harbour town to walk about in. `scenes/town/greenwood-glade.html` shows off the trees and plants: an oak grove with
+  copper beeches, a birch copse on the heath, a poplar avenue, pines climbing a hill to snowy firs, and a reed-fringed
+  pond fed by a stream, round a woodcutter's cottage. Its map is built by `node tools/make-greenwood.mjs`.
   `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
   villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
   clothes show, with the dragoon and the black mage beside them as the benchmark.
