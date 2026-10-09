@@ -4,7 +4,8 @@
   "stats": {
     "hp": 32,
     "attack": 11,
-    "range": 1
+    "range": 1,
+    "pattern": "melee"
   },
   "movement": {
     "move": 7,

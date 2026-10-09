@@ -98,3 +98,24 @@
   .ub-detail{padding:14px}
   .ub-table{max-height:75vh}
 }
+/* the attack pattern section: a picture of each pattern to pick, and the chosen one at the unit's range */
+.ub-section{margin:6px 0 0;font:500 14px var(--ui-sc);letter-spacing:.1em;color:var(--muted);display:flex;gap:8px;align-items:center}
+.ub-pattern{display:flex;flex-direction:column;gap:10px}
+.ub-pattern-body{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.ub-pattern-picks{display:flex;flex-direction:column;gap:6px}
+.ub-pattern-picks button{display:flex;align-items:center;gap:10px;background:var(--table);border:1px solid var(--line);border-radius:3px;color:var(--vellum);font:500 14px var(--ui);padding:5px 12px 5px 5px;cursor:pointer;text-align:left}
+.ub-pattern-picks button:hover{border-color:var(--brass)}
+.ub-pattern-picks button[aria-checked=true]{border-color:var(--brass-2);background:rgba(201,164,90,.14);color:var(--brass-2)}
+.ub-pattern-picks button:focus-visible{outline:2px solid var(--brass-2);outline-offset:1px}
+.ub-pattern-big{margin:0;display:flex;gap:14px;align-items:flex-start;flex:1 1 260px}
+.ub-pattern-big figcaption{flex:1;min-width:0}
+.ub-pattern-big figcaption b{display:block;font:500 15px var(--ui);color:var(--vellum)}
+.ub-pattern-big figcaption span{font-size:13px;color:var(--muted)}
+.ub-grid,.ub-grid-sm{display:block}
+.ub-grid{width:132px;height:132px;flex:none}
+.ub-grid-sm{width:36px;height:36px}
+.ub-grid rect,.ub-grid-sm rect{fill:#1a2324;stroke:#0b1011;stroke-width:.08}
+.ub-grid rect.hit,.ub-grid-sm rect.hit{fill:#ff3b2b}
+.ub-grid rect.me,.ub-grid-sm rect.me{fill:#2c3a3c}
+.ub-grid circle,.ub-grid-sm circle{fill:#e4c684}
+.ub-pattern.changed .ub-section{color:var(--brass-2)}

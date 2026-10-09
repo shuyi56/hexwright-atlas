@@ -4,7 +4,8 @@
   "stats": {
     "hp": 30,
     "attack": 3,
-    "range": 2
+    "range": 2,
+    "pattern": "ranged"
   },
   "movement": {
     "move": 4,

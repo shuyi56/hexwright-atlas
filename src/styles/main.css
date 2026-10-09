@@ -190,6 +190,17 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
 .tc-unit[hidden]{display:none}
+.tc-menu{display:flex;flex-direction:column;min-width:130px;padding:6px;z-index:2}
+.tc-menu[hidden]{display:none}
+.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:16px;background:none;border:0;border-radius:2px;color:#ece2c8;font:500 15px var(--ui);padding:6px 8px;text-align:left;cursor:pointer}
+.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:rgba(201,164,90,.18);outline:none}
+.tc-menu button[aria-pressed=true]{background:rgba(201,164,90,.28);color:#fff4d0}
+.tc-menu button:disabled{color:#6b665a;cursor:default}
+.tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
+.tc-hp i{display:block;height:100%;background:#7fc35a}
+.tc-hp i.mid{background:#e4c24a}
+.tc-hp i.low{background:#d9553f}
+.tc-menu kbd{font:500 11px var(--ui);color:#a39b86}
 #tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:1px solid #c9a45a}
 .tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
 .tc-keys{color:#a39b86}

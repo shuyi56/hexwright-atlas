@@ -8,8 +8,9 @@ import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
 import { $, state } from '../ui/state.js';
 import { moveRange, placeId, routeTo } from './move.js';
 import '../data/unit-files.js';
-import { onUnitsChange, unitFor } from '../data/units.js';
-import { drawScene, figureHit, portrait } from './render.js';
+import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
+import { attackReach } from './attack.js';
+import { drawScene, figureHeight, figureHit, portrait } from './render.js';
 import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 
 /* ================= tactical view: the screen =================
@@ -17,15 +18,19 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    after the cursor and the unit on the move. Pick a unit (click it, Enter on it, or Tab through them) and its move
    range lights up in blue; the route to the tile under the cursor is traced in gold; click a lit tile (or Enter)
    and it walks there, hopping up and down ledges, while the camera follows. Moves are edits of the map, on the
-   editor's undo stack. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
+   editor's undo stack. A picked unit has an actions window: Move, Attack (its pattern and range light up in red;
+   pick a unit of the other side there to strike it for its Attack) and Wait, beside the unit on screen. A unit
+   struck shows its health bar over its head for a moment, draining. Each unit moves once and acts once a round; once every
+   unit still standing has done both, a new round begins. Hit points are the battle's, not the map's: they start
+   full each time the view opens, and a unit brought to 0 stays where it fell, faded. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
    + and - zoom, PgUp / PgDn change storey, Esc steps back. */
 const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 /* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
    what an overlay changes */
-const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, range: null, walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, range: null, reach: null, hp: new Map(), turn: new Map(), pop: null, note: '', walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
-const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2;
+const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
 
 /* ---------- the scene and where things are ---------- */
 function rebuild() { TC.sc = buildScene(ED.M, { rot: TC.rot, top: TC.top }); TC.bounds = bounds(TC.sc); TC.dirty = true; }
@@ -72,7 +77,7 @@ function figures() {
     /* the nearer of the two tiles it is stepping between decides when it is drawn */
     const keyOf = q => { const [a, b] = viewPoint(sz, TC.rot, Math.floor(q.x) + 0.5, Math.floor(q.y) + 0.5); return a + b; };
     const key = w && p.seg ? Math.max(keyOf(p.seg[0]), keyOf(p.seg[1])) : keyOf(p);
-    out.push({ key, lv: L, pri: 2, X, Y, z: p.z, ground: p.ground ?? p.z, c: characterById(c.sprite) || characterById('villager'), k, face: FACES[(p.face + 3 * TC.rot) % 4], pose: w ? WALK[Math.floor(w.d * STRIDES) % WALK.length] : 0 });
+    out.push({ key, lv: L, pri: 2, X, Y, z: p.z, ground: p.ground ?? p.z, c: characterById(c.sprite) || characterById('villager'), k, face: FACES[(p.face + 3 * TC.rot) % 4], pose: w ? WALK[Math.floor(w.d * STRIDES) % WALK.length] : 0, ghost: !alive(k) });
   });
   return out;
 }
@@ -112,29 +117,68 @@ function setCursor(x, y, L, follow) {
   TC.cursor = { x, y, L }; if (follow) { const [ax, ay] = tileArt(x, y, L); keepInView(ax, ay - 16); }
   TC.dirty = true; panels();
 }
-function select(k) {
-  TC.sel = k; TC.range = null; TC.dirty = true;
+/* pick unit k (-1 for none) with an action ready: mode, or the first of move and attack it has left this round */
+function select(k, mode) {
+  TC.sel = k; TC.mode = null; TC.range = null; TC.reach = null; TC.dirty = true;
   if (k >= 0) {
-    const c = ED.M.chars[k]; TC.range = rangeOf(k);
+    const c = ED.M.chars[k], t = turnOf(k); TC.note = '';
+    setMode(mode !== undefined ? mode : !t.moved ? 'move' : !t.acted ? 'attack' : null);
     if (levelOf(c) > TC.top) setTop(levelOf(c));
     setCursor(c.x, c.y, levelOf(c)); const [ax, ay] = tileArt(c.x, c.y, levelOf(c)); lookAt(ax, ay - 20);
   }
   panels();
 }
-/* how far unit k moves and climbs comes from its data (data/units/), looked up by its sprite */
+/* the picked unit's action: 'move' lights its move range, 'attack' what its attack reaches, null neither */
+function setMode(m) {
+  const k = TC.sel, t = k >= 0 ? turnOf(k) : null;
+  if (!t || (m === 'move' && t.moved) || (m === 'attack' && t.acted)) m = null;
+  TC.mode = m; TC.range = m === 'move' ? rangeOf(k) : null; TC.reach = m === 'attack' ? reachOf(k) : null; TC.dirty = true;
+  panels();
+}
+/* how far unit k moves and climbs, and how far and in what pattern it strikes, come from its data (data/units/), looked up by its sprite */
 function rangeOf(k) { const { move, jump } = unitFor(ED.M.chars[k].sprite).movement; return moveRange(ED.M, k, move, jump); }
+function reachOf(k) { const { range, pattern } = statsOf(k), side = sideOf(k); return attackReach(ED.M, k, range, pattern, j => alive(j) && sideOf(j) !== side); }
 /* new numbers for the units (a save from the unit data page) redraw the picked unit's range and the panels */
-onUnitsChange(() => { if (!TC.open) return; if (TC.sel >= 0 && !TC.walk) { TC.range = rangeOf(TC.sel); TC.dirty = true; } panels(); });
+onUnitsChange(() => { if (!TC.open) return; if (TC.sel >= 0 && !TC.walk) setMode(TC.mode); panels(); });
 const unitAt = (x, y, L) => (ED.M.chars || []).findIndex(c => c.x === x && c.y === y && levelOf(c) === L);
-/* Enter or a click on (x, y, L): pick up the unit there, or send the picked unit there if it can reach it */
+
+/* ---------- the battle: hit points, and who has moved and acted this round ---------- */
+const statsOf = k => unitFor(ED.M.chars[k].sprite).stats;
+/* the side a unit fights on is its group in the unit data: characters against enemies */
+const sideOf = k => unitFor(ED.M.chars[k].sprite).group;
+const nameOf = k => { const c = ED.M.chars[k]; return characterById(c.sprite)?.name || c.sprite; };
+const hpOf = k => (TC.hp.has(k) ? TC.hp.get(k) : statsOf(k).hp);
+const alive = k => hpOf(k) > 0;
+const turnOf = k => TC.turn.get(k) || { moved: false, acted: false };
+const done = k => { const t = turnOf(k); return t.moved && t.acted; };
+const spend = (k, what) => TC.turn.set(k, { ...turnOf(k), [what]: true });
+/* after unit k's action: pick it again for what it has left, or put it down and start a new round once every unit
+   still standing is done */
+function finish(k) {
+  if (!done(k)) { select(k); return; }
+  select(-1);
+  if ((ED.M.chars || []).every((c, j) => !alive(j) || done(j))) { TC.turn.clear(); TC.note = 'A new round begins'; panels(); }
+}
+function attack(a, d) {
+  const dmg = statsOf(a).attack, was = hpOf(d), hp = Math.max(0, was - dmg), max = Math.max(1, statsOf(d).hp);
+  TC.hp.set(d, hp); spend(a, 'acted');
+  TC.pop = { k: d, text: String(dmg), t: 0, from: was / max, to: hp / max };
+  const note = `${nameOf(a)} hits ${nameOf(d)} for ${dmg}${hp ? '' : `. ${nameOf(d)} falls`}`;
+  finish(a); TC.note = note; panels();
+}
+function wait() { const k = TC.sel; if (k < 0 || TC.walk) return; spend(k, 'moved'); spend(k, 'acted'); finish(k); }
+/* Enter or a click on (x, y, L): strike the unit there if the picked unit is attacking and reaches it, pick up the
+   unit there, or send the picked unit there if it can reach it */
 function act(x, y, L) {
   if (TC.walk) return;
-  const u = unitAt(x, y, L);
+  let u = unitAt(x, y, L);
+  if (TC.sel >= 0 && TC.reach && TC.reach.targets.includes(u)) { attack(TC.sel, u); return; }
+  if (u >= 0 && !alive(u)) u = -1;
   if (u >= 0 && u !== TC.sel) { select(u); return; }
   if (TC.sel < 0) return;
   if (u === TC.sel) { select(-1); return; }
-  const path = TC.range && routeTo(TC.range, placeId(ED.M, x, y, L));
-  if (path && path.length) startWalk(TC.sel, path); else select(-1);
+  const k = TC.sel, path = TC.range && routeTo(TC.range, placeId(ED.M, x, y, L));
+  if (path && path.length) { if (startWalk(k, path)) spend(k, 'moved'); } else select(-1);
 }
 function setTop(L) { L = Math.max(0, Math.min(MAX_LEVEL, L)); if (L === TC.top) return; TC.top = L; rebuild(); if (TC.cursor) setCursor(TC.cursor.x, TC.cursor.y, Math.min(TC.cursor.L, L)); panels(); }
 function turn(d) {
@@ -156,10 +200,25 @@ function panels() {
     fg.clearRect(0, 0, f.width, f.height); fg.imageSmoothingEnabled = false; if (s) fg.drawImage(portrait(s), 0, 0, f.width, f.height);
     $('tcUnitName').textContent = s ? s.name : c.sprite;
     const u = unitFor(c.sprite), st = u.stats, mv = u.movement;
-    $('tcUnitInfo').textContent = `HP ${st.hp} · Attack ${st.attack} · Range ${st.range}`;
-    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${TC.sel === k ? ' · ready' : ''}`;
+    const pat = (PATTERNS.find(([id]) => id === st.pattern) || PATTERNS[0])[1], t = turnOf(k);
+    const bar = $('tcUnitHp').firstElementChild, frac = hpOf(k) / Math.max(1, st.hp);
+    bar.style.width = Math.round(100 * frac) + '%'; bar.className = frac > 0.5 ? '' : frac > 0.25 ? 'mid' : 'low';
+    $('tcUnitInfo').textContent = `HP ${hpOf(k)}/${st.hp} · Attack ${st.attack} · ${st.pattern === 'melee' ? pat : `${pat} ${st.range}`}`;
+    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${!alive(k) ? ' · fallen' : done(k) ? ' · done' : t.moved ? ' · moved' : t.acted ? ' · acted' : TC.sel === k ? ' · ready' : ''}`;
   }
-  $('tcHint').textContent = TC.walk ? 'On the move…' : TC.sel >= 0 ? 'Pick a blue tile to move there · Esc to cancel' : (M.chars || []).length ? 'Click a unit or press Tab to pick one' : 'No one stands on this map: place characters in the editor first';
+  /* the actions window for the picked unit */
+  const menu = $('tcMenu'), t = TC.sel >= 0 ? turnOf(TC.sel) : null;
+  menu.hidden = !t || !!TC.walk;
+  if (t) {
+    $('tcActMove').disabled = t.moved; $('tcActAttack').disabled = t.acted;
+    $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move')); $('tcActAttack').setAttribute('aria-pressed', String(TC.mode === 'attack'));
+  }
+  $('tcHint').textContent = TC.walk ? 'On the move…'
+    : TC.mode === 'move' ? 'Pick a blue tile to move there · Esc to cancel'
+    : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to attack it · Esc to cancel' : 'No one in reach: move, or Wait to end this unit\'s turn')
+    : TC.sel >= 0 ? 'Choose an action'
+    : TC.note ? TC.note
+    : (M.chars || []).length ? 'Click a unit or press Tab to pick one' : 'No one stands on this map: place characters in the editor first';
 }
 
 /* ---------- the frame ---------- */
@@ -176,7 +235,7 @@ function loop(now) {
       if (TC.locked) { TC.cam.x = ax; TC.cam.y = ay - 20; TC.goal = null; TC.glide = null; }
       else { lookAt(ax, ay - 20); if (Math.abs(TC.cam.x - ax) < 1.5 && Math.abs(TC.cam.y - (ay - 20)) < 1.5) TC.locked = true; }
     }
-    if (w.d >= w.pts.length - 1) { TC.walk = null; TC.locked = false; const k = w.k; TC.cam.x = ax; TC.cam.y = ay - 20; select(k); }
+    if (w.d >= w.pts.length - 1) { TC.walk = null; TC.locked = false; const k = w.k; TC.cam.x = ax; TC.cam.y = ay - 20; finish(k); }
     TC.dirty = true;
   }
   if (TC.goal && TC.glide) {
@@ -185,6 +244,8 @@ function loop(now) {
     if (f >= 1) { TC.cam.x = gx; TC.cam.y = gy; TC.goal = null; TC.glide = null; }
     TC.dirty = true;
   }
+  /* the damage number over a struck unit rises and fades over a second; its health bar stays a little longer */
+  if (TC.pop) { TC.pop.t += dt; if (TC.pop.t >= POP_TIME) TC.pop = null; TC.dirty = true; }
   /* water ripples and the cursor's bob tick over a few times a second */
   const tick = Math.floor(now / 220); if (tick !== TC.tick) { TC.tick = tick; TC.dirty = true; }
   if (TC.dirty) { TC.dirty = false; paint(); }
@@ -205,6 +266,7 @@ function paint() {
     const cur = TC.cursor, path = cur && routeTo(TC.range, placeId(M, cur.x, cur.y, cur.L));
     if (path) for (const [x, y, L] of path) marks.set(toViewU(x, y) + ',' + L, 'route');
   }
+  if (TC.reach && !TC.walk) for (const [x, y, L] of TC.reach.cells) if (L <= TC.top) marks.set(toViewU(x, y) + ',' + L, 'target');
   let cursor = null;
   if (TC.cursor && !TC.walk) { const c = TC.cursor, u = toViewU(c.x, c.y); cursor = { u, L: c.L, z: TC.sc.zAt(u, c.L), unit: unitAt(c.x, c.y, c.L) >= 0 }; }
   TC.figs = figures();
@@ -212,6 +274,30 @@ function paint() {
   if (cursor) { const X = cursor.u % S(), Y = (cursor.u / S()) | 0, [x, y] = P(X + 0.5, Y + 0.5, cursor.z); focus.push({ x, y, key: X + Y + 1 }); }
   drawScene(g, TC.sc, k, tx, ty, view, { frame: TC.tick >> 1, tick: TC.tick >> 1, figs: TC.figs, marks, cursor, focus, ...TC.debug });
   TC.view = { k, tx, ty };
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  placeMenu();
+  const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);
+  if (pf) {
+    /* a struck unit's health bar shows only while it is hit: it drains from the old HP to the new, then fades */
+    const { t, from, to } = TC.pop, [x, y] = P(pf.X, pf.Y, pf.z), head = y - figureHeight(pf);
+    const frac = from + (to - from) * ease(Math.max(0, Math.min(1, (t - 0.15) / 0.5))), w = 12, bx = Math.round(x - w / 2) * k + tx, by = Math.round(head - 4) * k + ty;
+    g.globalAlpha = Math.max(0, Math.min(1, (POP_TIME - t) / 0.3));
+    g.fillStyle = '#0b1011'; g.fillRect(bx - k, by - k, (w + 2) * k, 3 * k);
+    g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, k);
+    if (frac > 0) { g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, k); }
+    const sx = Math.round(x * k + tx), sy = Math.round((head - 7 - 10 * Math.min(1, t)) * k + ty);
+    g.globalAlpha = Math.max(0, Math.min(1, 3 * (1 - t))); g.font = `700 ${Math.round(9 * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
+    g.lineWidth = Math.max(2, Math.round(1.5 * k)); g.strokeStyle = '#0b1011'; g.strokeText(TC.pop.text, sx, sy); g.fillStyle = '#ffd2c4'; g.fillText(TC.pop.text, sx, sy);
+    g.globalAlpha = 1; g.textAlign = 'start';
+  }
+}
+/* the actions window stands beside the picked unit on screen: to its right, or its left near the screen's edge */
+function placeMenu() {
+  const menu = $('tcMenu'), f = !menu.hidden && TC.figs.find(q => q.k === TC.sel); if (!f) return;
+  const { k, tx, ty } = TC.view, d = state.dpr, [x, y] = P(f.X, f.Y, f.z), sx = (x * k + tx) / d, top = ((y - figureHeight(f)) * k + ty) / d, gap = 14 * k / d;
+  const w = menu.offsetWidth, h = menu.offsetHeight, left = sx + gap + w + 8 > TC.cw ? sx - gap - w : sx + gap;
+  menu.style.left = Math.round(Math.max(8, Math.min(TC.cw - w - 8, left))) + 'px';
+  menu.style.top = Math.round(Math.max(64, Math.min(TC.ch - h - 40, top))) + 'px';
 }
 const req = () => { TC.dirty = true; if (!raf && TC.open) raf = requestAnimationFrame(loop); };
 
@@ -250,7 +336,14 @@ root.addEventListener('keydown', e => {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (STEPS[k]) stepCursor(STEPS[k]);
   else if (k === 'Enter' || k === ' ') { if (TC.cursor) act(TC.cursor.x, TC.cursor.y, TC.cursor.L); }
-  else if (k === 'Tab') { const n = (ED.M.chars || []).length; if (n) select((TC.sel + (e.shiftKey ? n - 1 : 1)) % n); }
+  else if (k === 'Tab') {
+    /* the next unit still standing with something left to do this round */
+    const n = (ED.M.chars || []).length;
+    for (let i = 1; i <= n; i++) { const j = (TC.sel + (e.shiftKey ? n * 2 - i : i) + n) % n; if (alive(j) && !done(j)) { select(j); break; } }
+  }
+  else if (k === '1') { if (TC.sel >= 0 && !TC.walk) setMode('move'); }
+  else if (k === '2') { if (TC.sel >= 0 && !TC.walk) setMode('attack'); }
+  else if (k === '3') wait();
   else if (k === 'Escape') { if (TC.sel >= 0) select(-1); else closeTactical(); }
   else if (k === 'q' || k === '[') turn(-1); else if (k === 'e' || k === ']') turn(1);
   else if (k === '+' || k === '=') setZoom(TC.zoom + 1); else if (k === '-' || k === '_') setZoom(TC.zoom - 1);
@@ -265,7 +358,8 @@ root.addEventListener('keydown', e => {
    [x, y] to look at, or 'map' for the middle of the whole map */
 function openTactical(opts = {}) {
   if (!ED.M) return;
-  TC.open = true; root.hidden = false; TC.rot = ED.rot; TC.top = ED.level; TC.sel = -1; TC.walk = null; TC.range = null; TC.lastT = 0;
+  TC.open = true; root.hidden = false; TC.rot = ED.rot; TC.top = ED.level; TC.sel = -1; TC.walk = null; TC.range = null; TC.reach = null; TC.mode = null; TC.lastT = 0;
+  TC.hp.clear(); TC.turn.clear(); TC.pop = null; TC.note = '';
   $('tcName').textContent = ED.M.name;
   size(); rebuild();
   /* a comfortable close-up: about a dozen tiles across */
@@ -284,10 +378,13 @@ $('tcBack').addEventListener('click', closeTactical);
 $('tcRotL').addEventListener('click', () => { turn(-1); req(); }); $('tcRotR').addEventListener('click', () => { turn(1); req(); });
 $('tcFast').addEventListener('click', () => setFast(!TC.fast));
 $('tcIn').addEventListener('click', () => { setZoom(TC.zoom + 1); req(); }); $('tcOut').addEventListener('click', () => { setZoom(TC.zoom - 1); req(); });
+$('tcActMove').addEventListener('click', () => { setMode('move'); req(); root.focus({ preventScroll: true }); });
+$('tcActAttack').addEventListener('click', () => { setMode('attack'); req(); root.focus({ preventScroll: true }); });
+$('tcActWait').addEventListener('click', () => { wait(); req(); root.focus({ preventScroll: true }); });
 $('edTactical').addEventListener('click', () => openTactical());
 $('editor').addEventListener('keydown', e => { if (ED.open && !TC.open && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTactical(); } });
 new ResizeObserver(() => { if (TC.open) { size(); req(); } }).observe(root);
 /* test hook: the camera, cursor and units as the view has them */
-window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, select, setCursor, turn };
+window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, select, setCursor, setMode, turn, wait };
 
 export { closeTactical, openTactical };
