@@ -89,38 +89,45 @@ const HAIR_SHORT = {
     '..HQHHQHHQH..H..',
     '...HHH.HHH......',
     '....HH..HH......'] } };
-/* a tousled crop: tufts standing up off the crown so the head's outline is broken rather than a smooth dome, a
-   ragged fringe falling in uneven points, cut shorter at the side so more of the ear and jaw show, and a short
-   jagged nape behind */
+/* tousled: worn longer and messier than the short cut. A cowlick lifts in a clump at the back of the crown; the
+   locks sweep down toward the facing in long strands, and the fringe falls in pieces of different lengths, one lock
+   between the eyes; over the ear the hair runs down into a sideburn. Behind, the locks fan out and down from the
+   crown and fall shaggy over the nape in uneven points. */
 const HAIR_TOUSLED = {
   front: { x: 8, y: 1, rows: [
-    '...H...HH..H....',
-    '...HH.HHHHHHH...',
-    '..HHHHHIIHHHHH..',
-    '..HHIIHHHHHHQHH.',
-    '.HHIHHHHQHHHHQHH',
-    '.HHHHQHHHHQHHHQH',
-    '.HQHHHHQHHHHQHQH',
-    'HHHHQHHHHHQHHHHH',
-    'HQ.HHH.HHQ.HHQHH',
-    'H...H...H..HHHH.',
+    '..........HH....',
+    '.....HHHHHHH....',
+    '...HHHHHHHHHHH..',
+    '..HHHIIIHHHHQHH.',
+    '.HHIIHHHHQHHHQHH',
+    '.HHHHHHHQHHHQHQH',
+    'HHHHHHQHHHHQHHQH',
+    'HHHHHQHHHQHHHHQH',
+    '.HHHQHHHQHHHHQHH',
+    '.HHQ.HHQ..HHHQHH',
+    '.H...H.....HHQH.',
     '...........HQHH.',
-    '............HH..',
+    '...........HHQH.',
+    '............HQ..',
     '............H...'] },
   back: { x: 8, y: 1, rows: [
-    '...H...HH..H....',
-    '...HH.HHHHHHH...',
-    '..HHHHIIIIHHHH..',
-    '..HIIHHHHQHHHHH.',
-    '.HHHHHHHQHHHQHHH',
-    '.HHHQHHQHHHQHHHH',
-    '.HHQHHHQHHHQHHHH',
+    '..........HH....',
+    '.....HHHHHHH....',
+    '...HHIIIIHHHHH..',
+    '..HIIHHHHHHHHHH.',
+    '.HHHHHHHQQHHHHHH',
+    '.HHHHHHQHHQHHHHH',
+    '.HHQHHQHHHHQHHHH',
     '.HQHHHQHHHHHQHHH',
-    '.HQHHHQHHHQHHHHH',
-    '.HHHHHHHHHHHHHH.',
-    '.HQHHHQHHHQHHHH.',
-    '..HQH.HQHH.HQH..',
-    '..H....H....H...'] } };
+    '.HQHHHQHHHHQHQHH',
+    '.HQHHHQHHHQHHQHH',
+    '.HHQHHQHHHQHHQHH',
+    '.HHQHHHQHHQHHHQ.',
+    '..HQHHHQHHHQHHH.',
+    '..HHQHHHQHHHQHH.',
+    '...HQH.HQH.HQH..',
+    '...HH..HH..HH...',
+    '....H...H..H....'] } };
 const HAIR_LONG = {
   front: { x: 8, y: 1, rows: [
     '......HHHH......',
