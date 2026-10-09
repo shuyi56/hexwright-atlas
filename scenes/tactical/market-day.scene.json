@@ -1,0 +1,10 @@
+{
+  "title": "Market day: the townsfolk in their layered clothes",
+  "about": "A village market square in the tactical view, to judge the redesigned townsfolk on the ground they walk on. Merchants in long gold-faced coats stand at their stalls and cross the square; villagers in open vests over laced shirts talk round the well; farmers in rolled sleeves and overalls work the wheat field and the hay cart, some turned away to show the braces crossing their backs. The dragoon and the black mage stand on the road south as the benchmark.",
+  "view": "tactical",
+  "tactical": {
+    "zoom": 3,
+    "center": "map"
+  },
+  "checks": []
+}

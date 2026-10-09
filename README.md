@@ -201,6 +201,9 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   front of each, to judge their sizes against each other. Its map is `scenes/tactical/scale-study.json`, and
   `scale-study.scene.json` beside it gives the title, notes and the camera (`view: "tactical"`,
   `tactical: { zoom, center }`); a scene with nothing to check needs no checks file.
+  `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
+  villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
+  clothes show, with the dragoon and the black mage beside them as the benchmark.
 - **Rebuilding:** run `npm run scene -- <map.json> [out.html]` to rebuild a page from a saved map
   (`npm run scene -- scenes/tactical/scale-study.json scenes/tactical/scale-study.html` for the scale study). The checks
   come from a `<map>.checks.json` beside it, if there is one; see `src/editor/fixtures/hillside-tower.checks.json`
