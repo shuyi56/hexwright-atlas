@@ -115,7 +115,7 @@
 .ub-grid{width:132px;height:132px;flex:none}
 .ub-grid-sm{width:36px;height:36px}
 .ub-grid rect,.ub-grid-sm rect{fill:#1a2324;stroke:#0b1011;stroke-width:.08}
-.ub-grid rect.hit,.ub-grid-sm rect.hit{fill:#b5543e}
+.ub-grid rect.hit,.ub-grid-sm rect.hit{fill:#ff3b2b}
 .ub-grid rect.me,.ub-grid-sm rect.me{fill:#2c3a3c}
 .ub-grid circle,.ub-grid-sm circle{fill:#e4c684}
 .ub-pattern.changed .ub-section{color:var(--brass-2)}

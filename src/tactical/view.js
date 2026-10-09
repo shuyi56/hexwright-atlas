@@ -279,9 +279,9 @@ function paint() {
   for (const f of TC.figs) {
     if (!alive(f.k)) continue;
     const [x, y] = P(f.X, f.Y, f.z), frac = hpOf(f.k) / Math.max(1, statsOf(f.k).hp), w = 12, bx = Math.round(x - w / 2) * k + tx, by = Math.round(y - figureHeight(f) - 4) * k + ty;
-    g.fillStyle = '#0b1011'; g.fillRect(bx - k, by - k, (w + 2) * k, 4 * k);
-    g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, 2 * k);
-    g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, 2 * k);
+    g.fillStyle = '#0b1011'; g.fillRect(bx - k, by - k, (w + 2) * k, 3 * k);
+    g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, k);
+    g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, k);
   }
   placeMenu();
   const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);

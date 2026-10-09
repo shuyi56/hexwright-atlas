@@ -26,7 +26,7 @@ function sprite(s, frame) {
   return c;
 }
 const MARKS = {
-  move: () => marker('#5d8fd0', '#cfe2ff', 0.42), route: () => marker('#e4c684', '#fff4d0', 0.55), target: () => marker('#c4553f', '#ffd2c4', 0.45),
+  move: () => marker('#5d8fd0', '#cfe2ff', 0.42), route: () => marker('#e4c684', '#fff4d0', 0.55), target: () => marker('#ff3b2b', '#ffc2b8', 0.55),
   cursor0: () => cursor(0), cursor1: () => cursor(1), arrow: () => arrow(), shadow: () => unitShadow(17, 5)
 };
 const marks = new Map();

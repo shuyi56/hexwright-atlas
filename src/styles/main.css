@@ -196,7 +196,7 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:rgba(201,164,90,.18);outline:none}
 .tc-menu button[aria-pressed=true]{background:rgba(201,164,90,.28);color:#fff4d0}
 .tc-menu button:disabled{color:#6b665a;cursor:default}
-.tc-win .tc-hp{display:block;width:150px;height:6px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
+.tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
 .tc-hp i.low{background:#d9553f}
