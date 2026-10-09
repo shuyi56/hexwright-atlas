@@ -18,10 +18,10 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 
 | Townsfolk | Read at a glance by |
 | --- | --- |
-| Villager (standard) | Short brown hair, an open green waistcoat falling to points over a cream linen shirt laced at the throat and gathered at the cuffs, tan trousers bloused over the boots. |
+| Villager (standard) | Short brown hair, an open green waistcoat falling to points over an oatmeal linen shirt laced at the throat and gathered at the cuffs, tan trousers bloused over the boots. |
 | Farmer (standard) | A straw hat with a flat crown and a red band, a green shirt rolled to the elbow, blue overalls with a pocketed bib buckled to braces that cross on his back, turned up over the boots. |
 | Guard (standard) | A kettle helm with a comb and a turned-down brim, a steel breastplate over a red tunic, mail sleeves, a spear and a red cape. |
-| Merchant (stocky) | White hair and a full white beard falling to a point, a long blue coat with a gold shawl collar and gold-faced edges, open over a russet under-robe, a sash knotted at the hip, bell sleeves, a satchel on a strap. |
+| Merchant (stocky) | Ash-grey hair and a full grey beard falling to a point, a long blue coat with a gold shawl collar and gold-faced edges, open over a russet under-robe, a sash knotted at the hip, bell sleeves, a satchel on a strap. |
 | Monk (standard) | A deep plain cowl with the face in its shadow, a capelet over the shoulders, a robe of undyed wool to the floor with bell sleeves, tied with a rope whose end hangs. |
 | Healer (slim) | Long fair hair, a lilac tunic over white sleeves, a white satchel marked with a red cross. |
 | Noble Lady (slim) | A red braid over her shoulder, a gold circlet with a jewel, a green gown to the floor with a square neckline, bell sleeves and a gold hem. |
@@ -359,7 +359,8 @@ the same material in a crease: a fold, a seam, the line between two plates.
   anything tucked under hair, a brim or a belt falls into shade.
 - **Line work.** Solid ink throughout, in strengths set by `INK` in `pixels.js`:
   - **Outline:** the tiles' umber ink all round, only a touch warmer above and to the left where the light falls.
-    Diagonal corners are left open so curves stay round.
+    Round bare skin (a face, a hand) it is softer and warmer, a deep shade of the skin rather than the full umber,
+    so pale skin does not ring the figure in a hard line. Diagonal corners are left open so curves stay round.
   - **Contours:** where one part stands in front of another (an arm against the body), the part behind gets a
     dark line. The head, its hair and its hat count as one piece, as do a torso and what is worn over it.
   - **Edges:** within one piece, wherever a material ends against another below it or to its right, its last
@@ -429,7 +430,8 @@ with both eyes still glowing. Each of the townsfolk must keep what made them rec
 villager's open vest over a laced shirt, the farmer's straw hat and overalls buckled to braces that cross his back,
 the guard's kettle helm, cape and spear, the merchant's beard, satchel, and gold-faced coat open over an under-robe
 with a sash, the monk's cowl and rope belt, the healer's satchel and cross, the lady's braid, circlet and gown. The
-villager's, farmer's and merchant's outer pieces must lie over the torso as layers of their own, creased like their
+villager, farmer and merchant must meet their outline no harder than the dragoon and black mage do, give or take
+a little (the step in lightness from the outline to the pixels just inside it). Their outer pieces must lie over the torso as layers of their own, creased like their
 sleeves, on every build, view and pose, and the farmer's forearms must be bare. The
 monk must wear a gown to the floor with a rope girdle and no trousers. Every choice the maker offers must draw
 inside the frame on every build in colours it defines, alone and in sixty random characters. A spec must clean

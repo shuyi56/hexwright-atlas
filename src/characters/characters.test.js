@@ -165,6 +165,19 @@ test('the villager, farmer and merchant wear their clothes in layers, creased wh
     const under = layerOf(m.parts.torso);
     assert.ok(!under.length || Math.min(...layerOf(m.parts.coat)) > Math.min(...under), `${id} ${b} ${v} ${k}: the outer piece lies over the torso as a layer of its own`);
   }
+  /* their colours sit in the benchmark's range: the step from the outline to the pixels just inside it is no
+     harder than the dragoon's and the black mage's, give or take a little, so their edges do not stand out */
+  const step = id => {
+    const f = render(byId(id)), inside = [], ink = [];
+    for (const fr of [f.front[0], f.back[0]]) {
+      const a = (x, y) => x >= 0 && y >= 0 && x < W && y < H && fr[(y * W + x) * 4 + 3], L = (x, y) => rgbLch([0, 1, 2].map(i => fr[(y * W + x) * 4 + i]))[0];
+      const n4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], rim = (x, y) => a(x, y) && n4.some(([dx, dy]) => !a(x + dx, y + dy));
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (rim(x, y)) ink.push(L(x, y)); else if (a(x, y) && n4.some(([dx, dy]) => rim(x + dx, y + dy))) inside.push(L(x, y));
+    }
+    const mean = v => v.reduce((s, x) => s + x, 0) / v.length; return mean(inside) - mean(ink);
+  };
+  const bench = Math.max(step('dragoon'), step('blackmage'));
+  for (const id of ['villager', 'farmer', 'merchant']) assert.ok(step(id) <= bench + 0.09, `${id}: its edges stand out (${step(id).toFixed(3)} against ${bench.toFixed(3)})`);
   /* the farmer's shirt is rolled to the elbow: bare forearms above the fists */
   for (const b of BODIES) assert.ok(measure(b, 'front', 0, byId('farmer').outfit).parts.armNear.rows.slice(7).every(r => !/[AaD]/.test(r)), `${b}: the farmer's forearms are bare`);
 });
