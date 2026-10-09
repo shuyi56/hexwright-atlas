@@ -5,11 +5,11 @@ import { H, W } from '../characters/pixels.js';
 import { WALK, renderScaled } from '../characters/roster.js';
 import { unitFor } from '../data/units.js';
 import { ED } from '../editor/editor.js';
-import { MAX_LEVEL, STOREY, cloneModel, levelOf } from '../editor/model.js';
+import { MAX_LEVEL, cloneModel, levelOf } from '../editor/model.js';
 import { FACE_DELTA, findPath, isFree, neighbours } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $, state } from '../ui/state.js';
-import { FRAMES, LIFT, TILE, animated, faceAnimated, faceHeight, layerOf, tileFace, tileTop } from './ground.js';
+import { CHUNK, LIFT, TILE, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
 import { pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
 
@@ -20,66 +20,61 @@ import { lineFor, sightFor } from './talk.js';
    that is blocked; a click walks them to any tile they can reach, up and down stairs. Space or Enter talks to
    whoever they face, or looks at the piece or ground in front of them. Tab hands the hero's part to the next
    character. Everyone else strolls about near where they were put. Only the floors up to the hero's own are shown.
+   The ground is drawn in CHUNK-square pieces as they come into view, each with a depth buffer (which row of ground
+   every pixel shows); a piece or figure is cut away wherever the ground shown there lies in front of where it
+   stands, so a rise or cliff hides what is behind it.
    Walking here is a stroll, not an edit: the map is left as it was, and opening the view again starts afresh. */
 const root = $('town'), cv = $('twCanvas'), g = cv.getContext('2d');
 /* figures at three quarters of their sprite, as in the tactical view: about 30 pixels tall, so a one-tile cottage
    still stands over them */
 const FIGURE_SCALE = 0.75;
-const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.4, RUN = 1.9, STRIDES = 2, FOOT = 22;
-const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, layers: [], faces: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, homes: [], rest: [], pending: [], banner: 0 };
+const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 2.6, RUN = 1.9, STRIDES = 2, FOOT = T / 2 + 6;
+const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, F: null, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, homes: [], rest: [], pending: [], banner: 0 };
 
 /* ---------- caches: the painted ground, cliffs, pieces and figures as canvases ---------- */
 const canvasOf = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, w); c.height = Math.max(1, h); return c; };
 function toCanvas(w, h, px) { const c = canvasOf(w, h), cg = c.getContext('2d'), d = cg.createImageData(w, h); d.data.set(px); cg.putImageData(d, 0, 0); return c; }
-/* each storey's ground is one canvas the size of the map, filled in a tile at a time as it is first seen (and in
-   idle moments after); water and lava tiles keep their other frames apart */
-function buildLayers() {
-  TW.layers = []; TW.faces.clear(); TW.sprites.clear();
-  for (let L = 0; L <= MAX_LEVEL; L++) {
-    const G = layerOf(TW.M, L), S = G.S;
-    TW.layers.push({ G, can: G.any ? canvasOf(S * T, S * T) : null, done: new Uint8Array(S * S), anim: new Uint8Array(S * S).map((_, u) => (G.any && animated(G, u % S, (u / S) | 0) ? 1 : 0)), frames: new Map() });
+/* the surface for the storeys shown, and its chunks: { can, depth } keyed by chunk column and row */
+function buildField() { TW.F = fieldOf(TW.M, TW.top); TW.chunks.clear(); TW.clipped.clear(); TW.pending = []; TW.filled = false; TW.dirty = true; }
+function chunk(cx, cy) {
+  const key = cx + ',' + cy; let c = TW.chunks.get(key);
+  if (!c) {
+    if (TW.chunks.size > 600) TW.chunks.delete(TW.chunks.keys().next().value);
+    const r = renderChunk(TW.F, cx * CHUNK, cy * CHUNK);
+    c = { can: toCanvas(CHUNK, CHUNK, r.px), depth: r.depth, empty: !r.depth.some(v => v) }; TW.chunks.set(key, c);
   }
-  TW.pending = []; const S = TW.M.S; for (let L = 0; L <= MAX_LEVEL; L++) if (TW.layers[L].can) for (let u = 0; u < S * S; u++) if (TW.layers[L].G.terr[u] >= 0) TW.pending.push(L * S * S + u);
-}
-function ensureTop(L, u) {
-  const ly = TW.layers[L]; if (ly.done[u]) return; ly.done[u] = 1;
-  const S = TW.M.S, x = u % S, y = (u / S) | 0, cg = ly.can.getContext('2d'), d = cg.createImageData(T, T);
-  d.data.set(tileTop(ly.G, x, y, 0)); cg.putImageData(d, x * T, y * T);
-}
-function animFrame(L, u, f) {
-  const ly = TW.layers[L], key = u * FRAMES + f; let c = ly.frames.get(key);
-  if (!c) { const S = TW.M.S; c = toCanvas(T, T, tileTop(ly.G, u % S, (u / S) | 0, f)); ly.frames.set(key, c); }
   return c;
 }
-function faceCanvas(L, u, f) {
-  const ly = TW.layers[L], S = TW.M.S, x = u % S, y = (u / S) | 0, anim = faceAnimated(ly.G, x, y), key = `${L},${u},${anim ? f : 0}`;
-  if (!TW.faces.has(key)) { const im = faceHeight(ly.G, x, y) ? tileFace(ly.G, x, y, anim ? f : 0) : null; TW.faces.set(key, im && im.h ? toCanvas(im.w, im.h, im.px) : null); }
-  return TW.faces.get(key);
+/* 1 + the row of ground shown at art pixel (X, Y), 0 for none */
+function depthAt(X, Y) {
+  X = Math.floor(X); Y = Math.floor(Y); const cx = Math.floor(X / CHUNK), cy = Math.floor(Y / CHUNK);
+  if (X < 0 || X >= S() * T) return 0;
+  return chunk(cx, cy).depth[(Y - cy * CHUNK) * CHUNK + X - cx * CHUNK];
+}
+/* rgba with every pixel cut away where the ground at screen (X + i, Y + j) is further south than row base */
+function clip(px, w, h, X, Y, base, flip = false) {
+  const out = new Uint8ClampedArray(px);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const o = (j * w + i) * 4; if (!out[o + 3]) continue; const d = depthAt(X + (flip ? w - 1 - i : i), Y + j); if (d - 1 > base) out[o + 3] = 0; }
+  return out;
 }
 function spriteOf(o) {
   const key = `${o.id}|${o.face || 0}|${Math.round((o.v ?? 0.5) * 20)}|${o.links ? o.links.join('') : ''}`; let s = TW.sprites.get(key);
   if (!s) { const im = pieceSprite(o); s = { can: toCanvas(im.w, im.h, im.px), px: im.px, ox: im.ox, oy: im.oy, w: im.w, h: im.h }; TW.sprites.set(key, s); }
   return s;
 }
-const figFrames = new Map(), scaled = new Map();
+const scaled = new Map();
 const framesOf = c => { let f = scaled.get(lookOf(c)); if (!f) { if (scaled.size > 64) scaled.clear(); f = renderScaled(c, FIGURE_SCALE); scaled.set(lookOf(c), f); } return f; };
-/* a figure's frame for the way it faces: south and west show the front, east the front mirrored, north the back */
-function figure(c, face, pose) {
-  const view = face === 2 ? 'back' : 'front', flip = face === 1, key = `${lookOf(c)}|${view}|${pose}`; let can = figFrames.get(key);
-  if (!can) { if (figFrames.size > 300) figFrames.clear(); can = toCanvas(W, H, framesOf(c)[view][pose]); figFrames.set(key, can); }
-  return [can, flip];
-}
-
 /* ---------- where things are ---------- */
 const S = () => TW.M.S;
-const elevAt = (x, y, L) => TW.M.elev[y * S() + x] + STOREY * L;
-/* the art-pixel point a character's feet touch, standing on (x, y, L) */
-const feet = (x, y, L) => [x * T + T / 2, y * T + FOOT - elevAt(x, y, L) * LIFT];
+/* how high the surface stands at map pixel (gx, gy), in art pixels */
+const lift = (gx, gy) => heightAt(TW.F, Math.round(gx), Math.round(gy)) * LIFT;
 function charPos(k) {
   const c = TW.M.chars[k], st = TW.steps.get(k);
-  if (!st) { const [fx, fy] = feet(c.x, c.y, levelOf(c)); return { fx, fy, gy: c.y * T + FOOT, L: levelOf(c), face: c.face, moving: false, d: 0 }; }
-  const [ax, ay] = feet(...st.from), [bx, by] = feet(...st.to), f = Math.min(1, st.t), hop = st.from[2] === st.to[2] && ay !== by ? Math.sin(f * Math.PI) * 3 : 0;
-  return { fx: ax + (bx - ax) * f, fy: ay + (by - ay) * f - hop, gy: (st.from[1] + (st.to[1] - st.from[1]) * f) * T + FOOT, L: f < 0.5 ? st.from[2] : st.to[2], face: c.face, moving: true, d: st.d + f };
+  if (!st) { const gx = c.x * T + T / 2, gy = c.y * T + FOOT; return { fx: gx, fy: gy - lift(gx, gy), gy, L: levelOf(c), face: c.face, moving: false, d: 0 }; }
+  const f = Math.min(1, st.t), ax = st.from[0] * T + T / 2, ay = st.from[1] * T + FOOT, bx = st.to[0] * T + T / 2, by = st.to[1] * T + FOOT, gx = ax + (bx - ax) * f, gy = ay + (by - ay) * f;
+  /* on one storey the feet follow the ground; up or down a flight they climb evenly from one end to the other */
+  const z = st.from[2] === st.to[2] ? lift(gx, gy) : lift(ax, ay) + (lift(bx, by) - lift(ax, ay)) * f;
+  return { fx: gx, fy: gy - z, gy: Math.round(gy), L: f < 0.5 ? st.from[2] : st.to[2], face: c.face, moving: true, d: st.d + f };
 }
 
 /* ---------- walking ---------- */
@@ -154,11 +149,11 @@ function setZoom(z) { TW.zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length -
 function follow() {
   const k = TW.hero, c = TW.M.chars[k]; let x = S() * T / 2, y = S() * T / 2;
   if (c) { const p = charPos(k); x = p.fx; y = p.fy - 16; }
-  const sc = scale(), hw = cv.width / sc / 2, hh = cv.height / sc / 2, top = -TW.maxLift, w = S() * T, h = S() * T;
+  const sc = scale(), hw = cv.width / sc / 2, hh = cv.height / sc / 2, top = -TW.F.maxH * LIFT, w = S() * T, h = S() * T;
   TW.cam.x = w <= hw * 2 ? w / 2 : Math.max(hw, Math.min(w - hw, x));
   TW.cam.y = h - top <= hh * 2 ? (top + h) / 2 : Math.max(top + hh, Math.min(h - hh, y));
 }
-function setTop(L) { TW.top = Math.max(0, Math.min(MAX_LEVEL, L)); TW.dirty = true; place(); }
+function setTop(L) { L = Math.max(0, Math.min(MAX_LEVEL, L)); if (L !== TW.top) { TW.top = L; buildField(); } place(); }
 
 /* ---------- drawing ---------- */
 function paint() {
@@ -166,42 +161,54 @@ function paint() {
   const sc = scale(), Wd = cv.width, Hd = cv.height, tx = Math.round(Wd / 2 - Math.round(TW.cam.x) * sc), ty = Math.round(Hd / 2 - Math.round(TW.cam.y) * sc);
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#141b1c'; g.fillRect(0, 0, Wd, Hd);
   g.setTransform(sc, 0, 0, sc, tx, ty); g.imageSmoothingEnabled = false;
-  const vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (Wd - tx) / sc, vy1 = (Hd - ty) / sc, M = TW.M, n = S(), f = TW.tick % FRAMES;
-  const x0 = Math.max(0, Math.floor(vx0 / T) - 1), x1 = Math.min(n - 1, Math.ceil(vx1 / T) + 1);
-  /* Everything in one list, back to front by where it meets the ground. A storey's things go a tile further back
-     for each storey up, so a floor covers what stands on the storey below it, and anything on the ground in front of
-     it still stands before it. */
+  const vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (Wd - tx) / sc, vy1 = (Hd - ty) / sc, M = TW.M, F = TW.F, n = S();
+  /* the ground, chunk by chunk */
+  for (let cy = Math.floor(vy0 / CHUNK); cy * CHUNK < vy1; cy++) for (let cx = Math.max(0, Math.floor(vx0 / CHUNK)); cx * CHUNK < Math.min(vx1, n * T); cx++) { const c = chunk(cx, cy); if (!c.empty) g.drawImage(c.can, cx * CHUNK, cy * CHUNK); }
+  ripples(vx0, vy0, vx1, vy1);
+  /* then everything standing on it, back to front by where it meets the ground */
   const items = [];
-  for (let L = 0; L <= TW.top; L++) if (TW.layers[L].can) for (let y = 0; y < n; y++) items.push({ key: (y + L) * T, L, o: 0, row: y });
-  const links = TW.links;
   /* what stands under a floor that is shown is hidden by it */
-  const roofed = (x, y, L) => { for (let l = L + 1; l <= TW.top; l++) if (M.floors[l - 1] && M.floors[l - 1][y * n + x]) return true; return false; };
-  for (const p of M.objs) {
+  const roofed = (x, y, L) => F.lev[y * n + x] > L;
+  for (const [i, p] of M.objs.entries()) {
     const L = levelOf(p); if (L > TW.top) continue;
-    const [w, d] = footprint(p); if (L < TW.top && roofed(p.x, p.y, L) && roofed(p.x + w - 1, p.y + d - 1, L)) continue; items.push({ key: (p.y + d + L) * T - 1, L, o: 1, p: Object.assign({}, p, { links: links.get(p) || null }), w, d });
+    const [w, d] = footprint(p); if (L < TW.top && roofed(p.x, p.y, L) && roofed(p.x + w - 1, p.y + d - 1, L)) continue;
+    items.push({ key: (p.y + d) * T - 1, L, o: 1, i, p, w, d });
   }
-  M.chars.forEach((c, k) => { const q = charPos(k); if (q.L > TW.top || (q.L < TW.top && roofed(c.x, c.y, q.L))) return; items.push({ key: q.gy + q.L * T, L: q.L, o: 2, k, q }); });
+  M.chars.forEach((c, k) => { const q = charPos(k); if (q.L > TW.top || (q.L < TW.top && roofed(c.x, c.y, q.L))) return; items.push({ key: q.gy, L: q.L, o: 2, k, q }); });
   items.sort((a, b) => a.key - b.key || a.L - b.L || a.o - b.o);
   const hero = items.find(it => it.o === 2 && it.k === TW.hero), hb = hero ? [hero.q.fx - 8, hero.q.fy - 30, hero.q.fx + 8, hero.q.fy] : null;
   for (const it of items) {
-    if (it.o === 0) {
-      const ly = TW.layers[it.L], y = it.row;
-      for (let x = x0; x <= x1; x++) {
-        const u = y * n + x; if (ly.G.terr[u] < 0) continue;
-        const X = x * T, Y = y * T - ly.G.elev[u] * LIFT, fh = faceHeight(ly.G, x, y);
-        if (Y > vy1 || Y + T + fh < vy0) continue;
-        if (ly.anim[u]) g.drawImage(animFrame(it.L, u, f), X, Y);
-        else { ensureTop(it.L, u); g.drawImage(ly.can, X, y * T, T, T, X, Y, T, T); }
-        if (fh) { const fc = faceCanvas(it.L, u, f); if (fc) g.drawImage(fc, X, Y + T); }
-      }
-    } else if (it.o === 1) {
-      const p = it.p, s = spriteOf(p), e = Math.max(...Array.from({ length: it.w * it.d }, (_, i) => M.elev[(p.y + ((i / it.w) | 0)) * n + p.x + (i % it.w)])) + STOREY * it.L;
-      const X = p.x * T - s.ox, Y = p.y * T - e * LIFT - s.oy; if (X > vx1 || Y > vy1 || X + s.w < vx0 || Y + s.h < vy0) continue;
-      /* a piece standing in front of the hero fades, so they are never lost behind it */
-      const fade = hb && it.key > hero.key && it.L >= hero.L && X < hb[2] && X + s.w > hb[0] && Y < hb[3] && Y + s.h > hb[1] && covers(s, X, Y, hb);
-      if (fade) g.globalAlpha = 0.5;
-      g.drawImage(s.can, X, Y); g.globalAlpha = 1;
-    } else drawChar(it.k, it.q);
+    if (it.o === 2) { drawChar(it.k, it.q, vx0, vy0, vx1, vy1); continue; }
+    const s = pieceOn(it, vx0, vy0, vx1, vy1); if (!s) continue;
+    /* a piece standing in front of the hero fades, so they are never lost behind it */
+    const fade = hb && it.key > hero.key && s.X < hb[2] && s.X + s.w > hb[0] && s.Y < hb[3] && s.Y + s.h > hb[1] && covers(s, s.X, s.Y, hb);
+    if (fade) g.globalAlpha = 0.5;
+    g.drawImage(s.can, s.X, s.Y); g.globalAlpha = 1;
+  }
+}
+/* piece it as it stands on the surface: its sprite placed at the height of the ground at the middle of its front,
+   and cut away where the ground in front of it rises over it (made once each time the storeys shown change) */
+function pieceOn(it, vx0, vy0, vx1, vy1) {
+  let c = TW.clipped.get(it.i);
+  if (!c) {
+    const p = it.p, sp = spriteOf(Object.assign({}, p, { links: TW.links.get(p) || null })), z = lift((p.x + it.w / 2) * T, (p.y + it.d) * T - 4);
+    c = { sp, w: sp.w, h: sp.h, X: p.x * T - sp.ox, Y: Math.round(p.y * T - z) - sp.oy, can: null }; TW.clipped.set(it.i, c);
+  }
+  if (c.X > vx1 || c.Y > vy1 || c.X + c.w < vx0 || c.Y + c.h < vy0) return null;
+  if (!c.can) { c.px = clip(c.sp.px, c.w, c.h, c.X, c.Y, it.key); c.can = toCanvas(c.w, c.h, c.px); }
+  return c;
+}
+/* the water's ripples: short lit dashes drifting to and fro, wherever the water is in sight */
+function ripples(vx0, vy0, vx1, vy1) {
+  const F = TW.F, n = S(); g.fillStyle = 'rgba(240,246,240,0.75)';
+  for (let ty = Math.max(0, Math.floor(vy0 / T)); ty < n && ty * T < vy1 + F.maxH * LIFT; ty++) for (let tx = Math.max(0, Math.floor(vx0 / T)); tx < n && tx * T < vx1; tx++) {
+    const u = ty * n + tx; if (!isWater(F, u)) continue;
+    for (let k = 0; k < 3; k++) {
+      const ph = (TW.tick + k * 3 + Math.floor(h2(tx, ty, k) * 8)) % 8, gx = tx * T + 4 + Math.floor(h2(tx, ty, k + 10) * (T - 12)) + (ph < 4 ? ph : 8 - ph), gy = ty * T + 4 + Math.floor(h2(tx, ty, k + 20) * (T - 8)), len = [2, 3, 4, 3, 2, 0, 0, 0][ph];
+      if (!len) continue;
+      const Y = Math.round(gy - F.hgt[u] * LIFT); if (Math.abs(depthAt(gx, Y) - 1 - gy) > 2) continue;
+      g.fillRect(gx, Y, len, 1);
+    }
   }
 }
 /* does the sprite's body (not its shadow) cover any of a few points on the figure in box b? */
@@ -212,11 +219,15 @@ function covers(s, X, Y, b) {
   }
   return false;
 }
-function drawChar(k, q) {
+const figCan = canvasOf(W, H), figG = figCan.getContext('2d');
+function drawChar(k, q, vx0, vy0, vx1, vy1) {
   const c = TW.M.chars[k], ch = characterById(c.sprite) || characterById('villager'), pose = q.moving ? WALK[Math.floor(q.d * STRIDES) % WALK.length] : 0;
-  const [can, flip] = figure(ch, q.face, pose), x = Math.round(q.fx), y = Math.round(q.fy);
+  const view = q.face === 2 ? 'back' : 'front', flip = q.face === 1, x = Math.round(q.fx), y = Math.round(q.fy), X = x - W / 2, Y = y - BASE - 1;
+  if (X > vx1 || Y > vy1 || X + W < vx0 || Y + H < vy0) return;
+  /* the figure and its shadow, cut away wherever the ground shown lies in front of where it stands */
   g.fillStyle = 'rgba(43,33,22,0.32)'; g.beginPath(); g.ellipse(x + 1, y, 7, 2.5, 0, 0, Math.PI * 2); g.fill();
-  if (flip) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(can, -W / 2, y - BASE - 1); g.restore(); } else g.drawImage(can, x - W / 2, y - BASE - 1);
+  const im = figG.createImageData(W, H); im.data.set(clip(framesOf(ch)[view][pose], W, H, X, Y, q.gy, flip)); figG.putImageData(im, 0, 0);
+  if (flip) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(figCan, -W / 2, Y); g.restore(); } else g.drawImage(figCan, X, Y);
   /* the hero wears a small gold marker overhead until they first move */
   if (k === TW.hero && !TW.moved) { g.fillStyle = '#c9a24f'; const ty = y - 40 - (TW.tick % 2); g.beginPath(); g.moveTo(x - 4, ty); g.lineTo(x + 4, ty); g.lineTo(x, ty + 5); g.closePath(); g.fill(); g.strokeStyle = '#2b2116'; g.lineWidth = 1; g.stroke(); }
 }
@@ -249,7 +260,8 @@ function loop(now) {
   const tick = Math.floor(now / 260); if (tick !== TW.tick) { TW.tick = tick; TW.dirty = true; }
   if (TW.dirty) { TW.dirty = false; paint(); }
   /* paint the rest of the ground while idle, a few tiles a frame */
-  for (let i = 0; i < 24 && TW.pending.length; i++) { const v = TW.pending.pop(), NN = S() * S(); ensureTop((v / NN) | 0, v % NN); }
+  if (!TW.pending.length && !TW.filled) { TW.filled = true; const n = Math.ceil(S() * T / CHUNK); for (let cy = Math.floor(-TW.F.maxH * LIFT / CHUNK); cy * CHUNK < S() * T; cy++) for (let cx = 0; cx < n; cx++) TW.pending.push([cx, cy]); }
+  if (TW.pending.length && TW.chunks.size < 560) { const [cx, cy] = TW.pending.pop(); chunk(cx, cy); }
   raf = requestAnimationFrame(loop);
 }
 const req = () => { TW.dirty = true; if (!raf && TW.open) raf = requestAnimationFrame(loop); };
@@ -257,11 +269,10 @@ const req = () => { TW.dirty = true; if (!raf && TW.open) raf = requestAnimation
 /* ---------- input ---------- */
 function tileAt(e) {
   const r = cv.getBoundingClientRect(), sc = scale(), tx = Math.round(cv.width / 2 - Math.round(TW.cam.x) * sc), ty = Math.round(cv.height / 2 - Math.round(TW.cam.y) * sc);
-  const wx = ((e.clientX - r.left) * state.dpr - tx) / sc, wy = ((e.clientY - r.top) * state.dpr - ty) / sc, x = Math.floor(wx / T), n = S();
-  if (x < 0 || x >= n) return null;
-  /* the nearest tile top under the point, from the highest floor shown down to the ground */
-  for (let L = TW.top; L >= 0; L--) { const G = TW.layers[L].G; for (let y = n - 1; y >= 0; y--) { const u = y * n + x; if (G.terr[u] < 0) continue; const Y = y * T - G.elev[u] * LIFT; if (wy >= Y && wy < Y + T) return [x, y, L]; } }
-  return null;
+  const wx = ((e.clientX - r.left) * state.dpr - tx) / sc, wy = ((e.clientY - r.top) * state.dpr - ty) / sc, d = depthAt(wx, wy);
+  /* the ground under the point is the row its pixel shows */
+  if (!d) return null;
+  const x = Math.floor(wx / T), y = Math.floor((d - 1) / T); return [x, y, TW.F.lev[y * S() + x]];
 }
 cv.addEventListener('pointerdown', e => {
   const t = tileAt(e), M = TW.M, k = TW.hero; if (!t || !M.chars[k]) return;
@@ -305,11 +316,10 @@ function openTown(opts = {}) {
   TW.open = true; root.hidden = false; TW.steps.clear(); TW.path = []; TW.held = []; TW.talkTo = -1; TW.moved = false; TW.lastT = 0; TW.rest = [];
   TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs);
   TW.hero = opts.hero ?? (ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0);
-  TW.maxLift = (Math.max(0, ...TW.M.elev) + STOREY * MAX_LEVEL) * LIFT;
-  buildLayers(); size();
+  const c0 = TW.M.chars[TW.hero]; TW.top = c0 ? levelOf(c0) : 0;
+  buildField(); size();
   setZoom(opts.zoom || Math.max(2, Math.min(5, Math.round(TW.cw / (15 * T)))));
   $('twName').textContent = TW.M.name;
-  const c = TW.M.chars[TW.hero]; TW.top = c ? levelOf(c) : 0;
   closeSay(); place();
   /* the place's name shows for a moment, as a town's does on entering it */
   const b = $('twBanner'); b.textContent = TW.M.name; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');

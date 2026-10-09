@@ -10,11 +10,16 @@ import { TERRAIN } from '../tiles/terrain.js';
    Built grounds (paving, floors, fields) keep straight edges. Where one ground meets a lower-ranked one, the
    higher one is inked along its edge and casts a short shadow on the lower: grass overhangs a path, a path rims the
    sea, and the shore shows a strip of bank and a line of foam.
-   Height is shown the oblique way: a tile LIFT art pixels higher per height level, with a south-facing cliff
-   hanging below it down to the ground in front (an earth bank for one level, coursed rock for more), a rim
-   inked on its sides and a shadow on the ground to its east and at its foot. Upper floors are painted the same
-   way on their own layer, STOREY height levels above the ground under them. No DOM. */
-const TILE = 32, LIFT = 16, FRAMES = 4, WOBBLE = 12;
+   Height is a continuous surface, LIFT art pixels up per height level, seen obliquely from the south. Between
+   tiles one level apart (a step a walker can take) the ground rises in a smooth slope, lit where it faces the
+   light (the upper left) and shaded where it turns away; only where it jumps two levels or more (where no one can
+   walk) does it break into a cliff, its edge wandering like any other border. The surface is drawn column by
+   column from the south, as a height-field is: each point of ground stands at its height, and where it rises above
+   what is in front of it the gap below hangs as a cliff face (earth or rock with a grass lip, coursed stone under
+   paving, beams under floors, falling water). Every screen pixel remembers which row of ground it shows, so
+   figures and pieces standing behind a rise are hidden by it exactly. Upper floors that are shown join the
+   surface STOREY levels above the ground under them. No DOM. */
+const TILE = 64, LIFT = 14, FRAMES = 4, WOBBLE = 18, CLIFF_WOBBLE = 8, CHUNK = 128;
 
 /* ---------- noise ---------- */
 const h2 = (x, y, s = 0) => { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(s + 0x9e37, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
@@ -50,40 +55,86 @@ const INFO = TERRAIN.map(t => {
   const fam = FAMILY[t.id] || t.id;
   return {
     id: t.id, R: rampRgb(t.top), S: rampRgb(t.side[0]), fam, crisp, rank: RANK[fam] ?? 3, water: !!t.water, anim: !!t.water || !!t.glow,
-    face: t.water ? 'water' : t.glow ? 'lava' : fam === 'snow' ? 'snow' : t.group === 'Floors' || t.id === 'planks' ? 'wood' : crisp ? 'stone' : fam === 'rock' || fam === 'sand' ? 'rock' : 'earth',
+    face: t.water ? 'water' : t.glow ? 'lava' : fam === 'snow' ? 'snow' : t.group === 'Floors' || t.id === 'planks' ? 'wood' : crisp && t.group !== 'Farm' ? 'stone' : fam === 'rock' || fam === 'sand' ? 'rock' : 'earth',
     lip: fam === 'green' || fam === 'wet' || t.group === 'Farm' ? rampRgb(t.top) : fam === 'snow' ? rampRgb('#eceeea') : null
   };
 });
-const INK = rgb(OUTLINE);
+const INK = rgb(OUTLINE), WET = INFO.map(I => I.water);
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const dim = (c, k) => [c[0] * k, c[1] * k, c[2] * k * 1.04];
 const FLOWERS = ['#f4ecd8', '#e2bf4e', '#c4503e', '#9a7fc0'].map(rampRgb);
 const C = hex => rampRgb(hex);
 const LEAF = C('#6f8a40'), GRAIN = C('#e8d18a'), STALK = C('#b89443'), VINE = C('#5c773f'), GRAPE = C('#6a3d5c'), BUSH = C('#8f9a5a'), POOL = C('#8eb0ab'), LILY = C('#9ab06a');
+const TERRA = C('#c98a72'), PEBBLE = C('#bdb39d'), SNOWY = C('#eef0ec'), SHOAL = C('#c8bea0'), SWAMPW = C('#6c8278');
 const GOLDC = C('#e8ce8c'), CARPET_MARK = { carpet: C('#5a281e'), carpetblue: C('#283446') }, GLOW = C('#f4c25a'), CRUST = C('#5a4a42'), FOAM = rgb('#eef2ea'), STRAW = C('#b8a266');
 
-/* ---------- a map layer ---------- */
-/* the ground (L 0) or upper floor L of map M as a grid of ground indices (-1 where there is none) and heights */
-function layerOf(M, L = 0) {
-  const S = M.S, NN = S * S, terr = new Int16Array(NN), elev = new Int16Array(NN), fl = L ? M.floors && M.floors[L - 1] : null;
+/* ---------- the surface ---------- */
+/* the surface of map M seen with the storeys up to `top` shown: each tile's ground (or the highest floor laid over
+   it up to top), the storey that is and its height in levels */
+function fieldOf(M, top = 0) {
+  const S = M.S, NN = S * S, terr = new Int16Array(NN), hgt = new Float32Array(NN), lev = new Uint8Array(NN); let maxH = 0;
   for (let u = 0; u < NN; u++) {
-    if (L) { const v = fl ? fl[u] : 0; terr[u] = v ? v - 1 : -1; } else terr[u] = M.terr[u];
-    elev[u] = M.elev[u] + STOREY * L;
+    let L = 0, t = M.terr[u];
+    for (let l = 1; l <= top; l++) { const v = M.floors && M.floors[l - 1] ? M.floors[l - 1][u] : 0; if (v) { L = l; t = v - 1; } }
+    terr[u] = t; lev[u] = L; hgt[u] = M.elev[u] + STOREY * L; if (hgt[u] > maxH) maxH = hgt[u];
   }
-  return { S, L, terr, elev, ground: M.elev, any: terr.some(t => t >= 0) };
+  /* tiles with a slope round them (a neighbour one level off), where the ground is shaded by how it faces */
+  const slope = new Uint8Array(NN);
+  for (let u = 0; u < NN; u++) { const x = u % S, y = (u / S) | 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < S && Y < S && Math.abs(hgt[Y * S + X] - hgt[u]) === 1) slope[u] = 1; } }
+  return { S, top, terr, hgt, lev, maxH, slope, cells: new Map() };
 }
 const at = (G, x, y) => (x < 0 || y < 0 || x >= G.S || y >= G.S ? -1 : y * G.S + x);
 const terrAt = (G, x, y) => { const u = at(G, x, y); return u < 0 ? -1 : G.terr[u]; };
-/* the ground showing at map pixel (gx, gy): its own tile's, or for soft grounds, a neighbour's reached through a
-   smooth wobble, so the borders between them meander. Neighbours at another height, built grounds and the void
-   never wander in. */
-function classify(G, gx, gy) {
-  const tx = Math.floor(gx / TILE), ty = Math.floor(gy / TILE), u = at(G, tx, ty); if (u < 0) return -1;
-  const own = G.terr[u]; if (own < 0 || INFO[own].crisp) return own;
-  const sx = Math.floor((gx + (fbm(gx, gy, 1) - 0.5) * 2 * WOBBLE) / TILE), sy = Math.floor((gy + (fbm(gx, gy, 2) - 0.5) * 2 * WOBBLE) / TILE);
-  if (sx === tx && sy === ty) return own;
-  const s = at(G, sx, sy); if (s < 0) return own;
-  const t = G.terr[s]; return t < 0 || INFO[t].crisp || G.elev[s] !== G.elev[u] ? own : t;
+const cliff = (F, u, w) => Math.abs(F.hgt[u] - F.hgt[w]) >= 2;
+/* the tile whose height map pixel (gx, gy) takes: its own, or across a cliff a neighbour reached through a small
+   wobble, so cliff edges wander instead of running along the grid */
+function ownTile(F, gx, gy) {
+  const tx = Math.floor(gx / TILE), ty = Math.floor(gy / TILE), u = at(F, tx, ty); if (u < 0) return -1;
+  const w = at(F, Math.floor((gx + (fbm(gx, gy, 13) - 0.5) * 2 * CLIFF_WOBBLE) / TILE), Math.floor((gy + (fbm(gx, gy, 14) - 0.5) * 2 * CLIFF_WOBBLE) / TILE));
+  if (w < 0 || w === u || !cliff(F, u, w) || F.lev[u] || F.lev[w]) return u;
+  /* built ground and floors keep their straight edges */
+  const a = F.terr[u], b = F.terr[w]; return a < 0 || b < 0 || INFO[a].crisp || INFO[b].crisp ? u : w;
+}
+/* the ground showing at map pixel (gx, gy) of tile u: u's own, or for soft grounds, a neighbour's reached through
+   a smooth wobble, so the borders between them meander. Grounds across a cliff, built grounds and the void never
+   wander in. */
+function classify(F, gx, gy, u = ownTile(F, gx, gy)) {
+  if (u < 0) return -1;
+  const own = F.terr[u]; if (own < 0 || INFO[own].crisp) return own;
+  const s = at(F, Math.floor((gx + (fbm(gx, gy, 1) - 0.5) * 2 * WOBBLE) / TILE), Math.floor((gy + (fbm(gx, gy, 2) - 0.5) * 2 * WOBBLE) / TILE));
+  if (s < 0 || s === u) return own;
+  const t = F.terr[s]; return t < 0 || INFO[t].crisp || cliff(F, u, s) ? own : t;
+}
+/* the ground and height tile of every pixel, worked out a tile at a time and kept */
+function cellsOf(F, tx, ty) {
+  const key = ty * F.S + tx; let c = F.cells.get(key);
+  if (!c) {
+    if (F.cells.size > 1600) F.cells.delete(F.cells.keys().next().value);
+    const k = new Int16Array(TILE * TILE), own = new Int32Array(TILE * TILE);
+    for (let j = 0; j < TILE; j++) for (let i = 0; i < TILE; i++) { const gx = tx * TILE + i, gy = ty * TILE + j, u = ownTile(F, gx, gy); own[j * TILE + i] = u; k[j * TILE + i] = classify(F, gx, gy, u); }
+    c = { k, own }; F.cells.set(key, c);
+  }
+  return c;
+}
+/* the ground index at map pixel (gx, gy), or -1 off the map; its height tile is left in cellU */
+let cellU = -1;
+function cellAt(F, gx, gy) {
+  const tx = Math.floor(gx / TILE), ty = Math.floor(gy / TILE); if (tx < 0 || ty < 0 || tx >= F.S || ty >= F.S) { cellU = -1; return -1; }
+  const c = cellsOf(F, tx, ty), i = (gy - ty * TILE) * TILE + gx - tx * TILE; cellU = c.own[i]; return c.k[i];
+}
+const cellPair = (F, gx, gy) => { const k = cellAt(F, gx, gy); return [k, cellU]; };
+function corner(F, x, y, own, S) {
+  x = x < 0 ? 0 : x >= S ? S - 1 : x; y = y < 0 ? 0 : y >= S ? S - 1 : y;
+  const w = y * S + x, v = F.hgt[w], tw = F.terr[w]; return v - own >= 2 || own - v >= 2 || (tw >= 0 && WET[tw]) ? own : v;
+}
+/* the height in levels of map pixel (gx, gy), whose height tile is u: smoothed between the centres of the tiles
+   round it, except across a cliff (where it keeps its own level) and on water (which lies flat) */
+function heightAt(F, gx, gy, u = ownTile(F, gx, gy)) {
+  if (u < 0) return 0;
+  const own = F.hgt[u], t = F.terr[u]; if (t >= 0 && WET[t]) return own;
+  const fx = gx / TILE - 0.5, fy = gy / TILE - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), ax = smooth(fx - x0), ay = smooth(fy - y0), S = F.S;
+  const a = corner(F, x0, y0, own, S), b = corner(F, x0 + 1, y0, own, S), d = corner(F, x0, y0 + 1, own, S), e = corner(F, x0 + 1, y0 + 1, own, S);
+  return a + (b - a) * ax + (d - a) * ay + (a - b - d + e) * ax * ay;
 }
 
 /* ---------- the marks of each ground, in map pixels ---------- */
@@ -155,7 +206,7 @@ const TEX = {
   tallgrass: (R, x, y) => tuft(R, x, y, 5, 0.7, 121, true) || tuft(R, x + 2, y + 3, 6, 0.5, 122) || base(R, x, y, 0.2),
   pasture: (R, x, y) => tuft(R, x, y, 12, 0.25, 131) || base(R, x, y, 0.1),
   heath: (R, x, y) => { const q = spot(x, y, 5, 0.45, 141); if (q && Math.abs(q[0]) + Math.abs(q[1]) <= (q[2] < 0.5 ? 0 : 1)) return FLOWERS[3][q[0] || q[1] ? 2 : 1]; return tuft(R, x, y, 9, 0.3, 142) || base(R, x, y, 0.18); },
-  moor: (R, x, y) => tuft(R, x, y, 7, 0.45, 151) || pebble(C('#bdb39d'), x, y, 16, 0.2, 152) || base(R, x, y, 0.2),
+  moor: (R, x, y) => tuft(R, x, y, 7, 0.45, 151) || pebble(PEBBLE, x, y, 16, 0.2, 152) || base(R, x, y, 0.2),
   garden: (R, x, y) => flower(x, y, 5, 0.42, 161) || tuft(R, x, y, 9, 0.3, 162) || base(R, x, y),
   scrub: (R, x, y) => { const q = spot(x, y, 14, 0.5, 171, 4); if (q) { const d = (q[0] * q[0]) / 9 + (q[1] * q[1]) / 4; if (d < 1) return BUSH[d > 0.6 ? (q[1] > 0 ? 4 : 3) : q[1] < 0 && q[0] < 0 ? 1 : 2]; } return pebble(R, x, y, 9, 0.2, 172) || base(R, x, y, 0.18); },
   dirt: (R, x, y) => pebble(R, x, y, 8, 0.22, 181) || base(R, x, y, 0.22),
@@ -167,22 +218,22 @@ const TEX = {
   rock: (R, x, y) => { const c = fbm(x, y, 231); if (Math.abs(c - 0.5) < 0.012) return R[4]; if (Math.abs(c - 0.5) < 0.03) return R[1]; return base(R, x, y, 0.12); },
   scree: (R, x, y) => pebble(R, x, y, 5, 0.65, 241, 3) || base(R, x, y, 0.2),
   snow: (R, x, y) => { const h = h2(x, y, 251); if (h < 0.012) return R[0]; const c = ((Math.floor(y + 2 * Math.sin(x / 7)) % 13) + 13) % 13; return c === 0 && fbm(x, y, 252) > 0.5 ? R[3] : base(R, x, y, 0.06); },
-  tundra: (R, x, y) => { if (fbm(x, y, 261) > 0.64) return C('#eef0ec')[fbm(x, y - 1, 261) > 0.64 ? 1 : 2]; return tuft(R, x, y, 9, 0.3, 262) || base(R, x, y, 0.18); },
+  tundra: (R, x, y) => { if (fbm(x, y, 261) > 0.64) return SNOWY[fbm(x, y - 1, 261) > 0.64 ? 1 : 2]; return tuft(R, x, y, 9, 0.3, 262) || base(R, x, y, 0.18); },
   ice: (R, x, y) => { const d = ((x - y) % 23 + 23) % 23; if (d === 0 && fbm(x, y, 271) > 0.5) return [255, 255, 255]; if (Math.abs(fbm(x, y, 272) - 0.5) < 0.01) return R[4]; return base(R, x, y, 0.04); },
   ash: (R, x, y) => { const h = h2(x, y, 281); if (h < 0.004) return GLOW[1]; return pebble(R, x, y, 8, 0.2, 282) || base(R, x, y, 0.28); },
   lava: (R, x, y, f) => { const n = fbm(x + f * 1.5, y, 291); if (n < 0.36) return CRUST[n < 0.3 ? 3 : 2]; if (n < 0.4) return R[4]; const g = (Math.floor(x / 3 + y / 5) + f) % 6; return g === 0 ? GLOW[0] : g < 2 ? GLOW[1] : R[n > 0.6 ? 1 : 2]; },
-  shallows: (R, x, y, f) => pebble(C('#c8bea0'), x, y, 13, 0.25, 301) || waterTone(R, x, y, f, FOAM, 5),
+  shallows: (R, x, y, f) => pebble(SHOAL, x, y, 13, 0.25, 301) || waterTone(R, x, y, f, FOAM, 5),
   water: (R, x, y, f) => waterTone(R, x, y, f, mix(R[0], FOAM, 0.6)),
   deep: (R, x, y, f) => waterTone(R, x, y, f, R[0]),
   marsh: (R, x, y) => { if (fbm(x, y, 311) > 0.63) return POOL[fbm(x, y - 1, 311) > 0.63 ? 2 : 4]; return tuft(LEAF, x, y, 6, 0.5, 312, true) || base(R, x, y, 0.18); },
-  swamp: (R, x, y) => { if (fbm(x, y, 321) > 0.55) { const q = spot(x, y, 9, 0.35, 322); if (q && q[0] * q[0] + q[1] * q[1] <= 2) return LILY[q[1] < 0 ? 1 : 2]; return C('#6c8278')[fbm(x, y - 1, 321) > 0.55 ? 2 : 4]; } return tuft(LEAF, x, y, 6, 0.4, 323, true) || base(R, x, y, 0.2); },
+  swamp: (R, x, y) => { if (fbm(x, y, 321) > 0.55) { const q = spot(x, y, 9, 0.35, 322); if (q && q[0] * q[0] + q[1] * q[1] <= 2) return LILY[q[1] < 0 ? 1 : 2]; return SWAMPW[fbm(x, y - 1, 321) > 0.55 ? 2 : 4]; } return tuft(LEAF, x, y, 6, 0.4, 323, true) || base(R, x, y, 0.2); },
   field: (R, x, y) => { const m = ((y % 4) + 4) % 4; return m === 0 ? R[4] : m === 1 ? R[1] : base(R, x, y, 0.1); },
   wheat: (R, x, y) => { const c = ((x % 3) + 3) % 3, k = h2(Math.floor(x / 3), 7, 331), m = ((Math.floor(y + k * 6) % 6) + 6) % 6; if (c === 1) return m === 0 ? GRAIN[0] : m === 1 ? GRAIN[1] : m < 4 ? STALK[2] : STALK[3]; return m === 5 ? R[4] : R[c ? 2 : 3]; },
   crops: (R, x, y) => { const cx = ((x % 8) + 8) % 8, cy = ((y % 8) + 8) % 8, dx = cx - 3.5, dy = cy - 3.5, d = dx * dx + dy * dy * 1.4; if (d < 9) return LEAF[d < 3 ? (dy < 0 ? 0 : 1) : dy > 0 ? 4 : 2]; return cy === 7 ? R[4] : base(R, x, y, 0.1); },
   vineyard: (R, x, y) => { const cx = ((x % 8) + 8) % 8; if (cx >= 2 && cx <= 5) { const g = h2(Math.floor(x / 8), Math.floor(y / 5), 341); if (g < 0.3 && cx > 2 && cx < 5 && y % 5 > 1) return GRAPE[y % 5 === 2 ? 1 : 3]; return VINE[cx === 2 ? 1 : cx === 5 ? 4 : (y % 3 ? 2 : 3)]; } return cx === 6 ? R[4] : base(R, x, y, 0.1); },
   cobble: (R, x, y) => R[blocks(x, y, 8, 6, true)],
   flagstone: (R, x, y) => R[blocks(x, y, 16, 16, true, 1)],
-  plaza: (R, x, y, f, G, k) => { const t = blocks(x, y, 16, 16, false, 2), cx = ((x % 32) + 32) % 32 - 15.5, cy = ((y % 32) + 32) % 32 - 15.5; if (t !== 4 && Math.abs(cx) + Math.abs(cy) < 7) return C('#c98a72')[Math.abs(cx) + Math.abs(cy) < 4 ? 2 : 1]; return R[t]; },
+  plaza: (R, x, y, f, G, k) => { const t = blocks(x, y, 16, 16, false, 2), cx = ((x % 32) + 32) % 32 - 15.5, cy = ((y % 32) + 32) % 32 - 15.5; if (t !== 4 && Math.abs(cx) + Math.abs(cy) < 7) return TERRA[Math.abs(cx) + Math.abs(cy) < 4 ? 2 : 1]; return R[t]; },
   planks: (R, x, y) => R[boardsTone(x, y, 6, 1)],
   floorboards: (R, x, y) => R[boardsTone(x, y, 8, 2)],
   oakfloor: (R, x, y) => R[boardsTone(x, y, 6, 3)],
@@ -202,97 +253,87 @@ function carpetTone(R, x, y, G, k, M) {
 const TEXI = INFO.map(I => TEX[I.id] || ((R, x, y) => base(R, x, y)));
 const texel = (k, x, y, f, G) => TEXI[k](INFO[k].R, x, y, f, G, k);
 
-/* ---------- a tile's top ---------- */
-const PAD = 3, PW = TILE + 2 * PAD;
-const elevAt = (G, x, y) => { const u = at(G, x, y); return u < 0 || G.terr[u] < 0 ? null : G.elev[u]; };
-/* the top of tile (tx, ty) as TILE × TILE RGBA, frame f of the animated grounds */
-function tileTop(G, tx, ty, f = 0) {
-  const out = new Uint8ClampedArray(TILE * TILE * 4), u = at(G, tx, ty); if (u < 0 || G.terr[u] < 0) return out;
-  const e = G.elev[u], gx0 = tx * TILE - PAD, gy0 = ty * TILE - PAD, cls = new Int16Array(PW * PW), lvl = new Int16Array(PW * PW);
-  for (let j = 0; j < PW; j++) for (let i = 0; i < PW; i++) { const gx = gx0 + i, gy = gy0 + j, c = classify(G, gx, gy); cls[j * PW + i] = c; const ee = c < 0 ? null : elevAt(G, Math.floor(gx / TILE), Math.floor(gy / TILE)); lvl[j * PW + i] = ee == null ? -999 : ee; }
-  const eN = elevAt(G, tx, ty - 1), eS = elevAt(G, tx, ty + 1), eW = elevAt(G, tx - 1, ty), eE = elevAt(G, tx + 1, ty);
-  for (let ly = 0; ly < TILE; ly++) for (let lx = 0; lx < TILE; lx++) {
-    const i = (ly + PAD) * PW + lx + PAD, k = cls[i], gx = tx * TILE + lx, gy = ty * TILE + ly, I = INFO[k];
-    let c = texel(k, gx, gy, f, G);
-    /* where two grounds meet on one level: the higher-ranked one is inked along its edge, and shades the lower one
-       below its edge; the sea gets a bank and foam */
-    let edge = false, shade = 0;
-    for (const d of [-1, 1, -PW, PW]) { const n = cls[i + d]; if (n >= 0 && n !== k && lvl[i + d] === e && INFO[n].fam !== I.fam && INFO[n].rank < I.rank) edge = true; }
-    if (edge) c = mix(I.R[4], INK, 0.35);
-    else {
-      for (let s = 1; s <= 3; s++) { const n = cls[i - s * PW]; if (n >= 0 && n !== k && lvl[i - s * PW] === e && INFO[n].fam !== I.fam && INFO[n].rank > I.rank) { shade = s; break; } }
-      if (shade && I.water) {
-        const n = cls[i - shade * PW]; c = shade < 3 ? INFO[n].S[shade === 1 ? 2 : 3] : f % 2 ? FOAM : mix(FOAM, c, 0.4);
-      } else if (shade) c = dim(c, shade === 1 ? 0.74 : shade === 2 ? 0.84 : 0.93);
-      else if (I.water) {
-        for (const d of [-1, 1, PW, -2, 2, 2 * PW]) { const n = cls[i + d]; if (n >= 0 && !INFO[n].water && lvl[i + d] === e) { const near = d === -1 || d === 1 || d === PW; if (h2(gx, gy, f + 70) < (near ? 0.75 : 0.35)) c = mix(FOAM, c, near ? 0.2 : 0.55); break; } }
+/* ---------- drawing the surface ---------- */
+const D4 = [[-1, 0], [1, 0], [0, -1], [0, 1]], SHORE = [[-1, 0], [1, 0], [0, 1], [-2, 0], [2, 0], [0, 2]];
+/* the colour of the ground's top at map pixel (gx, gy) of ground k and height tile u, standing h levels up */
+function topColour(F, gx, gy, k, u, h, f) {
+  const I = INFO[k]; let c = texel(k, gx, gy, f, F);
+  const near = (x, y) => { const n = cellAt(F, x, y); return n >= 0 && !cliff(F, u, cellU) ? n : -1; };
+  /* where two grounds meet: the higher-ranked one is inked along its edge and shades the lower one below it; the
+     sea gets a bank and foam */
+  let edge = false;
+  for (const [dx, dy] of D4) { const n = near(gx + dx, gy + dy); if (n >= 0 && n !== k && INFO[n].fam !== I.fam && INFO[n].rank < I.rank) { edge = true; break; } }
+  if (edge) c = mix(I.R[4], INK, 0.35);
+  else {
+    let shade = 0, over = -1;
+    for (let s = 1; s <= 3; s++) { const n = near(gx, gy - s); if (n >= 0 && n !== k && INFO[n].fam !== I.fam && INFO[n].rank > I.rank) { shade = s; over = n; break; } }
+    if (shade && I.water) c = shade < 3 ? INFO[over].S[shade === 1 ? 2 : 3] : mix(FOAM, c, 0.25);
+    else if (shade) c = dim(c, shade === 1 ? 0.74 : shade === 2 ? 0.84 : 0.93);
+    else if (I.water) for (const [dx, dy] of SHORE) { const n = near(gx + dx, gy + dy); if (n >= 0 && !INFO[n].water) { const close = Math.abs(dx) + Math.abs(dy) === 1; if (h2(gx, gy, 70) < (close ? 0.75 : 0.35)) c = mix(FOAM, c, close ? 0.2 : 0.55); break; } }
+  }
+  if (!I.water && F.slope[u]) {
+    /* slopes: lit facing the upper left, shaded facing away */
+    const dx = heightAt(F, gx + 2, gy, u) - heightAt(F, gx - 2, gy, u), dy = heightAt(F, gx, gy + 2, u) - heightAt(F, gx, gy - 2, u);
+    if (dx || dy) { const l = 1 + 1.8 * (dx * 0.7 + dy * 0.45); c = l > 1 ? mix(c, [255, 250, 232], Math.min(0.35, (l - 1) * 0.9)) : dim(c, Math.max(0.6, l)); }
+  }
+  /* a cliff to the west throws its shadow east across this ground; one just north darkens its foot */
+  const S = F.S, tx = Math.floor(gx / TILE), ty = Math.floor(gy / TILE), hw = tx > 0 ? F.hgt[ty * S + tx - 1] : 0, hn = ty > 0 ? F.hgt[(ty - 1) * S + tx] : 0;
+  const hu = F.hgt[u];
+  if (hw - hu >= 2 || (tx > 0 && ty > 0 && F.hgt[(ty - 1) * S + tx - 1] - hu >= 2) || (tx > 0 && ty + 1 < S && F.hgt[(ty + 1) * S + tx - 1] - hu >= 2)) {
+    for (let s = 3; s <= 40; s += 3) { const w = ownTile(F, gx - s, gy); if (w < 0) break; if ((heightAt(F, gx - s, gy, w) - h) * LIFT > s * 0.8 + 1) { c = dim(c, 0.72); break; } }
+  }
+  if (hn - hu >= 2 || (ty > 0 && cliff(F, u, (ty - 1) * S + tx))) { const w = ownTile(F, gx, gy - 4); if (w >= 0 && heightAt(F, gx, gy - 4, w) - h >= 1.5) c = dim(c, 0.76); }
+  return c;
+}
+/* the colour of a cliff face r pixels below the brink of map pixel (gx, gy), in a face run pixels deep */
+function faceColour(F, gx, gy, k, u, h, r, run, f) {
+  const I = INFO[k], S2 = I.S, wy = Math.round(h * LIFT) - r; let c;
+  if (I.face === 'water' || I.face === 'lava') {
+    const R = I.R, s = ((r - f * 4 + Math.floor(h2(gx, 5) * 9)) % 9 + 9) % 9;
+    return I.face === 'lava' ? (s < 2 ? GLOW[1] : R[s < 5 ? 2 : 3]) : r < 2 ? FOAM : s < 2 ? mix(R[0], FOAM, 0.6) : R[s < 5 ? 1 : 2];
+  }
+  if (I.face === 'wood') { c = S2[Math.min(4, boardsTone(gx, wy, 5, 7) + 1)]; }
+  else if (I.face === 'stone') { const t = blocks(gx + Math.floor(h2(Math.floor(wy / 7), 3) * 6), wy, 10 + Math.floor(h2(Math.floor(wy / 7), 4) * 5), 7, false, 5); c = t === 4 ? mix(S2[4], INK, 0.3) : S2[t === 0 ? 1 : t]; }
+  else if (I.face === 'rock' || run > 2 * LIFT + 4) { const w = worley(gx, wy, 11, 8, 5), lit = w.dx + w.dy; c = w.edge < 0.09 ? mix(S2[4], INK, 0.35) : w.edge < 0.18 && lit > 0 ? S2[3] : lit < -0.35 ? S2[1] : w.id < 0.3 ? S2[3] : S2[2]; }
+  else { const n = vnoise(gx / 11, wy / 3, 61); c = S2[n < 0.3 ? 3 : n > 0.72 ? 1 : 2]; if (h2(gx, wy, 62) < 0.05) c = S2[4]; }
+  c = dim(c, 1 - 0.22 * r / run);
+  /* grass, crops and snow hang a ragged lip over the brink; anything else is inked along it */
+  if (I.lip) { const lip = 2 + Math.floor(h2(gx, 0, 63) * 3) + (h2(Math.floor(gx / 3), 1, 64) < 0.25 ? 2 : 0); if (r <= lip) c = I.lip[r === lip ? 4 : r === 1 ? 2 : 3]; }
+  else if (r === 1) c = mix(I.R[4], INK, 0.4);
+  if (r === run - 1) c = mix(c, INK, 0.45);
+  return c;
+}
+/* Draw the surface into a CHUNK × CHUNK piece of the screen whose top left is art pixel (X0, Y0): RGBA, and for each
+   pixel 1 + the row of ground it shows (0 for none). A screen pixel (X, Y) shows ground (X, gy) standing at
+   Y = gy - height × LIFT; each column is walked from the south, and wherever a point stands above everything in
+   front of it, the rows down to the next point are its cliff face. */
+function renderChunk(F, X0, Y0, f = 0) {
+  const W = CHUNK, px = new Uint8ClampedArray(W * W * 4), depth = new Uint16Array(W * W), S = F.S, end = S * TILE, maxL = F.maxH * LIFT, Y1 = Y0 + W;
+  for (let i = 0; i < W; i++) {
+    const gx = X0 + i; if (gx < 0 || gx >= end) continue;
+    const g0 = Math.min(end - 1, Math.floor(Y1 + maxL + 1)), g1 = Math.max(0, Y0);
+    /* the map's south edge stands on a face down to height 0 */
+    let ymin = g0 === end - 1 ? end : Infinity;
+    for (let gy = g0; gy >= g1; gy--) {
+      const k = cellAt(F, gx, gy), u = cellU; if (k < 0) continue;
+      const h = heightAt(F, gx, gy, u), sy = Math.round(gy - h * LIFT);
+      if (sy >= ymin) continue;
+      const run = ymin === Infinity ? 1 : ymin - sy, a = Math.max(sy, Y0), b = Math.min(ymin, Y1);
+      if (a < b) {
+        const top = topColour(F, gx, gy, k, u, h, f), steep = run > 3;
+        for (let y = a; y < b; y++) {
+          const r = y - sy; let c = r === 0 || !steep ? top : faceColour(F, gx, gy, k, u, h, r, run, f);
+          if (r === 0 && steep) c = mix(c, [255, 250, 235], 0.3);
+          const o = (y - Y0) * W + i; px[o * 4] = c[0]; px[o * 4 + 1] = c[1]; px[o * 4 + 2] = c[2]; px[o * 4 + 3] = 255; depth[o] = gy + 1;
+        }
       }
+      ymin = sy;
     }
-    /* heights: a lit lip on the edges that fall away, an inked rim at the sides, shadows below what rises */
-    if (eW === null || eW < e) { if (lx === 0) c = mix(I.R[4], INK, 0.5); }
-    else if (eW > e) { const w = Math.min(TILE, (eW - e) * 6); if (lx < w) c = dim(c, 0.74 + 0.16 * lx / w); }
-    if (eE === null || eE < e) { if (lx === TILE - 1) c = mix(I.R[4], INK, 0.5); }
-    if (eN === null || eN < e) { if (ly === 0) c = mix(c, [255, 250, 235], 0.35); }
-    else if (eN > e && ly < 4) c = dim(c, 0.66 + 0.08 * ly);
-    if ((eS === null || eS < e) && ly === TILE - 1) c = mix(c, [255, 250, 235], 0.3);
-    const o = (ly * TILE + lx) * 4; out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 255;
   }
-  return out;
+  return { px, depth };
 }
-/* does tile (tx, ty) change from frame to frame (water or lava on it or wandering into it)? */
-function animated(G, tx, ty) {
-  const u = at(G, tx, ty); if (u < 0 || G.terr[u] < 0) return false;
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const t = terrAt(G, tx + dx, ty + dy); if (t >= 0 && INFO[t].anim && (!dx && !dy || G.elev[at(G, tx + dx, ty + dy)] === G.elev[u])) return true; }
-  return false;
-}
+/* the screen row of map pixel (gx, gy)'s top */
+const screenY = (F, gx, gy) => Math.round(gy - heightAt(F, gx, gy) * LIFT);
+const isWater = (F, u) => u >= 0 && F.terr[u] >= 0 && INFO[F.terr[u]].water;
 
-/* ---------- a tile's cliff ---------- */
-/* how far the face below tile (tx, ty) drops, in art pixels: down to the tile in front on the same layer, or on an
-   upper floor with nothing in front, down to the ground there */
-function faceHeight(G, tx, ty) {
-  const u = at(G, tx, ty); if (u < 0 || G.terr[u] < 0) return 0;
-  const s = at(G, tx, ty + 1), e = G.elev[u];
-  const below = s < 0 ? (G.L ? G.ground[u] : 0) : G.terr[s] >= 0 ? G.elev[s] : G.ground[s];
-  return Math.max(0, (e - below) * LIFT);
-}
-/* the face below tile (tx, ty): TILE × faceHeight RGBA */
-function tileFace(G, tx, ty, f = 0) {
-  const h = faceHeight(G, tx, ty), out = new Uint8ClampedArray(TILE * Math.max(1, h) * 4); if (!h) return { w: TILE, h: 0, px: out };
-  const u = at(G, tx, ty), k = G.terr[u], I = INFO[k], e = G.elev[u], top = e * LIFT, steep = h > LIFT, hW = faceHeight(G, tx - 1, ty), hE = faceHeight(G, tx + 1, ty);
-  const S = I.S;
-  for (let y = 0; y < h; y++) for (let x = 0; x < TILE; x++) {
-    const gx = tx * TILE + x, wy = top - y; let c;
-    if (I.face === 'water' || I.face === 'lava') {
-      const R = I.R, s = ((y - f * 4 + Math.floor(h2(gx, 5) * 9)) % 9 + 9) % 9;
-      c = I.face === 'lava' ? (s < 2 ? GLOW[1] : R[s < 5 ? 2 : 3]) : y < 2 ? FOAM : s < 2 ? mix(R[0], FOAM, 0.6) : R[s < 5 ? 1 : 2];
-    } else if (I.face === 'wood') {
-      const t = boardsTone(gx, y, 5, 7); c = S[Math.min(4, t + 1)];
-      if (y === 0) c = mix(S[4], INK, 0.5);
-    } else if ((steep && I.face !== 'stone') || I.face === 'rock') {
-      /* natural rock: boulders lit on their upper left, cracks between them */
-      const w = worley(gx, wy, 11, 8, 5), lit = w.dx + w.dy;
-      c = w.edge < 0.09 ? mix(S[4], INK, 0.35) : w.edge < 0.18 && lit > 0 ? S[3] : lit < -0.35 ? S[1] : w.id < 0.3 ? S[3] : S[2];
-    } else if (I.face === 'stone') {
-      const t = blocks(gx + Math.floor(h2(Math.floor(wy / 7), 3) * 6), wy, 10 + Math.floor(h2(Math.floor(wy / 7), 4) * 5), 7, false, 5);
-      c = S[t === 4 ? 4 : t === 0 ? 1 : t === 1 ? 1 : t]; if (t === 4) c = mix(S[4], INK, 0.3);
-    } else {
-      /* an earth bank: wandering strata */
-      const n = vnoise(gx / 11, wy / 3, 61); c = S[n < 0.3 ? 3 : n > 0.72 ? 1 : 2];
-      if (h2(gx, wy, 62) < 0.05) c = S[4];
-    }
-    /* the light falls from the upper left: the face darkens toward its foot */
-    if (I.face !== 'water' && I.face !== 'lava') c = dim(c, 1 - 0.18 * y / h);
-    /* grass, crops and snow hang a ragged lip over the brink */
-    if (I.lip && I.face !== 'water') { const lip = 2 + Math.floor(h2(gx, 0, 63) * 3) + (h2(Math.floor(gx / 3), 1, 64) < 0.25 ? 2 : 0); if (y < lip) c = I.lip[y === lip - 1 ? 4 : y === 0 ? 2 : 3]; }
-    else if (y === 0 && I.face !== 'water' && I.face !== 'lava') c = mix(I.R[4], INK, 0.4);
-    if (y === h - 1) c = mix(c, INK, 0.45);
-    /* the rim where the face ends beside a lower one */
-    if ((x === 0 && y >= hW) || (x === TILE - 1 && y >= hE)) c = mix(c, INK, 0.6);
-    else if (x === TILE - 1 && I.face !== 'water') c = dim(c, 0.9);
-    const o = (y * TILE + x) * 4; out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 255;
-  }
-  return { w: TILE, h, px: out };
-}
-const faceAnimated = (G, tx, ty) => { const u = at(G, tx, ty); return u >= 0 && G.terr[u] >= 0 && INFO[G.terr[u]].anim && faceHeight(G, tx, ty) > 0; };
-
-export { FRAMES, INFO, LIFT, TILE, animated, classify, faceAnimated, faceHeight, fbm, h2, layerOf, mixHex, texel, tileFace, tileTop };
+export { CHUNK, FRAMES, INFO, LIFT, TILE, cellAt, cellPair, classify, fbm, fieldOf, h2, heightAt, isWater, mixHex, ownTile, renderChunk, screenY, texel };

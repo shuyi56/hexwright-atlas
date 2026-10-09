@@ -218,21 +218,29 @@ frames of an animated ground, then a left and right face two levels deep), with 
 ### Town view
 
 **Town** (`O`) in the editor walks the map the way the old town RPGs do (Final Fantasy VI, Dragon Quest, Pokémon):
-seen from above and the south on square 32-pixel tiles, with the ground painted as one solid surface rather than a
-grid of blocks.
+seen from above and the south on square 64-pixel tiles (about four figures across), with the ground painted as one
+solid surface rather than a grid of blocks.
 
 - **Solid ground:** every mark (grass tufts, flowers, cobbles, boards, ripples) is laid out in map pixels, so a
   ground runs across tile edges without a seam. Where soft grounds meet (grass, a dirt road, sand, the sea) the border
   wanders on a smooth noise instead of following the grid; paving, floors and fields keep straight edges. The
   higher-ranked ground is inked along its edge and shades the lower one: grass overhangs a path, and the shore shows
   a strip of bank and a line of foam on the water. Water and lava ripple.
-- **Heights:** a raised tile sits 16 pixels higher per height level, with its cliff hanging below it to the south:
-  an earth bank with a grass lip for one level, broken rock for more, coursed blocks under paving, beams under floors.
-  Water falls over its edge. Cliff tops get a lit rim, and the ground at a cliff's foot and to its east is shaded.
-- **Pieces:** every building, prop, plant and piece of furniture is redrawn front-on: front walls (plaster,
-  timber framing, ashlar, planks) with doors and shuttered windows, under thatch, clay tile, slate or shingle roofs
-  that lean back over them, with chimneys and smoke; round towers with cones or battlements; trees as lit leaf
-  masses; and a shadow on the ground to the east. City and room walls join their neighbours. A piece standing in
+- **Heights:** height is one continuous surface, 14 pixels up per level, drawn column by column from the south like
+  a height-field. Between tiles one level apart (a step anyone can walk) the ground rises in a smooth slope, lit
+  where it faces the upper left and shaded where it turns away. Only a jump of two levels or more (where no one can
+  walk) breaks into a cliff, its edge wandering like any other border: earth or rock under a ragged grass lip,
+  coursed blocks under paving, beams under floors, falling water. Cliffs throw a shadow east and darken the ground at
+  their foot. Upper floors that are shown join the surface a storey up.
+- **Depth:** every screen pixel of ground remembers which row of the map it shows. A piece or figure is cut away
+  wherever the ground shown there lies in front of where it stands, so a rise or cliff hides exactly what is behind
+  it, and figures walking up a slope follow the ground.
+- **Pieces:** every building, prop, plant and piece of furniture is redrawn front-on. A house fills its own
+  footprint, wider than it is tall: a front wall (plaster, timber framing, ashlar, planks) with doors and shuttered
+  windows, and above it a thatch, clay tile, slate or shingle roof with chimneys and smoke. So a row of houses never
+  covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
+  towers carry cones or battlements, trees are lit leaf masses, and props and furniture keep the figures' scale in the
+  middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
   front of the hero fades so they are never lost behind it.
 - **Walking:** the arrow keys or `WASD` walk the hero a tile at a time (`Shift` runs), turning to face a way that is
   blocked; clicking a tile walks them there by the editor's walking rules, up and down stairs. Only the storeys up
@@ -243,8 +251,8 @@ grid of blocks.
 - **A stroll, not an edit:** the town view walks a copy of the map, so nothing it does changes the map or its undo
   history, and it starts afresh each time it is opened.
 
-`src/town/` holds it: `ground.js` paints tile tops and cliffs from the map (no DOM), `pieces.js` draws the pieces
-(no DOM), `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
+`src/town/` holds it: `ground.js` builds the height surface and paints it in 128-pixel chunks with their depth
+buffers (no DOM), `pieces.js` draws the pieces (no DOM), `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
 in it.
 
 ![The town view](docs/images/town-view.png)
@@ -381,8 +389,8 @@ src/
   units/              The unit data page (units.html)
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen
-  town/               Town view: the solid painted ground and its cliffs, the front-on pieces, townsfolk's
-                      lines and the walking screen
+  town/               Town view: the painted height surface with its slopes, cliffs and depth buffer, the
+                      front-on pieces, townsfolk's lines and the walking screen
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
 tools/                Vite plugin that relays HTTP calls to the editor page and saves unit data (dev server only),

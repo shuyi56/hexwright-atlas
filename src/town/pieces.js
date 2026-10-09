@@ -10,6 +10,13 @@ import { TILE } from './ground.js';
    (ox, oy) in the sprite is the footprint's north-west corner on the ground, and everything rises from there.
    Front walls carry the door when the piece faces south, east or west; turned away, the front shows windows.
    No DOM. */
+/* The town's tiles are twice as wide as the tile set's 32, about four figures across, so a house is properly
+   wider than it is tall. Towers are drawn twice as wide (RS) and walls half as tall again (HS), keeping doors and
+   windows at the figures' scale. A house keeps inside its own footprint, front wall below and roof above, so a
+   row of houses never covers the fronts of the row behind; only towers, keeps and spires stand up over the tiles
+   north of them. Props, plants and furniture are drawn at the 32 scale (small buildings at 48) and stood in the
+   middle of their tiles. */
+const HS = 1.55, RS = TILE / 32;
 const T = TILE, INK = hexRgb(OUTLINE), SHADOW = [43, 33, 22, 72];
 const ramps = new Map();
 const R = hex => { let r = ramps.get(hex); if (!r) { r = ramp(hex).map(hexRgb); ramps.set(hex, r); } return r; };
@@ -58,7 +65,9 @@ function kit(FW, FD, up, side = 16) {
     },
     /* the shadow on the ground: east of the rows [y0, y1), reaching len pixels past x1, under nothing drawn */
     shadow(x0, y0, x1, y1, len) {
-      for (let y = Math.ceil(y0); y < y1; y++) { const reach = x1 + len * Math.min(1, (y - y0 + 2) / 6); for (let x = Math.ceil(x0); x < reach; x++) { const i = idx(x, y); if (i >= 0 && !px[i + 3]) { px[i] = SHADOW[0]; px[i + 1] = SHADOW[1]; px[i + 2] = SHADOW[2]; px[i + 3] = SHADOW[3]; } } }
+      /* only along the front part of the footprint, tapering off toward the back */
+      const from = Math.max(y0, y1 - Math.max(14, (y1 - y0) * 0.55));
+      for (let y = Math.ceil(from); y < y1; y++) { const reach = x1 + len * Math.min(1, (y - from + 2) / 8); for (let x = Math.ceil(x0); x < reach; x++) { const i = idx(x, y); if (i >= 0 && !px[i + 3]) { px[i] = SHADOW[0]; px[i + 1] = SHADOW[1]; px[i + 2] = SHADOW[2]; px[i + 3] = SHADOW[3]; } } }
     },
     ovalShadow(cx, cy, rx, ry) {
       for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
@@ -130,51 +139,55 @@ function chimney(K, x, y, h, smoke) {
    east-west and the roof's south slope covers the top; deeper than wide, the ridge runs north-south and the
    front shows the gable end. */
 function house(K, o, p) {
-  const { FW, FD } = K, ins = p.inset ?? 2, x0 = ins, x1 = FW - ins, yb = FD - 3 - (p.lift || 0), yk = 7, wallH = p.wallH ?? 24, rise = p.rise ?? 16;
+  const { FW, FD } = K, ins = p.inset ?? 4, x0 = ins, x1 = FW - ins, yb = FD - 4 - Math.round((p.lift || 0) * HS);
+  /* the wall takes what it needs, up to all but the room a roof needs above it */
+  const wallH = Math.round(Math.min((p.wallH ?? 24) * HS, yb - Math.max(16, FD * 0.28))), rise = Math.round((p.rise ?? 16) * HS);
   const Wl = R(WALL[p.wall] || p.wall || WALL.plaster), Rf = R(ROOF[p.roof] || p.roof), floors = p.floors || 1, top = yb - wallH, floorH = wallH / floors;
-  const ov = p.overhang ?? 3, ridgeX = p.ridge ? p.ridge === 'x' : FW >= FD, door = p.door !== false && o.face !== 2;
-  if (p.lift) for (const sx of [x0 + 1, x1 - 4]) K.rect(sx, yb, sx + 3, yb + p.lift, R('#c4b99f')[sx < FW / 2 ? 2 : 3]);
+  const ov = p.overhang ?? 4, ridgeX = p.ridge ? p.ridge === 'x' : FW >= FD, door = p.door !== false && o.face !== 2;
+  if (p.lift) for (const sx of [x0 + 2, x1 - 6]) K.rect(sx, yb, sx + 4, yb + Math.round(p.lift * HS), R('#c4b99f')[sx < FW / 2 ? 2 : 3]);
   /* the front wall */
   K.rect(x0, top, x1, yb, (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top));
-  if (p.plinth) K.rect(x0, yb - 3, x1, yb, (x, y) => R('#b5aa94')[y === yb - 3 ? 1 : 3]);
-  const dx = p.doorX ?? FW / 2, doorW = p.doorW || 10, doorH = Math.min(wallH - 6, p.doorH || 16);
+  if (p.plinth) K.rect(x0, yb - 4, x1, yb, (x, y) => R('#b5aa94')[y === yb - 4 ? 1 : 3]);
+  const dx = p.doorX ?? FW / 2, doorW = Math.round((p.doorW || 10) * 1.3), doorH = Math.min(Math.round(floorH - 3), Math.round((p.doorH || 16) * 1.45));
   if (door) doorAt(K, dx, yb, doorW, doorH, { col: p.doorCol, arch: p.arch, open: p.open });
   if (p.windows !== false) {
     for (let f = 0; f < floors; f++) {
-      const wy = Math.round(top + floorH * (floors - 1 - f) + (f ? floorH * 0.3 : floorH * 0.28)), ww = p.winW || 6, n = Math.max(1, Math.floor((x1 - x0 - 4) / (ww + 7)));
+      const wh = Math.min(13, Math.round(floorH * 0.42)), wy = Math.round(top + floorH * (floors - 1 - f) + (floorH - wh) * (f ? 0.45 : 0.32)), ww = Math.round((p.winW || 6) * 1.5), n = Math.max(1, Math.floor((x1 - x0 - 8) / (ww + 12)));
       for (let k = 0; k < n; k++) {
         const wx = Math.round(x0 + (x1 - x0) * (k + 0.5) / n - ww / 2);
-        if (door && f === 0 && wx + ww > dx - doorW / 2 - 2 && wx < dx + doorW / 2 + 2) continue;
-        windowAt(K, wx, wy, ww, Math.min(8, Math.round(floorH * 0.38)), { shutter: p.shutter, lit: p.lit, arch: p.arch, glass: p.glass });
+        if (door && f === 0 && wx + ww > dx - doorW / 2 - 3 && wx < dx + doorW / 2 + 3) continue;
+        windowAt(K, wx, wy, ww, wh, { shutter: p.shutter, lit: p.lit, arch: p.arch, glass: p.glass });
       }
     }
   }
   if (ridgeX) {
-    const ridge = Math.round((yk + yb) / 2 - wallH - rise), eave = top + ov, l = x0 - ov, r = x1 + ov;
-    const pts = p.hip ? [[l, eave], [l + rise * 0.7, ridge], [r - rise * 0.7, ridge], [r, eave]] : [[l, eave], [l, ridge], [r, ridge], [r, eave]];
-    K.poly(pts, (x, y) => roofTone(p.roof, Rf, x, eave - y, eave - y < 3 ? 1 : 0));
-    K.rect(l + (p.hip ? rise * 0.7 : 0), ridge, r - (p.hip ? rise * 0.7 : 0), ridge + 2, Rf[4]);
+    /* the roof fills the footprint above the wall: its south slope seen from the eave up to the ridge at the back */
+    const ridge = Math.min(top - 10, 1), eave = top + ov, l = x0 - ov, r = x1 + ov, hip = Math.min(rise, (eave - ridge) * 0.8);
+    const pts = p.hip ? [[l, eave], [l + hip, ridge], [r - hip, ridge], [r, eave]] : [[l, eave], [l, ridge], [r, ridge], [r, eave]];
+    K.poly(pts, (x, y) => roofTone(p.roof, Rf, x, eave - y, eave - y < 3 ? 1 : y < ridge + 3 ? -1 : 0) || Rf[1]);
+    K.rect(l + (p.hip ? hip : 0), ridge, r - (p.hip ? hip : 0), ridge + 2, Rf[4]);
     if (!p.hip) { K.rect(l, ridge, l + 1, eave, Rf[4]); K.rect(r - 1, ridge, r, eave, Rf[4]); }
     K.rect(l, eave - 1, r, eave, inked(Rf[3], 0.4));
     /* the eaves shade the top of the wall */
-    K.rect(x0, eave, x1, eave + 2, (x, y) => mix(wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top), INK, 0.35));
-    if (p.chimney) chimney(K, Math.round(x0 + (x1 - x0) * 0.7), Math.round(ridge + (eave - ridge) * 0.45), 8, p.chimney > 1);
-    if (p.dormer) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (x1 - x0) * fx), cy = Math.round(ridge + (eave - ridge) * 0.55); K.poly([[cx - 6, cy + 2], [cx, cy - 6], [cx + 6, cy + 2]], Rf[1]); K.rect(cx - 4, cy + 2, cx + 4, cy + 8, Wl[2]); windowAt(K, cx - 2, cy + 3, 4, 4, {}); }
+    K.rect(x0, eave, x1, eave + 3, (x, y) => mix(wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top), INK, 0.35));
+    if (p.chimney) chimney(K, Math.round(x0 + (x1 - x0) * 0.72), Math.round(ridge + (eave - ridge) * 0.4), 10, p.chimney > 1);
+    if (p.dormer && eave - ridge > 18) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (x1 - x0) * fx), cy = Math.round(ridge + (eave - ridge) * 0.5); K.poly([[cx - 8, cy + 2], [cx, cy - 7], [cx + 8, cy + 2]], Rf[1]); K.rect(cx - 6, cy + 2, cx + 6, cy + 10, Wl[2]); windowAt(K, cx - 3, cy + 3, 6, 6, {}); }
     return { ridge, eave, top, yb, x0, x1 };
   }
-  /* ridge north-south: two slopes and the gable end in front */
-  const cx = FW / 2, back = yk - wallH, ridgeTop = back - rise, ridgeBot = top - rise, l = x0 - ov, r = x1 + ov;
-  K.poly([[l, back], [cx, ridgeTop], [cx, ridgeBot], [l, top + ov]], (x, y) => roofTone(p.roof, Rf, y, x - l, 0));
-  K.poly([[cx, ridgeTop], [r, back], [r, top + ov], [cx, ridgeBot]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1));
-  K.rect(Math.floor(cx) - 1, ridgeTop, Math.floor(cx) + 1, ridgeBot, Rf[4]);
-  K.poly([[x0, top + 1], [cx, ridgeBot + 2], [x1, top + 1]], (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top));
-  K.line(l, top + ov, cx, ridgeBot, inked(Rf[3], 0.4)); K.line(cx, ridgeBot, r - 1, top + ov, inked(Rf[3], 0.4));
-  if (rise > 10) windowAt(K, Math.round(cx - 2), Math.round(top - rise * 0.45), 4, 5, {});
-  if (p.chimney) chimney(K, Math.round(cx + 3), Math.round((back + top) / 2 - rise * 0.6), 8, p.chimney > 1);
+  /* ridge north-south: two slopes running back from the gable end in front */
+  const cx = FW / 2, apex = Math.round(top - Math.min(rise, (x1 - x0) * 0.45)), ridgeTop = 1, l = x0 - ov, r = x1 + ov, eaveTop = ridgeTop + Math.round((x1 - x0) * 0.3);
+  K.poly([[l, eaveTop], [cx, ridgeTop], [cx, apex], [l, top + ov]], (x, y) => roofTone(p.roof, Rf, y, x - l, 0));
+  K.poly([[cx, ridgeTop], [r, eaveTop], [r, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1));
+  K.rect(Math.floor(cx) - 1, ridgeTop, Math.floor(cx) + 1, apex, Rf[4]);
+  K.poly([[x0, top + 1], [cx, apex + 3], [x1, top + 1]], (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top));
+  K.line(l, top + ov, cx, apex, inked(Rf[3], 0.4)); K.line(cx, apex, r - 1, top + ov, inked(Rf[3], 0.4));
+  if (top - apex > 14) windowAt(K, Math.round(cx - 3), Math.round(apex + (top - apex) * 0.45), 6, 6, {});
+  if (p.chimney) chimney(K, Math.round(cx + 6), Math.round((ridgeTop + apex) / 2), 10, p.chimney > 1);
   return { ridge: ridgeTop, eave: top + ov, top, yb, x0, x1 };
 }
 /* a round tower: radius r, wallH high, standing on (cx, yb), with a cone, battlements or a flat top */
 function tower(K, cx, yb, r, wallH, p) {
+  r = Math.round(r * RS); wallH = Math.round(wallH * HS); if (p.rise) p = { ...p, rise: p.rise * HS };
   const Wl = R(WALL[p.wall] || p.wall || WALL.stone), ry = Math.max(2, Math.round(r * 0.45)), topY = yb - ry - wallH;
   const tone = (x, P, y) => { const t = (x + 0.5 - cx) / r; return P[t < -0.55 ? 1 : t < 0.25 ? 2 : t < 0.7 ? 3 : 4]; };
   for (let x = Math.floor(cx - r); x < cx + r; x++) {
@@ -208,7 +221,7 @@ function crenels(K, x0, x1, yTop, yBack, P) {
   K.rect(x0, yBack - 3, x0 + 2, yTop, P[1]); K.rect(x1 - 2, yBack - 3, x1, yTop, P[3]);
 }
 function keep(K, o, p) {
-  const { FW, FD } = K, x0 = 2, x1 = FW - 2, yb = FD - 3, wallH = p.wallH, top = yb - wallH, P = R(WALL[p.wall] || WALL.stone);
+  const { FW, FD } = K, x0 = 3, x1 = FW - 3, yb = FD - 3, wallH = Math.round(p.wallH * HS), top = yb - wallH, P = R(WALL[p.wall] || WALL.stone);
   K.rect(x0, top, x1, yb, (x, y) => wallTone('stone', P, x, y));
   crenels(K, x0, x1, top, 8 - wallH, P);
   for (let f = 1; f <= Math.floor(wallH / 22); f++) for (let k = 0; k < Math.max(1, Math.floor((x1 - x0) / 16)); k++) windowAt(K, Math.round(x0 + (x1 - x0) * (k + 0.5) / Math.max(1, Math.floor((x1 - x0) / 16)) - 2), yb - f * 22 + 4, 4, 7, { arch: true });
@@ -224,7 +237,7 @@ const BUILD = {
   granary: (K, o) => house(K, o, { wall: 'planks', roof: 'thatch', wallH: 14, rise: 12, lift: 6, hip: true, inset: 5, door: false, windows: false }),
   smithy: (K, o) => { house(K, o, { wall: 'stone', roof: 'slate', wallH: 22, rise: 12, chimney: 2, open: true, doorW: 12 }); K.oval(K.FW / 2, K.FD - 8, 5, 3, (x, y) => (y > K.FD - 9 ? R('#f4a03a')[1] : null)); },
   tavern: (K, o) => { const b = house(K, o, { wall: 'plaster', wallTex: 'timber', roof: 'tiles', wallH: 40, floors: 2, rise: 14, hip: true, chimney: 2, lit: true, shutter: '#7a4a2a' }); K.line(b.x0 + 4, b.top + 12, b.x0 - 2, b.top + 12, TIMBER[3]); K.rect(b.x0 - 5, b.top + 13, b.x0 + 1, b.top + 19, (x, y) => (y === b.top + 16 && x === b.x0 - 2 ? R('#c9a24f')[1] : R('#7a4a2a')[2])); },
-  chapel: (K, o) => { const b = house(K, o, { wall: 'stone', roof: 'slate', wallH: 24, rise: 16, arch: true, glass: '#4b5a6e', doorX: K.FW * 0.62 }); tower(K, 10, K.FD - 6, 7, 40, { wall: 'stone', top: 'cone', roof: 'slate', rise: 18 }); return b; },
+  chapel: (K, o) => { const b = house(K, o, { wall: 'stone', roof: 'slate', wallH: 24, rise: 16, arch: true, glass: '#4b5a6e', doorX: K.FW * 0.62 }); tower(K, 20, K.FD - 6, 7, 40, { wall: 'stone', top: 'cone', roof: 'slate', rise: 18 }); return b; },
   watchtower: (K, o) => {
     const { FW, FD } = K, P = R('#8e6a44'); for (const x of [6, FW - 9]) K.rect(x, FD - 46, x + 3, FD - 3, (px) => P[px === x ? 1 : 3]);
     K.line(9, FD - 6, FW - 9, FD - 30, P[3]); K.line(9, FD - 30, FW - 9, FD - 6, P[3]);
@@ -258,7 +271,7 @@ const BUILD = {
   dovecote: (K, o) => { const top = tower(K, K.FW / 2, K.FD - 4, 10, 30, { wall: 'plaster', wallTex: 'plain', top: 'cone', roof: 'tiles', rise: 16, windows: false }); for (let k = 0; k < 3; k++) K.rect(K.FW / 2 - 6 + k * 5, top + 10, K.FW / 2 - 4 + k * 5, top + 12, R('#2a2018')[2]); },
   windmill: (K, o) => {
     const cx = K.FW / 2, top = tower(K, cx, K.FD - 4, 11, 40, { wall: 'plaster', wallTex: 'plain', top: 'cone', roof: 'thatch', rise: 14, door: o.face !== 2 }), hy = top + 6, S = R('#f0e6cb'), F = R('#7a5a3a');
-    for (const [ax, ay] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { for (let i = 0; i < 24; i++) { const x = cx + ax * i * 0.75, y = hy + ay * i * 0.75; K.set(x, y, F[3]); if (i > 6) for (let s = 1; s <= 3; s++) K.set(x + ax * s, y - ay * s * 0 + (ax === ay ? -s : s), (i + s) % 3 ? S[1] : F[2]); } }
+    for (const [ax, ay] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { for (let i = 0; i < 34; i++) { const x = cx + ax * i * 0.75, y = hy + ay * i * 0.75; K.set(x, y, F[3]); if (i > 6) for (let s = 1; s <= 3; s++) K.set(x + ax * s, y - ay * s * 0 + (ax === ay ? -s : s), (i + s) % 3 ? S[1] : F[2]); } }
     K.oval(cx, hy, 2, 2, F[1]);
   },
   shrine: (K, o) => { const { FW } = K, b = house(K, o, { wall: 'white', wallTex: 'stone', roof: 'lead', wallH: 20, rise: 4, inset: 5, overhang: 1, windows: false, arch: true, doorW: 8, doorH: 14 }); K.oval(FW / 2, b.ridge - 2, 10, 10, (x, y, dx, dy) => (dy > 0.25 ? null : R('#6f9c86')[dx < -0.4 ? 1 : dx > 0.4 ? 3 : 2])); K.rect(FW / 2 - 1, b.ridge - 16, FW / 2 + 1, b.ridge - 10, R('#c9a24f')[1]); },
@@ -268,14 +281,14 @@ const BUILD = {
   wall: (K, o) => cityWall(K, o, 34),
   walltower: (K, o) => { cityWall(K, o, 34); tower(K, K.FW / 2, K.FD - 4, 14, 52, { wall: 'stone', top: 'crenel', windows: true }); },
   gatehouse: (K, o) => {
-    const { FW, FD } = K, P = R(WALL.stone), ax = FW >= FD, x0 = 2, x1 = FW - 2, yb = FD - 3, H = 48;
+    const { FW, FD } = K, P = R(WALL.stone), ax = FW >= FD, x0 = 3, x1 = FW - 3, yb = FD - 3, H = Math.round(48 * HS);
     if (!ax) { keep(K, o, { wallH: H }); return; }
     K.rect(x0, yb - H, x1, yb, (x, y) => wallTone('stone', P, x, y)); crenels(K, x0, x1, yb - H, 8 - H, P);
     K.rect(FW / 2 - 10, yb - 26, FW / 2 + 10, yb, R('#2a2018')[2]); K.oval(FW / 2, yb - 26, 10, 6, (x, y) => (y < yb - 26 ? R('#2a2018')[2] : null));
     K.rect(FW / 2 - 10, yb - 24, FW / 2 + 10, yb - 4, (x, y) => ((x % 3 === 0 || y % 4 === 0) ? R('#4a4a48')[2] : null));
-    for (const cx of [12, FW - 12]) tower(K, cx, FD - 3, 12, 60, { wall: 'stone', top: 'crenel' });
+    for (const cx of [27, FW - 27]) tower(K, cx, FD - 3, 12, 60, { wall: 'stone', top: 'crenel' });
   },
-  church: (K, o) => { const b = house(K, o, { wall: 'stone', roof: 'slate', wallH: 36, rise: 20, arch: true, glass: '#4b5a6e', doorX: K.FW * 0.62, winW: 5 }); tower(K, 16, K.FD - 5, 13, 70, { wall: 'stone', top: 'cone', roof: 'slate', rise: 40 }); return b; },
+  church: (K, o) => { const b = house(K, o, { wall: 'stone', roof: 'slate', wallH: 36, rise: 20, arch: true, glass: '#4b5a6e', doorX: K.FW * 0.62, winW: 5 }); tower(K, 32, K.FD - 5, 13, 70, { wall: 'stone', top: 'cone', roof: 'slate', rise: 40 }); return b; },
   cathedral: (K, o) => {
     const { FW } = K, b = house(K, o, { wall: 'stone', roof: 'copper', wallH: 60, rise: 34, arch: true, glass: '#5a4f78', door: false, winW: 7, floors: 2 });
     for (const cx of [FW * 0.3, FW * 0.7]) tower(K, cx, K.FD - 5, 18, 120, { wall: 'stone', top: 'cone', roof: 'copper', rise: 50 });
@@ -284,7 +297,7 @@ const BUILD = {
   }
 };
 function cityWall(K, o, H) {
-  const { FW, FD } = K, P = R(WALL.stone), L = o.links || [0, 0, 0, 0], c0 = 6, c1 = FW - 6;
+  const { FW, FD } = K, P = R(WALL.stone), L = o.links || [0, 0, 0, 0], c0 = 12, c1 = FW - 12; H = Math.round(H * HS);
   /* the core and an arm to each joined side, as one block with battlements */
   const x0 = L[2] ? 0 : c0, x1 = L[0] ? FW : c1, y0 = L[3] ? 0 : c0, y1 = L[1] ? FD : c1;
   const seg = (a0, b0, a1, b1) => { K.rect(a0, b1 - H, a1, b1, (x, y) => wallTone('stone', P, x, y)); K.rect(a0, b0 - H, a1, b1 - H, (x, y) => R('#8a8f90')[((x + y) % 7 === 0) ? 3 : 2]); for (let x = a0; x < a1; x += 5) K.rect(x, b1 - H - 4, Math.min(a1, x + 3), b1 - H, P[1]); };
@@ -313,12 +326,12 @@ function conifer(K, P, cx, base, h, w, snow = false) {
   }
 }
 const NATURE = {
-  oak: (K, o) => broadleaf(K, R(o.v > 0.7 ? '#cf9f48' : LEAVES.oak), K.FW / 2, K.FD - 8, 20, 30, '#6e5236', o.v * 6),
-  beech: (K, o) => broadleaf(K, R(LEAVES.beech), K.FW / 2, K.FD - 8, 20, 30, '#7a6a5a', o.v * 6),
-  birch: (K, o) => broadleaf(K, R(LEAVES.birch), K.FW / 2, K.FD - 8, 22, 24, '#eeeae0', o.v * 6, true),
-  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8, B = R('#6e5236'); K.rect(cx - 2, b - 10, cx + 2, b, (x) => B[x < cx ? 2 : 3]); K.mass(cx, b - 30, 9, 24, R(LEAVES.poplar), o.v * 5); },
-  pine: (K, o) => conifer(K, R(LEAVES.pine), K.FW / 2, K.FD - 6, 44, 28),
-  snowpine: (K, o) => conifer(K, R('#4b7a46'), K.FW / 2, K.FD - 6, 44, 28, true),
+  oak: (K, o) => broadleaf(K, R(o.v > 0.7 ? '#cf9f48' : LEAVES.oak), K.FW / 2, K.FD - 8, 30, 48, '#6e5236', o.v * 6),
+  beech: (K, o) => broadleaf(K, R(LEAVES.beech), K.FW / 2, K.FD - 8, 30, 48, '#7a6a5a', o.v * 6),
+  birch: (K, o) => broadleaf(K, R(LEAVES.birch), K.FW / 2, K.FD - 8, 32, 38, '#eeeae0', o.v * 6, true),
+  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8, B = R('#6e5236'); K.rect(cx - 2, b - 12, cx + 2, b, (x) => B[x < cx ? 2 : 3]); K.mass(cx, b - 44, 14, 36, R(LEAVES.poplar), o.v * 5); },
+  pine: (K, o) => conifer(K, R(LEAVES.pine), K.FW / 2, K.FD - 6, 68, 44),
+  snowpine: (K, o) => conifer(K, R('#4b7a46'), K.FW / 2, K.FD - 6, 68, 44, true),
   palm: (K, o) => {
     const cx = K.FW / 2, b = K.FD - 8, B = R('#a38158'), P = R('#7fa04c');
     for (let y = 0; y < 34; y++) { const x = cx + Math.sin(y / 14) * 4; K.rect(x - 2, b - y - 1, x + 2, b - y, B[y % 3 === 0 ? 3 : x < cx + 1 ? 1 : 2]); }
@@ -343,7 +356,7 @@ const PROPS = {
   barrels: (K) => { const P = R('#9a6a40'); for (const [x, y] of [[9, K.FD - 6], [21, K.FD - 9], [14, K.FD - 14]]) { K.rect(x - 5, y - 10, x + 5, y, (px, py) => ((py - y) % 4 === -1 ? R('#5a5048')[2] : P[px < x - 2 ? 1 : px > x + 2 ? 3 : 2])); K.oval(x, y - 10, 5, 2, P[1]); } },
   crates: (K) => { const P = R('#b08a58'); for (const [x, y, s] of [[4, K.FD - 5, 12], [17, K.FD - 7, 11], [9, K.FD - 15, 10]]) K.box(x, y - s * 0.6, x + s, y, s, (px, py) => P[(px - x) % 4 === 0 ? 2 : 0], (px, py) => (px === x || px === x + s - 1 || py === y - s || py === y - 1 || Math.abs((px - x) - (py - (y - s))) < 1 ? P[3] : P[2])); },
   cart: (K, o) => { const P = R(WOOD), W = R('#6e5236'), ax = o.face % 2 === 0; K.box(4, 8, K.FW - 4, K.FD - 8, 10, (x, y) => R('#d8b968')[h2(x, y) < 0.3 ? 1 : 0], (x, y) => P[x % 4 === 0 ? 3 : 2]); if (ax) for (const x of [7, K.FW - 9]) K.oval(x, K.FD - 7, 3, 5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.6 ? W[3] : W[1])); else K.oval(K.FW / 2, K.FD - 6, 6, 5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.65 || Math.abs(dx) < 0.15 || Math.abs(dy) < 0.15 ? W[3] : null)); },
-  fence: (K, o) => { const P = R(WOOD), along = (o.face || 0) % 2 === 0; if (along) { for (const x of [2, 15, 28]) K.rect(x, K.FD - 18, x + 3, K.FD - 6, (px) => P[px === x ? 1 : 3]); K.rect(0, K.FD - 16, K.FW, K.FD - 14, P[1]); K.rect(0, K.FD - 11, K.FW, K.FD - 9, P[2]); } else { const cx = K.FW / 2; for (let y = 2; y < K.FD; y += 13) K.rect(cx - 1, y - 12, cx + 2, y, P[2]); K.rect(cx - 1, -10, cx + 1, K.FD - 12, P[1]); K.rect(cx, -6, cx + 2, K.FD - 7, P[3]); } },
+  fence: (K, o) => { const P = R(WOOD), along = (o.face || 0) % 2 === 0; if (along) { for (const x of [2, Math.round(K.FW / 2) - 1, K.FW - 4]) K.rect(x, K.FD - 18, x + 3, K.FD - 6, (px) => P[px === x ? 1 : 3]); K.rect(0, K.FD - 16, K.FW, K.FD - 14, P[1]); K.rect(0, K.FD - 11, K.FW, K.FD - 9, P[2]); } else { const cx = K.FW / 2; for (let y = 2; y < K.FD; y += K.FD / 2 - 1) K.rect(cx - 1, y - 12, cx + 2, y, P[2]); K.rect(cx - 1, -10, cx + 1, K.FD - 12, P[1]); K.rect(cx, -6, cx + 2, K.FD - 7, P[3]); } },
   well: (K) => { const S = R('#c4b99f'), cx = K.FW / 2, yb = K.FD - 6; K.rect(cx - 11, yb - 10, cx + 11, yb, (x, y) => wallTone('stone', S, x, y)); K.oval(cx, yb - 10, 11, 5, S[1]); K.oval(cx, yb - 10, 8, 3, R('#2f3e46')[3]); const W = R('#7a5a3a'); K.rect(cx - 11, yb - 30, cx - 9, yb - 8, W[2]); K.rect(cx + 9, yb - 30, cx + 11, yb - 8, W[3]); K.poly([[cx - 14, yb - 28], [cx, yb - 38], [cx + 14, yb - 28]], (x, y) => R(ROOF.shingle)[x > cx ? 3 : 1]); K.line(cx, yb - 28, cx, yb - 16, R('#bfa47a')[3]); K.rect(cx - 2, yb - 17, cx + 2, yb - 13, W[1]); },
   scarecrow: (K) => { const cx = K.FW / 2, b = K.FD - 6, W = R('#7a5a3a'); K.rect(cx - 1, b - 30, cx + 1, b, W[2]); K.rect(cx - 10, b - 24, cx + 10, b - 22, W[3]); K.rect(cx - 6, b - 26, cx + 6, b - 14, R('#7d6a9a')[2]); K.oval(cx, b - 30, 4, 4, R('#d8b968')[1]); K.rect(cx - 6, b - 35, cx + 6, b - 33, R('#6e5236')[2]); K.rect(cx - 3, b - 38, cx + 3, b - 34, R('#6e5236')[1]); },
   stones: (K) => { const P = R('#a9a08c'); for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2, x = K.FW / 2 + Math.cos(a) * K.FW * 0.34, y = K.FD / 2 + Math.sin(a) * K.FD * 0.3; K.rect(x - 3, y - 18, x + 3, y, (px, py) => P[px < x - 1 ? 1 : px > x + 1 ? 3 : 2]); K.rect(x - 3, y - 19, x + 3, y - 17, P[0]); } },
@@ -362,7 +375,7 @@ const PROPS = {
 };
 
 /* ---------- interiors ---------- */
-const ROOMW = 26;
+const ROOMW = 34;
 function roomWall(K, o, front) {
   const { FW, FD } = K, L = o.links || [0, 0, 0, 0], t = 5, c0 = FW / 2 - t, c1 = FW / 2 + t, P = R(WALL.plaster), Tp = R('#7a5a3a');
   const x0 = L[2] ? 0 : c0, x1 = L[0] ? FW : c1, y0 = L[3] ? 0 : c0, y1 = L[1] ? FD : c1;
@@ -414,12 +427,15 @@ const INTERIOR = {
 const DRAW = { ...BUILD, ...NATURE, ...PROPS, ...INTERIOR };
 /* how far a piece's shadow falls east of it, in art pixels */
 const FLAT = new Set(['flowers', 'mushrooms', 'rocks', 'rowboat', 'reeds', 'fence']);
-const shadowOf = a => (a.group === 'Interior' ? 0 : Math.min(T * 0.75, 4 + a.h * 0.45));
+const ROOM = new Set(['iwall', 'iwindow', 'idoor', 'post', 'stairs', 'hearth']);
+const shadowOf = a => (a.group === 'Interior' ? 0 : Math.min(16, 4 + a.h * 0.3));
 /* the sprite for placed piece o ({ id, face, v, links }), trimmed to what is drawn:
    { w, h, px, ox, oy } with (ox, oy) the footprint's north-west corner */
+/* drawn at the tile set's 32 scale and stood in the middle of the south edge of their footprint */
+const SMALL = new Set([...Object.keys(NATURE), ...Object.keys(PROPS).filter(id => id !== 'fence'), ...Object.keys(INTERIOR).filter(id => !ROOM.has(id))]), MID = new Set(['yurt', 'mine', 'watchtower', 'granary', 'dovecote', 'shrine']);
 function pieceSprite(o) {
-  const a = ASSET_BY_ID[o.id], [fw, fd] = footprint(o), FW = fw * T, FD = fd * T, up = Math.round(Math.max(40, (a ? a.h : 16) * 2.6 + 50));
-  const K = kit(FW, FD, up), draw = DRAW[o.id];
+  const a = ASSET_BY_ID[o.id], [fw, fd] = footprint(o), U = SMALL.has(o.id) ? 32 : MID.has(o.id) ? 48 : T, small = U !== T, FW = fw * U, FD = fd * U, up = Math.round(Math.max(40, (a ? a.h : 16) * 3.2 + 60));
+  const K = kit(FW, FD, up, small ? 24 : 16), draw = DRAW[o.id];
   const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null };
   if (draw) draw(K, inst);
   else K.box(4, 4, FW - 4, FD - 4, Math.min(30, (a ? a.h : 8) * 1.4), R('#c4b99f')[1], R('#c4b99f')[3]);
@@ -428,7 +444,9 @@ function pieceSprite(o) {
   const len = a ? shadowOf(a) : 6;
   if (a && (a.group === 'Nature' || a.group === 'Props')) { if (!FLAT.has(o.id)) K.ovalShadow(FW / 2 + 3, FD - 7, FW * 0.4, Math.min(8, FD * 0.18)); }
   else if (len) K.shadow(2, 4, FW - 2, FD - 2, len);
-  return trim(K);
+  const s = trim(K);
+  if (small) { s.ox -= (fw * T - FW) / 2; s.oy -= fd * T - FD; }
+  return s;
 }
 function trim(K) {
   const { w, h, px } = K; let x0 = w, y0 = h, x1 = -1, y1 = -1;
