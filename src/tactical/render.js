@@ -201,6 +201,14 @@ function drawFigure(ctx, it) {
   const [px, py] = P(it.X, it.Y, it.z).map(Math.round), [can, flip] = figureCanvas(it.c, it.face, it.pose);
   if (flip) { ctx.save(); ctx.translate(px, 0); ctx.scale(-1, 1); ctx.drawImage(can, -W / 2, py - BASE - 1); ctx.restore(); } else ctx.drawImage(can, px - W / 2, py - BASE - 1);
 }
+/* how many art pixels a figure stands above its feet, from the top of its sprite (a slime is short, a knight with a
+   plume tall), for what goes over its head */
+const tops = new WeakMap();
+function figureHeight(it) {
+  const [can] = figureCanvas(it.c, it.face, it.pose); let top = tops.get(can);
+  if (top == null) { const d = can.getContext('2d').getImageData(0, 0, W, H).data; top = 0; while (top < H && !d.slice(top * W * 4, (top + 1) * W * 4).some((v, i) => i % 4 === 3 && v)) top++; tops.set(can, top); }
+  return BASE + 1 - top;
+}
 /* the silhouette a hidden figure shows through what stands in front of it: a pale fill inside a dark rim */
 const xray = canvasOf(W, H), xg = xray.getContext('2d'), sils = new WeakMap();
 /* a figure and its shadow, before what stands in front of it is cut out (taller than the frame: the shadow stays on
@@ -238,4 +246,4 @@ function portrait(c, size = 24) {
   out.getContext('2d').drawImage(can, (W - size) / 2, 4, size, size, 0, 0, size, size); return out;
 }
 
-export { drawScene, figureHit, pieceSprite, portrait };
+export { drawScene, figureHeight, figureHit, pieceSprite, portrait };

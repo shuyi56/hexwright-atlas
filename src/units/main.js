@@ -2,6 +2,7 @@ import '../styles/main.css';
 import './units.css';
 import '../data/unit-files.js';
 import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, PATTERNS, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.js';
+import { patternOffsets } from '../tactical/attack.js';
 import { characterById, list as customCharacters } from '../characters/library.js';
 import { ROSTER, WALK, render } from '../characters/roster.js';
 import { figureThumb } from '../characters/draw.js';
@@ -10,7 +11,7 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 
 /* ================= the unit data page =================
    Every unit in data/units/ (src/data/units.js) to read and change: a list down the side, a card per unit with its
-   sprite walking, its HP, Attack, Range, attack pattern, Move and Jump, and a table of everyone for balancing numbers side by
+   sprite walking, its HP, Attack, Range, Move and Jump, a picture of its attack pattern, and a table of everyone for balancing numbers side by
    side. Changes are drafts until saved. On the dev server Save writes the files through the Hexwright bridge
    (tools/vite-hexwright.js), and the tactical view in any open tab picks the new numbers up at once; a built copy
    of the site can read the units and download a unit's file, but not save. */
@@ -94,14 +95,25 @@ function tile(sec, [k, label, lo, hi], e) {
 }
 const patternLabel = id => (PATTERNS.find(([p]) => p === id) || PATTERNS[0])[1];
 const patternOptions = v => PATTERNS.map(([id, label]) => `<option value="${id}"${id === v ? ' selected' : ''}>${label}</option>`).join('');
-/* the attack pattern as a row of the list, under Range */
-function patternTile(e) {
-  const v = e.draft.stats.pattern, saved = e.saved?.stats?.pattern, changed = e.saved && saved !== v;
-  return `<label class="ub-value${changed ? ' changed' : ''}"${changed ? ` title="saved: ${patternLabel(saved)}"` : ''}>
-    <span class="ub-value-name">Pattern</span>
-    <select data-sec="stats" data-k="pattern" aria-label="Attack pattern">${patternOptions(v)}</select>
-    <span class="ub-dim ub-value-note">${v === 'melee' ? 'the four tiles beside it, no diagonals' : v === 'line' ? 'straight out in four directions, up to Range' : 'any tile up to Range steps away'}</span>
-  </label>`;
+const PATTERN_NOTE = { melee: 'The four tiles beside it, no diagonals. Range does not change it.', line: 'Straight out in the four directions, up to Range tiles.', ranged: 'Any tile up to Range steps away along the grid.' };
+/* a pattern seen from above on the map's grid: the unit in the middle, the tiles it strikes lit. The grid is at
+   least five tiles across, so melee shows the corners it does not reach. */
+function patternGrid(pattern, range, cls) {
+  const R = Math.max(2, range), N = 2 * R + 1, hit = new Set(patternOffsets(pattern, range).map(([x, y]) => `${x},${y}`));
+  let cells = '';
+  for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) cells += `<rect x="${x + R}" y="${y + R}" width="1" height="1" class="${!x && !y ? 'me' : hit.has(`${x},${y}`) ? 'hit' : ''}"/>`;
+  return `<svg class="${cls}" viewBox="-0.1 -0.1 ${N + 0.2} ${N + 0.2}" aria-hidden="true">${cells}<circle cx="${R + 0.5}" cy="${R + 0.5}" r="0.28"/></svg>`;
+}
+/* the attack pattern, a section of its own: a picture of each to pick from, and the chosen one at the unit's range */
+function patternSection(e) {
+  const { pattern: v, range } = e.draft.stats, saved = e.saved?.stats?.pattern, changed = e.saved && saved !== v;
+  return `<section class="ub-pattern${changed ? ' changed' : ''}" aria-label="Attack pattern">
+    <h3 class="ub-section">Attack pattern${changed ? ` <span class="ub-tag" title="saved: ${patternLabel(saved)}">changed</span>` : ''}</h3>
+    <div class="ub-pattern-body">
+      <div class="ub-pattern-picks" role="radiogroup" aria-label="Attack pattern">${PATTERNS.map(([id, label]) => `<button role="radio" aria-checked="${id === v}" data-pattern="${id}">${patternGrid(id, range, 'ub-grid-sm')}<span>${label}</span></button>`).join('')}</div>
+      <figure class="ub-pattern-big">${patternGrid(v, range, 'ub-grid')}<figcaption><b>${patternLabel(v)}${v === 'melee' ? '' : ` · Range ${range}`}</b><span>${PATTERN_NOTE[v]}</span></figcaption></figure>
+    </div>
+  </section>`;
 }
 function renderDetail() {
   const box = $('detail'); stopPreview();
@@ -117,7 +129,8 @@ function renderDetail() {
         </div>
         <p class="ub-file"><code>${esc(unitPath(e.group, d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}${sprite ? '' : ` <span class="ub-dim">no sprite called “${esc(d.id)}”</span>`}</p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
-        <div class="ub-values">${SECTIONS.flatMap(sec => [...FIELDS[sec].map(f => tile(sec, f, e)), ...(sec === 'stats' ? [patternTile(e)] : [])]).join('')}</div>
+        <div class="ub-values">${SECTIONS.flatMap(sec => FIELDS[sec].map(f => tile(sec, f, e))).join('')}</div>
+        ${patternSection(e)}
         <div class="ub-card-actions">
           <button class="btn" id="revertOne"${isDirty(e) && e.saved ? '' : ' disabled'}>Revert</button>
           <button class="btn ub-danger" id="deleteOne">Delete</button>
@@ -137,7 +150,7 @@ function renderDetail() {
     e.draft[sec][k] = n;
     commit(e);
   }));
-  box.querySelector('select[data-k=pattern]').addEventListener('change', ev => { e.draft.stats.pattern = ev.target.value; commit(e); });
+  box.querySelectorAll('[data-pattern]').forEach(b => b.addEventListener('click', () => { e.draft.stats.pattern = b.dataset.pattern; commit(e); }));
   $('name').addEventListener('change', () => { e.draft.name = $('name').value; commit(e); });
   $('group').addEventListener('change', () => { e.group = $('group').value; commit(e); });
   $('faceL').addEventListener('click', () => { V.face = (V.face + 3) % 4; });

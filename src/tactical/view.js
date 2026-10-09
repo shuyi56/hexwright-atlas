@@ -10,7 +10,7 @@ import { moveRange, placeId, routeTo } from './move.js';
 import '../data/unit-files.js';
 import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
 import { attackReach } from './attack.js';
-import { drawScene, figureHit, portrait } from './render.js';
+import { drawScene, figureHeight, figureHit, portrait } from './render.js';
 import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 
 /* ================= tactical view: the screen =================
@@ -19,7 +19,8 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    range lights up in blue; the route to the tile under the cursor is traced in gold; click a lit tile (or Enter)
    and it walks there, hopping up and down ledges, while the camera follows. Moves are edits of the map, on the
    editor's undo stack. A picked unit has an actions window: Move, Attack (its pattern and range light up in red;
-   pick a unit of the other side there to strike it for its Attack) and Wait. Each unit moves once and acts once a round; once every
+   pick a unit of the other side there to strike it for its Attack) and Wait, beside the unit on screen. Every unit
+   standing has a health bar over its head. Each unit moves once and acts once a round; once every
    unit still standing has done both, a new round begins. Hit points are the battle's, not the map's: they start
    full each time the view opens, and a unit brought to 0 stays where it fell, faded. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
    + and - zoom, PgUp / PgDn change storey, Esc steps back. */
@@ -200,6 +201,8 @@ function panels() {
     $('tcUnitName').textContent = s ? s.name : c.sprite;
     const u = unitFor(c.sprite), st = u.stats, mv = u.movement;
     const pat = (PATTERNS.find(([id]) => id === st.pattern) || PATTERNS[0])[1], t = turnOf(k);
+    const bar = $('tcUnitHp').firstElementChild, frac = hpOf(k) / Math.max(1, st.hp);
+    bar.style.width = Math.round(100 * frac) + '%'; bar.className = frac > 0.5 ? '' : frac > 0.25 ? 'mid' : 'low';
     $('tcUnitInfo').textContent = `HP ${hpOf(k)}/${st.hp} · Attack ${st.attack} · ${st.pattern === 'melee' ? pat : `${pat} ${st.range}`}`;
     $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${!alive(k) ? ' · fallen' : done(k) ? ' · done' : t.moved ? ' · moved' : t.acted ? ' · acted' : TC.sel === k ? ' · ready' : ''}`;
   }
@@ -271,13 +274,31 @@ function paint() {
   if (cursor) { const X = cursor.u % S(), Y = (cursor.u / S()) | 0, [x, y] = P(X + 0.5, Y + 0.5, cursor.z); focus.push({ x, y, key: X + Y + 1 }); }
   drawScene(g, TC.sc, k, tx, ty, view, { frame: TC.tick >> 1, tick: TC.tick >> 1, figs: TC.figs, marks, cursor, focus, ...TC.debug });
   TC.view = { k, tx, ty };
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  /* a health bar over every unit still standing, in whole art pixels like the sprites */
+  for (const f of TC.figs) {
+    if (!alive(f.k)) continue;
+    const [x, y] = P(f.X, f.Y, f.z), frac = hpOf(f.k) / Math.max(1, statsOf(f.k).hp), w = 12, bx = Math.round(x - w / 2) * k + tx, by = Math.round(y - figureHeight(f) - 4) * k + ty;
+    g.fillStyle = '#0b1011'; g.fillRect(bx - k, by - k, (w + 2) * k, 4 * k);
+    g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, 2 * k);
+    g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, 2 * k);
+  }
+  placeMenu();
   const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);
   if (pf) {
-    const [x, y] = P(pf.X, pf.Y, pf.z), t = TC.pop.t, sx = Math.round(x * k + tx), sy = Math.round((y - 34 - 10 * t) * k + ty);
-    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = Math.min(1, 3 * (1 - t)); g.font = `700 ${Math.round(9 * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
+    const [x, y] = P(pf.X, pf.Y, pf.z), t = TC.pop.t, sx = Math.round(x * k + tx), sy = Math.round((y - figureHeight(pf) - 7 - 10 * t) * k + ty);
+    g.globalAlpha = Math.min(1, 3 * (1 - t)); g.font = `700 ${Math.round(9 * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
     g.lineWidth = Math.max(2, Math.round(1.5 * k)); g.strokeStyle = '#0b1011'; g.strokeText(TC.pop.text, sx, sy); g.fillStyle = '#ffd2c4'; g.fillText(TC.pop.text, sx, sy);
     g.globalAlpha = 1; g.textAlign = 'start';
   }
+}
+/* the actions window stands beside the picked unit on screen: to its right, or its left near the screen's edge */
+function placeMenu() {
+  const menu = $('tcMenu'), f = !menu.hidden && TC.figs.find(q => q.k === TC.sel); if (!f) return;
+  const { k, tx, ty } = TC.view, d = state.dpr, [x, y] = P(f.X, f.Y, f.z), sx = (x * k + tx) / d, top = ((y - figureHeight(f)) * k + ty) / d, gap = 14 * k / d;
+  const w = menu.offsetWidth, h = menu.offsetHeight, left = sx + gap + w + 8 > TC.cw ? sx - gap - w : sx + gap;
+  menu.style.left = Math.round(Math.max(8, Math.min(TC.cw - w - 8, left))) + 'px';
+  menu.style.top = Math.round(Math.max(64, Math.min(TC.ch - h - 40, top))) + 'px';
 }
 const req = () => { TC.dirty = true; if (!raf && TC.open) raf = requestAnimationFrame(loop); };
 
