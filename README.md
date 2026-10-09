@@ -112,6 +112,76 @@ tile, and the walk into `docs/images/character-walk.png`. Add `--strips` for one
 
 ![The character roster walking](docs/images/character-walk.png)
 
+### Tactical view
+
+**Tactical** (`T`) in the editor shows the map through a close-up camera like the old tactics games (Final
+Fantasy Tactics, Tactics Ogre): pixel art at whole-pixel zoom (×1 to ×6, about a dozen tiles across by default),
+with the camera gliding after the cursor and the unit on the move.
+
+- **Moving units:** click a unit (or press `Tab`) and the tiles it can reach in five steps light up in blue, by
+  the editor's walking rules (one height level a step, around pieces, up and down stairs). The route to the tile
+  under the cursor is traced in gold. Click a blue tile (or press `Enter`) and the unit walks there, hopping up
+  and down ledges, one stride to a tile at 4.2 tiles a second (8.4 with the ▶▶ 2× chip or F), so the arms swing at the pace the figure moves. The
+  camera sits on whole art pixels and rides along the walker's path on the ground (not its hops), holding the
+  walker still on screen while the ground scrolls under it. Moves are map edits, on the editor's undo stack.
+- **Camera:** the arrow keys or `WASD` step the cursor along the grid and the camera keeps it in view. Drag to
+  pan, scroll or `+`/`-` to zoom, `Q`/`E` to turn the view, `PgUp`/`PgDn` to change storey, `Esc` to go back.
+  Pieces standing in front of the unit in play or the cursor fade so neither is lost behind them.
+- **Panels:** the tile under the cursor (ground, piece, height, storey) and the unit's portrait and stats.
+- **Figures:** units are drawn at three quarters of their sprite size, about 30 pixels tall, a little under a
+  tile's width. The shrink is done on the sprite's materials before its light and outline are worked out, so it
+  stays crisp pixel art with its face intact (`renderScaled` in `characters/roster.js`).
+- **Depth:**
+  - **Cast shadows:** light comes from the left. Cliffs, walls and buildings throw shadows across the ground to
+    their right, and trees throw short ones. Shadow edges follow the ground at a third of a tile.
+  - **Occlusion:** ground at the foot of a higher cliff darkens along the edge that meets it.
+  - **Elevation:** low ground is a shade darker and high ground a shade lighter, so heights read across a field.
+  - **Silhouettes:** a unit hidden behind a building, cliff or tree shows through as an outlined silhouette.
+  - **Ordering:** a unit beside a long or wide building is drawn on the correct side of it. It is tested against
+    the building's edges, not its centre.
+
+`src/tactical/` holds it:
+
+- **Tile sheet** (`tiles.js`, no DOM). Every ground in the tile set redrawn as pixel art at the characters' scale:
+  a 2:1 diamond 32 wide and 16 tall whose rows tile with no gap or overlap, 8 pixels of cliff to a height level,
+  so a 32×48 figure stands on it 1:1. Each ground keeps its tile's colours as a five-step ramp and its marks
+  (tufts, flowers, furrows, cobbles, boards, carpet borders, ripples) redrawn as pixels, in four variants.
+  Cliff faces hang in the tile's two side colours with wandering strata (earth), coursed blocks (stone) or beams
+  (wood), and grassy grounds hang a lip over the edge. Water and lava have four frames, and water foams where it
+  meets land. Markers: move range, route, target, a two-frame cursor, a pointer and a unit's shadow.
+- **Buildings, trees and plants** (`buildings.js`, `foliage.js`, no DOM). Every building and every piece of nature
+  in the tile set redesigned as pixel art for the close camera, at the figures' own scale, rather than shrunk
+  from the editor's drawings. Each keeps its editor self with the detail a close view can show:
+  - **Walls:** plaster with timber framing and braces, coursed ashlar with quoins at the corners, rubble,
+    boards and logs.
+  - **Openings:** windows with frames, mullions, sills, shutters and a glint on the glass (lit at the tavern),
+    and plank doors with hinges and a latch, arched in stone walls.
+  - **Roofs and tops:** thatch laid in courses with a stitched ridge and ragged eave, clay tiles, slates,
+    shingles and copper; chimneys with caps and smoke; flags, battlements, spires and crosses.
+  - **Trees:** broadleaf crowns are lit masses broken into leaf clumps on barked trunks. Pines are drooping
+    tiers of needles; the snowy fir has snow along each tier.
+  - **Other nature:** palm, dead tree, cactus, reeds, toadstools, wildflowers and rocks.
+- **Forge** (`forge.js`, no DOM). The small renderer they are built on: triangles, quads, turned surfaces and
+  rounded masses, a depth buffer, per-pixel material shaders over five-step ramps with ordered dithering, and
+  finishing that inks the outline and draws a contour wherever one part stands in front of another.
+- **Scene** (`scene.js`, no DOM). A map as one back-to-front list of tiles, floors and pieces, each a few sprites
+  at art-pixel positions, with figures slotted in by the same depth key. Pieces stand taller than on the editor's
+  map, so a cottage is about a figure's height (tall buildings are lifted less, stairs not at all).
+- **Renderer** (`render.js`). Draws only what is on screen, at whole device pixels with no smoothing. Buildings,
+  trees and plants come from their designs. The smaller props and the furniture are the tile set's own drawings,
+  drawn once at one unit to the pixel and finished as pixel art (hard edges, a small palette, an inked rim,
+  a dithered contact shadow).
+- **Move range** (`move.js`, no DOM) and the screen itself (`view.js`).
+
+`npm run tactical-sheet` draws the sheet into `docs/images/tactical-tile-sheet.png`. Add `--atlas` for the packed
+atlas, `docs/images/tactical-tiles.png`: one row per ground of 32×22 cells (the four variants, the three extra
+frames of an animated ground, then a left and right face two levels deep), with the cell map in
+`docs/images/tactical-tiles.json`. The sheet also shows every designed building, tree and plant.
+
+![The tactical view](docs/images/tactical-view.png)
+
+![The tactical tile sheet](docs/images/tactical-tile-sheet.png)
+
 ### Test scenes
 
 `scenes/` holds self-contained HTML test pages. Each one is the whole app inlined into a single file that
@@ -124,7 +194,15 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   shows pass or fail, with the route's step count, heights and storey changes. **Re-run** repeats the checks,
   and clicking a check replays that walk on screen.
 - **Scripted browsers:** results are in `window.__sceneResults`.
-- **Rebuilding:** run `npm run scene -- <map.json> [out.html]` to rebuild a page from a saved map. The checks
+- **Editor and tactical view:** every scene page has both. The panel's **Editor** and **Tactical** buttons switch
+  between them, and what is edited in the editor shows in the tactical view when it is opened again.
+- **Tactical scenes:** `scenes/tactical/` holds pages that open straight in the tactical view.
+  `scenes/tactical/scale-study.html` stands every kind of house, tower and tree on a flat green, with a figure in
+  front of each, to judge their sizes against each other. Its map is `scenes/tactical/scale-study.json`, and
+  `scale-study.scene.json` beside it gives the title, notes and the camera (`view: "tactical"`,
+  `tactical: { zoom, center }`); a scene with nothing to check needs no checks file.
+- **Rebuilding:** run `npm run scene -- <map.json> [out.html]` to rebuild a page from a saved map
+  (`npm run scene -- scenes/tactical/scale-study.json scenes/tactical/scale-study.html` for the scale study). The checks
   come from a `<map>.checks.json` beside it, if there is one; see `src/editor/fixtures/hillside-tower.checks.json`
   for the format. The same scene is replayed by `src/editor/scene.test.js` under `npm test`.
 
@@ -197,6 +275,7 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
 | `npm run scene -- <map.json>` | Build a self-contained HTML test page for a scene into `scenes/` |
 | `npm run sheet`   | Draw the character sprite sheet and walk into `docs/images/` |
+| `npm run tactical-sheet` | Draw the tactical tile sheet (and with `--atlas` the tile atlas) into `docs/images/` |
 | `npm test`        | Unit tests (no browser needed)  |
 | `npm run test:e2e`| MCP end-to-end test (Chromium)  |
 | `npm run perf`    | Editor latency budget (Chromium)|
@@ -226,6 +305,8 @@ src/
                       drawn procedurally with a small iso kit (used by the city view and the editor)
   characters/         Characters: pixel engine, body builds, shared parts, the townsfolk and the jobs, drawing
                       them on the map, the sprite sheet layout and its pixel font
+  tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
+                      whole-pixel renderer, move ranges and the close-up camera screen
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
 tools/                Vite plugin that relays HTTP calls to the editor page (dev server only),

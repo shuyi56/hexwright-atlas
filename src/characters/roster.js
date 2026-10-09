@@ -1,7 +1,7 @@
-import { BODY_TYPES, REF, measure } from './body.js';
+import { BASE, BODY_TYPES, REF, measure } from './body.js';
 import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, recolor, staff } from './parts.js';
 import { BANDANA, FEATHER_CAP, WIZARD_HAT } from './hats.js';
-import { finish, frameBuf, mixHex, ramp, stamp } from './pixels.js';
+import { finish, frameBuf, mixHex, ramp, shrink, stamp } from './pixels.js';
 import { TOWNSFOLK } from './townsfolk.js';
 
 /* ================= character sprites: the roster =================
@@ -57,6 +57,13 @@ function palette(job) {
   return out;
 }
 /* every frame of a job: { front: [rgba x3], back: [rgba x3] }, in its own build or the one named */
+/* every frame drawn smaller (scale < 1) about the feet, for a view that wants the figures less tall: the
+   tactical camera draws them at about three quarters, so they stand closer to a tile's width */
+function renderScaled(job, scale, body = job.body) {
+  const pal = palette(job), out = {};
+  for (const v of VIEWS) out[v] = Array.from({ length: POSES }, (_, k) => finish(shrink(frame(job, v, k, body), scale, 16, BASE + 1), pal));
+  return out;
+}
 function render(job, body = job.body) {
   const pal = palette(job), out = {};
   for (const v of VIEWS) out[v] = Array.from({ length: POSES }, (_, k) => finish(frame(job, v, k, body), pal));
@@ -431,4 +438,4 @@ const ROSTER = [...TOWNSFOLK, ...JOBS];
 const BY_ID = new Map(ROSTER.map(c => [c.id, c]));
 const byId = id => BY_ID.get(id) || null;
 
-export { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render };
+export { BODIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render, renderScaled };

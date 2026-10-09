@@ -140,4 +140,64 @@ function cellsToPart(cells) {
   return { x, y, rows: g.map(r => r.join('')) };
 }
 
-export { H, OUTLINE, PAPER, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, rgbLch, stamp, wash };
+/* A frame's figure drawn smaller, about the point between its feet (cx, the row under its soles), before it is
+   finished: each new pixel takes the material (with its crease, layer and group) that covers most of the area it
+   samples, so the outline, the light and the contours are worked out afresh at the new size rather than blurred.
+   The eyes are not averaged: a 2×2 eye would smear into the brow over it and the two would come out unequal.
+   They shrink as the skin under them, and each is then copied whole, pupil and glint as drawn, to where its
+   corner lands on the smaller face, a clear gap of skin kept between the two and either side of each. The
+   mouth lands as a single pixel. */
+const WEIGHT = { N: 3, J: 1.5 };
+const EYE = new Set(['E', 'W']);
+function shrink(buf, s, cx, foot) {
+  const out = frameBuf(), mat = buf.mat.slice();
+  /* the eyes, their whites, the brow right over them and the mouth vote as skin */
+  const brow = u => buf.mat[u] === 'Q' && (buf.mat[u + W] === 'E' || buf.mat[u + W] === 'W');
+  for (let u = 0; u < W * H; u++) if (EYE.has(buf.mat[u]) || buf.mat[u] === 'M' || brow(u)) mat[u] = 'K';
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const X0 = cx + (x - cx) / s, X1 = cx + (x + 1 - cx) / s, Y0 = foot + (y - foot) / s, Y1 = foot + (y + 1 - foot) / s, area = (X1 - X0) * (Y1 - Y0);
+    const votes = new Map(); let solid = 0;
+    for (let j = Math.floor(Y0); j < Math.ceil(Y1); j++) for (let i = Math.floor(X0); i < Math.ceil(X1); i++) {
+      if (i < 0 || j < 0 || i >= W || j >= H) continue;
+      const u = j * W + i, m = mat[u]; if (m === null) continue;
+      const a = (Math.min(X1, i + 1) - Math.max(X0, i)) * (Math.min(Y1, j + 1) - Math.max(Y0, j)); if (a <= 0) continue;
+      solid += a;
+      const key = m + buf.crease[u] + '|' + buf.layer[u], w = a * (WEIGHT[m] || 1) * (1 + buf.layer[u] * 0.015) * (buf.crease[u] ? 1.15 : 1), v = votes.get(key);
+      if (v) v.w += w; else votes.set(key, { w, u, m });
+    }
+    if (solid < area * 0.42) continue;
+    let best = null; for (const v of votes.values()) if (!best || v.w > best.w) best = v;
+    const o = y * W + x; out.mat[o] = best.m; out.crease[o] = buf.crease[best.u]; out.layer[o] = buf.layer[best.u]; out.group[o] = buf.group[best.u];
+  }
+  /* each eye: its pixels (pupil and white) found as one piece and copied whole to its scaled corner */
+  const seen = new Uint8Array(W * H), scale = (v, c) => Math.round(c + (v - c) * s), eyes = [];
+  for (let u = 0; u < W * H; u++) {
+    if (!EYE.has(buf.mat[u]) || seen[u]) continue;
+    const cells = [], stack = [u]; seen[u] = 1;
+    while (stack.length) { const v = stack.pop(); cells.push(v); for (const d of [-1, 1, -W, W]) { const q = v + d; if (q >= 0 && q < W * H && !seen[q] && EYE.has(buf.mat[q]) && Math.abs((q % W) - (v % W)) <= 1) { seen[q] = 1; stack.push(q); } } }
+    const x0 = Math.min(...cells.map(v => v % W)), y0 = Math.min(...cells.map(v => (v / W) | 0));
+    eyes.push({ cells, x0, y0, x: scale(x0, cx), y: scale(y0, foot), w: Math.max(...cells.map(v => v % W)) - x0 + 1 });
+  }
+  eyes.sort((a, b) => a.x - b.x);
+  /* keep a column of skin between the eyes */
+  for (let k = 1; k < eyes.length; k++) { const p = eyes[k - 1], e = eyes[k]; if (e.x < p.x + p.w + 1) e.x = p.x + p.w + 1; }
+  for (const e of eyes) {
+    /* an eye that lands against the edge of the face moves a pixel inward */
+    const skin = (i, j) => out.mat[j * W + i] === 'K';
+    if (!skin(e.x - 1, e.y + 1) && skin(e.x + e.w, e.y + 1) && skin(e.x + e.w + 1, e.y + 1)) e.x++;
+    for (const v of e.cells) {
+      const o = (e.y + ((v / W) | 0) - e.y0) * W + e.x + (v % W) - e.x0;
+      if (o >= 0 && o < W * H && out.mat[o]) { out.mat[o] = buf.mat[v]; out.crease[o] = 0; out.layer[o] = buf.layer[v]; out.group[o] = buf.group[v]; }
+    }
+  }
+  /* the mouth as one pixel where its middle lands */
+  const mouth = []; for (let u = 0; u < W * H; u++) if (buf.mat[u] === 'M') mouth.push(u);
+  if (mouth.length) {
+    const mx = mouth.reduce((a, v) => a + (v % W), 0) / mouth.length, my = mouth.reduce((a, v) => a + ((v / W) | 0), 0) / mouth.length;
+    const o = scale(Math.round(my), foot) * W + scale(Math.round(mx), cx), u = mouth[0];
+    if (out.mat[o]) { out.mat[o] = 'M'; out.crease[o] = 0; out.layer[o] = buf.layer[u]; out.group[o] = buf.group[u]; }
+  }
+  return out;
+}
+
+export { H, OUTLINE, PAPER, W, cellsToPart, finish, frameBuf, hexRgb, mixHex, ramp, rgbHex, rgbLch, shrink, stamp, wash };

@@ -5,14 +5,14 @@
    (custom.js) offers them all. Letters: X the hat's cloth or straw, R a band or feather, S steel, G gold, J a
    jewel, H hair (the beard). */
 
-/* a straw hat with a wide brim and a flat crown ringed by a band (R), the brim's weave picked out in creases */
+/* a straw hat with a wide brim and a flat crown ringed by a band (R), in solid shapes with a shadow under the brim */
 const STRAW_HAT = { x: 4, y: 3, rows: [
   '.......XXXXXXXX.........',
-  '......XXXxXXXXXX........',
+  '......XXXXXXXXXX........',
   '......XXXXXXXXXX........',
   '......RRRRRRRRRR........',
   '..XXXXXXXXXXXXXXXXXXXX..',
-  'XXXxXXXXxXXXXxXXXXxXXXXX',
+  'XXXXXXXXXXXXXXXXXXXXXXXX',
   '.xxxxxxxxxxxxxxxxxxxxxx.'] };
 /* a kettle helm: a round steel crown with a comb along its top and a broad brim turned down all round */
 const KETTLE_HELM = { x: 5, y: 1, rows: [

@@ -1,0 +1,7 @@
+{
+  "title": "Scale study: buildings, trees and figures in the tactical view",
+  "about": "Every kind of house, tower and tree from the tile set on a flat green, a figure standing in front of each, to judge their sizes against each other. Back row, along the cobbled lane: cottage, townhouse, slate-roofed house, smithy, tavern, stone hall house. Middle row, along the road: barn, chapel, watchtower, stone tower, windmill, mansion. Front row: oak, copper beech, birch, poplar, pine, snowy fir, bush, palm, well, barrels.",
+  "view": "tactical",
+  "tactical": { "zoom": 2, "center": "map" },
+  "checks": []
+}

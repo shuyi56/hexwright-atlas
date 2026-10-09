@@ -172,3 +172,24 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .ed-levels .ed-lbl{margin:0 0 1px;text-align:center}
 .ed-levels .chip{min-width:34px;padding:4px 8px;justify-content:center;text-align:center}
 .ed-levels .chip::before{content:none!important}
+
+/* Tactical view: the editor's map through a close-up pixel camera */
+.tactical{position:fixed;inset:0;z-index:35;background:#0e1414;overflow:hidden}
+.tactical:focus{outline:none}
+#tcCanvas{display:block;touch-action:none;cursor:pointer}
+.tc-bar{position:absolute;top:12px;left:14px;right:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;pointer-events:none}
+.tc-bar>*{pointer-events:auto}
+.tc-title{display:flex;flex-direction:column;min-width:0;flex:1 1 160px;color:var(--vellum);font:400 clamp(18px,2vw,24px)/1.1 var(--display);text-shadow:0 1px 2px #000}
+.tc-chips{display:flex;align-items:center;gap:6px}
+.tc-zoom{font:500 13px var(--ui);color:var(--vellum);min-width:28px;text-align:center}
+.tc-win{position:absolute;background:linear-gradient(#1d2829,#141c1d);border:2px solid #c9a45a;box-shadow:0 0 0 2px #0b1011,0 6px 18px rgba(0,0,0,.45);border-radius:2px;color:#ece2c8;font:500 14px var(--ui);padding:8px 12px}
+.tc-win b{display:block;font:500 16px var(--ui);color:#ece2c8}
+.tc-win span{display:block;color:#a39b86;font-size:13px}
+.tc-tile{left:14px;bottom:40px;min-width:170px}
+.tc-xy{position:absolute;right:10px;top:8px}
+.tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
+.tc-unit[hidden]{display:none}
+#tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:1px solid #c9a45a}
+.tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
+.tc-keys{color:#a39b86}
+@media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
