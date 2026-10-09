@@ -1,5 +1,5 @@
 import { BANDANA, BEARD, CAPELET, CIRCLET, COWL, COWL_POINT, FEATHER_CAP, KETTLE_HELM, STRAW_HAT, WIZARD_HAT } from './hats.js';
-import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, KITE, SKIN, SWORD, recolor, staff } from './parts.js';
+import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, KITE, SKIN, SWORD, recolor, staff } from './parts.js';
 
 /* ================= character sprites: characters made from choices =================
    A spec is a character described by a handful of choices (a build, clothes, sleeves, hair, a hat, a beard, a
@@ -11,23 +11,23 @@ import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, H
 /* each choice: its options as [value, label], the first being the default */
 const CHOICES = {
   build: [['standard', 'Standard'], ['slim', 'Slim'], ['stocky', 'Stocky'], ['tall', 'Tall']],
-  clothes: [['vest', 'Shirt and vest'], ['tunic', 'Tunic'], ['overalls', 'Overalls'], ['plate', 'Breastplate'], ['robe', 'Belted robe'], ['gown', 'Gown to the floor']],
+  clothes: [['vest', 'Shirt and vest'], ['tunic', 'Tunic'], ['overalls', 'Overalls'], ['plate', 'Breastplate'], ['robe', 'Long coat and sash'], ['gown', 'Gown to the floor']],
   sleeves: [['cloth', 'Same cloth'], ['second', 'Second colour']],
   cut: [['plain', 'Plain'], ['bell', 'Bell']],
   neckline: [['high', 'High'], ['square', 'Square']],
   rope: [['none', 'None'], ['rope', 'Rope belt']],
-  hair: [['short', 'Short'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['bun', 'Low bun'], ['braid', 'Braid']],
+  hair: [['short', 'Short'], ['tousled', 'Tousled'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['bun', 'Low bun'], ['braid', 'Braid']],
   hat: [['none', 'None'], ['straw', 'Straw hat'], ['kettle', 'Kettle helm'], ['circlet', 'Circlet'], ['cowl', 'Cowl'], ['cap', 'Feathered cap'], ['bandana', 'Bandana'], ['wizard', 'Wizard hat']],
   beard: [['none', 'None'], ['full', 'Full beard']],
   cape: [['none', 'None'], ['cape', 'Cape'], ['dagged', 'Dagged cape']],
   satchel: [['none', 'None'], ['satchel', 'Satchel'], ['cross', 'Satchel with a cross']],
   held: [['none', 'Nothing'], ['sword', 'Sword'], ['dagger', 'Dagger'], ['daggers', 'Two daggers'], ['spear', 'Spear'], ['staff', 'Staff'], ['bow', 'Bow']],
   shield: [['none', 'None'], ['kite', 'Kite shield'], ['buckler', 'Buckler']] };
-/* the choices that only mean something with some clothes or gear: the neckline on a gown, the rope belt on a robe
-   or gown, a shield in the hand a second dagger would take */
+/* the choices that only mean something with some clothes or gear: the neckline and the rope belt on a gown, a
+   shield in the hand a second dagger would take */
 const APPLIES = {
   neckline: s => s.clothes === 'gown',
-  rope: s => s.clothes === 'robe' || s.clothes === 'gown',
+  rope: s => s.clothes === 'gown',
   shield: s => s.held !== 'daggers' };
 /* every colour a spec sets: [key, the material letter it paints, label] */
 const COLOURS = [
@@ -47,7 +47,7 @@ const SWATCHES = [
   '#a6533b', '#b8483a', '#a84a3c', '#c27458', '#b0614a', '#8fa462', '#6c8549', '#356a52', '#a6b878',
   '#7f9cb4', '#6f8faa', '#8297b0', '#56688f', '#66727e', '#a898b8', '#8a7a9a', '#c4c8c6', '#3f3a3d'];
 
-const HAIRS = { short: HAIR_SHORT, long: HAIR_LONG, ponytail: HAIR_PONYTAIL, bun: HAIR_BUN, braid: HAIR_BRAID };
+const HAIRS = { short: HAIR_SHORT, tousled: HAIR_TOUSLED, long: HAIR_LONG, ponytail: HAIR_PONYTAIL, bun: HAIR_BUN, braid: HAIR_BRAID };
 /* a hat for each view; the cowl brings its capelet, and from behind its point */
 const HATS = {
   straw: { front: { hat: STRAW_HAT }, back: { hat: STRAW_HAT } },
@@ -89,16 +89,21 @@ function describe(s) {
 /* the character a spec describes */
 function fromSpec(spec, extra = {}) {
   const s = cleanSpec(spec), o = {}, front = {}, back = {}, pal = {};
-  if (s.clothes === 'vest') Object.assign(o, { torso: 'tunic', vest: true });
+  if (s.clothes === 'vest') o.garment = 'vest';
   else if (s.clothes === 'tunic') o.torso = 'tunic';
-  else if (s.clothes === 'overalls') Object.assign(o, { torso: 'tunic', bib: true });
+  else if (s.clothes === 'overalls') o.garment = 'overalls';
   else if (s.clothes === 'plate') Object.assign(o, { torso: 'plate', skirt: 2 });
+  else if (s.clothes === 'robe') o.garment = 'coat';
   else Object.assign(o, { torso: s.clothes, legs: s.clothes });
   if (APPLIES.rope(s) && s.rope === 'rope') { o.cord = 5; if (s.clothes === 'gown') o.girdle = true; }
   if (APPLIES.neckline(s) && s.neckline === 'square') o.neckline = true;
   const sl = {};
   if (s.sleeves === 'second') Object.assign(sl, { A: 'D', C: s.cut === 'bell' ? 'C' : 'D' });
   if (s.cut === 'bell') sl.bell = true;
+  /* the garments' sleeves (garments.js): a vest's shirt gathered at the cuff, overalls' shirt rolled, all creased */
+  if (o.garment) sl.folds = true;
+  if (o.garment === 'vest') sl.puff = !sl.bell;
+  if (o.garment === 'overalls') sl.roll = true;
   if (Object.keys(sl).length) o.sleeves = sl;
   if (s.cape !== 'none') o.cloak = s.cape === 'dagged' ? 'dagged' : true;
   if (s.satchel !== 'none') Object.assign(o, { strap: 1, satchel: s.satchel === 'cross' ? 'cross' : true });

@@ -1,3 +1,4 @@
+import { GARMENTS } from './garments.js';
 import { cellsToPart } from './pixels.js';
 
 /* ================= character sprites: bodies =================
@@ -69,11 +70,18 @@ function armPart(bt, view, pose, side, top, o = {}) {
     /* a bell sleeve widens below the elbow: a pixel outward over the forearm, and both ways at its mouth */
     if (sl.bell && j >= a.cuff - 2) { n++; if (a.s < 0) from--; }
     if (sl.bell && j === a.cuff) { n++; if (a.s > 0) from--; }
+    /* a full sleeve (puff) gathers into its cuff, blousing a pixel outward over the forearm above it; a rolled
+       sleeve (roll) is turned up above the elbow in a thick band, the bare forearm beneath */
+    const rolled = sl.roll && j >= 5 && j <= 6, bare = sl.roll && j > 6;
+    if ((sl.puff && j >= a.cuff - 3 && j < a.cuff) || rolled) { n++; if (a.s < 0) from--; }
     /* spiked armour: the gauntlet's cuff flares a pixel outward */
     if (sl.spike && j === a.cuff) { n++; if (a.s < 0) from--; }
     for (let i = 0; i < n; i++) {
       const x = from + i, inner = a.s > 0 ? i === 0 : i === n - 1;
-      put(x, top + j, j === a.cuff ? cuffL : inner && j > 0 && j < 5 ? sleeve.toLowerCase() : sleeve);
+      /* cloth sleeves (folds) crease at the elbow, the fold turning across the forearm, and at the gather */
+      const next = a.s > 0 ? i === 1 : i === n - 2;
+      const crease = (inner && j > 0 && j < 5) || (sl.folds && !sl.roll && ((j === 5 && inner) || (j === 6 && next) || (sl.puff && j === a.cuff - 1 && next)));
+      put(x, top + j, bare ? skin : rolled ? (j === 6 ? sleeve.toLowerCase() : sleeve) : j === a.cuff ? cuffL : crease ? sleeve.toLowerCase() : sleeve);
     }
     /* and a spike stands out from the elbow, pointing out and up */
     if (sl.spike && j === 5) {
@@ -258,16 +266,24 @@ function cloakCells(bt, view, top, style) {
   return cells;
 }
 
-/* Everything a frame needs from the body: the generated parts and the landmarks. */
+/* what a garment (garments.js) is cut to: the build, the view and pose, the torso's rows, where its belt falls */
+function garmentContext(bt, view, pose, top, o) {
+  const { rows, belt } = profile(bt);
+  return { bt, view, pose, top, rows, belt, T: bt.torso, front: view === 'front', fc, CX, BASE, span, geo: legGeometry(bt, view, pose), o };
+}
+/* Everything a frame needs from the body: the generated parts and the landmarks. A garment (o.garment) brings
+   its own torso and legs, and a coat: the piece worn over the torso, drawn as a layer of its own. */
 function measure(type, view, pose, o = {}) {
   const bt = BODY_TYPES[type]; if (!bt) throw new Error(`unknown body type "${type}"`);
   const top = BASE + 1 - bt.legs - bt.torso + (pose ? 1 : 0), { rows } = profile(bt);
   const near = armPart(bt, view, pose, 'near', top, o), far = armPart(bt, view, pose, 'far', top, o);
+  const g = o.garment ? GARMENTS[o.garment](garmentContext(bt, view, pose, top, o)) : null;
   return {
     bt, top,
     parts: {
-      torso: cellsToPart(torsoCells(bt, view, top, o)),
-      legs: cellsToPart(o.legs === 'gown' ? gownCells(bt, view, pose) : o.legs === 'robe' ? robeCells(bt, view, pose, o.teeth) : pantsCells(bt, view, pose, o)),
+      torso: cellsToPart(g ? g.torso : torsoCells(bt, view, top, o)),
+      coat: g ? cellsToPart(g.coat) : null,
+      legs: cellsToPart(g ? g.legs : o.legs === 'gown' ? gownCells(bt, view, pose) : o.legs === 'robe' ? robeCells(bt, view, pose, o.teeth) : pantsCells(bt, view, pose, o)),
       armNear: cellsToPart(near.cells), armFar: cellsToPart(far.cells), fistNear: cellsToPart(near.fist), fistFar: cellsToPart(far.fist),
       cloak: o.cloak ? cellsToPart(cloakCells(bt, view, top, o.cloak)) : null },
     at: { head: [9, top - 14], neck: [CX, top], shoulderNear: [rows[2][1], top], shoulderFar: [rows[2][0], top], handNear: near.hand, handFar: far.hand } };
