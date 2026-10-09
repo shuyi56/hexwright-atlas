@@ -1,16 +1,9 @@
 {
   "id": "whitemage",
   "name": "White Mage",
-  "level": 5,
   "stats": {
     "hp": 32,
-    "mp": 40,
-    "attack": 4,
-    "defense": 5,
-    "magic": 12,
-    "resistance": 14,
-    "speed": 6,
-    "evade": 8
+    "attack": 4
   },
   "movement": {
     "move": 3,

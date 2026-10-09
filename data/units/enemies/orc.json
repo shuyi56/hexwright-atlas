@@ -1,24 +1,13 @@
 {
   "id": "orc",
   "name": "Orc",
-  "level": 5,
   "stats": {
     "hp": 66,
-    "mp": 0,
-    "attack": 15,
-    "defense": 11,
-    "magic": 1,
-    "resistance": 4,
-    "speed": 5,
-    "evade": 4
+    "attack": 15
   },
   "movement": {
     "move": 4,
     "jump": 1
-  },
-  "rewards": {
-    "xp": 28,
-    "gold": 12
   },
   "notes": "Front-rank brute. Slow, heavy hitter."
 }

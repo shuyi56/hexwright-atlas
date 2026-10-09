@@ -1,20 +1,13 @@
 {
   "id": "summoner",
   "name": "Summoner",
-  "level": 7,
   "stats": {
     "hp": 30,
-    "mp": 52,
-    "attack": 3,
-    "defense": 4,
-    "magic": 17,
-    "resistance": 13,
-    "speed": 5,
-    "evade": 6
+    "attack": 3
   },
   "movement": {
     "move": 3,
     "jump": 1
   },
-  "notes": "Job. Calls beasts at great MP cost; slowest caster."
+  "notes": "Job. Calls beasts to fight; frail and slow on foot."
 }

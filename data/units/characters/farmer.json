@@ -1,16 +1,9 @@
 {
   "id": "farmer",
   "name": "Farmer",
-  "level": 1,
   "stats": {
     "hp": 28,
-    "mp": 0,
-    "attack": 6,
-    "defense": 4,
-    "magic": 1,
-    "resistance": 2,
-    "speed": 5,
-    "evade": 5
+    "attack": 6
   },
   "movement": {
     "move": 4,

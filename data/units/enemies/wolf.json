@@ -1,24 +1,13 @@
 {
   "id": "wolf",
   "name": "Wolf",
-  "level": 3,
   "stats": {
     "hp": 32,
-    "mp": 0,
-    "attack": 11,
-    "defense": 5,
-    "magic": 0,
-    "resistance": 3,
-    "speed": 12,
-    "evade": 20
+    "attack": 11
   },
   "movement": {
     "move": 7,
     "jump": 2
   },
-  "rewards": {
-    "xp": 16,
-    "gold": 0
-  },
-  "notes": "Pack hunter. Longest move of any enemy; drops no gold."
+  "notes": "Pack hunter. Longest move of any enemy."
 }

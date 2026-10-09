@@ -1,16 +1,9 @@
 {
   "id": "noble",
   "name": "Noble Lady",
-  "level": 2,
   "stats": {
     "hp": 26,
-    "mp": 14,
-    "attack": 3,
-    "defense": 3,
-    "magic": 8,
-    "resistance": 8,
-    "speed": 5,
-    "evade": 6
+    "attack": 3
   },
   "movement": {
     "move": 3,

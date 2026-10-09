@@ -156,7 +156,7 @@ function panels() {
     fg.clearRect(0, 0, f.width, f.height); fg.imageSmoothingEnabled = false; if (s) fg.drawImage(portrait(s), 0, 0, f.width, f.height);
     $('tcUnitName').textContent = s ? s.name : c.sprite;
     const u = unitFor(c.sprite), st = u.stats, mv = u.movement;
-    $('tcUnitInfo').textContent = `Lv ${u.level} · HP ${st.hp} · MP ${st.mp}`;
+    $('tcUnitInfo').textContent = `HP ${st.hp} · Attack ${st.attack}`;
     $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${TC.sel === k ? ' · ready' : ''}`;
   }
   $('tcHint').textContent = TC.walk ? 'On the move…' : TC.sel >= 0 ? 'Pick a blue tile to move there · Esc to cancel' : (M.chars || []).length ? 'Click a unit or press Tab to pick one' : 'No one stands on this map: place characters in the editor first';

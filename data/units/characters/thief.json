@@ -1,16 +1,9 @@
 {
   "id": "thief",
   "name": "Thief",
-  "level": 4,
   "stats": {
     "hp": 36,
-    "mp": 8,
-    "attack": 9,
-    "defense": 6,
-    "magic": 4,
-    "resistance": 5,
-    "speed": 11,
-    "evade": 22
+    "attack": 9
   },
   "movement": {
     "move": 5,

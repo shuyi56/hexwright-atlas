@@ -1,16 +1,9 @@
 {
   "id": "guard",
   "name": "Guard",
-  "level": 4,
   "stats": {
     "hp": 48,
-    "mp": 0,
-    "attack": 11,
-    "defense": 12,
-    "magic": 2,
-    "resistance": 5,
-    "speed": 6,
-    "evade": 8
+    "attack": 11
   },
   "movement": {
     "move": 4,

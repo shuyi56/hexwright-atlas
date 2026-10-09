@@ -1,16 +1,9 @@
 {
   "id": "knight",
   "name": "Knight",
-  "level": 5,
   "stats": {
     "hp": 58,
-    "mp": 8,
-    "attack": 13,
-    "defense": 15,
-    "magic": 3,
-    "resistance": 6,
-    "speed": 5,
-    "evade": 6
+    "attack": 13
   },
   "movement": {
     "move": 3,

@@ -1,7 +1,7 @@
 import '../styles/main.css';
 import './units.css';
 import '../data/unit-files.js';
-import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, LEVEL, listUnits, normalizeUnit, onUnitsChange, sectionsOf, unitPath, unitText, validateUnit } from '../data/units.js';
+import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.js';
 import { characterById, list as customCharacters } from '../characters/library.js';
 import { ROSTER, WALK, render } from '../characters/roster.js';
 import { figureThumb } from '../characters/draw.js';
@@ -10,14 +10,14 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 
 /* ================= the unit data page =================
    Every unit in data/units/ (src/data/units.js) to read and change: a list down the side, a card per unit with its
-   sprite walking, its stats, movement, rewards and notes, and a table of everyone for balancing numbers side by
+   sprite walking, its HP and Attack, its movement and notes, and a table of everyone for balancing numbers side by
    side. Changes are drafts until saved. On the dev server Save writes the files through the Hexwright bridge
    (tools/vite-hexwright.js), and the tactical view in any open tab picks the new numbers up at once; a built copy
    of the site can read the units and download a unit's file, but not save. */
 const $ = id => document.getElementById(id);
 const WRITABLE = import.meta.env.DEV;
 const SAVE_URL = (group, id) => `/__hexwright/units/${group}/${id}`;
-const SECTION_LABEL = { stats: 'Stats', movement: 'Movement', rewards: 'Rewards' };
+const SECTION_LABEL = { stats: 'Stats', movement: 'Movement' };
 
 /* id -> { group, draft, saved, savedGroup }: saved is null for a unit not yet written */
 const E = new Map();
@@ -75,7 +75,7 @@ function renderList() {
       const b = document.createElement('button'); b.className = 'ub-row'; b.dataset.id = id; b.setAttribute('aria-current', String(id === V.sel));
       const t = thumb(id); if (t) { t.className = 'ub-thumb'; b.append(t); } else { const s = document.createElement('span'); s.className = 'ub-thumb ub-nosprite'; s.textContent = '?'; b.append(s); }
       const d = e.draft, info = document.createElement('span'); info.className = 'ub-row-text';
-      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>Lv ${d.level} · HP ${d.stats.hp} · Move ${d.movement.move} · Jump ${d.movement.jump}</span>`;
+      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>HP ${d.stats.hp} · Atk ${d.stats.attack} · Move ${d.movement.move} · Jump ${d.movement.jump}</span>`;
       b.append(info); b.addEventListener('click', () => { V.sel = id; renderAll(); if (V.view === 'table') setView('cards'); });
       box.append(b);
     }
@@ -113,14 +113,13 @@ function renderDetail() {
         <input class="ub-name" id="name" value="${esc(d.name)}" maxlength="40" spellcheck="false" aria-label="Name">
         <div class="ub-meta">
           <label class="ub-field"><span>group</span><select id="group">${GROUPS.map(g => `<option value="${g}"${g === e.group ? ' selected' : ''}>${GROUP_LABEL[g]}</option>`).join('')}</select></label>
-          ${field('', ['level', 'Level', LEVEL.min, LEVEL.max, 0, 'experience level'], e)}
         </div>
         <p class="ub-file"><code>${esc(unitPath(e.group, d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}</p>
         <p class="ub-dim">${sprite ? `Plays as the ${esc(sprite.name)} sprite${sprite.blurb ? `: ${esc(sprite.blurb)}` : '.'}` : `No sprite called “${esc(d.id)}” is in the roster or the character library, so nothing on a map uses these numbers yet.`}</p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
       </div>
     </div>
-    ${sectionsOf(e.group).map(sec => `
+    ${SECTIONS.map(sec => `
       <section class="ub-sec"><h2>${SECTION_LABEL[sec]}</h2>
         ${sec === 'movement' ? `<div class="ub-move"><div class="ub-stats">${FIELDS[sec].map(f => field(sec, f, e)).join('')}</div><canvas id="reach" width="264" height="160" aria-label="Tiles reachable on flat ground"></canvas></div>`
     : `<div class="ub-stats">${FIELDS[sec].map(f => field(sec, f, e)).join('')}</div>`}
@@ -148,9 +147,8 @@ function renderDetail() {
   if (sprite) startPreview(sprite); else $('preview').classList.add('ub-blank');
   if ($('reach')) drawReach($('reach'), d.movement.move);
 }
-/* clamp what was typed into range and fit the sections to the group (only enemies carry rewards), then redraw
-   everything that shows it */
-function commit(e) { e.draft = normalizeUnit(e.draft, e.group); renderAll(); }
+/* clamp what was typed into range, then redraw everything that shows it */
+function commit(e) { e.draft = normalizeUnit(e.draft); renderAll(); }
 
 /* ---------- the sprite, walking ---------- */
 const FACING = [['front', false], ['front', true], ['back', false], ['back', true]];
@@ -188,8 +186,8 @@ function drawReach(can, move) {
 }
 
 /* ---------- the table ---------- */
-const COLS = [['name', 'Name'], ['group', 'Group'], ['level', 'Lv'], ...FIELDS.stats.map(([k, l]) => [`stats.${k}`, l]), ...FIELDS.movement.map(([k, l]) => [`movement.${k}`, l]), ...FIELDS.rewards.map(([k, l]) => [`rewards.${k}`, l])];
-const LIMITS = Object.fromEntries([['level', [LEVEL.min, LEVEL.max]], ...Object.entries(FIELDS).flatMap(([sec, fs]) => fs.map(([k, , lo, hi]) => [`${sec}.${k}`, [lo, hi]]))]);
+const COLS = [['name', 'Name'], ['group', 'Group'], ...SECTIONS.flatMap(sec => FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]))];
+const LIMITS = Object.fromEntries(SECTIONS.flatMap(sec => FIELDS[sec].map(([k, , lo, hi]) => [`${sec}.${k}`, [lo, hi]])));
 const cellOf = (e, key) => { if (key === 'group') return e.group; if (key === 'name') return nameOf(e); const [a, b] = key.split('.'); return b ? e.draft[a]?.[b] : e.draft[a]; };
 const savedCell = (e, key) => { if (!e.saved) return undefined; if (key === 'group') return e.savedGroup; if (key === 'name') return e.saved.name; const [a, b] = key.split('.'); return b ? e.saved[a]?.[b] : e.saved[a]; };
 function renderTable() {
@@ -209,7 +207,7 @@ function renderTable() {
     return `<td class="${changed.trim()}"><input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${v}" data-k="${k}" aria-label="${esc(k)} of ${esc(nameOf(e))}"></td>`;
   }).join('')}</tr>`).join('');
   box.innerHTML = `<div class="ub-table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
-    <p class="ub-dim ub-table-hint">Click a column to sort, a name to open its card. Brass cells differ from the saved file. Rewards apply to enemies only.</p>`;
+    <p class="ub-dim ub-table-hint">Click a column to sort, a name to open its card. Brass cells differ from the saved file.</p>`;
   box.querySelectorAll('[data-sort]').forEach(b => b.addEventListener('click', () => { const k = b.dataset.sort; V.sort = V.sort.key === k ? { key: k, dir: -V.sort.dir } : { key: k, dir: 1 }; renderTable(); }));
   box.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => { V.sel = b.dataset.open; setView('cards'); }));
   box.querySelectorAll('tbody input, tbody select').forEach(inp => inp.addEventListener('change', () => {

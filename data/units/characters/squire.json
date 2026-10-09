@@ -1,16 +1,9 @@
 {
   "id": "squire",
   "name": "Squire",
-  "level": 1,
   "stats": {
     "hp": 36,
-    "mp": 6,
-    "attack": 9,
-    "defense": 8,
-    "magic": 3,
-    "resistance": 4,
-    "speed": 7,
-    "evade": 8
+    "attack": 9
   },
   "movement": {
     "move": 4,

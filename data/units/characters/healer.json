@@ -1,16 +1,9 @@
 {
   "id": "healer",
   "name": "Healer",
-  "level": 3,
   "stats": {
     "hp": 30,
-    "mp": 30,
-    "attack": 3,
-    "defense": 4,
-    "magic": 11,
-    "resistance": 10,
-    "speed": 6,
-    "evade": 8
+    "attack": 3
   },
   "movement": {
     "move": 4,

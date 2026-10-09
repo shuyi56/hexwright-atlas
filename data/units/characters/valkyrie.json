@@ -1,16 +1,9 @@
 {
   "id": "valkyrie",
   "name": "Valkyrie",
-  "level": 6,
   "stats": {
     "hp": 48,
-    "mp": 16,
-    "attack": 13,
-    "defense": 10,
-    "magic": 6,
-    "resistance": 9,
-    "speed": 8,
-    "evade": 12
+    "attack": 13
   },
   "movement": {
     "move": 4,

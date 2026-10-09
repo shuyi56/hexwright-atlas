@@ -44,8 +44,6 @@
 .ub-name{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--vellum);font:400 30px/1.15 var(--display);padding:2px 0}
 .ub-name:hover{border-bottom-color:var(--brass)}
 .ub-meta{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:end}
-.ub-meta .ub-stat{grid-template-columns:auto 72px;width:auto}
-.ub-meta .ub-stat-what{display:none}
 .ub-field{display:flex;flex-direction:column;gap:3px}
 .ub-field span,.ub-stat-name{font:500 12.5px var(--ui-sc);letter-spacing:.08em;color:var(--muted)}
 .ub select,.ub input[type=number],.ub textarea{background:var(--table);border:1px solid var(--line);color:var(--vellum);font:500 14px var(--ui);padding:5px 8px;border-radius:3px}

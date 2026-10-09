@@ -1,16 +1,9 @@
 {
   "id": "dragoon",
   "name": "Dragoon",
-  "level": 6,
   "stats": {
     "hp": 50,
-    "mp": 10,
-    "attack": 14,
-    "defense": 11,
-    "magic": 3,
-    "resistance": 6,
-    "speed": 7,
-    "evade": 8
+    "attack": 14
   },
   "movement": {
     "move": 4,

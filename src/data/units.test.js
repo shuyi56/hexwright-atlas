@@ -24,20 +24,19 @@ test('the unit files are valid and in canonical form', () => {
   for (const f of readUnits()) {
     assert.deepEqual(validateUnit(f.raw, f.group), [], f.file);
     assert.equal(f.file, `data/units/${f.group}/${f.unit.id}.json`, 'named by its id');
-    assert.equal(readFileSync(join(ROOT, f.file), 'utf8'), unitText(f.raw, f.group), `${f.file} is as a save would write it`);
-    assert.equal(!!f.unit.rewards, f.group === 'enemies', 'only enemies carry rewards');
+    assert.equal(readFileSync(join(ROOT, f.file), 'utf8'), unitText(f.raw), `${f.file} is as a save would write it`);
+    assert.deepEqual(Object.keys(f.raw), ['id', 'name', 'stats', 'movement', 'notes']);
   }
 });
 
 test('a unit is clamped and filled out, and its faults are named', () => {
-  const u = normalizeUnit({ id: 'Imp', level: 400, stats: { hp: -3, speed: 7.6 }, movement: { jump: 9 }, rewards: { xp: 5 }, extra: 1 }, 'characters');
-  assert.equal(u.id, 'imp'); assert.equal(u.name, 'Imp'); assert.equal(u.level, 99);
-  assert.equal(u.stats.hp, 1); assert.equal(u.stats.speed, 8); assert.equal(u.stats.attack, DEFAULT_UNIT.stats.attack);
+  const u = normalizeUnit({ id: 'Imp', level: 400, stats: { hp: -3, attack: 7.6, mp: 9 }, movement: { jump: 9 }, extra: 1 });
+  assert.equal(u.id, 'imp'); assert.equal(u.name, 'Imp');
+  assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'attack']);
   assert.equal(u.movement.jump, 6); assert.equal(u.movement.move, DEFAULT_UNIT.movement.move);
-  assert.equal(u.rewards, undefined, 'a character has no rewards'); assert.equal(u.extra, undefined);
-  assert.deepEqual(normalizeUnit({ id: 'imp' }, 'enemies').rewards, { xp: 0, gold: 0 });
+  assert.equal(u.level, undefined); assert.equal(u.extra, undefined);
   assert.deepEqual(validateUnit({ id: 'imp', stats: { hp: 30 } }), []);
-  const errs = validateUnit({ id: '../x', level: 0, stats: { hp: 2.5 }, movement: { move: 40 } }, 'enemies');
+  const errs = validateUnit({ id: '../x', stats: { hp: 2.5, attack: 120 }, movement: { move: 40 } }, 'enemies');
   assert.equal(errs.length, 4, errs.join(' | '));
   assert.ok(validateUnit({ id: 'a' }, 'bosses').length, 'an unknown group');
 });
@@ -54,8 +53,8 @@ test('the store writes canonical files, moves a unit between groups and deletes 
   try {
     const { file } = writeUnit('characters', { id: 'imp', name: 'Imp', stats: { hp: 12 } }, root);
     assert.equal(file, 'data/units/characters/imp.json');
-    writeUnit('enemies', { id: 'imp', name: 'Imp', rewards: { xp: 3 } }, root);
-    const all = readUnits(root); assert.equal(all.length, 1); assert.equal(all[0].group, 'enemies'); assert.equal(all[0].unit.rewards.xp, 3);
+    writeUnit('enemies', { id: 'imp', name: 'Imp', stats: { hp: 14 } }, root);
+    const all = readUnits(root); assert.equal(all.length, 1); assert.equal(all[0].group, 'enemies'); assert.equal(all[0].unit.stats.hp, 14);
     assert.throws(() => writeUnit('enemies', { id: '../../evil' }, root), /id must be/);
     assert.equal(deleteUnit('enemies', 'imp', root), true); assert.equal(deleteUnit('enemies', 'imp', root), false);
     assert.throws(() => deleteUnit('enemies', '../x', root));
