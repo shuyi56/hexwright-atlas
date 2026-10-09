@@ -243,7 +243,9 @@ solid surface rather than a grid of blocks.
   glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
   capped ridge, a fascia board along the eave, its east end in shade, chimneys and smoke. So a row of houses never
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
-  towers carry cones or battlements, trees are lit leaf masses, and props and furniture keep the figures' scale in the
+  towers carry cones or battlements, trees are crowns of separate leaf clumps (each lit on its upper
+  left and rimmed in shade where it stands over the one behind, with leaf dabs inside) on tapered trunks with roots,
+  pines are tiers of slanting needles with drooping tips, and props and furniture keep the figures' scale in the
   middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
   front of the hero fades so they are never lost behind it.
 - **Walking:** the arrow keys or `WASD` walk the hero a tile at a time (`Shift` runs), turning to face a way that is
