@@ -54,7 +54,9 @@
 .ub-value{display:grid;grid-template-columns:90px 96px minmax(0,1fr);gap:14px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line)}
 .ub-value-name{font:500 14px var(--ui-sc);letter-spacing:.1em;color:var(--muted)}
 .ub .ub-value input[type=number]{width:100%;font:500 22px/1.1 var(--ui);padding:5px 10px}
-.ub-value.changed input{border-color:var(--brass);color:var(--brass-2)}
+.ub .ub-value select{width:100%;font:500 16px/1.1 var(--ui);padding:8px 6px}
+.ub-value-note{font-size:13px}
+.ub-value.changed input,.ub-value.changed select{border-color:var(--brass);color:var(--brass-2)}
 .ub-meter{height:8px;background:var(--table);border:1px solid var(--line);border-radius:3px;overflow:hidden}
 .ub-meter i{display:block;height:100%;background:linear-gradient(90deg,#8a6d36,var(--brass))}
 .ub-card-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:auto;padding-top:8px}

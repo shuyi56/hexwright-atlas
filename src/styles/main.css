@@ -190,7 +190,14 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
 .tc-unit[hidden]{display:none}
+.tc-menu{right:14px;bottom:146px;display:flex;flex-direction:column;min-width:140px;padding:6px}
+.tc-menu[hidden]{display:none}
+.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:16px;background:none;border:0;border-radius:2px;color:#ece2c8;font:500 15px var(--ui);padding:6px 8px;text-align:left;cursor:pointer}
+.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:rgba(201,164,90,.18);outline:none}
+.tc-menu button[aria-pressed=true]{background:rgba(201,164,90,.28);color:#fff4d0}
+.tc-menu button:disabled{color:#6b665a;cursor:default}
+.tc-menu kbd{font:500 11px var(--ui);color:#a39b86}
 #tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:1px solid #c9a45a}
 .tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
 .tc-keys{color:#a39b86}
-@media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
+@media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}.tc-menu{bottom:216px}}

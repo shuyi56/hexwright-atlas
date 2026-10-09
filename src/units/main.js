@@ -1,7 +1,7 @@
 import '../styles/main.css';
 import './units.css';
 import '../data/unit-files.js';
-import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.js';
+import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, PATTERNS, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.js';
 import { characterById, list as customCharacters } from '../characters/library.js';
 import { ROSTER, WALK, render } from '../characters/roster.js';
 import { figureThumb } from '../characters/draw.js';
@@ -10,7 +10,7 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 
 /* ================= the unit data page =================
    Every unit in data/units/ (src/data/units.js) to read and change: a list down the side, a card per unit with its
-   sprite walking, its HP, Attack, Move and Jump, and a table of everyone for balancing numbers side by
+   sprite walking, its HP, Attack, Range, attack pattern, Move and Jump, and a table of everyone for balancing numbers side by
    side. Changes are drafts until saved. On the dev server Save writes the files through the Hexwright bridge
    (tools/vite-hexwright.js), and the tactical view in any open tab picks the new numbers up at once; a built copy
    of the site can read the units and download a unit's file, but not save. */
@@ -74,7 +74,7 @@ function renderList() {
       const b = document.createElement('button'); b.className = 'ub-row'; b.dataset.id = id; b.setAttribute('aria-current', String(id === V.sel));
       const t = thumb(id); if (t) { t.className = 'ub-thumb'; b.append(t); } else { const s = document.createElement('span'); s.className = 'ub-thumb ub-nosprite'; s.textContent = '?'; b.append(s); }
       const d = e.draft, info = document.createElement('span'); info.className = 'ub-row-text';
-      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>HP ${d.stats.hp} · Atk ${d.stats.attack} · Rng ${d.stats.range} · Move ${d.movement.move} · Jump ${d.movement.jump}</span>`;
+      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>HP ${d.stats.hp} · Atk ${d.stats.attack} · Rng ${d.stats.range} ${patternLabel(d.stats.pattern)} · Move ${d.movement.move} · Jump ${d.movement.jump}</span>`;
       b.append(info); b.addEventListener('click', () => { V.sel = id; renderAll(); if (V.view === 'table') setView('cards'); });
       box.append(b);
     }
@@ -92,6 +92,17 @@ function tile(sec, [k, label, lo, hi], e) {
     <span class="ub-meter" aria-hidden="true"><i style="width:${Math.round(100 * Math.min(1, v / rosterMax(sec, k)))}%"></i></span>
   </label>`;
 }
+const patternLabel = id => (PATTERNS.find(([p]) => p === id) || PATTERNS[0])[1];
+const patternOptions = v => PATTERNS.map(([id, label]) => `<option value="${id}"${id === v ? ' selected' : ''}>${label}</option>`).join('');
+/* the attack pattern as a row of the list, under Range */
+function patternTile(e) {
+  const v = e.draft.stats.pattern, saved = e.saved?.stats?.pattern, changed = e.saved && saved !== v;
+  return `<label class="ub-value${changed ? ' changed' : ''}"${changed ? ` title="saved: ${patternLabel(saved)}"` : ''}>
+    <span class="ub-value-name">Pattern</span>
+    <select data-sec="stats" data-k="pattern" aria-label="Attack pattern">${patternOptions(v)}</select>
+    <span class="ub-dim ub-value-note">${v === 'melee' ? 'the four tiles beside it, no diagonals' : v === 'line' ? 'straight out in four directions, up to Range' : 'any tile up to Range steps away'}</span>
+  </label>`;
+}
 function renderDetail() {
   const box = $('detail'); stopPreview();
   const e = E.get(V.sel);
@@ -106,7 +117,7 @@ function renderDetail() {
         </div>
         <p class="ub-file"><code>${esc(unitPath(e.group, d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}${sprite ? '' : ` <span class="ub-dim">no sprite called “${esc(d.id)}”</span>`}</p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
-        <div class="ub-values">${SECTIONS.flatMap(sec => FIELDS[sec].map(f => tile(sec, f, e))).join('')}</div>
+        <div class="ub-values">${SECTIONS.flatMap(sec => [...FIELDS[sec].map(f => tile(sec, f, e)), ...(sec === 'stats' ? [patternTile(e)] : [])]).join('')}</div>
         <div class="ub-card-actions">
           <button class="btn" id="revertOne"${isDirty(e) && e.saved ? '' : ' disabled'}>Revert</button>
           <button class="btn ub-danger" id="deleteOne">Delete</button>
@@ -126,6 +137,7 @@ function renderDetail() {
     e.draft[sec][k] = n;
     commit(e);
   }));
+  box.querySelector('select[data-k=pattern]').addEventListener('change', ev => { e.draft.stats.pattern = ev.target.value; commit(e); });
   $('name').addEventListener('change', () => { e.draft.name = $('name').value; commit(e); });
   $('group').addEventListener('change', () => { e.group = $('group').value; commit(e); });
   $('faceL').addEventListener('click', () => { V.face = (V.face + 3) % 4; });
@@ -157,7 +169,7 @@ function startPreview(c) {
 }
 function stopPreview() { if (anim) cancelAnimationFrame(anim); anim = 0; }
 /* ---------- the table ---------- */
-const COLS = [['name', 'Name'], ['group', 'Group'], ...SECTIONS.flatMap(sec => FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]))];
+const COLS = [['name', 'Name'], ['group', 'Group'], ...SECTIONS.flatMap(sec => [...FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]), ...(sec === 'stats' ? [['stats.pattern', 'Pattern']] : [])])];
 const LIMITS = Object.fromEntries(SECTIONS.flatMap(sec => FIELDS[sec].map(([k, , lo, hi]) => [`${sec}.${k}`, [lo, hi]])));
 const cellOf = (e, key) => { if (key === 'group') return e.group; if (key === 'name') return nameOf(e); const [a, b] = key.split('.'); return b ? e.draft[a]?.[b] : e.draft[a]; };
 const savedCell = (e, key) => { if (!e.saved) return undefined; if (key === 'group') return e.savedGroup; if (key === 'name') return e.saved.name; const [a, b] = key.split('.'); return b ? e.saved[a]?.[b] : e.saved[a]; };
@@ -168,11 +180,12 @@ function renderTable() {
     const c = key === 'group' ? GROUPS.indexOf(x) - GROUPS.indexOf(y) || nameOf(a.e).localeCompare(nameOf(b.e)) : typeof x === 'string' ? x.localeCompare(y) : (x ?? -1) - (y ?? -1);
     return c * dir;
   });
-  const head = COLS.map(([k, l]) => `<th scope="col"${['name', 'group'].includes(k) ? ' class="txt"' : ''}><button data-sort="${k}" aria-sort="${V.sort.key === k ? (V.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}">${esc(l)}${V.sort.key === k ? (V.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('');
+  const head = COLS.map(([k, l]) => `<th scope="col"${['name', 'group', 'stats.pattern'].includes(k) ? ' class="txt"' : ''}><button data-sort="${k}" aria-sort="${V.sort.key === k ? (V.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}">${esc(l)}${V.sort.key === k ? (V.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('');
   const body = rows.map(({ id, e }) => `<tr data-id="${id}"${id === V.sel ? ' class="sel"' : ''}>${COLS.map(([k]) => {
     const v = cellOf(e, k), changed = e.saved && savedCell(e, k) !== v ? ' changed' : '';
     if (k === 'name') return `<th scope="row" class="txt${changed}"><button class="ub-open" data-open="${id}">${esc(v)}</button>${isDirty(e) ? '<i class="ub-dot"></i>' : ''}</th>`;
     if (k === 'group') return `<td class="txt${changed}"><select data-k="group" aria-label="Group of ${esc(nameOf(e))}">${GROUPS.map(g => `<option value="${g}"${g === v ? ' selected' : ''}>${GROUP_LABEL[g]}</option>`).join('')}</select></td>`;
+    if (k === 'stats.pattern') return `<td class="txt${changed}"><select data-k="${k}" aria-label="Attack pattern of ${esc(nameOf(e))}">${patternOptions(v)}</select></td>`;
     if (v === undefined) return '<td class="na">·</td>';
     const [lo, hi] = LIMITS[k];
     return `<td class="${changed.trim()}"><input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${v}" data-k="${k}" aria-label="${esc(k)} of ${esc(nameOf(e))}"></td>`;
@@ -184,6 +197,7 @@ function renderTable() {
   box.querySelectorAll('tbody input, tbody select').forEach(inp => inp.addEventListener('change', () => {
     const e = E.get(inp.closest('tr').dataset.id), k = inp.dataset.k;
     if (k === 'group') e.group = inp.value;
+    else if (k === 'stats.pattern') e.draft.stats.pattern = inp.value;
     else { const [a, b] = k.split('.'), n = Math.round(Number(inp.value)); if (b) e.draft[a][b] = n; else e.draft[a] = n; }
     commit(e);
   }));
