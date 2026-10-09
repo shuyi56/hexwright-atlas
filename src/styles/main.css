@@ -190,12 +190,10 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
 .tc-unit[hidden]{display:none}
-/* The actions menu and the unit's portrait are framed in oak, like the map's carts, signposts and planks: a dark
-   wood rim, lit along its top and shaded along its foot. The actions menu is small, beside the unit like a tactics
-   game's command list. */
-.tactical{--tc-oak:#6b4a2b;--tc-oak-hi:#8a6238;--tc-oak-lo:#4e341d;--tc-oak-ink:#1a120a;--tc-text:#f1e6cc;--tc-dim:#bba98a;--tc-pick:rgba(160,110,60,.35);--tc-mark:#ffe9c2;--tc-off:#7d6c55}
-.tc-win.tc-menu{background:#2a221a;color:var(--tc-text);border:3px solid var(--tc-oak);border-top-color:var(--tc-oak-hi);border-bottom-color:var(--tc-oak-lo);border-radius:3px;
-  box-shadow:inset 0 0 0 1px #3b2a1a,0 0 0 1px var(--tc-oak-ink),0 4px 10px rgba(0,0,0,.4)}
+/* The actions menu and the unit's portrait have a thin gold rim, one pixel inside a dark outline. The actions menu
+   is small, beside the unit like a tactics game's command list. */
+.tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
+.tc-win.tc-menu{background:linear-gradient(#1d2829,#141c1d);color:var(--tc-text);border:1px solid var(--tc-gold);border-radius:2px;box-shadow:0 0 0 1px #0b1011,0 4px 10px rgba(0,0,0,.4)}
 .tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
 .tc-menu[hidden]{display:none}
 .tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
@@ -208,7 +206,7 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
 .tc-hp i.low{background:#d9553f}
-#tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:4px solid var(--tc-oak);border-top-color:var(--tc-oak-hi);border-bottom-color:var(--tc-oak-lo);border-radius:3px;box-shadow:0 0 0 1px var(--tc-oak-ink),inset 0 0 0 1px var(--tc-oak-ink)}
+#tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:1px solid var(--tc-gold);box-shadow:0 0 0 1px #0b1011}
 .tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
 .tc-keys{color:#a39b86}
 @media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
