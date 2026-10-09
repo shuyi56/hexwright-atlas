@@ -1,7 +1,7 @@
 import { BASE } from './body.js';
 import { BUCKLER, HAIR_SHORT, HEAD_BACK, SWORD, staff } from './parts.js';
 import { CAPELET, COWL, COWL_POINT } from './hats.js';
-import { cellsToPart, frameBuf, stamp, W } from './pixels.js';
+import { cellsToPart, frameBuf, ramp, stamp, W } from './pixels.js';
 
 /* ================= character sprites: the enemies =================
    What a party meets on the road: a goblin, a bandit, an orc and a skeleton, drawn like the jobs (a build, an
@@ -266,34 +266,38 @@ const WOLF = {
   pal: { K: '#8f8c84', A: { ramp: '#8f8c84', clean: true }, D: { ramp: '#5f5a55', clean: true }, B: { ramp: '#ddd2b8', clean: true }, J: { flat: '#e2b048' }, Z: { flat: '#2a2228' }, F: '#f4efe4' }
 };
 
-/* The slime. A round ball of blue-green jelly (A) sat on its flattened base (a, its rim), a shine (W) on its upper left, and in front two
-   eyes (E) and a mouth (M). It does not walk but heaves: squashed wide in one stride and drawn up tall in the
-   other. */
+/* The slime. A ball of blue-green jelly sat on the ground, a shine (X) high on its upper left, and in front two eyes (E)
+   and a mouth (M). The engine lights a figure like an upright cylinder, which would band a ball into a jar, so the
+   slime is lit here instead, as a sphere under light from the upper left: each pixel takes one of five flat tones
+   of its jelly (U highlight, A light, B base, D shade, V deep) by how far its surface faces the light. Its outline is
+   a pixel circle, eased a touch at the shoulders so its top stays round at this size, with its base pressed
+   flat on the ground. It does not walk but heaves: squashed wide in one stride
+   and drawn up tall in the other. */
+const SLIME_JELLY = '#72a8aa', SLIME_TONES = ['U', 'A', 'B', 'D', 'V'];
+const LIGHT = (() => { const v = [-0.55, -0.62, 0.56], n = Math.hypot(...v); return v.map(c => c / n); })();
 function slimeFrame(view, pose) {
-  /* a ball of jelly: round as a ball above its middle, its sides bulging out and curling under to sit on a flattened
-     base, the base a little wider in a squash */
-  const [w, h] = [[22, 20], [24, 17], [19, 23]][pose], cells = [], top = BASE - h + 1, cy = top + (h - 1) * 0.48, ry = (h - 1) * 0.52;
-  for (let j = 0; j < h; j++) {
-    const y = top + j, t = Math.min(1, Math.abs(y - cy) / ry), base = j >= h - 2;
-    const half = (w / 2) * Math.sqrt(1 - t * t * (y > cy ? 0.55 : 1)) - (base ? (h - 1 - j ? 0.5 : 1.5) : 0);
-    const l = Math.round(16 - half), r = Math.round(16 + half) - 1;
-    for (let x = l; x <= r; x++) cells.push([x, y, j === h - 1 ? 'a' : 'A']);
+  const [w, h] = [[21, 19], [24, 15], [18, 22]][pose], rx = w / 2, ry = h / 2, cx = 16, cy = BASE + 2.5 - ry, cells = [];
+  for (let y = 0; y <= BASE; y++) for (let x = 0; x < W; x++) {
+    const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry, d = nx * nx + ny * ny; if (Math.abs(nx) ** 1.8 + Math.abs(ny) ** 1.8 > 1) continue;
+    const nz = Math.sqrt(Math.max(0, 1 - d)), lit = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
+    const tone = y === BASE ? 4 : lit > 0.8 ? 0 : lit > 0.5 ? 1 : lit > 0.15 ? 2 : lit > -0.2 ? 3 : 4;
+    cells.push([x, y, SLIME_TONES[tone]]);
   }
-  const at = (x, y, ch) => cells.push([x, y, ch]);
+  const at = (x, y, ch) => cells.push([x, y, ch]), top = Math.ceil(cy - ry);
   /* the shine: a short arc high on the upper left, and a fleck beside it */
-  const sx = 16 - Math.round(w * 0.27), sy = top + 3;
-  at(sx, sy + 2, 'W'); at(sx, sy + 3, 'W'); at(sx + 1, sy + 1, 'W'); at(sx + 2, sy + 1, 'W'); at(sx + 4, sy, 'W');
+  const sx = Math.round(cx - rx * 0.5), sy = Math.round(cy - ry * 0.62);
+  at(sx, sy + 1, 'X'); at(sx, sy + 2, 'X'); at(sx + 1, sy, 'X'); at(sx + 2, sy, 'X'); at(sx + 3, sy - 1, 'X');
   if (view === 'front') {
-    const ey = top + Math.round(h * 0.42), mid = 14;
+    const ey = top + Math.round(h * 0.45), mid = 14;
     for (const ex of [mid - 3, mid + 2]) { at(ex, ey, 'E'); at(ex, ey + 1, 'E'); }
     at(mid - 1, ey + 3, 'M'); at(mid, ey + 3, 'M');
   }
   return beastFrame([cellsToPart(cells)], false);
 }
 const SLIME = {
-  id: 'slime', name: 'Slime', blurb: 'A heaving dome of blue-green jelly that swallows boots whole.',
+  id: 'slime', name: 'Slime', blurb: 'A heaving ball of blue-green jelly that swallows boots whole.',
   enemy: true, beast: true, body: 'standard', outfit: {}, draw: slimeFrame,
-  pal: { K: '#72a8aa', A: '#72a8aa', W: { flat: '#f4f6e4' }, E: { flat: '#1c1218' }, M: { flat: '#2e4a4c' } }
+  pal: { K: SLIME_JELLY, ...Object.fromEntries(ramp(SLIME_JELLY).map((c, i) => [SLIME_TONES[i], { flat: c }])), X: { flat: '#f4f6e4' }, E: { flat: '#1c1218' }, M: { flat: '#2e4a4c' } }
 };
 
 const ENEMIES = [GOBLIN, BANDIT, ORC, SKELETON, WOLF, SLIME];

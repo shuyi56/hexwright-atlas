@@ -208,7 +208,9 @@ the head seen from behind. They are drawn the same in any build, so the sheet's 
   with clean fur colours (no ink between grey, saddle and cream), so the fur is even; light creases mark the back
   of the cheek and the curve of the haunch.
 - **The slime.** A round ball of jelly sat on a flattened base, with a shine high on the upper left and, in
-  front, two dot eyes and a mouth. It heaves rather than walks: squashed wide in one stride and drawn up tall in
+  front, two dot eyes and a mouth. The engine lights figures like upright cylinders, which would band a ball into
+  a jar, so the slime is lit as a sphere instead: each pixel takes one of five flat tones of its jelly by how far
+  its surface faces the light from the upper left. It heaves rather than walks: squashed wide in one stride and drawn up tall in
   the other.
 
 ## Palette
