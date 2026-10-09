@@ -1,0 +1,20 @@
+{
+  "id": "thief",
+  "name": "Thief",
+  "level": 4,
+  "stats": {
+    "hp": 36,
+    "mp": 8,
+    "attack": 9,
+    "defense": 6,
+    "magic": 4,
+    "resistance": 5,
+    "speed": 11,
+    "evade": 22
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  },
+  "notes": "Job. Fastest of the party, nimble over ledges."
+}

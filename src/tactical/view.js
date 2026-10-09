@@ -6,7 +6,9 @@ import { MAX_LEVEL, levelOf } from '../editor/model.js';
 import { walkChar } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
 import { $, state } from '../ui/state.js';
-import { MOVE, moveRange, placeId, routeTo } from './move.js';
+import { moveRange, placeId, routeTo } from './move.js';
+import '../data/unit-files.js';
+import { onUnitsChange, unitFor } from '../data/units.js';
 import { drawScene, figureHit, portrait } from './render.js';
 import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 
@@ -53,7 +55,7 @@ function walkerPos(w) {
 }
 function startWalk(k, path) {
   const M = ED.M, c = M.chars[k], start = ptOf(c.x, c.y, levelOf(c));
-  const r = mutate(M2 => { const w = walkChar(M2, k, path); return { changed: w.ok && path.length ? 1 : 0, ok: w.ok }; });
+  const jump = unitFor(c.sprite).movement.jump, r = mutate(M2 => { const w = walkChar(M2, k, path, jump); return { changed: w.ok && path.length ? 1 : 0, ok: w.ok }; });
   if (!r || !r.ok) return false;
   TC.walk = { k, pts: [start, ...path.map(([x, y, L]) => ptOf(x, y, L || 0))], d: 0 }; TC.locked = false; TC.free = false;
   TC.range = null; rebuild();
@@ -113,12 +115,16 @@ function setCursor(x, y, L, follow) {
 function select(k) {
   TC.sel = k; TC.range = null; TC.dirty = true;
   if (k >= 0) {
-    const c = ED.M.chars[k]; TC.range = moveRange(ED.M, k, MOVE);
+    const c = ED.M.chars[k]; TC.range = rangeOf(k);
     if (levelOf(c) > TC.top) setTop(levelOf(c));
     setCursor(c.x, c.y, levelOf(c)); const [ax, ay] = tileArt(c.x, c.y, levelOf(c)); lookAt(ax, ay - 20);
   }
   panels();
 }
+/* how far unit k moves and climbs comes from its data (data/units/), looked up by its sprite */
+function rangeOf(k) { const { move, jump } = unitFor(ED.M.chars[k].sprite).movement; return moveRange(ED.M, k, move, jump); }
+/* new numbers for the units (a save from the unit data page) redraw the picked unit's range and the panels */
+onUnitsChange(() => { if (!TC.open) return; if (TC.sel >= 0 && !TC.walk) { TC.range = rangeOf(TC.sel); TC.dirty = true; } panels(); });
 const unitAt = (x, y, L) => (ED.M.chars || []).findIndex(c => c.x === x && c.y === y && levelOf(c) === L);
 /* Enter or a click on (x, y, L): pick up the unit there, or send the picked unit there if it can reach it */
 function act(x, y, L) {
@@ -149,7 +155,9 @@ function panels() {
     const c = M.chars[k], s = characterById(c.sprite), f = $('tcFace'), fg = f.getContext('2d');
     fg.clearRect(0, 0, f.width, f.height); fg.imageSmoothingEnabled = false; if (s) fg.drawImage(portrait(s), 0, 0, f.width, f.height);
     $('tcUnitName').textContent = s ? s.name : c.sprite;
-    $('tcUnitInfo').textContent = `Move ${MOVE} · Jump 1${TC.sel === k ? ' · ready' : ''}`;
+    const u = unitFor(c.sprite), st = u.stats, mv = u.movement;
+    $('tcUnitInfo').textContent = `Lv ${u.level} · HP ${st.hp} · MP ${st.mp}`;
+    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${TC.sel === k ? ' · ready' : ''}`;
   }
   $('tcHint').textContent = TC.walk ? 'On the move…' : TC.sel >= 0 ? 'Pick a blue tile to move there · Esc to cancel' : (M.chars || []).length ? 'Click a unit or press Tab to pick one' : 'No one stands on this map: place characters in the editor first';
 }

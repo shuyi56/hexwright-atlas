@@ -1,0 +1,20 @@
+{
+  "id": "monk",
+  "name": "Monk",
+  "level": 3,
+  "stats": {
+    "hp": 34,
+    "mp": 18,
+    "attack": 7,
+    "defense": 6,
+    "magic": 9,
+    "resistance": 10,
+    "speed": 6,
+    "evade": 10
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  },
+  "notes": "Townsfolk. Fights bare-handed; steady against spells."
+}

@@ -1,4 +1,5 @@
 import { METHODS } from '../src/editor/api-spec.js';
+import { deleteUnit, readUnits, writeUnit } from './units-store.mjs';
 
 /* ================= Hexwright bridge: Vite plugin (server side) =================
    Lets anything that can speak HTTP drive the tile editor open in a real browser:
@@ -7,9 +8,14 @@ import { METHODS } from '../src/editor/api-spec.js';
      GET  /__hexwright/spec             the method list with JSON schemas
      POST /__hexwright/api/<method>     body = params, answer = { ok, result } or { ok: false, error }
      POST /__hexwright/call             { method, params, page?, timeoutMs? }
+     GET    /__hexwright/units                every unit data file (data/units/), normalized
+     PUT    /__hexwright/units/<group>/<id>   body = the unit; writes data/units/<group>/<id>.json
+     DELETE /__hexwright/units/<group>/<id>   removes that file
 
    Calls travel over Vite's HMR websocket to src/editor/bridge.js in the page, which runs them on
-   window.hexwright. The MCP server in mcp/ is a thin client of these endpoints. Dev server only. */
+   window.hexwright. The MCP server in mcp/ is a thin client of these endpoints. The units endpoints are how the
+   unit data page (units.html) saves; they touch only files under data/units/ (tools/units-store.mjs). Dev
+   server only. */
 export default function hexwrightBridge() {
   return {
     name: 'hexwright-bridge', apply: 'serve',
@@ -42,6 +48,13 @@ export default function hexwrightBridge() {
           const path = (req.url || '/').split('?')[0].replace(/\/+$/, '');
           if (path === '/pages' && req.method === 'GET') { live().forEach(p => p.client.send('hexwright:ping', {})); return send(res, 200, { root: server.config.root, pages: live().map(pub) }); }
           if (path === '/spec' && req.method === 'GET') return send(res, 200, { methods: METHODS });
+          if (path === '/units' && req.method === 'GET') return send(res, 200, { ok: true, units: readUnits(server.config.root).map(({ group, file, unit }) => ({ group, file, unit })) });
+          const um = path.match(/^\/units\/([a-z]+)\/([a-z0-9-]+)$/);
+          if (um && req.method === 'PUT') {
+            const raw = await body(req); if (raw.id !== um[2]) return send(res, 400, { ok: false, error: { message: `the body's id "${raw.id}" does not match the path's "${um[2]}"` } });
+            try { return send(res, 200, { ok: true, ...writeUnit(um[1], raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
+          }
+          if (um && req.method === 'DELETE') return send(res, 200, { ok: true, deleted: deleteUnit(um[1], um[2], server.config.root) });
           let method, params, page, timeoutMs;
           if (path.startsWith('/api/') && (req.method === 'POST' || req.method === 'GET')) { method = decodeURIComponent(path.slice(5)); params = req.method === 'POST' ? await body(req) : {}; page = new URL(req.url, 'http://x').searchParams.get('page') || undefined; }
           else if (path === '/call' && req.method === 'POST') ({ method, params, page, timeoutMs } = await body(req));

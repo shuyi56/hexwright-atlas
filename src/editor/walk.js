@@ -7,7 +7,8 @@ import { MAX_LEVEL, floorAt, levelOf, objAt } from './model.js';
    and holds neither a piece (other than one made to be walked through, such as a doorway or stairs) nor
    another character on that level.
    A step goes to one of the four edge-neighbours on the same level and may climb or drop at most one height
-   level; an upper floor follows the ground under it, so the rule holds there too. Stairs join two levels:
+   level (a unit's jump, from its data in data/units/, can widen that for the tactical view); an upper floor
+   follows the ground under it, so the rule holds there too. Stairs join two levels:
    from a stairs piece on level L a step towards its high end (its back) lands on the tile behind it on level
    L + 1, and the same step back comes down, provided the flight's top and that floor are within one height
    level of each other. Pure, so the
@@ -25,29 +26,30 @@ function blockedBy(M, x, y, except = -1, L = 0) {
   return null;
 }
 const isFree = (M, x, y, except = -1, L = 0) => !blockedBy(M, x, y, except, L);
-/* a step on one level: free, and no more than MAX_STEP height levels up or down (floors sit on the ground's height) */
+/* a step on one level: free, and no more than jump (MAX_STEP unless a unit says otherwise) height levels up or down
+   (floors sit on the ground's height) */
 const climb = (M, x, y, nx, ny) => Math.abs(M.elev[ny * M.S + nx] - M.elev[y * M.S + x]);
-const canStep = (M, x, y, nx, ny, except = -1, L = 0) => isFree(M, nx, ny, except, L) && climb(M, x, y, nx, ny) <= MAX_STEP;
+const canStep = (M, x, y, nx, ny, except = -1, L = 0, jump = MAX_STEP) => isFree(M, nx, ny, except, L) && climb(M, x, y, nx, ny) <= jump;
 const faceOf = (dx, dy) => FACE_DELTA.findIndex(([a, b]) => a === dx && b === dy);
 /* the stairs piece on (x, y, L), if any, and the tile its top lands on (one level up) */
 function stairsAt(M, x, y, L) {
   const k = objAt(M, x, y, L); if (k < 0 || M.objs[k].id !== 'stairs') return null;
   const [dx, dy] = FACE_DELTA[(M.objs[k].face + 2) % 4]; return { k, up: [x + dx, y + dy, L + 1] };
 }
-/* every place one step from (x, y, L) */
-function neighbours(M, x, y, L, except) {
+/* every place one step from (x, y, L) for a walker that climbs or drops at most jump height levels a step */
+function neighbours(M, x, y, L, except, jump = MAX_STEP) {
   const out = [];
   for (const [dx, dy] of FACE_DELTA) {
     const nx = x + dx, ny = y + dy; if (!inb(M, nx, ny)) continue;
-    if (canStep(M, x, y, nx, ny, except, L)) out.push([nx, ny, L]);
+    if (canStep(M, x, y, nx, ny, except, L, jump)) out.push([nx, ny, L]);
     /* down a flight: the tile in front is stairs on the level below whose top is here */
-    if (L > 0) { const st = stairsAt(M, nx, ny, L - 1); if (st && st.up[0] === x && st.up[1] === y && isFree(M, nx, ny, except, L - 1) && climb(M, x, y, nx, ny) <= MAX_STEP) out.push([nx, ny, L - 1]); }
+    if (L > 0) { const st = stairsAt(M, nx, ny, L - 1); if (st && st.up[0] === x && st.up[1] === y && isFree(M, nx, ny, except, L - 1) && climb(M, x, y, nx, ny) <= jump) out.push([nx, ny, L - 1]); }
   }
   /* up a flight */
-  const st = stairsAt(M, x, y, L); if (st && L < MAX_LEVEL && inb(M, st.up[0], st.up[1]) && isFree(M, st.up[0], st.up[1], except, L + 1) && climb(M, x, y, st.up[0], st.up[1]) <= MAX_STEP) out.push(st.up);
+  const st = stairsAt(M, x, y, L); if (st && L < MAX_LEVEL && inb(M, st.up[0], st.up[1]) && isFree(M, st.up[0], st.up[1], except, L + 1) && climb(M, x, y, st.up[0], st.up[1]) <= jump) out.push(st.up);
   return out;
 }
-const stepOK = (M, from, to, except) => neighbours(M, from[0], from[1], from[2], except).some(n => n[0] === to[0] && n[1] === to[1] && n[2] === to[2]);
+const stepOK = (M, from, to, except, jump) => neighbours(M, from[0], from[1], from[2], except, jump).some(n => n[0] === to[0] && n[1] === to[1] && n[2] === to[2]);
 
 /* where a click on (x, y) of level L sends character k: a flight of stairs means "go up it", to the landing on
    the floor above; the open stairwell over a flight means "go down", onto the flight; anything else is itself */
@@ -88,12 +90,13 @@ function placeChar(M, c) {
   return { ok: true, index: M.chars.length - 1, char: ch };
 }
 function eraseCharAt(M, x, y, L = 0) { const k = charAt(M, x, y, -1, L); if (k < 0) return 0; M.chars.splice(k, 1); return 1; }
-/* walk character k along a path (as findPath returns it); the model jumps to the end, facing the last step */
-function walkChar(M, k, path) {
+/* walk character k along a path (as findPath returns it); the model jumps to the end, facing the last step. jump is
+   the most height levels a step may climb or drop (MAX_STEP by default). */
+function walkChar(M, k, path, jump) {
   const c = M.chars[k]; let at = [c.x, c.y, levelOf(c)];
   for (const p of path) {
     const to = [p[0], p[1], p[2] ?? at[2]];
-    if (!stepOK(M, at, to, k)) return { ok: false, reason: `cannot step from ${at[0]},${at[1]} (level ${at[2]}) to ${to[0]},${to[1]} (level ${to[2]})` };
+    if (!stepOK(M, at, to, k, jump)) return { ok: false, reason: `cannot step from ${at[0]},${at[1]} (level ${at[2]}) to ${to[0]},${to[1]} (level ${to[2]})` };
     at = to;
   }
   if (path.length) {

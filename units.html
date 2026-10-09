@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Unit data · Hexwright</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans+SC:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap">
+</head>
+<body>
+<div class="ub">
+  <header class="ub-bar">
+    <a class="btn" href="./index.html">← Atlas</a>
+    <div class="ub-title"><span class="eyebrow">unit data</span><h1>Characters &amp; enemies</h1></div>
+    <div class="ub-views" role="tablist" aria-label="View">
+      <button class="chip" role="tab" id="viewCards" aria-pressed="true" aria-selected="true">Cards</button>
+      <button class="chip" role="tab" id="viewTable" aria-pressed="false" aria-selected="false">Table</button>
+    </div>
+    <div class="ub-actions">
+      <span class="ub-mode" id="mode"></span>
+      <button class="btn" id="newUnit">New unit…</button>
+      <button class="btn" id="download" title="Download the selected unit's JSON file">Download</button>
+      <button class="btn" id="revertAll">Revert all</button>
+      <button class="btn btn-brass" id="saveAll" title="Save every changed unit (Ctrl+S)">Save</button>
+    </div>
+  </header>
+  <main class="ub-main" id="main">
+    <aside class="ub-list" aria-label="Units">
+      <input class="ub-search" id="search" type="search" placeholder="Filter by name or id" aria-label="Filter units" spellcheck="false" autocomplete="off">
+      <div class="ub-rows" id="rows"></div>
+    </aside>
+    <section class="ub-detail" id="detail" aria-live="polite"></section>
+    <section class="ub-table" id="table" hidden></section>
+  </main>
+  <div class="ub-toast" id="toast" role="status" hidden></div>
+</div>
+<dialog class="ub-dialog" id="newDialog">
+  <form method="dialog" id="newForm">
+    <h2>New unit</h2>
+    <p class="ub-dim">A unit gives a sprite its numbers. These sprites have none yet.</p>
+    <label class="ub-field"><span>sprite</span><select id="newSprite" required></select></label>
+    <label class="ub-field"><span>group</span><select id="newGroup"><option value="characters">Characters</option><option value="enemies">Enemies</option></select></label>
+    <label class="ub-field"><span>start from</span><select id="newFrom"></select></label>
+    <div class="ub-dialog-actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn btn-brass" value="ok" id="newOk">Create</button></div>
+  </form>
+</dialog>
+<script type="module" src="/src/units/main.js"></script>
+</body>
+</html>

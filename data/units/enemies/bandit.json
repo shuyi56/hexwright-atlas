@@ -1,0 +1,24 @@
+{
+  "id": "bandit",
+  "name": "Bandit",
+  "level": 3,
+  "stats": {
+    "hp": 38,
+    "mp": 4,
+    "attack": 10,
+    "defense": 7,
+    "magic": 2,
+    "resistance": 4,
+    "speed": 8,
+    "evade": 14
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  },
+  "rewards": {
+    "xp": 14,
+    "gold": 18
+  },
+  "notes": "Road ambusher. Carries the most gold."
+}

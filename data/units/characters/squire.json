@@ -1,0 +1,20 @@
+{
+  "id": "squire",
+  "name": "Squire",
+  "level": 1,
+  "stats": {
+    "hp": 36,
+    "mp": 6,
+    "attack": 9,
+    "defense": 8,
+    "magic": 3,
+    "resistance": 4,
+    "speed": 7,
+    "evade": 8
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  },
+  "notes": "Job. The all-rounder every party starts with."
+}

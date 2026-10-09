@@ -1,0 +1,24 @@
+{
+  "id": "slime",
+  "name": "Slime",
+  "level": 2,
+  "stats": {
+    "hp": 44,
+    "mp": 0,
+    "attack": 6,
+    "defense": 3,
+    "magic": 4,
+    "resistance": 14,
+    "speed": 3,
+    "evade": 0
+  },
+  "movement": {
+    "move": 3,
+    "jump": 0
+  },
+  "rewards": {
+    "xp": 10,
+    "gold": 2
+  },
+  "notes": "Slow jelly that cannot climb. Soaks spells."
+}

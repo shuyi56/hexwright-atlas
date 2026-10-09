@@ -114,14 +114,46 @@ tile, and the walk into `docs/images/character-walk.png`. Add `--strips` for one
 
 ![The character roster walking](docs/images/character-walk.png)
 
+### Unit data
+
+How each character and enemy plays lives in data files, one per unit, kept apart from how they look:
+
+```
+data/units/
+  characters/  archer.json  blackmage.json  dragoon.json  ...  (the townsfolk and the jobs)
+  enemies/     bandit.json  goblin.json  orc.json  skeleton.json  slime.json  wolf.json
+```
+
+A file is named by the unit's id, which is the id of the sprite it plays as, and holds its name, level, stats
+(HP, MP, Attack, Defense, Magic, Resistance, Speed, Evade %), movement (Move: tiles a turn; Jump: height levels
+a step can climb or drop) and notes. Enemies also carry rewards (XP and gold). `src/data/units.js` defines the
+fields, their ranges and defaults, and normalizes and validates a unit; a sprite with no file, such as a custom
+character from the maker, plays with the defaults. Today the tactical view uses Move and Jump; the other numbers
+are there for combat to build on.
+
+**Unit data** in the atlas header opens `units.html`, an editor for these files:
+
+- **Cards:** the list of units down the side, filterable, and a card for the picked one: its sprite walking (turn
+  it with ⟲ ⟳), name, group and level, every stat with a bar against the strongest unit, movement with the tiles
+  its Move reaches on flat ground, rewards, notes and the file's contents. Changed values show what they were.
+- **Table:** everyone in one sortable grid for balancing numbers side by side, every cell editable.
+- **Saving:** changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes the
+  files through the Hexwright bridge: `PUT` and `DELETE /__hexwright/units/<group>/<id>`, `GET /__hexwright/units`.
+  Every write is normalized, so the files keep one shape. A tactical view open in another tab picks the new
+  numbers up straight away. **New unit…** gives a sprite without a unit its own file, starting from the defaults
+  or a copy of another unit; moving a unit to the other group moves its file. The built site (GitHub Pages)
+  shows the same data read-only, with **Download** for a unit's file.
+
+![The unit data editor](docs/images/unit-data.png)
+
 ### Tactical view
 
 **Tactical** (`T`) in the editor shows the map through a close-up camera like the old tactics games (Final
 Fantasy Tactics, Tactics Ogre): pixel art at whole-pixel zoom (×1 to ×6, about a dozen tiles across by default),
 with the camera gliding after the cursor and the unit on the move.
 
-- **Moving units:** click a unit (or press `Tab`) and the tiles it can reach in five steps light up in blue, by
-  the editor's walking rules (one height level a step, around pieces, up and down stairs). The route to the tile
+- **Moving units:** click a unit (or press `Tab`) and the tiles it can reach light up in blue, by its own Move and
+  Jump from its [unit data](#unit-data) and the editor's walking rules (no more height levels a step than its Jump, around pieces, up and down stairs). The route to the tile
   under the cursor is traced in gold. Click a blue tile (or press `Enter`) and the unit walks there, hopping up
   and down ledges, one stride to a tile at 4.2 tiles a second (8.4 with the ▶▶ 2× chip or F), so the arms swing at the pace the figure moves. The
   camera sits on whole art pixels and rides along the walker's path on the ground (not its hops), holding the
@@ -310,12 +342,15 @@ src/
                       drawn procedurally with a small iso kit (used by the city view and the editor)
   characters/         Characters: pixel engine, body builds, shared parts, the townsfolk and the jobs, drawing
                       them on the map, the sprite sheet layout and its pixel font
+  data/               Unit data: the fields and ranges of a unit's stats, and the registry the game reads
+  units/              The unit data page (units.html)
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
-tools/                Vite plugin that relays HTTP calls to the editor page (dev server only),
+tools/                Vite plugin that relays HTTP calls to the editor page and saves unit data (dev server only),
                       the character sheet writer and a minimal PNG and APNG encoder
+data/units/           One JSON file per character and enemy: stats, movement, rewards
 mcp/                  MCP server, backend launcher and end-to-end test
   ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view
 legacy/               The original single-file artifact, kept for reference

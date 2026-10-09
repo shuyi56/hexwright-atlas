@@ -1,0 +1,24 @@
+{
+  "id": "goblin",
+  "name": "Goblin",
+  "level": 1,
+  "stats": {
+    "hp": 22,
+    "mp": 0,
+    "attack": 7,
+    "defense": 4,
+    "magic": 1,
+    "resistance": 2,
+    "speed": 8,
+    "evade": 12
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  },
+  "rewards": {
+    "xp": 6,
+    "gold": 4
+  },
+  "notes": "Weak alone, comes in threes. Scrambles up ledges."
+}

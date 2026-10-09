@@ -1,0 +1,20 @@
+{
+  "id": "archer",
+  "name": "Archer",
+  "level": 4,
+  "stats": {
+    "hp": 40,
+    "mp": 6,
+    "attack": 12,
+    "defense": 7,
+    "magic": 4,
+    "resistance": 5,
+    "speed": 8,
+    "evade": 12
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  },
+  "notes": "Job. Strikes from range; fragile up close."
+}

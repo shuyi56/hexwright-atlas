@@ -1,0 +1,24 @@
+{
+  "id": "skeleton",
+  "name": "Skeleton",
+  "level": 4,
+  "stats": {
+    "hp": 40,
+    "mp": 0,
+    "attack": 10,
+    "defense": 9,
+    "magic": 0,
+    "resistance": 12,
+    "speed": 5,
+    "evade": 6
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  },
+  "rewards": {
+    "xp": 20,
+    "gold": 6
+  },
+  "notes": "Undead. Shrugs off magic; weak to holy (not yet modelled)."
+}

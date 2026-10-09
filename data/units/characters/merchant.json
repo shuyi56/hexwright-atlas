@@ -1,0 +1,20 @@
+{
+  "id": "merchant",
+  "name": "Merchant",
+  "level": 2,
+  "stats": {
+    "hp": 26,
+    "mp": 6,
+    "attack": 3,
+    "defense": 3,
+    "magic": 4,
+    "resistance": 5,
+    "speed": 4,
+    "evade": 4
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  },
+  "notes": "Townsfolk. Slow, but knows a trick or two with coin."
+}

@@ -1,0 +1,20 @@
+{
+  "id": "farmer",
+  "name": "Farmer",
+  "level": 1,
+  "stats": {
+    "hp": 28,
+    "mp": 0,
+    "attack": 6,
+    "defense": 4,
+    "magic": 1,
+    "resistance": 2,
+    "speed": 5,
+    "evade": 5
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  },
+  "notes": "Townsfolk. Strong from the fields, clumsy with a weapon."
+}

@@ -1,0 +1,20 @@
+{
+  "id": "blackmage",
+  "name": "Black Mage",
+  "level": 5,
+  "stats": {
+    "hp": 30,
+    "mp": 40,
+    "attack": 4,
+    "defense": 4,
+    "magic": 15,
+    "resistance": 11,
+    "speed": 6,
+    "evade": 6
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  },
+  "notes": "Job. Destructive spells, paper robes."
+}

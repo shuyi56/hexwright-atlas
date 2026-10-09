@@ -1,0 +1,20 @@
+{
+  "id": "villager",
+  "name": "Villager",
+  "level": 1,
+  "stats": {
+    "hp": 24,
+    "mp": 0,
+    "attack": 4,
+    "defense": 3,
+    "magic": 2,
+    "resistance": 3,
+    "speed": 5,
+    "evade": 5
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  },
+  "notes": "Townsfolk. Not a fighter: flees rather than stands."
+}
