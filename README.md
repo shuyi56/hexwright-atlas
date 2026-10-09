@@ -223,7 +223,8 @@ solid surface rather than a grid of blocks.
 
 - **Solid ground:** every mark (grass tufts, flowers, cobbles, boards, ripples) is laid out in map pixels, so a
   ground runs across tile edges without a seam. Where soft grounds meet (grass, a dirt road, sand, the sea) the border
-  wanders on a smooth noise instead of following the grid; paving, floors and fields keep straight edges. The
+  wanders on a smooth noise instead of following the grid (a road only gently); paving, floors and fields keep
+  straight edges, and paving and roads climb slopes along their length only, so their courses stay straight. The
   higher-ranked ground is inked along its edge and shades the lower one: grass overhangs a path, and the shore shows
   a strip of bank and a line of foam on the water. Water and lava ripple.
 - **Heights:** height is one continuous surface, 14 pixels up per level, drawn column by column from the south like
@@ -236,8 +237,11 @@ solid surface rather than a grid of blocks.
   wherever the ground shown there lies in front of where it stands, so a rise or cliff hides exactly what is behind
   it, and figures walking up a slope follow the ground.
 - **Pieces:** every building, prop, plant and piece of furniture is redrawn front-on. A house fills its own
-  footprint, wider than it is tall: a front wall (plaster, timber framing, ashlar, planks) with doors and shuttered
-  windows, and above it a thatch, clay tile, slate or shingle roof with chimneys and smoke. So a row of houses never
+  footprint, wider than it is tall, seen from the south and a little east: a front wall (plaster, timber framing,
+  ashlar, planks) with its east wall receding beside it in shade, both on a stone plinth; a door set back in its
+  frame with iron straps, a ring handle and a step, with windows placed symmetrically round it (lintels, sills,
+  glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof with a fascia board along the eave,
+  its east end running back over the side wall, chimneys and smoke. So a row of houses never
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
   towers carry cones or battlements, trees are lit leaf masses, and props and furniture keep the figures' scale in the
   middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in

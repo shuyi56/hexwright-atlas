@@ -111,23 +111,43 @@ function wallTone(tex, P, x, y, wx0, wx1, floorH, top) {
   }
   return P[h2(x, y, 5) < 0.07 ? 3 : h2(x, y, 6) < 0.04 ? 1 : 2];
 }
+/* a window set into the wall: a lintel over it, a frame, glass shadowed under the lintel with a glint, glazing bars,
+   a sill that stands out with its shadow below, and shutters if asked */
 function windowAt(K, x, y, w = 6, h = 7, opts = {}) {
-  const F = R(opts.frame || '#efe6d0'), G = R(opts.glass || '#3b4a5a'), S = opts.shutter ? R(opts.shutter) : null;
-  if (opts.arch) K.oval(x + w / 2, y + 1, w / 2, 2, F[2]);
-  K.rect(x, y, x + w, y + h, F[2]); K.rect(x + 1, y + 1, x + w - 1, y + h - 1, (px, py) => (px === x + 1 && py < y + 3 ? G[0] : opts.lit ? R('#f2c25a')[py < y + 3 ? 0 : 1] : G[py === y + 1 ? 1 : 3]));
-  if (w > 4) K.rect(x + Math.floor(w / 2), y + 1, x + Math.floor(w / 2) + 1, y + h - 1, F[3]);
-  K.rect(x - 1, y + h, x + w + 1, y + h + 1, F[3]);
-  if (S) { K.rect(x - 3, y, x - 1, y + h, (px, py) => S[py % 3 === 0 ? 3 : 2]); K.rect(x + w + 1, y, x + w + 3, y + h, (px, py) => S[py % 3 === 0 ? 3 : 2]); }
-}
-function doorAt(K, cx, yb, w = 10, h = 16, opts = {}) {
-  const D = R(opts.col || '#7a5a3a'), F = R(opts.frame || '#5a3f28'), x0 = Math.round(cx - w / 2);
-  K.rect(x0 - 1, yb - h - 1, x0 + w + 1, yb, F[3]);
-  if (opts.arch) K.oval(cx, yb - h, w / 2 + 1, 3, F[3]);
-  K.rect(x0, yb - h, x0 + w, yb, (x, y) => (((x - x0) % 3 === 0) ? D[3] : y === yb - h ? D[1] : D[2]));
-  if (opts.arch) K.oval(cx, yb - h, w / 2, 2, (x, y) => (y < yb - h ? D[2] : null));
-  if (opts.open) K.rect(x0 + 1, yb - h + 1, x0 + w - 1, yb, R('#2a2018')[3]);
-  else K.set(x0 + w - 3, yb - h / 2, R('#c9a24f')[1]);
-  K.rect(x0 - 1, yb, x0 + w + 1, yb + 2, R('#b5aa94')[2]);
+  const F = R(opts.frame || '#efe6d0'), G = R(opts.glass || '#3b4a5a'), S = opts.shutter ? R(opts.shutter) : null, lit = opts.lit ? R('#f2c25a') : null;
+  if (S) for (const sx of [x - 4, x + w + 1]) K.rect(sx, y, sx + 3, y + h, (px, py) => (py === y ? S[1] : (py - y) % 3 === 0 ? S[3] : px === sx ? S[1] : S[2]));
+  K.rect(x - 1, y - 2, x + w + 1, y - 1, inked(F[3], 0.35));
+  if (opts.arch) K.oval(x + w / 2, y, w / 2 + 1, 2.5, F[2]);
+  K.rect(x, y - 1, x + w, y + h, F[1]);
+  K.rect(x + 1, y, x + w - 1, y + h - 1, (px, py) => {
+    if (py === y) return lit ? lit[2] : inked(G[3], 0.4);
+    if (px === x + 2 && py > y + 1 && py < y + 4) return lit ? lit[0] : G[0];
+    return lit ? lit[py < y + h / 2 ? 0 : 1] : G[py < y + 3 ? 2 : 3];
+  });
+  if (w > 5) K.rect(x + Math.floor(w / 2), y, x + Math.floor(w / 2) + 1, y + h - 1, F[2]);
+  if (h > 7) K.rect(x + 1, y + Math.floor(h / 2), x + w - 1, y + Math.floor(h / 2) + 1, F[2]);
+  K.rect(x - 2, y + h - 1, x + w + 2, y + h + 1, (px, py) => (py === y + h - 1 ? F[0] : F[3]));
+  }
+/* a door in its frame: stone or timber surround with a lintel, the door set back into it (shadowed along its top and
+   left), boards with a rail across and iron straps, a ring handle, and a step on the ground in front */
+function doorAt(K, cx, yb, w = 12, h = 20, opts = {}) {
+  const D = R(opts.col || '#7a5a3a'), F = R(opts.frame || (opts.arch ? '#c4b99f' : '#6e5236')), I = R('#3b3a38'), x0 = Math.round(cx - w / 2), x1 = x0 + w, y0 = yb - h;
+  /* the surround */
+  K.rect(x0 - 2, y0 - 2, x1 + 2, yb, (x, y) => (y < y0 ? F[y === y0 - 2 ? 1 : 2] : x < x0 ? F[x === x0 - 2 ? 1 : 2] : F[3]));
+  if (opts.arch) K.oval(cx, y0, w / 2 + 2, 4, (x, y) => (y <= y0 ? F[1] : null));
+  if (opts.open) { K.rect(x0, y0, x1, yb, (x, y) => R('#2a2018')[y < y0 + 3 ? 4 : 3]); if (opts.arch) K.oval(cx, y0, w / 2, 3, (x, y) => (y <= y0 ? R('#2a2018')[4] : null)); }
+  else {
+    K.rect(x0, y0, x1, yb, (x, y) => {
+      if (y === y0 || x === x0) return D[4];                 /* set back: in shadow under the lintel and the jamb */
+      const bx = (x - x0) % 4; let c = bx === 0 ? D[3] : bx === 1 ? D[1] : D[2];
+      if (y === Math.round(y0 + h * 0.3) || y === Math.round(y0 + h * 0.72)) c = I[x === x0 + 1 ? 1 : 2];   /* iron straps */
+      return c;
+    });
+    if (opts.arch) K.oval(cx, y0, w / 2, 3, (x, y) => (y < y0 ? D[3] : null));
+    const hx = x1 - 3, hy = Math.round(y0 + h * 0.55); K.set(hx, hy, R('#c9a24f')[0]); K.set(hx, hy + 1, R('#c9a24f')[2]); K.set(hx - 1, hy + 1, R('#c9a24f')[3]);
+  }
+  /* the step, standing out on the ground */
+  const St = R('#c4b99f'); K.rect(x0 - 3, yb, x1 + 3, yb + 3, (x, y) => (y === yb ? St[0] : x === x1 + 2 ? St[3] : St[2]));
 }
 function chimney(K, x, y, h, smoke) {
   const C = R('#b9a98a'); K.rect(x, y - h, x + 5, y, (px, py) => C[(py - y) % 3 === 0 ? 3 : px === x ? 1 : 2]); K.rect(x - 1, y - h - 2, x + 6, y - h, C[1]);
@@ -138,52 +158,75 @@ function chimney(K, x, y, h, smoke) {
 /* A house: a front wall wallH high across the footprint, under a roof. Wider than deep (or square), the ridge runs
    east-west and the roof's south slope covers the top; deeper than wide, the ridge runs north-south and the
    front shows the gable end. */
+/* Window positions across a wall from a to b, ww wide: symmetric about the middle, leaving the door's place (cx,
+   width dw) clear when there is a door on this floor */
+function windowSlots(a, b, ww, door, cx, dw) {
+  const gap = 12, out = [];
+  if (!door) { const n = Math.max(1, Math.floor((b - a - 8) / (ww + gap))); for (let k = 0; k < n; k++) out.push(Math.round(a + (b - a) * (k + 0.5) / n - ww / 2)); return out; }
+  const left = cx - dw / 2 - 3 - a, n = Math.max(left >= ww + 4 ? 1 : 0, Math.floor((left - 4) / (ww + gap)));
+  for (let k = 0; k < n; k++) { const off = dw / 2 + 3 + (left - 2) * (k + 0.5) / n; out.push(Math.round(cx - off - ww / 2), Math.round(cx + off - ww / 2)); }
+  return out;
+}
+/* A house, seen from the south and a little east: its front wall across the footprint and its east wall receding
+   beside it in shade, on a stone plinth, under a roof with a fascia board along the eave. Wider than deep (or
+   square), the ridge runs east-west and the roof's south slope covers the top; deeper than wide, the ridge runs
+   north-south and the front shows the gable end. It keeps inside its footprint. */
 function house(K, o, p) {
-  const { FW, FD } = K, ins = p.inset ?? 4, x0 = ins, x1 = FW - ins, yb = FD - 4 - Math.round((p.lift || 0) * HS);
+  const { FW, FD } = K, ins = p.inset ?? 4, x0 = ins, x1 = FW - ins, yb = FD - 5 - Math.round((p.lift || 0) * HS);
   /* the wall takes what it needs, up to all but the room a roof needs above it */
   const wallH = Math.round(Math.min((p.wallH ?? 24) * HS, yb - Math.max(16, FD * 0.28))), rise = Math.round((p.rise ?? 16) * HS);
   const Wl = R(WALL[p.wall] || p.wall || WALL.plaster), Rf = R(ROOF[p.roof] || p.roof), floors = p.floors || 1, top = yb - wallH, floorH = wallH / floors;
   const ov = p.overhang ?? 4, ridgeX = p.ridge ? p.ridge === 'x' : FW >= FD, door = p.door !== false && o.face !== 2;
-  if (p.lift) for (const sx of [x0 + 2, x1 - 6]) K.rect(sx, yb, sx + 4, yb + Math.round(p.lift * HS), R('#c4b99f')[sx < FW / 2 ? 2 : 3]);
-  /* the front wall */
-  K.rect(x0, top, x1, yb, (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top));
-  if (p.plinth) K.rect(x0, yb - 4, x1, yb, (x, y) => R('#b5aa94')[y === yb - 4 ? 1 : 3]);
-  const dx = p.doorX ?? FW / 2, doorW = Math.round((p.doorW || 10) * 1.3), doorH = Math.min(Math.round(floorH - 3), Math.round((p.doorH || 16) * 1.45));
-  if (door) doorAt(K, dx, yb, doorW, doorH, { col: p.doorCol, arch: p.arch, open: p.open });
+  /* the east wall: sw wide, its far edge k higher, as it runs back */
+  const sw = Math.max(4, Math.round((x1 - x0) * 0.09)), k = Math.round(sw * 0.75), xf = x1 - sw;
+  const tex = (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, xf, floorH, top);
+  if (p.lift) for (const sx of [x0 + 2, xf - 6, x1 - 3]) K.rect(sx, yb, sx + 4, yb + Math.round(p.lift * HS) - (sx > xf ? k : 0), R('#c4b99f')[sx < FW / 2 ? 2 : 3]);
+  /* walls: the east one in shade, then the front with a lit west corner and a dark east one */
+  K.poly([[xf, yb], [x1, yb - k], [x1, top - k], [xf, top]], (x, y) => mix(wallTone(p.wallTex || p.wall, Wl, x, y + Math.round((x - xf) * k / sw), xf, x1, floorH, top), INK, 0.3));
+  K.rect(x0, top, xf, yb, tex);
+  K.rect(x0, top, x0 + 1, yb, (x, y) => mix(tex(x, y), [255, 250, 235], 0.35));
+  K.rect(xf - 1, top, xf, yb, (x, y) => mix(tex(x, y), INK, 0.3));
+  /* the plinth along the foot of both walls */
+  const Pl = R('#b5aa94');
+  K.rect(x0, yb - 4, xf, yb, (x, y) => (y === yb - 4 ? Pl[1] : ((x + (y % 2) * 3) % 7 === 0 ? Pl[4] : Pl[2])));
+  K.poly([[xf, yb], [x1, yb - k], [x1, yb - k - 4], [xf, yb - 4]], Pl[3]);
+  const dx = p.doorX ?? (x0 + xf) / 2, doorW = Math.round((p.doorW || 10) * 1.2), doorH = Math.min(wallH - 8, Math.max(Math.round(floorH - 4), 19), Math.round((p.doorH || 16) * 1.35));
   if (p.windows !== false) {
     for (let f = 0; f < floors; f++) {
-      const wh = Math.min(13, Math.round(floorH * 0.42)), wy = Math.round(top + floorH * (floors - 1 - f) + (floorH - wh) * (f ? 0.45 : 0.32)), ww = Math.round((p.winW || 6) * 1.5), n = Math.max(1, Math.floor((x1 - x0 - 8) / (ww + 12)));
-      for (let k = 0; k < n; k++) {
-        const wx = Math.round(x0 + (x1 - x0) * (k + 0.5) / n - ww / 2);
-        if (door && f === 0 && wx + ww > dx - doorW / 2 - 3 && wx < dx + doorW / 2 + 3) continue;
-        windowAt(K, wx, wy, ww, wh, { shutter: p.shutter, lit: p.lit, arch: p.arch, glass: p.glass });
-      }
+      const wh = Math.min(13, Math.round(floorH * 0.4)), wy = Math.round(top + floorH * (floors - 1 - f) + (floorH - wh) * (f ? 0.45 : 0.36)), ww = Math.round((p.winW || 6) * 1.5);
+      for (const wx of windowSlots(x0 + 2, xf - 2, ww, door && f === 0, dx, doorW)) windowAt(K, wx, wy, ww, wh, { shutter: p.shutter, lit: p.lit, arch: p.arch, glass: p.glass });
     }
   }
+  if (door) doorAt(K, dx, yb, doorW, doorH, { col: p.doorCol, arch: p.arch, open: p.open });
   if (ridgeX) {
-    /* the roof fills the footprint above the wall: its south slope seen from the eave up to the ridge at the back */
-    const ridge = Math.min(top - 10, 1), eave = top + ov, l = x0 - ov, r = x1 + ov, hip = Math.min(rise, (eave - ridge) * 0.8);
-    const pts = p.hip ? [[l, eave], [l + hip, ridge], [r - hip, ridge], [r, eave]] : [[l, eave], [l, ridge], [r, ridge], [r, eave]];
-    K.poly(pts, (x, y) => roofTone(p.roof, Rf, x, eave - y, eave - y < 3 ? 1 : y < ridge + 3 ? -1 : 0) || Rf[1]);
-    K.rect(l + (p.hip ? hip : 0), ridge, r - (p.hip ? hip : 0), ridge + 2, Rf[4]);
-    if (!p.hip) { K.rect(l, ridge, l + 1, eave, Rf[4]); K.rect(r - 1, ridge, r, eave, Rf[4]); }
-    K.rect(l, eave - 1, r, eave, inked(Rf[3], 0.4));
-    /* the eaves shade the top of the wall */
-    K.rect(x0, eave, x1, eave + 3, (x, y) => mix(wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top), INK, 0.35));
-    if (p.chimney) chimney(K, Math.round(x0 + (x1 - x0) * 0.72), Math.round(ridge + (eave - ridge) * 0.4), 10, p.chimney > 1);
-    if (p.dormer && eave - ridge > 18) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (x1 - x0) * fx), cy = Math.round(ridge + (eave - ridge) * 0.5); K.poly([[cx - 8, cy + 2], [cx, cy - 7], [cx + 8, cy + 2]], Rf[1]); K.rect(cx - 6, cy + 2, cx + 6, cy + 10, Wl[2]); windowAt(K, cx - 3, cy + 3, 6, 6, {}); }
-    return { ridge, eave, top, yb, x0, x1 };
+    /* The roof fills the footprint above the wall: its south slope from the eave up to the ridge, a sliver of the
+       north slope beyond, and at the east end the roof's edge running back over the east wall. */
+    const ridge = Math.min(top - 10, 3), eave = top + ov, l = x0 - ov, rf = xf + ov, r = x1 + ov, hip = Math.min(rise, (eave - ridge) * 0.8);
+    const front = p.hip ? [[l, eave], [l + hip, ridge], [rf - hip, ridge], [rf, eave]] : [[l, eave], [l, ridge], [rf, ridge], [rf, eave]];
+    K.poly([[l + (p.hip ? hip : 0), ridge], [l + (p.hip ? hip : 0) + 2, ridge - 3], [r - (p.hip ? hip * 0.6 : 0), ridge - 3 - k], [r - (p.hip ? hip * 0.6 : 0), ridge - k], [rf, ridge]], (x, y) => roofTone(p.roof, Rf, x, y + 40, 2));
+    K.poly([[rf - (p.hip ? hip : 0), ridge], [r - (p.hip ? hip * 0.6 : 0), ridge - k], [r, eave - k], [rf, eave]], (x, y) => roofTone(p.roof, Rf, y, x, 1) || Rf[3]);
+    K.poly(front, (x, y) => roofTone(p.roof, Rf, x, eave - y, eave - y < 3 ? 1 : y < ridge + 3 ? -1 : 0) || Rf[1]);
+    K.rect(l + (p.hip ? hip : 0), ridge, rf - (p.hip ? hip : 0), ridge + 2, Rf[4]);
+    /* the fascia under the eave, lit along its top, and its shadow on the wall */
+    K.rect(l, eave - 1, rf, eave + 1, (x, y) => (y === eave - 1 ? Rf[1] : inked(Rf[4], 0.4)));
+    K.line(rf, eave + 0.5, r, eave - k + 0.5, inked(Rf[4], 0.4));
+    K.rect(x0, eave + 1, xf, eave + 4, (x, y) => mix(tex(x, y), INK, y === eave + 1 ? 0.45 : 0.25));
+    if (p.chimney) chimney(K, Math.round(x0 + (xf - x0) * 0.7), Math.round(ridge + (eave - ridge) * 0.4), 10, p.chimney > 1);
+    if (p.dormer && eave - ridge > 18) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (xf - x0) * fx), cy = Math.round(ridge + (eave - ridge) * 0.5); K.poly([[cx - 8, cy + 2], [cx, cy - 7], [cx + 8, cy + 2]], Rf[1]); K.rect(cx - 6, cy + 2, cx + 6, cy + 10, Wl[2]); windowAt(K, cx - 3, cy + 3, 6, 6, {}); }
+    return { ridge, eave, top, yb, x0, x1: xf };
   }
-  /* ridge north-south: two slopes running back from the gable end in front */
-  const cx = FW / 2, apex = Math.round(top - Math.min(rise, (x1 - x0) * 0.45)), ridgeTop = 1, l = x0 - ov, r = x1 + ov, eaveTop = ridgeTop + Math.round((x1 - x0) * 0.3);
+  /* ridge north-south: two slopes running back from the gable end in front, the east one in shade over the east wall */
+  const cx = (x0 + xf) / 2, apex = Math.round(top - Math.min(rise, (xf - x0) * 0.45)), ridgeTop = 1, l = x0 - ov, r = x1 + ov, eaveTop = ridgeTop + Math.round((x1 - x0) * 0.3);
   K.poly([[l, eaveTop], [cx, ridgeTop], [cx, apex], [l, top + ov]], (x, y) => roofTone(p.roof, Rf, y, x - l, 0));
-  K.poly([[cx, ridgeTop], [r, eaveTop], [r, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1));
+  K.poly([[cx, ridgeTop], [r, eaveTop - k], [r, top + ov - k], [xf + ov, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1));
   K.rect(Math.floor(cx) - 1, ridgeTop, Math.floor(cx) + 1, apex, Rf[4]);
-  K.poly([[x0, top + 1], [cx, apex + 3], [x1, top + 1]], (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, x1, floorH, top));
-  K.line(l, top + ov, cx, apex, inked(Rf[3], 0.4)); K.line(cx, apex, r - 1, top + ov, inked(Rf[3], 0.4));
-  if (top - apex > 14) windowAt(K, Math.round(cx - 3), Math.round(apex + (top - apex) * 0.45), 6, 6, {});
-  if (p.chimney) chimney(K, Math.round(cx + 6), Math.round((ridgeTop + apex) / 2), 10, p.chimney > 1);
-  return { ridge: ridgeTop, eave: top + ov, top, yb, x0, x1 };
+  K.poly([[x0, top + 1], [cx, apex + 3], [xf, top + 1]], tex);
+  /* the bargeboards along the gable, standing proud */
+  K.line(l, top + ov, cx, apex, Rf[1]); K.line(l, top + ov + 1, cx, apex + 1, inked(Rf[4], 0.45));
+  K.line(cx, apex, xf + ov, top + ov, inked(Rf[3], 0.3)); K.line(cx, apex + 1, xf + ov, top + ov + 1, inked(Rf[4], 0.45));
+  if (top - apex > 16) windowAt(K, Math.round(cx - 3), Math.round(apex + (top - apex) * 0.42), 6, 7, {});
+  if (p.chimney) chimney(K, Math.round(cx + 8), Math.round((ridgeTop + apex) / 2), 10, p.chimney > 1);
+  return { ridge: ridgeTop, eave: top + ov, top, yb, x0, x1: xf };
 }
 /* a round tower: radius r, wallH high, standing on (cx, yb), with a cone, battlements or a flat top */
 function tower(K, cx, yb, r, wallH, p) {

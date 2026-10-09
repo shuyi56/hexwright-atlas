@@ -19,7 +19,7 @@ import { TERRAIN } from '../tiles/terrain.js';
    paving, beams under floors, falling water). Every screen pixel remembers which row of ground it shows, so
    figures and pieces standing behind a rise are hidden by it exactly. Upper floors that are shown join the
    surface STOREY levels above the ground under them. No DOM. */
-const TILE = 64, LIFT = 14, FRAMES = 4, WOBBLE = 18, CLIFF_WOBBLE = 8, CHUNK = 128;
+const TILE = 64, LIFT = 14, FRAMES = 4, WOBBLE = 18, ROAD_WOBBLE = 6, CLIFF_WOBBLE = 8, CHUNK = 128;
 
 /* ---------- noise ---------- */
 const h2 = (x, y, s = 0) => { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(s + 0x9e37, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
@@ -54,7 +54,7 @@ const INFO = TERRAIN.map(t => {
   const crisp = (t.group === 'Paved' && t.id !== 'road') || t.group === 'Floors' || t.group === 'Farm';
   const fam = FAMILY[t.id] || t.id;
   return {
-    id: t.id, R: rampRgb(t.top), S: rampRgb(t.side[0]), fam, crisp, rank: RANK[fam] ?? 3, water: !!t.water, anim: !!t.water || !!t.glow,
+    id: t.id, R: rampRgb(t.top), S: rampRgb(t.side[0]), fam, crisp, road: t.id === 'road', rank: RANK[fam] ?? 3, water: !!t.water, anim: !!t.water || !!t.glow,
     face: t.water ? 'water' : t.glow ? 'lava' : fam === 'snow' ? 'snow' : t.group === 'Floors' || t.id === 'planks' ? 'wood' : crisp && t.group !== 'Farm' ? 'stone' : fam === 'rock' || fam === 'sand' ? 'rock' : 'earth',
     lip: fam === 'green' || fam === 'wet' || t.group === 'Farm' ? rampRgb(t.top) : fam === 'snow' ? rampRgb('#eceeea') : null
   };
@@ -101,7 +101,9 @@ function ownTile(F, gx, gy) {
 function classify(F, gx, gy, u = ownTile(F, gx, gy)) {
   if (u < 0) return -1;
   const own = F.terr[u]; if (own < 0 || INFO[own].crisp) return own;
-  const s = at(F, Math.floor((gx + (fbm(gx, gy, 1) - 0.5) * 2 * WOBBLE) / TILE), Math.floor((gy + (fbm(gx, gy, 2) - 0.5) * 2 * WOBBLE) / TILE));
+  let s = at(F, Math.floor((gx + (fbm(gx, gy, 1) - 0.5) * 2 * WOBBLE) / TILE), Math.floor((gy + (fbm(gx, gy, 2) - 0.5) * 2 * WOBBLE) / TILE));
+  /* a road keeps a straighter edge: a smaller, slower wander */
+  if (INFO[own].road || (s >= 0 && F.terr[s] >= 0 && INFO[F.terr[s]].road)) s = at(F, Math.floor((gx + (vnoise(gx / 40, gy / 40, 15) - 0.5) * 2 * ROAD_WOBBLE) / TILE), Math.floor((gy + (vnoise(gx / 40, gy / 40, 16) - 0.5) * 2 * ROAD_WOBBLE) / TILE));
   if (s < 0 || s === u) return own;
   const t = F.terr[s]; return t < 0 || INFO[t].crisp || cliff(F, u, s) ? own : t;
 }
@@ -133,6 +135,9 @@ function heightAt(F, gx, gy, u = ownTile(F, gx, gy)) {
   if (u < 0) return 0;
   const own = F.hgt[u], t = F.terr[u]; if (t >= 0 && WET[t]) return own;
   const fx = gx / TILE - 0.5, fy = gy / TILE - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), ax = smooth(fx - x0), ay = smooth(fy - y0), S = F.S;
+  /* paving and roads climb only along the north-south line of their own tiles, so their courses and edges stay
+     straight on a slope */
+  if (t >= 0 && (INFO[t].crisp || INFO[t].road)) { const ux = u % S, a1 = corner(F, ux, y0, own, S), d1 = corner(F, ux, y0 + 1, own, S); return a1 + (d1 - a1) * ay; }
   const a = corner(F, x0, y0, own, S), b = corner(F, x0 + 1, y0, own, S), d = corner(F, x0, y0 + 1, own, S), e = corner(F, x0 + 1, y0 + 1, own, S);
   return a + (b - a) * ax + (d - a) * ay + (a - b - d + e) * ax * ay;
 }
