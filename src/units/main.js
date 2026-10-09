@@ -17,7 +17,6 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 const $ = id => document.getElementById(id);
 const WRITABLE = import.meta.env.DEV;
 const SAVE_URL = (group, id) => `/__hexwright/units/${group}/${id}`;
-const SECTION_LABEL = { stats: 'Stats', movement: 'Movement' };
 
 /* id -> { group, draft, saved, savedGroup }: saved is null for a unit not yet written */
 const E = new Map();
@@ -84,13 +83,13 @@ function renderList() {
 }
 
 /* ---------- the card ---------- */
-function field(sec, [k, label, lo, hi], e) {
-  const v = sec ? e.draft[sec][k] : e.draft[k], max = sec ? rosterMax(sec, k) : 0, saved = e.saved && (sec ? e.saved[sec]?.[k] : e.saved[k]);
-  const changed = e.saved && saved !== v;
-  return `<label class="ub-stat${changed ? ' changed' : ''}"${changed ? ` title="saved: ${saved}"` : ''}>
-    <span class="ub-stat-name">${esc(label)}</span>
+/* one number as a tile: its label, the value to edit, and a bar against the largest across every unit */
+function tile(sec, [k, label, lo, hi], e) {
+  const v = e.draft[sec][k], saved = e.saved?.[sec]?.[k], changed = e.saved && saved !== v;
+  return `<label class="ub-tile${changed ? ' changed' : ''}"${changed ? ` title="saved: ${saved}"` : ''}>
+    <span class="ub-tile-name">${esc(label)}</span>
     <input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${v}" data-sec="${sec}" data-k="${k}" aria-label="${esc(label)}">
-    ${sec ? `<span class="ub-meter" aria-hidden="true"><i style="width:${Math.round(100 * Math.min(1, v / max))}%"></i></span>` : ''}
+    <span class="ub-meter" aria-hidden="true"><i style="width:${Math.round(100 * Math.min(1, v / rosterMax(sec, k)))}%"></i></span>
   </label>`;
 }
 function renderDetail() {
@@ -99,37 +98,32 @@ function renderDetail() {
   if (!e) { box.innerHTML = '<p class="ub-dim ub-empty">No units yet. Make one with New unit.</p>'; return; }
   const d = e.draft, sprite = spriteOf(d.id), errs = validateUnit(d, e.group);
   box.innerHTML = `
-    <div class="ub-hero">
+    <div class="ub-card">
       <div class="ub-stage">
-        <canvas id="preview" width="${FW * 4}" height="${(BASE + 6) * 4}" aria-label="${esc(nameOf(e))} walking"></canvas>
+        <canvas id="preview" width="${FW * 8}" height="${(BASE + 6) * 8}" aria-label="${esc(nameOf(e))} walking"></canvas>
         <div class="ub-stage-chips">
           <button class="chip" id="faceL" title="Turn left">⟲</button>
           <button class="chip" id="play" aria-pressed="${V.playing}">Walk</button>
           <button class="chip" id="faceR" title="Turn right">⟳</button>
         </div>
       </div>
-      <div class="ub-head">
-        <input class="ub-name" id="name" value="${esc(d.name)}" maxlength="40" spellcheck="false" aria-label="Name">
-        <div class="ub-meta">
-          <label class="ub-field"><span>group</span><select id="group">${GROUPS.map(g => `<option value="${g}"${g === e.group ? ' selected' : ''}>${GROUP_LABEL[g]}</option>`).join('')}</select></label>
+      <div class="ub-body">
+        <div class="ub-head">
+          <input class="ub-name" id="name" value="${esc(d.name)}" maxlength="40" spellcheck="false" aria-label="Name">
+          <select id="group" aria-label="Group">${GROUPS.map(g => `<option value="${g}"${g === e.group ? ' selected' : ''}>${GROUP_LABEL[g]}</option>`).join('')}</select>
         </div>
-        <p class="ub-file"><code>${esc(unitPath(e.group, d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}</p>
-        ${sprite ? '' : `<p class="ub-dim">No sprite called “${esc(d.id)}”.</p>`}
+        <p class="ub-file"><code>${esc(unitPath(e.group, d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}${sprite ? '' : ` <span class="ub-dim">no sprite called “${esc(d.id)}”</span>`}</p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
+        <div class="ub-tiles">${SECTIONS.flatMap(sec => FIELDS[sec].map(f => tile(sec, f, e))).join('')}</div>
+        <div class="ub-card-actions">
+          <button class="btn" id="revertOne"${isDirty(e) && e.saved ? '' : ' disabled'}>Revert</button>
+          <button class="btn ub-danger" id="deleteOne">Delete</button>
+        </div>
       </div>
-    </div>
-    ${SECTIONS.map(sec => `
-      <section class="ub-sec"><h2>${SECTION_LABEL[sec]}</h2>
-        <div class="ub-stats">${FIELDS[sec].map(f => field(sec, f, e)).join('')}</div>
-      </section>`).join('')}
-    <div class="ub-card-actions">
-      <span class="ub-spacer"></span>
-      <button class="btn" id="revertOne"${isDirty(e) && e.saved ? '' : ' disabled'}>Revert</button>
-      <button class="btn ub-danger" id="deleteOne">Delete</button>
     </div>`;
   box.querySelectorAll('input[type=number]').forEach(inp => inp.addEventListener('change', () => {
     const sec = inp.dataset.sec, k = inp.dataset.k, n = Math.round(Number(inp.value));
-    if (sec) e.draft[sec][k] = n; else e.draft[k] = n;
+    e.draft[sec][k] = n;
     commit(e);
   }));
   $('name').addEventListener('change', () => { e.draft.name = $('name').value; commit(e); });
@@ -148,7 +142,7 @@ function commit(e) { e.draft = normalizeUnit(e.draft); renderAll(); }
 const FACING = [['front', false], ['front', true], ['back', false], ['back', true]];
 let anim = 0;
 function startPreview(c) {
-  const can = $('preview'), g = can.getContext('2d'), frames = render(c), px = 4, one = document.createElement('canvas'), og = one.getContext('2d');
+  const can = $('preview'), g = can.getContext('2d'), frames = render(c), px = 8, one = document.createElement('canvas'), og = one.getContext('2d');
   one.width = FW; one.height = FH;
   const step = now => {
     anim = requestAnimationFrame(step);
