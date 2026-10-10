@@ -187,18 +187,11 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-tile{left:14px;bottom:40px;min-width:170px}
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
-/* The actions menu and the unit's portrait have a thin gold rim, one pixel inside a dark outline. The actions menu
-   is small, beside the unit like a tactics game's command list. */
+/* The unit's portrait has a thin gold rim, one pixel inside a dark outline. The actions menu, small beside the unit
+   like a tactics game's command list, has the same thin frame in the colours of the rock tiles: a warm stone fill
+   with a sandstone rim. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-.tc-win.tc-menu{--tc-top:#1d2829;--tc-foot:#141c1d;--tc-rim:var(--tc-gold);--tc-ink:#0b1011;background:linear-gradient(var(--tc-top),var(--tc-foot));color:var(--tc-text);border:1px solid var(--tc-rim);border-radius:2px;box-shadow:0 0 0 1px var(--tc-ink),0 4px 10px rgba(0,0,0,.4)}
-/* the same frame in other colours, by data-skin on #tcMenu: walnut, moss, night, stone, steel, wine and ink */
-.tc-win.tc-menu[data-skin=walnut]{--tc-top:#3a2d21;--tc-foot:#241a11;--tc-ink:#140d07;--tc-dim:#b5a283;--tc-pick:rgba(228,198,132,.26)}
-.tc-win.tc-menu[data-skin=moss]{--tc-top:#2e3a26;--tc-foot:#1b2416;--tc-rim:#d8c98e;--tc-ink:#0e130b;--tc-dim:#a9b08e;--tc-pick:rgba(216,201,142,.24)}
-.tc-win.tc-menu[data-skin=night]{--tc-top:#2f3d70;--tc-foot:#1a2249;--tc-rim:#e9e4d6;--tc-ink:#0b0f1f;--tc-text:#fff;--tc-dim:#b9c3e6;--tc-pick:rgba(207,226,255,.24);--tc-mark:#fff}
-.tc-win.tc-menu[data-skin=stone]{--tc-top:#4a4640;--tc-foot:#2d2a26;--tc-rim:#c4b89c;--tc-ink:#141210;--tc-dim:#b3aa98;--tc-pick:rgba(255,244,208,.2)}
-.tc-win.tc-menu[data-skin=steel]{--tc-top:#2a3542;--tc-foot:#161d26;--tc-rim:#b9c4cf;--tc-ink:#090c10;--tc-dim:#9aa6b2;--tc-pick:rgba(185,196,207,.22);--tc-mark:#f4f8ff}
-.tc-win.tc-menu[data-skin=wine]{--tc-top:#3f2026;--tc-foot:#251114;--tc-ink:#120708;--tc-dim:#bf9d92;--tc-pick:rgba(228,168,120,.26)}
-.tc-win.tc-menu[data-skin=ink]{--tc-top:#211c16;--tc-foot:#120f0b;--tc-rim:#e8dcb8;--tc-ink:#050403;--tc-dim:#a59b86;--tc-pick:rgba(232,220,184,.18)}
+.tc-win.tc-menu{--tc-dim:#b3aa98;--tc-pick:rgba(255,244,208,.2);background:linear-gradient(#4a4640,#2d2a26);color:var(--tc-text);border:1px solid #c4b89c;border-radius:2px;box-shadow:0 0 0 1px #141210,0 4px 10px rgba(0,0,0,.4)}
 .tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
 .tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
 .tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
