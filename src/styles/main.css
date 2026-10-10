@@ -195,15 +195,15 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
    it (the drawing is the .tc-frame SVG in index.html). The commands are in the atlas's engraved small capitals,
    each with a little pixel glyph; the chosen one glows, with a star twinkling beside it. */
 .tc-win.tc-menu{background:none;border:0;border-radius:0;box-shadow:none;color:#f4ead2;width:140px;height:108px;box-sizing:border-box;padding:22px 20px 12px;
-  filter:drop-shadow(0 4px 8px rgba(8,6,24,.55))}
+  filter:drop-shadow(0 4px 8px rgba(20,14,6,.55))}
 .tc-menu{display:flex;flex-direction:column;justify-content:center;z-index:2}
 .tc-menu .tc-frame{position:absolute;inset:0;width:100%;height:100%;z-index:-1;overflow:visible}
 .tc-menu[hidden]{display:none}
-.tc-menu button{display:flex;align-items:center;gap:7px;background:none;border:0;border-radius:8px;color:inherit;padding:4px 8px 4px 16px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #0b0a1c}
+.tc-menu button{display:flex;align-items:center;gap:7px;background:none;border:0;border-radius:8px;color:inherit;padding:4px 8px 4px 16px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #140f08}
 .tc-menu .tc-act{display:block;flex:1;font:400 14px/1 var(--display);letter-spacing:.04em;color:inherit}
 .tc-menu .tc-ico{width:12px;height:12px;flex:none;fill:currentColor;shape-rendering:crispEdges;opacity:.8}
-.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:radial-gradient(80% 140% at 30% 50%,rgba(170,150,255,.18),rgba(170,150,255,0));outline:none}
-.tc-menu button[aria-pressed=true]{background:radial-gradient(80% 160% at 30% 50%,rgba(255,226,150,.26),rgba(170,150,255,.1) 60%,rgba(170,150,255,0));color:#fff3c8;text-shadow:0 0 6px rgba(255,226,150,.7),0 1px 0 #0b0a1c}
+.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:radial-gradient(80% 140% at 30% 50%,rgba(196,170,96,.2),rgba(196,170,96,0));outline:none}
+.tc-menu button[aria-pressed=true]{background:radial-gradient(80% 160% at 30% 50%,rgba(255,226,150,.26),rgba(150,170,90,.12) 60%,rgba(150,170,90,0));color:#fff3c8;text-shadow:0 0 6px rgba(255,226,150,.7),0 1px 0 #140f08}
 .tc-menu button[aria-pressed=true] .tc-ico{opacity:1;filter:drop-shadow(0 0 2px rgba(255,226,150,.85))}
 /* the star */
 .tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:4px;top:50%;width:8px;height:8px;margin-top:-4px;background:#fff6c8;
