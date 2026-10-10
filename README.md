@@ -264,9 +264,17 @@ than a person, a cottage about twice their height, two-storey houses towering ov
 - **Pieces:** every building, prop, plant and piece of furniture is redrawn front-on. A house fills its own
   footprint, wider than it is tall, seen from the south and a little east: a front wall (plaster, timber framing,
   ashlar, planks) with its east wall receding beside it in shade, both on a stone plinth; a door set back in its
-  frame with iron straps, a ring handle and a step, with windows placed symmetrically round it (lintels, sills,
-  glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
-  capped ridge, a fascia board along the eave, its east end in shade, chimneys and smoke. So a row of houses never
+  frame with iron straps, a ring handle and a step, with windows placed symmetrically round it, each set back into
+  the wall: the reveal shading the glass along its top and west edge, glazing bars with hairline shadows, the sky
+  reflected in the upper panes, a lintel above, a projecting sill with its shadow on the wall, and board shutters
+  casting thin shadows; and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
+  capped ridge, a thick eave, its east end in shade, and pale stone chimneys with overhanging caps, a faint shadow on the
+  roof and soft smoke. Timber framing shows on the front only: beams three pixels thick standing proud of the wall (lit
+  along their tops and west edges, grained, dark underneath), each casting a shadow into the lime-washed plaster
+  panels, while the plain shaded east wall keeps the house's depth. Clay tiles are curved, each course shading the
+  one below. Roofs keep one pitch, about four tenths of
+  the house's depth (steeper for thatch), with the wall fitted below; a two-storey house on one tile takes a lower
+  pitch so both storeys keep their full height. So a row of houses never
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
   towers carry cones or battlements, trees are crowns of rounded leaf clumps, flatly lit (a sunlit band
   along each clump's top, shade along its underside, a soft rim where it stands over the one behind) on tapered
