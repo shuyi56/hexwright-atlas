@@ -206,6 +206,23 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 #tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:1px solid var(--tc-gold);box-shadow:0 0 0 1px #0b1011}
 .tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
 .tc-keys{color:#a39b86}
+/* The battle: the turn and whose phase it is beside the title, a banner across the top as each phase begins (gold for
+   the player, rust for the enemy) that stays once the battle is won or lost, and an enemy's name in the unit window
+   in the enemy's colour. */
+.tc-turn{display:flex;flex-direction:column;align-items:flex-end;padding:3px 10px;border-right:2px solid var(--tc-gold);color:var(--tc-text);text-shadow:0 1px 2px #000;font:500 12px/1.2 var(--ui)}
+.tc-turn b{font:400 18px/1.1 var(--display)}
+.tc-turn span{color:var(--tc-dim)}
+.tc-turn[data-kind=enemy],.tc-turn[data-kind=defeat]{border-color:#c9705a}
+.tc-turn[data-kind=enemy] span,.tc-turn[data-kind=defeat] span{color:#e6a08e}
+.tc-chips .chip:disabled{opacity:.45;cursor:default}
+.tc-win.tc-phase{left:50%;top:18%;transform:translateX(-50%);text-align:center;padding:10px 40px 12px;pointer-events:none;z-index:3;animation:tc-phase .3s ease-out}
+.tc-win.tc-phase b{font:400 clamp(26px,4vw,38px)/1.1 var(--display);letter-spacing:.04em;color:var(--tc-mark)}
+.tc-win.tc-phase span{margin-top:2px;font:500 14px var(--ui-sc,var(--ui));letter-spacing:.12em;text-transform:uppercase;color:var(--tc-gold)}
+.tc-win.tc-phase[data-kind=enemy],.tc-win.tc-phase[data-kind=defeat]{border-color:#c9705a}
+.tc-win.tc-phase[data-kind=enemy] span,.tc-win.tc-phase[data-kind=defeat] span{color:#e6a08e}
+.tc-unit[data-side=enemy] b{color:#f0b3a3}
+@keyframes tc-phase{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.tc-win.tc-phase{animation:none}}
 @media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
 /* the town view: the tactical view's frame, a place banner on entering, and a speech window in the same slate and
    gold as the tactical view's windows, with the speaker's portrait framed like the unit's */

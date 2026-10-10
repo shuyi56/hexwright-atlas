@@ -10,6 +10,8 @@ import { moveRange, placeId, routeTo } from './move.js';
 import '../data/unit-files.js';
 import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
 import { attackReach } from './attack.js';
+import { planTurn } from '../battle/ai.js';
+import * as battle from '../battle/state.js';
 import { drawScene, figureHeight, figureHit, portrait } from './render.js';
 import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 
@@ -22,17 +24,23 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    beside it, as in the tactics games: Move, Attack (its pattern and range light up in red; pick a unit of the
    other side there to strike it for its Attack) and Wait. Esc or a right-click steps back: from the attack to the
    window, from the window to the move (taking the move back if it walked), from the move to no unit. A unit
-   struck shows its health bar over its head for a moment, draining. Each unit moves once and acts once a round; once every
-   unit still standing has done both, a new round begins. Hit points are the battle's, not the map's: they start
-   full each time the view opens, and a unit brought to 0 stays where it fell, faded. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
+   struck shows its health bar over its head for a moment, draining. The fight is kept by battle/state.js: a turn is
+   the player's phase and then the enemy's, each unit of the side in play moves once and acts once, and the phase
+   passes when every one of them is done or End turn (T) is pressed, with a banner for each new phase. In the enemy
+   phase the computer plays each enemy in turn (battle/ai.js), showing its range, walking and striking, while the
+   controls wait. Hit points are the battle's, not the map's: they start full each time the view opens, and a unit
+   brought to 0 stays where it fell, faded; the last enemy falling wins the battle, the last of yours loses it. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
    + and - zoom, PgUp / PgDn change storey, Esc steps back. */
 const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 /* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
    what an overlay changes */
-const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, from: null, range: null, reach: null, hp: new Map(), turn: new Map(), pop: null, note: '', walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, from: null, range: null, reach: null, battle: null, ai: null, banner: null, pop: null, note: '', walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
+/* how long a phase's banner shows, and the computer's pauses between showing an enemy's range, walking, aiming and
+   striking (all halved by the 2× chip) */
+const BANNER_TIME = 1.5, AI_PAUSE = { pick: 0.45, aim: 0.5, after: 1.1, stay: 0.3 };
 
 /* ---------- the scene and where things are ---------- */
 function rebuild() { TC.sc = buildScene(ED.M, { rot: TC.rot, top: TC.top }); TC.bounds = bounds(TC.sc); TC.dirty = true; }
@@ -127,8 +135,8 @@ function select(k) {
   if (k !== TC.sel) TC.from = null;
   TC.sel = k; TC.mode = null; TC.menu = false; TC.range = null; TC.reach = null; TC.dirty = true;
   if (k >= 0) {
-    const c = ED.M.chars[k], t = turnOf(k); TC.note = '';
-    if (!t.moved) setMode('move'); else if (!t.acted) openMenu();
+    const c = ED.M.chars[k]; TC.note = '';
+    if (battle.canMove(TC.battle, k)) setMode('move'); else if (battle.canAct(TC.battle, k)) openMenu();
     if (levelOf(c) > TC.top) setTop(levelOf(c));
     setCursor(c.x, c.y, levelOf(c)); const [ax, ay] = tileArt(c.x, c.y, levelOf(c)); lookAt(ax, ay - 20);
   }
@@ -137,25 +145,25 @@ function select(k) {
 /* the picked unit's action: 'move' lights its move range, 'attack' what its attack reaches, null neither; choosing
    one shuts the actions window */
 function setMode(m) {
-  const k = TC.sel, t = k >= 0 ? turnOf(k) : null;
-  if (!t || (m === 'move' && t.moved) || (m === 'attack' && t.acted)) m = null;
+  const k = TC.sel;
+  if (k < 0 || (m === 'move' && !battle.canMove(TC.battle, k)) || (m === 'attack' && !battle.canAct(TC.battle, k))) m = null;
   if (m) TC.menu = false;
   TC.mode = m; TC.range = m === 'move' ? rangeOf(k) : null; TC.reach = m === 'attack' ? reachOf(k) : null; TC.dirty = true;
   panels();
 }
 /* open the picked unit's actions window, with nothing lit until an action is chosen */
-function openMenu() { if (TC.sel < 0 || done(TC.sel)) return; TC.menu = true; setMode(null); }
+function openMenu() { if (TC.sel < 0 || !battle.ready(TC.battle, TC.sel)) return; TC.menu = true; setMode(null); }
 /* the walk unit k just made can still be taken back: nothing else has been done to the map since */
 const canUndoMove = k => !!TC.from && TC.from.k === k && turnOf(k).moved && !turnOf(k).acted && ED.undo[ED.undo.length - 1] === TC.from.snap;
 /* put the picked unit back where it stood before its walk, ready to move again */
 function undoMove() {
   const k = TC.sel; if (!canUndoMove(k)) return false;
-  undo(); TC.from = null; TC.turn.set(k, { ...turnOf(k), moved: false }); rebuild();
+  undo(); TC.from = null; battle.unspend(TC.battle, k, 'moved'); rebuild();
   select(k); return true;
 }
 /* Esc or a right-click: one step back */
 function back() {
-  if (TC.walk) return true;
+  if (busy()) return true;
   const k = TC.sel; if (k < 0) return false;
   if (TC.mode === 'attack') openMenu();
   else if (TC.menu && !turnOf(k).moved) { TC.menu = false; setMode('move'); }
@@ -164,41 +172,96 @@ function back() {
 }
 /* how far unit k moves and climbs, and how far and in what pattern it strikes, come from its data (data/units/), looked up by its sprite */
 function rangeOf(k) { const { move, jump } = unitFor(ED.M.chars[k].sprite).movement; return moveRange(ED.M, k, move, jump); }
-function reachOf(k) { const { range, pattern } = statsOf(k), side = sideOf(k); return attackReach(ED.M, k, range, pattern, j => alive(j) && sideOf(j) !== side); }
+function reachOf(k) { const { range, pattern } = statsOf(k); return attackReach(ED.M, k, range, pattern, j => battle.foes(TC.battle, k, j)); }
 /* new numbers for the units (a save from the unit data page) redraw the picked unit's range and the panels */
-onUnitsChange(() => { if (!TC.open) return; if (TC.sel >= 0 && !TC.walk) setMode(TC.mode); panels(); });
+onUnitsChange(() => {
+  if (!TC.open) return;
+  if (TC.battle) battle.refresh(TC.battle, rosterOf());
+  if (TC.sel >= 0 && !busy()) setMode(TC.mode); panels();
+});
 const unitAt = (x, y, L) => (ED.M.chars || []).findIndex(c => c.x === x && c.y === y && levelOf(c) === L);
 
-/* ---------- the battle: hit points, and who has moved and acted this round ---------- */
+/* ---------- the battle (battle/state.js): sides, hit points, the turn and whose phase it is ---------- */
 const statsOf = k => unitFor(ED.M.chars[k].sprite).stats;
-/* the side a unit fights on is its group in the unit data: characters against enemies */
-const sideOf = k => unitFor(ED.M.chars[k].sprite).group;
 const nameOf = k => { const c = ED.M.chars[k]; return characterById(c.sprite)?.name || c.sprite; };
-const hpOf = k => (TC.hp.has(k) ? TC.hp.get(k) : statsOf(k).hp);
-const alive = k => hpOf(k) > 0;
-const turnOf = k => TC.turn.get(k) || { moved: false, acted: false };
-const done = k => { const t = turnOf(k); return t.moved && t.acted; };
-const spend = (k, what) => TC.turn.set(k, { ...turnOf(k), [what]: true });
-/* after unit k's action: pick it again for what it has left, or put it down and start a new round once every unit
-   still standing is done */
+/* every unit as the battle takes it: the side its group in the unit data fights on (characters against enemies),
+   and its full hit points */
+const rosterOf = () => (ED.M.chars || []).map(c => { const u = unitFor(c.sprite); return { side: battle.sideOfGroup(u.group), hp: u.stats.hp }; });
+const hpOf = k => TC.battle.units[k].hp;
+const alive = k => battle.alive(TC.battle, k);
+const turnOf = k => TC.battle.units[k] || { moved: false, acted: false };
+const done = k => battle.done(TC.battle, k);
+/* the computer plays the enemy when there is a side of the player's for it to fight; on a map of enemies only, they
+   are the player's to move */
+const aiPlays = side => side === 'enemy' && TC.battle.sides.includes('player');
+/* a walk or the computer's phase is under way: the controls wait */
+const busy = () => !!TC.walk || !!TC.ai;
+/* the banner across the top of the screen: a new phase for a moment, or the battle's end for good */
+function banner(title, sub, kind, stay) {
+  const el = $('tcPhase'); el.firstElementChild.textContent = title; el.lastElementChild.textContent = sub;
+  el.dataset.kind = kind; el.hidden = false; TC.banner = { t: 0, stay };
+}
+/* after unit k's action: pick it again for what it has left, or put it down and pass play on once every unit of its
+   side still standing is done. The computer's phase runs itself (aiStep). */
 function finish(k) {
+  if (TC.ai) return;
   if (!done(k)) { select(k); return; }
   select(-1);
-  if ((ED.M.chars || []).every((c, j) => !alive(j) || done(j))) { TC.turn.clear(); TC.note = 'A new round begins'; panels(); }
+  if (battle.phaseOver(TC.battle)) nextPhase();
 }
+/* pass play to the other side: a banner, and the computer takes over if the side is its own */
+function nextPhase() {
+  const r = battle.endPhase(TC.battle); if (!r) return;
+  select(-1); TC.from = null; TC.note = '';
+  banner(`Turn ${r.turn}`, battle.SIDE_LABEL[r.phase], r.phase);
+  if (aiPlays(r.phase)) TC.ai = { queue: battle.standing(TC.battle, r.phase), k: -1, step: null, plan: null, target: -1, t: BANNER_TIME * 0.8 };
+  panels();
+}
+/* End turn (T): the player's side gives up whatever its units have left this phase */
+function endTurn() { if (busy() || !TC.battle || TC.battle.outcome || !TC.battle.sides.length) return; nextPhase(); }
 function attack(a, d) {
-  const dmg = statsOf(a).attack, was = hpOf(d), hp = Math.max(0, was - dmg), max = Math.max(1, statsOf(d).hp);
-  TC.hp.set(d, hp); spend(a, 'acted'); TC.from = null;
-  TC.pop = { k: d, text: String(dmg), t: 0, from: was / max, to: hp / max };
-  const note = `${nameOf(a)} hits ${nameOf(d)} for ${dmg}${hp ? '' : `. ${nameOf(d)} falls`}`;
-  finish(a); TC.note = note; panels();
+  const r = battle.strike(TC.battle, a, d, statsOf(a).attack); if (!r) return;
+  TC.from = null; TC.pop = { k: d, text: String(r.dmg), t: 0, from: r.from / r.max, to: r.to / r.max };
+  const note = `${nameOf(a)} hits ${nameOf(d)} for ${r.dmg}${r.fell ? `. ${nameOf(d)} falls` : ''}`;
+  const end = TC.battle.outcome;
+  if (end) { TC.ai = null; select(-1); banner(battle.OUTCOME_LABEL[end], end === 'victory' ? 'Every enemy has fallen' : 'Every one of your units has fallen', end, true); }
+  else finish(a);
+  TC.note = note; panels();
 }
-function wait() { const k = TC.sel; if (k < 0 || TC.walk) return; spend(k, 'moved'); spend(k, 'acted'); TC.from = null; finish(k); }
+function wait() { const k = TC.sel; if (k < 0 || busy() || !battle.wait(TC.battle, k)) return; TC.from = null; finish(k); }
+/* one step of the computer's phase, from the frame loop: each enemy in turn is picked (its move range showing), walks
+   by its plan (battle/ai.js), aims (the red tiles showing) and strikes, or waits where it stands. When none is left
+   play passes back to the player. */
+function aiStep(dt) {
+  const A = TC.ai; if (!A || TC.walk) return;
+  A.t -= dt * (TC.fast ? 2 : 1); if (A.t > 0) return;
+  const B = TC.battle, k = A.k;
+  if (A.step === 'pick') {
+    setMode(null); battle.spend(B, k, 'moved');
+    if (A.plan.path.length) startWalk(k, A.plan.path);
+    TC.from = null; A.step = 'arrive'; A.t = 0; return;
+  }
+  if (A.step === 'arrive') {
+    /* strike the foe it planned for, or any other its attack now reaches */
+    const targets = reachOf(k).targets, d = targets.includes(A.plan.target) ? A.plan.target : targets.length ? targets[0] : -1;
+    if (d < 0) { battle.wait(B, k); TC.note = `${nameOf(k)} waits`; select(-1); A.step = null; A.t = AI_PAUSE.stay; panels(); return; }
+    setMode('attack'); const c = ED.M.chars[d]; setCursor(c.x, c.y, levelOf(c));
+    A.target = d; A.step = 'aim'; A.t = AI_PAUSE.aim; return;
+  }
+  if (A.step === 'aim') { const a = k, d = A.target; A.step = null; A.t = AI_PAUSE.after; select(-1); attack(a, d); return; }
+  /* the next enemy still standing */
+  let next; do next = A.queue.shift(); while (next !== undefined && !battle.ready(B, next));
+  if (next === undefined) { TC.ai = null; nextPhase(); return; }
+  const u = unitFor(ED.M.chars[next].sprite);
+  A.k = next; A.step = 'pick'; A.t = AI_PAUSE.pick;
+  A.plan = planTurn(ED.M, next, { ...u.movement, range: u.stats.range, pattern: u.stats.pattern, isFoe: j => battle.foes(B, next, j), hpOf });
+  select(next);
+}
 /* Enter or a click on (x, y, L): strike the unit there if the picked unit is attacking and reaches it, pick up the
    unit there, send the picked unit there if it can reach it, or open its actions window where it stands if it is
    picked again */
 function act(x, y, L) {
-  if (TC.walk) return;
+  if (busy()) return;
   let u = unitAt(x, y, L);
   if (TC.sel >= 0 && TC.reach && TC.reach.targets.includes(u)) { attack(TC.sel, u); return; }
   if (u >= 0 && !alive(u)) u = -1;
@@ -208,7 +271,7 @@ function act(x, y, L) {
   if (TC.mode === 'move') {
     if (u === k) { openMenu(); return; }
     const path = routeTo(TC.range, placeId(ED.M, x, y, L));
-    if (path && path.length) { if (startWalk(k, path)) spend(k, 'moved'); } else select(-1);
+    if (path && path.length) { if (startWalk(k, path)) battle.spend(TC.battle, k, 'moved'); } else select(-1);
   }
   /* off the red tiles, back to the actions window; with the window open a stray click leaves it be */
   else if (TC.mode === 'attack') openMenu();
@@ -238,20 +301,30 @@ function panels() {
     const bar = $('tcUnitHp').firstElementChild, frac = hpOf(k) / Math.max(1, st.hp);
     bar.style.width = Math.round(100 * frac) + '%'; bar.className = frac > 0.5 ? '' : frac > 0.25 ? 'mid' : 'low';
     $('tcUnitInfo').textContent = `HP ${hpOf(k)}/${st.hp} · Attack ${st.attack} · ${st.pattern === 'melee' ? pat : `${pat} ${st.range}`}`;
-    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${!alive(k) ? ' · fallen' : done(k) ? ' · done' : t.moved ? ' · moved' : t.acted ? ' · acted' : TC.sel === k ? ' · ready' : ''}`;
+    const off = t.side !== TC.battle.phase;
+    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${!alive(k) ? ' · fallen' : off ? '' : done(k) ? ' · done' : t.moved ? ' · moved' : t.acted ? ' · acted' : TC.sel === k ? ' · ready' : ''}`;
+    box.dataset.side = t.side;
   }
   /* the actions window for the picked unit */
   const menu = $('tcMenu'), t = TC.sel >= 0 ? turnOf(TC.sel) : null;
-  menu.hidden = !t || !TC.menu || !!TC.walk;
+  menu.hidden = !t || !TC.menu || busy();
   if (t) {
-    $('tcActMove').disabled = t.moved; $('tcActAttack').disabled = t.acted;
+    $('tcActMove').disabled = !battle.canMove(TC.battle, TC.sel); $('tcActAttack').disabled = !battle.canAct(TC.battle, TC.sel);
     $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move')); $('tcActAttack').setAttribute('aria-pressed', String(TC.mode === 'attack'));
   }
-  $('tcHint').textContent = TC.walk ? 'On the move…'
+  /* the turn and whose phase it is, and End turn while the player can give it up */
+  const B = TC.battle, sel = TC.sel, side = sel >= 0 ? turnOf(sel).side : null;
+  $('tcTurn').hidden = !B.sides.length; $('tcTurn').dataset.kind = B.outcome || B.phase;
+  $('tcTurnNo').textContent = `Turn ${B.turn}`; $('tcTurnSide').textContent = B.outcome ? battle.OUTCOME_LABEL[B.outcome] : battle.SIDE_LABEL[B.phase];
+  $('tcEnd').disabled = busy() || !!B.outcome || !B.sides.length;
+  $('tcHint').textContent = TC.ai ? (TC.note || 'The enemy is on the move…')
+    : B.outcome ? (TC.note ? `${TC.note} · ${battle.OUTCOME_LABEL[B.outcome]}` : `${battle.OUTCOME_LABEL[B.outcome]}: the battle is over`)
+    : TC.walk ? 'On the move…'
     : TC.mode === 'move' ? 'Pick a blue tile to move there, or the unit to stay put · Esc to cancel'
     : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to attack it · Esc to go back' : 'No one in reach · Esc to go back')
     : TC.menu ? (canUndoMove(TC.sel) ? 'Choose an action · Esc to take the move back' : 'Choose an action · Esc to go back')
-    : TC.sel >= 0 && done(TC.sel) ? 'This unit is done for the round'
+    : sel >= 0 && alive(sel) && side !== B.phase ? (side === 'enemy' ? 'An enemy: it moves in the enemy phase' : 'One of yours: it moves in your phase')
+    : sel >= 0 && done(sel) ? 'This unit is done for the turn · T to end the turn'
     : TC.note ? TC.note
     : (M.chars || []).length ? 'Click a unit or press Tab to pick one' : 'No one stands on this map: place characters in the editor first';
 }
@@ -273,6 +346,9 @@ function loop(now) {
     if (w.d >= w.pts.length - 1) { TC.walk = null; TC.locked = false; const k = w.k; TC.cam.x = ax; TC.cam.y = ay - 20; finish(k); }
     TC.dirty = true;
   }
+  /* the computer's phase, a step at a time; a phase's banner shows for a moment, the battle's end stays */
+  if (TC.ai) { aiStep(dt); TC.dirty = true; }
+  if (TC.banner && !TC.banner.stay) { TC.banner.t += dt; if (TC.banner.t >= BANNER_TIME) { TC.banner = null; $('tcPhase').hidden = true; } }
   if (TC.goal && TC.glide) {
     const g = TC.glide, [gx, gy] = TC.goal; g.t += dt; const f = Math.min(1, g.t / g.dur), e = ease(f);
     TC.cam.x = g.from[0] + (gx - g.from[0]) * e; TC.cam.y = g.from[1] + (gy - g.from[1]) * e;
@@ -376,11 +452,12 @@ root.addEventListener('keydown', e => {
   else if (k === 'Tab') {
     /* the next unit still standing with something left to do this round */
     const n = (ED.M.chars || []).length;
-    for (let i = 1; i <= n; i++) { const j = (TC.sel + (e.shiftKey ? n * 2 - i : i) + n) % n; if (alive(j) && !done(j)) { select(j); break; } }
+    if (!busy()) for (let i = 1; i <= n; i++) { const j = (TC.sel + (e.shiftKey ? n * 2 - i : i) + n) % n; if (battle.ready(TC.battle, j)) { select(j); break; } }
   }
-  else if (k === '1') { if (TC.sel >= 0 && !TC.walk) setMode('move'); }
-  else if (k === '2') { if (TC.sel >= 0 && !TC.walk) setMode('attack'); }
+  else if (k === '1') { if (TC.sel >= 0 && !busy()) setMode('move'); }
+  else if (k === '2') { if (TC.sel >= 0 && !busy()) setMode('attack'); }
   else if (k === '3') wait();
+  else if (k === 't') endTurn();
   else if (k === 'Escape') { if (!back()) closeTactical(); }
   else if (k === 'q' || k === '[') turn(-1); else if (k === 'e' || k === ']') turn(1);
   else if (k === '+' || k === '=') setZoom(TC.zoom + 1); else if (k === '-' || k === '_') setZoom(TC.zoom - 1);
@@ -396,7 +473,7 @@ root.addEventListener('keydown', e => {
 function openTactical(opts = {}) {
   if (!ED.M) return;
   TC.open = true; root.hidden = false; TC.rot = ED.rot; TC.top = ED.level; TC.sel = -1; TC.walk = null; TC.range = null; TC.reach = null; TC.mode = null; TC.lastT = 0;
-  TC.hp.clear(); TC.turn.clear(); TC.pop = null; TC.note = '';
+  TC.battle = battle.createBattle(rosterOf()); TC.ai = null; TC.pop = null; TC.note = ''; TC.banner = null; $('tcPhase').hidden = true;
   $('tcName').textContent = ED.M.name;
   size(); rebuild();
   /* a comfortable close-up: about a dozen tiles across */
@@ -407,9 +484,10 @@ function openTactical(opts = {}) {
   if (opts.zoom) setZoom(opts.zoom);
   if (opts.center === 'map') { const b = TC.bounds; TC.cursor = null; lookAt((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, true); }
   else if (Array.isArray(opts.center)) { const [x, y] = opts.center; setCursor(x, y, 0); const [ax, ay] = tileArt(x, y, 0); lookAt(ax, ay - 16, true); }
+  if (TC.battle.sides.length) banner('Turn 1', battle.SIDE_LABEL[TC.battle.phase], TC.battle.phase);
   panels(); root.focus({ preventScroll: true }); req();
 }
-function closeTactical() { if (!TC.open) return; TC.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TC.walk = null; $('edCanvas').focus({ preventScroll: true }); }
+function closeTactical() { if (!TC.open) return; TC.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TC.walk = null; TC.ai = null; $('edCanvas').focus({ preventScroll: true }); }
 
 $('tcBack').addEventListener('click', closeTactical);
 $('tcRotL').addEventListener('click', () => { turn(-1); req(); }); $('tcRotR').addEventListener('click', () => { turn(1); req(); });
@@ -418,9 +496,10 @@ $('tcIn').addEventListener('click', () => { setZoom(TC.zoom + 1); req(); }); $('
 $('tcActMove').addEventListener('click', () => { setMode('move'); req(); root.focus({ preventScroll: true }); });
 $('tcActAttack').addEventListener('click', () => { setMode('attack'); req(); root.focus({ preventScroll: true }); });
 $('tcActWait').addEventListener('click', () => { wait(); req(); root.focus({ preventScroll: true }); });
+$('tcEnd').addEventListener('click', () => { endTurn(); req(); root.focus({ preventScroll: true }); });
 $('editor').addEventListener('keydown', e => { if (ED.open && !TC.open && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTactical(); } });
 new ResizeObserver(() => { if (TC.open) { size(); req(); } }).observe(root);
 /* test hook: the camera, cursor and units as the view has them */
-window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, back, select, setCursor, setMode, turn, undoMove, wait };
+window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, back, endTurn, select, setCursor, setMode, turn, undoMove, wait };
 
 export { closeTactical, openTactical };
