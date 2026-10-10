@@ -187,10 +187,11 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-tile{left:14px;bottom:40px;min-width:170px}
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
-/* The actions menu and the unit's portrait have a thin gold rim, one pixel inside a dark outline. The actions menu
-   is small, beside the unit like a tactics game's command list. */
+/* The unit's portrait has a thin gold rim, one pixel inside a dark outline. The actions menu, small beside the unit
+   like a tactics game's command list, has the same thin frame in the colours of the rock tiles: a warm stone fill
+   with a sandstone rim. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-.tc-win.tc-menu{background:linear-gradient(#1d2829,#141c1d);color:var(--tc-text);border:1px solid var(--tc-gold);border-radius:2px;box-shadow:0 0 0 1px #0b1011,0 4px 10px rgba(0,0,0,.4)}
+.tc-win.tc-menu{--tc-dim:#b3aa98;--tc-pick:rgba(255,244,208,.2);background:linear-gradient(#4a4640,#2d2a26);color:var(--tc-text);border:1px solid #c4b89c;border-radius:2px;box-shadow:0 0 0 1px #141210,0 4px 10px rgba(0,0,0,.4)}
 .tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
 .tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
 .tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
