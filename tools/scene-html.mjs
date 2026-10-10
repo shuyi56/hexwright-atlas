@@ -69,7 +69,9 @@ css.textContent = '.scene-panel{position:fixed;z-index:60;top:84px;left:28px;wid
   + '.scene-panel .sum{padding:8px 12px 4px;color:#cfc4a8}.scene-panel .sum b{color:#efe6cf}.scene-panel .about{padding:0 12px 8px;color:#a59c86;font-size:12px}'
   + '.scene-panel ol{list-style:none;margin:0;padding:0 6px 8px}.scene-panel li{padding:7px 8px;border-radius:4px;cursor:pointer;display:grid;grid-template-columns:18px 1fr;gap:2px 6px}.scene-panel li:hover{background:#262b28}'
   + '.scene-panel .mark{font-weight:700}.scene-panel .ok .mark{color:#9fc27a}.scene-panel .bad .mark{color:#e07a5f}.scene-panel .run .mark{color:#a59c86}'
-  + '.scene-panel .detail{grid-column:2;color:#a59c86;font-size:12px}.scene-panel .bad .detail{color:#e0a08a}.scene-panel.min ol,.scene-panel.min .about,.scene-panel.min .sum{display:none}';
+  + '.scene-panel .detail{grid-column:2;color:#a59c86;font-size:12px}.scene-panel .bad .detail{color:#e0a08a}.scene-panel.min ol,.scene-panel.min .about,.scene-panel.min .sum{display:none}'
+  /* on a phone: across the screen under the view's own bar, and folded down to its buttons */
+  + '@media (max-width:700px){.scene-panel{top:112px;left:8px;right:8px;width:auto;max-height:calc(100vh - 260px)}.scene-panel header{flex-wrap:wrap;padding:6px 8px;gap:6px}.scene-panel.min h2{display:none}.scene-panel button{padding:5px 12px}}';
 document.head.appendChild(css);
 const panel = document.createElement('section'); panel.className = 'scene-panel'; panel.setAttribute('aria-label', 'Scene checks');
 panel.innerHTML = '<header><h2></h2><button data-a="editor" title="Edit the scene in the tile editor">Editor</button><button data-a="tactical" title="Look at the scene in the tactical view (T in the editor)">Tactical</button><button data-a="town" title="Walk the scene in the town view (O in the editor)">Town</button><button data-a="rerun" title="Run every check again">Re-run</button><button data-a="min" title="Fold the list">–</button></header><div class="sum"></div><div class="about"></div><ol></ol>';

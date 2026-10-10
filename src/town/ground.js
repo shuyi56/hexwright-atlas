@@ -1,5 +1,5 @@
 import { OUTLINE, hexRgb, mixHex, ramp } from '../characters/pixels.js';
-import { STOREY } from '../editor/model.js';
+import { STOREY } from '../editor/storeys.js';
 import { TERRAIN } from '../tiles/terrain.js';
 
 /* ================= town view: the painted ground =================

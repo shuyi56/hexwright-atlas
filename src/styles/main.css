@@ -218,6 +218,18 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 @media (prefers-reduced-motion:reduce){.tw-banner.show{animation:none;opacity:0}.tw-say i{animation:none}}
 .town .tc-zoom{text-shadow:0 1px 2px #000,0 0 5px #000}
 .tw-say span{display:block;font:500 17px/1.45 var(--ui);color:#fff}
+/* the town view on a phone: the page under it never pans, zooms or selects, the canvas keeps its pixels square, and
+   a finger gets a stick to walk by and a Talk button */
+.town{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+#twCanvas{display:block;width:100%;height:100%;touch-action:none;image-rendering:pixelated;cursor:pointer}
+.tw-stick{position:absolute;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;border:2px solid rgba(233,228,214,.55);background:radial-gradient(rgba(11,16,17,.18),rgba(11,16,17,.38));box-shadow:0 0 0 1px rgba(11,16,17,.5);pointer-events:none}
+.tw-stick i{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f4ead2,#c9a45a 70%);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.tw-stick.run{border-color:#e4c684}
+.tw-talk{display:none;position:absolute;right:16px;bottom:calc(48px + env(safe-area-inset-bottom,0px));width:68px;height:68px;border-radius:50%;border:2px solid #e9e4d6;background:radial-gradient(circle at 40% 35%,#4d63ab,#1d2753 75%);box-shadow:0 0 0 2px #0b1011,0 6px 16px rgba(0,0,0,.5);color:#fff;font:600 15px var(--ui);text-shadow:1px 1px 0 #0b1011;cursor:pointer;touch-action:manipulation}
+.tw-talk:active{transform:scale(.94)}
+.town.saying .tw-talk{display:none}
+.town .chip{backdrop-filter:none}
+@media (pointer:coarse){.tw-talk{display:block}.town .tc-chips .chip{min-width:40px;min-height:36px}}
 
 /* ---------- the module rail: every part of the app, down the left edge (along the bottom on phones) ---------- */
 body{--rail-w:0px;--rail-b:0px}

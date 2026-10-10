@@ -150,7 +150,7 @@
   <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · 1/2/3 move, attack, wait · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc back</span></div>
 </div>
 <div class="tactical town" id="town" hidden tabindex="-1" aria-label="Town view">
-  <canvas id="twCanvas" role="img" aria-label="Town view of the map, seen from above. Walk the hero with the arrow keys or by clicking a tile; Space talks to whoever they face."></canvas>
+  <canvas id="twCanvas" role="img" aria-label="Town view of the map, seen from above. Walk the hero with the arrow keys, by clicking a tile, or on a touch screen by dragging a finger; Space or the Talk button talks to whoever they face."></canvas>
   <div class="tc-bar">
     <button class="btn" id="twBack">← Editor</button>
     <div class="tc-title"><span class="eyebrow">town view</span><span id="twName"></span></div>
@@ -162,6 +162,8 @@
   <div class="tw-banner" id="twBanner" aria-hidden="true"></div>
   <div class="tc-win tc-tile" id="twPlace" hidden><b id="twHero"></b><span id="twWhere"></span></div>
   <div class="tc-win tw-say" id="twSay" hidden aria-live="polite"><b id="twWho"></b><span id="twLine"></span><i aria-hidden="true">▼</i></div>
+  <div class="tw-stick" id="twStick" hidden aria-hidden="true"><i></i></div>
+  <button class="tw-talk" id="twTalk" title="Talk to whoever the hero faces, or look at what is in front of them (Space)">Talk</button>
   <div class="tc-hint"><span id="twHint"></span><span class="tc-keys">arrows/WASD walk · Shift run · Space talk · click a tile to walk there · Tab next hero · +/− zoom · Esc back</span></div>
 </div>
 <div class="editor char-maker" id="charMaker" hidden tabindex="-1" aria-label="Character maker">

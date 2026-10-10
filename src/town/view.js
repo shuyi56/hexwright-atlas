@@ -8,11 +8,12 @@ import { ED } from '../editor/editor.js';
 import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf } from '../editor/model.js';
 import { FACE_DELTA, findPath, neighbours, stairsAt } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
-import { $, state } from '../ui/state.js';
+import { $ } from '../ui/state.js';
 import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
 import { hits, shapesOf } from './collide.js';
 import { pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
+import GroundWorker from './ground-worker.js?worker&inline';
 
 /* ================= town view: the screen =================
    The editor's map walked the way the old town RPGs are: looked down on from the south, square tiles, the ground
@@ -21,9 +22,17 @@ import { lineFor, sightFor } from './talk.js';
    that is blocked; a click walks them to any tile they can reach, up and down stairs. Space or Enter talks to
    whoever they face, or looks at the piece or ground in front of them. Tab hands the hero's part to the next
    character. Everyone else strolls about near where they were put. Only the floors up to the hero's own are shown.
+   On a touch screen a finger dragged anywhere is a stick that walks the hero that way (pulled far, they run); a tap
+   walks them to the spot or up to whoever is there and talks, a tap on the hero talks to whoever they face, the Talk
+   button does the same, and two fingers pinch the zoom.
    The ground is drawn in CHUNK-square pieces as they come into view, each with a depth buffer (which row of ground
    every pixel shows); a piece or figure is cut away wherever the ground shown there lies in front of where it
-   stands, so a rise or cliff hides what is behind it.
+   stands, so a rise or cliff hides what is behind it. Chunks are painted by workers (town/ground-worker.js), nearest
+   the camera first, so a piece coming into view is ready before it does; where no worker runs, or one is late, the
+   chunk is painted on the spot.
+   The canvas has one pixel for every device pixel and the art is drawn a whole number of device pixels to the art
+   pixel, so the pixel art stays sharp; the camera and the walkers are placed to the nearest device pixel, so they
+   glide instead of stepping an art pixel at a time.
    Walking here is a stroll, not an edit: the map is left as it was, and opening the view again starts afresh. */
 const root = $('town'), cv = $('twCanvas'), g = cv.getContext('2d');
 /* figures at three quarters of their sprite, as in the tactical view: about 30 pixels tall, so a one-tile cottage
@@ -34,27 +43,94 @@ const FIGURE_SCALE = 0.75;
    NPC_SPEED tiles a second, STRIDES strides to a tile. A walker's feet are a circle FOOT_R across. */
 const HERO_SPEED = 90, RUN = 1.85, STRIDE = 7, NPC_SPEED = 0.8, STRIDES = 8, FOOT_R = 5;
 const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], FOOT = T / 2 + 6;
-const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, F: null, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, homes: [], rest: [], pending: [], banner: 0 };
+const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, stick: null, F: null, gen: 0, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, dpr: 1, homes: [], rest: [] };
+/* at most this many chunks are kept (about 40 MB), the furthest from the camera let go first; the workers paint
+   ahead out to FILL chunks from the middle of the screen */
+const KEEP = 420, FILL = 9;
 
 /* ---------- caches: the painted ground, cliffs, pieces and figures as canvases ---------- */
 const canvasOf = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, w); c.height = Math.max(1, h); return c; };
 function toCanvas(w, h, px) { const c = canvasOf(w, h), cg = c.getContext('2d'), d = cg.createImageData(w, h); d.data.set(px); cg.putImageData(d, 0, 0); return c; }
-/* the surface for the storeys shown, and its chunks: { can, depth } keyed by chunk column and row */
-function buildField() { TW.F = fieldOf(TW.M, TW.top); TW.chunks.clear(); TW.clipped.clear(); TW.pending = []; TW.filled = false; TW.dirty = true; }
+/* the surface for the storeys shown, and its chunks: { can, depth, empty } keyed by chunk column and row */
+const keyOf = (cx, cy) => (cy + 512) * 1024 + cx;
+function buildField() {
+  for (const c of TW.chunks.values()) if (c.can.close) c.can.close();
+  TW.F = fieldOf(TW.M, TW.top); TW.gen++; TW.chunks.clear(); TW.clipped.clear(); lastKey = NaN; lastChunk = null; TW.dirty = true;
+  const { S: n, top, terr, hgt, lev, maxH, slope, axis } = TW.F;
+  for (const p of painters) p.w.postMessage({ gen: TW.gen, field: { S: n, top, terr, hgt, lev, maxH, slope, axis } });
+}
+function keep(cx, cy, c) {
+  TW.chunks.set(keyOf(cx, cy), Object.assign(c, { cx, cy }));
+  if (TW.chunks.size <= KEEP) return;
+  /* let go of the chunk furthest from the camera */
+  const mx = TW.cam.x / CHUNK, my = TW.cam.y / CHUNK; let far = null, fd = -1;
+  for (const [k, o] of TW.chunks) { const d = Math.hypot(o.cx + 0.5 - mx, o.cy + 0.5 - my); if (d > fd) { fd = d; far = k; } }
+  const o = TW.chunks.get(far); if (o.can.close) o.can.close(); TW.chunks.delete(far); if (far === lastKey) { lastKey = NaN; lastChunk = null; }
+}
+/* the chunk, painted here and now if no worker has brought it yet */
 function chunk(cx, cy) {
-  const key = cx + ',' + cy; let c = TW.chunks.get(key);
-  if (!c) {
-    if (TW.chunks.size > 600) TW.chunks.delete(TW.chunks.keys().next().value);
-    const r = renderChunk(TW.F, cx * CHUNK, cy * CHUNK);
-    c = { can: toCanvas(CHUNK, CHUNK, r.px), depth: r.depth, empty: !r.depth.some(v => v) }; TW.chunks.set(key, c);
-  }
+  let c = TW.chunks.get(keyOf(cx, cy));
+  if (!c) { const r = renderChunk(TW.F, cx * CHUNK, cy * CHUNK); c = { can: toCanvas(CHUNK, CHUNK, r.px), depth: r.depth, empty: !r.depth.some(v => v) }; keep(cx, cy, c); }
   return c;
 }
-/* 1 + the row of ground shown at art pixel (X, Y), 0 for none */
+/* 1 + the row of ground shown at art pixel (X, Y), 0 for none; the last chunk looked in is kept to hand, as a sprite's
+   pixels are looked up one after another */
+let lastKey = NaN, lastChunk = null;
 function depthAt(X, Y) {
-  X = Math.floor(X); Y = Math.floor(Y); const cx = Math.floor(X / CHUNK), cy = Math.floor(Y / CHUNK);
-  if (X < 0 || X >= S() * T) return 0;
-  return chunk(cx, cy).depth[(Y - cy * CHUNK) * CHUNK + X - cx * CHUNK];
+  X = Math.floor(X); Y = Math.floor(Y); if (X < 0 || X >= S() * T) return 0;
+  const cx = Math.floor(X / CHUNK), cy = Math.floor(Y / CHUNK), key = keyOf(cx, cy);
+  if (key !== lastKey) { lastChunk = chunk(cx, cy); lastKey = key; }
+  return lastChunk.depth[(Y - cy * CHUNK) * CHUNK + X - cx * CHUNK];
+}
+/* is any ground shown in the box of whole art pixels (X, Y, w, h) further south than row base? */
+function hidden(X, Y, w, h, base) {
+  const lim = base + 1, n = S() * T;
+  for (let cy = Math.floor(Y / CHUNK); cy * CHUNK < Y + h; cy++) for (let cx = Math.floor(Math.max(0, X) / CHUNK); cx * CHUNK < Math.min(X + w, n); cx++) {
+    const d = chunk(cx, cy).depth, x0 = Math.max(X, cx * CHUNK), x1 = Math.min(X + w, (cx + 1) * CHUNK, n), y0 = Math.max(Y, cy * CHUNK), y1 = Math.min(Y + h, (cy + 1) * CHUNK);
+    for (let y = y0; y < y1; y++) { const o = (y - cy * CHUNK) * CHUNK - cx * CHUNK; for (let x = x0; x < x1; x++) if (d[o + x] > lim) return true; }
+  }
+  return false;
+}
+
+/* ---------- the painters: workers painting chunks ahead of the camera ---------- */
+const painters = [];
+let noWorkers = false;
+function startPainters() {
+  if (painters.length || noWorkers) return;
+  try {
+    const n = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
+    for (let i = 0; i < n; i++) {
+      const p = { w: new GroundWorker(), busy: NaN };
+      p.w.onmessage = e => painted(p, e.data);
+      p.w.onerror = () => { noWorkers = true; for (const q of painters) q.w.terminate(); painters.length = 0; };
+      painters.push(p);
+    }
+  } catch { noWorkers = true; painters.length = 0; }
+}
+function painted(p, d) {
+  p.busy = NaN;
+  if (!d.stale && d.gen === TW.gen && TW.open && !TW.chunks.has(keyOf(d.cx, d.cy))) {
+    keep(d.cx, d.cy, { can: d.bitmap || toCanvas(CHUNK, CHUNK, d.px), depth: d.depth, empty: d.empty });
+    /* only a chunk on screen needs the screen painted again */
+    const sc = scale(), hw = cv.width / sc / 2, hh = cv.height / sc / 2, x = d.cx * CHUNK, y = d.cy * CHUNK;
+    if (x < TW.cam.x + hw && x + CHUNK > TW.cam.x - hw && y < TW.cam.y + hh && y + CHUNK > TW.cam.y - hh) TW.dirty = true;
+  }
+  pump();
+}
+/* hand each idle painter the nearest chunk not yet painted, out to FILL chunks from the camera */
+function pump() {
+  if (!TW.open || !TW.F) return;
+  const n = Math.ceil(S() * T / CHUNK), cy0 = Math.floor(-TW.F.maxH * LIFT / CHUNK), mx = TW.cam.x / CHUNK - 0.5, my = TW.cam.y / CHUNK - 0.5;
+  for (const p of painters) {
+    if (!Number.isNaN(p.busy)) continue;
+    let best = null, bd = FILL;
+    for (let cy = Math.max(cy0, Math.floor(my - FILL)); cy <= Math.min(n - 1, Math.ceil(my + FILL)); cy++) for (let cx = Math.max(0, Math.floor(mx - FILL)); cx <= Math.min(n - 1, Math.ceil(mx + FILL)); cx++) {
+      const k = keyOf(cx, cy); if (TW.chunks.has(k) || painters.some(q => q.busy === k)) continue;
+      const d = Math.hypot(cx - mx, (cy - my) * 1.2); if (d < bd) { bd = d; best = [cx, cy, k]; }
+    }
+    if (!best) return;
+    p.busy = best[2]; p.w.postMessage({ gen: TW.gen, cx: best[0], cy: best[1] });
+  }
 }
 /* rgba with every pixel cut away where the ground at screen (X + i, Y + j) is further south than row base */
 function clip(px, w, h, X, Y, base, flip = false) {
@@ -67,8 +143,14 @@ function spriteOf(o) {
   if (!s) { const im = pieceSprite(o); s = { can: toCanvas(im.w, im.h, im.px), px: im.px, ox: im.ox, oy: im.oy, w: im.w, h: im.h }; TW.sprites.set(key, s); }
   return s;
 }
-const scaled = new Map();
-const framesOf = c => { let f = scaled.get(lookOf(c)); if (!f) { if (scaled.size > 64) scaled.clear(); f = renderScaled(c, FIGURE_SCALE); scaled.set(lookOf(c), f); } return f; };
+const scaled = new Map(), figs = new Map();
+const framesOf = c => { let f = scaled.get(lookOf(c)); if (!f) { if (scaled.size > 64) { scaled.clear(); figs.clear(); } f = renderScaled(c, FIGURE_SCALE); scaled.set(lookOf(c), f); } return f; };
+/* one frame of a figure, as its pixels and a canvas made once, so a walker in the open is drawn without a fresh upload */
+function figure(ch, view, pose) {
+  const key = `${lookOf(ch)}|${view}|${pose}`; let f = figs.get(key);
+  if (!f) { const px = framesOf(ch)[view][pose]; f = { px, can: toCanvas(W, H, px) }; figs.set(key, f); }
+  return f;
+}
 /* ---------- where things are ---------- */
 const S = () => TW.M.S;
 /* how high the surface stands at map pixel (gx, gy), in art pixels */
@@ -169,8 +251,11 @@ function settle(dt) {
 function heroTick(dt) {
   const m = TW.me; if (!m) return;
   settle(dt);
-  let vx = 0, vy = 0;
+  let vx = 0, vy = 0, pace = TW.run ? RUN : 1;
   for (const d of TW.held) { vx += FACE_DELTA[d][0]; vy += FACE_DELTA[d][1]; }
+  /* the touch stick: a slow walk for a small pull, a walk for a full one, a run beyond */
+  const st = TW.stick, pull = st ? Math.hypot(st.x, st.y) : 0;
+  if (!vx && !vy && pull > 0.2) { vx = st.x; vy = st.y; pace = pull > 1.3 ? RUN : Math.max(0.45, Math.min(1, pull)); }
   if (vx || vy) TW.path = [];
   else if (TW.path.length) {
     /* following a route: toward the next point, dropping it once there or once stuck on it */
@@ -178,7 +263,7 @@ function heroTick(dt) {
     if (d < 1.5) { TW.path.shift(); TW.stuck = 0; } else { vx = ex / d; vy = ey / d; }
   }
   if (vx || vy) {
-    const len = Math.hypot(vx, vy), sp = HERO_SPEED * (TW.run ? RUN : 1) * dt;
+    const len = Math.hypot(vx, vy), sp = HERO_SPEED * pace * dt;
     m.face = FACE_OF(vx, vy);
     const gone = moveHero(vx / len * sp, vy / len * sp);
     m.dist += gone; m.moving = gone > 0.05;
@@ -233,13 +318,26 @@ function talk(to = -1) {
     const line = sightFor(piece ? ASSET_BY_ID[piece.id] : null, ground, M.name); if (!line) return;
     TW.say = { k: -1, who: '', line };
   }
-  $('twWho').textContent = TW.say.who; $('twWho').hidden = !TW.say.who; $('twLine').textContent = TW.say.line; $('twSay').hidden = false; TW.dirty = true;
+  $('twWho').textContent = TW.say.who; $('twWho').hidden = !TW.say.who; $('twLine').textContent = TW.say.line; $('twSay').hidden = false; root.classList.add('saying'); TW.dirty = true; place();
 }
-function closeSay() { TW.say = null; $('twSay').hidden = true; TW.dirty = true; }
+function closeSay() { TW.say = null; $('twSay').hidden = true; root.classList.remove('saying'); TW.dirty = true; if (TW.M) place(); }
 
 /* ---------- the camera ---------- */
-const scale = () => Math.max(1, Math.round(TW.zoom * state.dpr));
-function size() { const r = root.getBoundingClientRect(); TW.cw = r.width; TW.ch = r.height; cv.width = Math.round(r.width * state.dpr); cv.height = Math.round(r.height * state.dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; TW.dirty = true; }
+/* device pixels to the art pixel: always a whole number, so every art pixel is the same size on screen */
+const scale = () => Math.max(1, Math.round(TW.zoom * TW.dpr));
+/* where the art's origin lands on the canvas, to the nearest device pixel */
+const offset = sc => [Math.round(cv.width / 2 - TW.cam.x * sc), Math.round(cv.height / 2 - TW.cam.y * sc)];
+/* the canvas's backing store, one pixel to each device pixel: the exact count where the browser gives it (box, from a
+   ResizeObserver's device-pixel-content-box), else the CSS size times the device pixel ratio. A store that missed by
+   even a little would be stretched to fit, smearing the art and making it shimmer as it scrolls. */
+function size(box) {
+  const r = cv.getBoundingClientRect(); TW.cw = r.width; TW.ch = r.height; TW.dpr = Math.min(4, window.devicePixelRatio || 1);
+  /* (a box that disagrees with the CSS size by more than rounding is not believed: an emulated screen reports CSS pixels) */
+  const good = box && Math.abs(box.inlineSize - r.width * TW.dpr) < 1.5 && Math.abs(box.blockSize - r.height * TW.dpr) < 1.5;
+  const w = good ? box.inlineSize : Math.round(r.width * TW.dpr), h = good ? box.blockSize : Math.round(r.height * TW.dpr);
+  if (w && h && (cv.width !== w || cv.height !== h)) { cv.width = w; cv.height = h; }
+  TW.dirty = true;
+}
 function setZoom(z) { TW.zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z)); $('twZoom').textContent = `×${TW.zoom}`; TW.dirty = true; }
 /* on the hero, kept inside the map where the map is bigger than the screen */
 function follow() {
@@ -254,7 +352,7 @@ function setTop(L) { L = Math.max(0, Math.min(MAX_LEVEL, L)); if (L !== TW.top) 
 /* ---------- drawing ---------- */
 function paint() {
   follow();
-  const sc = scale(), Wd = cv.width, Hd = cv.height, tx = Math.round(Wd / 2 - Math.round(TW.cam.x) * sc), ty = Math.round(Hd / 2 - Math.round(TW.cam.y) * sc);
+  const sc = scale(), Wd = cv.width, Hd = cv.height, [tx, ty] = offset(sc);
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#141b1c'; g.fillRect(0, 0, Wd, Hd);
   g.setTransform(sc, 0, 0, sc, tx, ty); g.imageSmoothingEnabled = false;
   const vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (Wd - tx) / sc, vy1 = (Hd - ty) / sc, M = TW.M, F = TW.F, n = S();
@@ -274,7 +372,7 @@ function paint() {
   items.sort((a, b) => a.key - b.key || a.L - b.L || a.o - b.o);
   const hero = items.find(it => it.o === 2 && it.k === TW.hero), hb = hero ? [hero.q.fx - 8, hero.q.fy - 30, hero.q.fx + 8, hero.q.fy] : null;
   for (const it of items) {
-    if (it.o === 2) { drawChar(it.k, it.q, vx0, vy0, vx1, vy1); continue; }
+    if (it.o === 2) { drawChar(it.k, it.q, vx0, vy0, vx1, vy1, sc); continue; }
     const s = pieceOn(it, vx0, vy0, vx1, vy1); if (!s) continue;
     /* a piece standing in front of the hero fades, so they are never lost behind it */
     const fade = hb && it.key > hero.key && s.X < hb[2] && s.X + s.w > hb[0] && s.Y < hb[3] && s.Y + s.h > hb[1] && covers(s, s.X, s.Y, hb);
@@ -315,15 +413,22 @@ function covers(s, X, Y, b) {
   }
   return false;
 }
-const figCan = canvasOf(W, H), figG = figCan.getContext('2d');
-function drawChar(k, q, vx0, vy0, vx1, vy1) {
+/* A figure that ground hides in part is cut away into a canvas of its own character's, never one shared: a phone's
+   browser may read a canvas drawn from only when the frame is shown, so one canvas rewritten for each walker in turn
+   showed every walker as whichever was cut last. */
+const cuts = [];
+const cutFor = k => cuts[k] || (cuts[k] = (c => ({ can: c, g: c.getContext('2d') }))(canvasOf(W, H)));
+function drawChar(k, q, vx0, vy0, vx1, vy1, sc) {
   const c = TW.M.chars[k], ch = characterById(c.sprite) || characterById('villager'), pose = !q.moving ? 0 : q.dist != null ? WALK[Math.floor(q.dist / STRIDE) % WALK.length] : WALK[Math.floor(q.d * STRIDES) % WALK.length];
-  const view = q.face === 2 ? 'back' : 'front', flip = q.face === 1, x = Math.round(q.fx), y = Math.round(q.fy), X = x - W / 2, Y = y - BASE - 1;
+  /* placed to the nearest device pixel, so a walker glides with the camera; what hides it is worked out on the art
+     pixel it is nearest */
+  const view = q.face === 2 ? 'back' : 'front', flip = q.face === 1, x = Math.round(q.fx * sc) / sc, y = Math.round(q.fy * sc) / sc, X = x - W / 2, Y = y - BASE - 1;
   if (X > vx1 || Y > vy1 || X + W < vx0 || Y + H < vy0) return;
   /* the figure and its shadow, cut away wherever the ground shown lies in front of where it stands */
   g.fillStyle = 'rgba(43,33,22,0.32)'; g.beginPath(); g.ellipse(x + 1, y, 7, 2.5, 0, 0, Math.PI * 2); g.fill();
-  const im = figG.createImageData(W, H); im.data.set(clip(framesOf(ch)[view][pose], W, H, X, Y, q.gy, flip)); figG.putImageData(im, 0, 0);
-  if (flip) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(figCan, -W / 2, Y); g.restore(); } else g.drawImage(figCan, X, Y);
+  const f = figure(ch, view, pose), ax = Math.round(X), ay = Math.round(Y); let can = f.can;
+  if (hidden(ax, ay, W, H, q.gy)) { const cut = cutFor(k), im = cut.g.createImageData(W, H); im.data.set(clip(f.px, W, H, ax, ay, q.gy, flip)); cut.g.putImageData(im, 0, 0); can = cut.can; }
+  if (flip) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(can, -W / 2, Y); g.restore(); } else g.drawImage(can, X, Y);
   /* the hero wears a small gold marker overhead until they first move */
   if (k === TW.hero && !TW.moved) { g.fillStyle = '#c9a24f'; const ty = y - 40 - (TW.tick % 2); g.beginPath(); g.moveTo(x - 4, ty); g.lineTo(x + 4, ty); g.lineTo(x, ty + 5); g.closePath(); g.fill(); g.strokeStyle = '#2b2116'; g.lineWidth = 1; g.stroke(); }
 }
@@ -334,8 +439,10 @@ function place() {
   if (!c) { $('twHint').textContent = 'No one stands on this map: place characters in the editor, then come back to walk about'; $('twPlace').hidden = true; return; }
   const ch = characterById(c.sprite), L = levelOf(c), u = c.y * M.S + c.x, Tn = L ? TERRAIN[M.floors[L - 1][u] - 1] : TERRAIN[M.terr[u]];
   $('twPlace').hidden = false; $('twHero').textContent = ch ? ch.name : c.sprite; $('twWhere').textContent = `${Tn ? Tn.label : ''}${L ? ` · floor ${L}` : ''}`;
-  $('twHint').textContent = TW.say ? 'Space to close' : 'Walk with the arrow keys · Space to talk';
+  $('twHint').textContent = touchy() ? (TW.say ? 'Tap to close' : 'Drag to walk · tap a spot to go there') : TW.say ? 'Space to close' : 'Walk with the arrow keys · Space to talk';
 }
+/* is this a touch screen, with no mouse to point with? */
+const touchy = () => window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 /* ---------- the frame ---------- */
 let raf = 0;
@@ -348,31 +455,90 @@ function loop(now) {
   /* the ripples, the fire and the hero's marker tick over a few times a second */
   const tick = Math.floor(now / 260); if (tick !== TW.tick) { TW.tick = tick; TW.dirty = true; }
   if (TW.dirty) { TW.dirty = false; paint(); }
-  /* paint the rest of the ground while idle, a few tiles a frame */
-  if (!TW.pending.length && !TW.filled) { TW.filled = true; const n = Math.ceil(S() * T / CHUNK); for (let cy = Math.floor(-TW.F.maxH * LIFT / CHUNK); cy * CHUNK < S() * T; cy++) for (let cx = 0; cx < n; cx++) TW.pending.push([cx, cy]); }
-  if (TW.pending.length && TW.chunks.size < 560) { const [cx, cy] = TW.pending.pop(); chunk(cx, cy); }
+  /* the painters work ahead of the camera; with none, the ground just off screen is painted here, one chunk a frame,
+     only while the hero stands still so a walk never waits on it */
+  if (painters.length) pump(); else if (!(TW.me && TW.me.moving)) fillOne();
   raf = requestAnimationFrame(loop);
 }
 const req = () => { TW.dirty = true; if (!raf && TW.open) raf = requestAnimationFrame(loop); };
+function fillOne() {
+  const n = Math.ceil(S() * T / CHUNK), mx = Math.floor(TW.cam.x / CHUNK), my = Math.floor(TW.cam.y / CHUNK);
+  for (let r = 0; r <= 2; r++) for (let cy = my - r; cy <= my + r; cy++) for (let cx = Math.max(0, mx - r); cx <= Math.min(n - 1, mx + r); cx++) {
+    if (cy * CHUNK >= S() * T || TW.chunks.has(keyOf(cx, cy))) continue;
+    chunk(cx, cy); return;
+  }
+}
 
 /* ---------- input ---------- */
+/* the art pixel under a point on the screen, and the tile whose ground it shows: [x, y, storey, art x, ground row,
+   art y] */
 function tileAt(e) {
-  const r = cv.getBoundingClientRect(), sc = scale(), tx = Math.round(cv.width / 2 - Math.round(TW.cam.x) * sc), ty = Math.round(cv.height / 2 - Math.round(TW.cam.y) * sc);
-  const wx = ((e.clientX - r.left) * state.dpr - tx) / sc, wy = ((e.clientY - r.top) * state.dpr - ty) / sc, d = depthAt(wx, wy);
+  const r = cv.getBoundingClientRect(), sc = scale(), [tx, ty] = offset(sc), k = r.width ? cv.width / r.width : TW.dpr;
+  const wx = ((e.clientX - r.left) * k - tx) / sc, wy = ((e.clientY - r.top) * k - ty) / sc, d = depthAt(wx, wy);
   /* the ground under the point is the row its pixel shows */
   if (!d) return null;
-  const x = Math.floor(wx / T), y = Math.floor((d - 1) / T); return [x, y, TW.F.lev[y * S() + x], wx, d - 1];
+  const x = Math.floor(wx / T), y = Math.floor((d - 1) / T); return [x, y, TW.F.lev[y * S() + x], wx, d - 1, wy];
 }
-cv.addEventListener('pointerdown', e => {
+/* a click or a tap: on the hero, talk to whoever they face; on someone else, walk up to them and talk; anywhere
+   else, walk there */
+function tapAt(e) {
   const t = tileAt(e), M = TW.M, k = TW.hero; if (!t || !M.chars[k] || !TW.me) return;
-  if (TW.say) closeSay();
   TW.moved = true; TW.stuck = 0;
-  /* a click on someone walks up to them and talks; anywhere else walks there */
+  const h = charPos(k);
+  if (Math.abs(t[3] - h.fx) < 9 && t[5] > h.fy - 32 && t[5] < h.fy + 3) { TW.path = []; TW.talkTo = -1; talk(); req(); return; }
+  if (TW.say) closeSay();
   const j = M.chars.findIndex((o, i) => i !== k && o.x === t[0] && o.y === t[1] && levelOf(o) === t[2]);
   if (j >= 0) { const q = charPos(j); TW.path = routeTo(q.fx, q.gy + (TW.me.y > q.gy ? 14 : -14), t[2]); TW.talkTo = j; }
   else { TW.path = routeTo(t[3], t[4], t[2]); TW.talkTo = -1; }
   req();
+}
+/* A mouse acts as it is pressed. A finger (or pen) waits to see what it does: lifted where it went down, it taps
+   (and a tap while someone is speaking closes what they said); dragged, it becomes a stick the hero walks by, its
+   pull measured from where it went down (STICK CSS pixels for a full walk, the start dragged along behind a finger
+   pulled further than a run); a second finger pinches the zoom a step at a time. */
+const STICK = 44, fingers = new Map(), stickEl = $('twStick'), knob = stickEl.firstElementChild;
+let gesture = null;
+function showStick(x0, y0, dx, dy) {
+  const r = root.getBoundingClientRect(), d = Math.hypot(dx, dy), k = d > STICK ? STICK / d : 1;
+  stickEl.style.left = `${x0 - r.left}px`; stickEl.style.top = `${y0 - r.top}px`; stickEl.hidden = false;
+  knob.style.transform = `translate(${dx * k}px,${dy * k}px)`; stickEl.classList.toggle('run', d > STICK * 1.3);
+}
+function dropStick() { if (TW.stick) { TW.stick = null; req(); } stickEl.hidden = true; }
+const spread = () => { const [a, b] = [...fingers.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+cv.addEventListener('pointerdown', e => {
+  if (!TW.open) return;
+  if (e.pointerType === 'mouse') { if (e.button === 0) tapAt(e); return; }
+  e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch { /* not every pointer can be captured */ }
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (fingers.size === 1) gesture = { kind: 'tap', id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now() };
+  else { dropStick(); gesture = fingers.size === 2 ? { kind: 'pinch', d0: spread() } : { kind: 'none' }; }
 });
+cv.addEventListener('pointermove', e => {
+  const f = fingers.get(e.pointerId); if (!f || !gesture) return;
+  f.x = e.clientX; f.y = e.clientY;
+  if (gesture.kind === 'pinch' && fingers.size === 2) {
+    const d = spread(), r = d / gesture.d0;
+    if (r > 1.3 || r < 0.77) { setZoom(TW.zoom + (r > 1 ? 1 : -1)); gesture.d0 = d; req(); }
+    return;
+  }
+  if (gesture.id !== e.pointerId) return;
+  let dx = e.clientX - gesture.x0, dy = e.clientY - gesture.y0;
+  if (gesture.kind === 'tap' && Math.hypot(dx, dy) > 10) { gesture.kind = 'stick'; TW.moved = true; TW.talkTo = -1; if (TW.say) closeSay(); }
+  if (gesture.kind !== 'stick') return;
+  const d = Math.hypot(dx, dy), far = STICK * 1.6;
+  if (d > far) { gesture.x0 += dx * (1 - far / d); gesture.y0 += dy * (1 - far / d); dx = e.clientX - gesture.x0; dy = e.clientY - gesture.y0; }
+  TW.stick = { x: dx / STICK, y: dy / STICK }; showStick(gesture.x0, gesture.y0, dx, dy); req();
+});
+function letGo(e) {
+  if (!fingers.delete(e.pointerId) || !gesture) return;
+  if (gesture.id === e.pointerId) {
+    if (gesture.kind === 'tap' && e.type === 'pointerup' && performance.now() - gesture.t0 < 600) { if (TW.say) { closeSay(); req(); } else tapAt(e); }
+    if (gesture.kind === 'stick') dropStick();
+  }
+  if (!fingers.size) gesture = null; else if (gesture && gesture.kind !== 'none') { dropStick(); gesture = { kind: 'none' }; }
+}
+cv.addEventListener('pointerup', letGo); cv.addEventListener('pointercancel', letGo); cv.addEventListener('lostpointercapture', letGo);
+cv.addEventListener('contextmenu', e => { if (TW.open) e.preventDefault(); });
 cv.addEventListener('wheel', e => { e.preventDefault(); const i = ZOOMS.indexOf(TW.zoom); setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + (e.deltaY < 0 ? 1 : -1)))]); req(); }, { passive: false });
 root.addEventListener('keydown', e => {
   if (!TW.open) return;
@@ -388,6 +554,8 @@ root.addEventListener('keydown', e => {
 });
 root.addEventListener('keyup', e => { const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (k in DIRS) TW.held = TW.held.filter(d => d !== DIRS[k]); else if (k === 'Shift') TW.run = false; });
 root.addEventListener('blur', () => { TW.held = []; TW.run = false; });
+/* let go of everything held when the page is put away, so the hero is not still walking when it comes back */
+document.addEventListener('visibilitychange', () => { if (document.hidden) { TW.held = []; TW.run = false; fingers.clear(); gesture = null; dropStick(); } });
 function nextHero(d = 1) {
   const n = TW.M.chars.length; if (n < 2) return;
   TW.hero = (TW.hero + d + n) % n; TW.path = []; TW.talkTo = -1; if (TW.say) closeSay();
@@ -407,11 +575,11 @@ function openTown(opts = {}) {
   if (!ED.M) return;
   TW.M = cloneModel(ED.M); TW.M.chars = TW.M.chars || []; TW.M.floors = TW.M.floors || [];
   TW.open = true; root.hidden = false; TW.steps.clear(); TW.path = []; TW.held = []; TW.talkTo = -1; TW.moved = false; TW.lastT = 0; TW.rest = [];
-  TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs);
+  TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs); cuts.length = 0;
   TW.hero = opts.hero ?? (ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0);
   TW.G0 = fieldOf(TW.M, 0); TW.shapes = shapesOf(TW.M.objs, TW.links); takeHero();
   TW.top = TW.me ? TW.me.L : 0;
-  buildField(); size();
+  startPainters(); buildField(); size();
   setZoom(opts.zoom || Math.max(2, Math.min(5, Math.round(TW.cw / (15 * T)))));
   $('twName').textContent = TW.M.name;
   closeSay(); place();
@@ -419,13 +587,28 @@ function openTown(opts = {}) {
   const b = $('twBanner'); b.textContent = TW.M.name; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   root.focus({ preventScroll: true }); req();
 }
-function closeTown() { if (!TW.open) return; TW.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TW.steps.clear(); $('edCanvas').focus({ preventScroll: true }); }
+function closeTown() {
+  if (!TW.open) return; TW.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TW.steps.clear();
+  fingers.clear(); gesture = null; dropStick();
+  /* the painted ground is let go with the view; the workers stay, idle, for the next time it opens */
+  for (const c of TW.chunks.values()) if (c.can.close) c.can.close();
+  TW.chunks.clear(); TW.clipped.clear(); lastKey = NaN; lastChunk = null;
+  $('edCanvas').focus({ preventScroll: true });
+}
 
 $('twBack').addEventListener('click', closeTown);
 $('twNext').addEventListener('click', () => { nextHero(1); root.focus({ preventScroll: true }); });
 $('twIn').addEventListener('click', () => { setZoom(TW.zoom + 1); req(); }); $('twOut').addEventListener('click', () => { setZoom(TW.zoom - 1); req(); });
+$('twTalk').addEventListener('click', () => { TW.moved = true; TW.path = []; TW.talkTo = -1; talk(); req(); });
 $('editor').addEventListener('keydown', e => { if (ED.open && !TW.open && (e.key === 'o' || e.key === 'O') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTown(); } });
-new ResizeObserver(() => { if (TW.open) { size(); req(); } }).observe(root);
+/* on a resize the canvas is sized and painted again at once, before the browser shows it, so it never flashes blank
+   (as it does on a phone each time the address bar slides in or out) */
+const resized = new ResizeObserver(([en]) => {
+  if (!TW.open) return;
+  const box = en && en.devicePixelContentBoxSize && en.devicePixelContentBoxSize[0];
+  size(box); TW.dirty = false; paint(); req();
+});
+try { resized.observe(cv, { box: 'device-pixel-content-box' }); } catch { resized.observe(cv); }
 /* test hook */
 window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
 
