@@ -1,5 +1,6 @@
 import { characterById, get as getCustom, merge as mergeCustom } from '../characters/library.js';
 import { ASSET_BY_ID, TERRAIN, TERRAIN_BY_ID, footprint } from '../tiles/index.js';
+import { MAX_ELEV, MAX_LEVEL, STOREY } from './storeys.js';
 
 /* ================= tile editor: the map model =================
    terr holds an index into TERRAIN per tile, elev a height level 0..MAX_ELEV,
@@ -9,7 +10,6 @@ import { ASSET_BY_ID, TERRAIN, TERRAIN_BY_ID, footprint } from '../tiles/index.j
    Storeys: the ground is level 0. floors[L - 1] holds upper floor L as one byte per tile, 0 where there is no
    floor and 1 + a TERRAIN index where there is; it stands STOREY height levels above the ground under it.
    Pieces and characters carry level (absent means 0) and only meet things on their own level. */
-const MAX_ELEV = 6, MAX_LEVEL = 3, STOREY = 2;
 const levelOf = o => o.level || 0;
 const TI = Object.fromEntries(TERRAIN.map((t, k) => [t.id, k]));
 

@@ -295,11 +295,19 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   (`src/town/collide.js`).
 - **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a classic blue window),
   or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
+- **Phones and tablets:** a finger dragged anywhere on the map is a stick the hero walks by (a small pull strolls,
+  pulled further they run, and the stick follows a finger dragged past it); a tap walks them to the spot or up to
+  whoever is there, a tap on the hero or the **Talk** button talks, a tap closes what was said, and two fingers pinch
+  the zoom. The page under the view never pans, zooms or selects text.
+- **Sharp and smooth:** the canvas has one pixel per device pixel and every art pixel is a whole number of them, so
+  the pixel art never smears or shimmers at any screen density; the camera and walkers move to the nearest device
+  pixel, so they glide rather than stepping an art pixel at a time. The ground is painted in workers ahead of the
+  camera, nearest first, so walking never waits on a new piece of ground coming into view.
 - **A stroll, not an edit:** the town view walks a copy of the map, so nothing it does changes the map or its undo
   history, and it starts afresh each time it is opened.
 
 `src/town/` holds it: `ground.js` builds the height surface and paints it in 128-pixel chunks with their depth
-buffers (no DOM), `pieces.js` draws the pieces (no DOM), `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
+buffers (no DOM), `ground-worker.js` runs that painting in a worker, `pieces.js` draws the pieces (no DOM), `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
 in it.
 
 ![The town view](docs/images/town-view.png)
