@@ -217,18 +217,27 @@ function house(K, o, p) {
     if (p.dormer && span > 18) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (xf - x0) * fx), cy = Math.round(ridge + span * 0.5); K.poly([[cx - 8, cy + 2], [cx, cy - 7], [cx + 8, cy + 2]], Rf[1]); K.rect(cx - 6, cy + 2, cx + 6, cy + 10, Wl[2]); windowAt(K, cx - 3, cy + 3, 6, 6, {}); }
     return { ridge, eave, top, yb, x0, x1: xf };
   }
-  /* ridge north-south: two slopes running back from the gable end in front, the east one in shade over the east wall */
-  const cx = (x0 + xf) / 2, apex = Math.round(top - Math.min(rise, (xf - x0) * 0.45)), ridgeTop = 1, l = x0 - ov, r = x1 + ov, eaveTop = ridgeTop + Math.round((x1 - x0) * 0.3);
-  K.poly([[l, eaveTop], [cx, ridgeTop], [cx, apex], [l, top + ov]], (x, y) => roofTone(p.roof, Rf, y, x - l, 0));
-  K.poly([[cx, ridgeTop], [r, eaveTop], [r, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1));
-  K.rect(Math.floor(cx) - 1, ridgeTop, Math.floor(cx) + 1, apex, Rf[4]);
+  /* Ridge north-south: the gable end in front and the two slopes running back from it, drawn as parallelograms so
+     the ridge, the eaves and the bargeboards all keep one pitch. The gable rises gh above the wall; at the back the
+     ridge meets the top of the footprint and the eaves sit gh below it, as they do at the front. The east slope is
+     in shade. */
+  const cx = Math.round((x0 + xf) / 2), gh = Math.round(Math.min(rise * 1.2, (xf - x0) * 0.42)), apex = top - gh, back = 2, l = x0 - ov, r = x1 + ov;
+  const slope = (x, side) => gh * (side ? r - x : x - l) / (side ? r - cx : cx - l);   /* how far the slope's top edge drops at x */
+  K.poly([[l, back + gh], [cx, back], [cx, apex], [l, top + ov]], (x, y) => { const v = x - l, edge = y - back - (gh - slope(x, 0)); return roofTone(p.roof, Rf, y, v, edge < 2 ? -1 : 0) || Rf[1]; });
+  K.poly([[cx, back], [r, back + gh], [r, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1) || Rf[3]);
+  /* the ridge cap down the middle, lit on its west side; the eaves along both sides */
+  K.rect(cx - 2, back, cx, apex, Rf[0]); K.rect(cx, back, cx + 2, apex, Rf[4]);
+  K.rect(l, back + gh, l + 1, top + ov, Rf[3]); K.rect(r - 1, back + gh, r, top + ov, inked(Rf[4], 0.4));
+  /* the gable end: the wall carried up to the apex, with a window in it, under bargeboards that stand proud */
   K.poly([[x0, top + 1], [cx, apex + 3], [xf, top + 1]], tex);
-  /* the bargeboards along the gable, standing proud */
-  K.line(l, top + ov, cx, apex, Rf[1]); K.line(l, top + ov + 1, cx, apex + 1, inked(Rf[4], 0.45));
-  K.line(cx, apex, xf + ov, top + ov, inked(Rf[3], 0.3)); K.line(cx, apex + 1, xf + ov, top + ov + 1, inked(Rf[4], 0.45));
-  if (top - apex > 16) windowAt(K, Math.round(cx - 3), Math.round(apex + (top - apex) * 0.42), 6, 7, {});
-  if (p.chimney) chimney(K, Math.round(cx + 8), Math.round((ridgeTop + apex) / 2), 10, p.chimney > 1);
-  return { ridge: ridgeTop, eave: top + ov, top, yb, x0, x1: xf };
+  if (gh > 18) windowAt(K, cx - 4, Math.round(apex + gh * 0.45), 8, Math.min(12, Math.round(gh * 0.3)), { arch: p.arch, glass: p.glass });
+  for (let i = 0; i < 3; i++) {
+    const c = i === 0 ? Rf[1] : i === 1 ? Rf[2] : inked(Rf[4], 0.45);
+    K.line(l, top + ov + i, cx, apex + i, c); K.line(cx, apex + i, r - 1, top + ov + i, i === 0 ? Rf[2] : c);
+  }
+  K.rect(x0, top + 1, xf, top + 3, (x, y) => mix(tex(x, y), INK, 0.3));
+  if (p.chimney) chimney(K, cx + 10, Math.round(back + (apex - back) * 0.35), 10, p.chimney > 1);
+  return { ridge: back, eave: top + ov, top, yb, x0, x1: xf };
 }
 /* a round tower: radius r, wallH high, standing on (cx, yb), with a cone, battlements or a flat top */
 function tower(K, cx, yb, r, wallH, p) {
@@ -298,11 +307,29 @@ const BUILD = {
     const P = R('#efe8d8'); for (let x = b.x0 + 2; x < b.x1 - 3; x += 9) K.rect(x, b.top + 4, x + 4, b.yb - 3, (px) => P[px === x ? 0 : px === x + 3 ? 3 : 1]);
   },
   markethall: (K, o) => {
-    const { FW, FD } = K, P = R('#c4b99f'), b = house(K, o, { wall: 'cream', wallTex: 'timber', roof: 'tiles', wallH: 40, rise: 14, door: false, windows: false });
-    K.rect(b.x0, b.yb - 18, b.x1, b.yb, R('#3a2e22')[3]);
-    for (let x = b.x0; x < b.x1; x += 12) { K.rect(x, b.yb - 18, x + 4, b.yb, (px) => P[px === x ? 1 : 2]); K.oval(x + 8, b.yb - 18, 4, 3, P[2]); }
-    for (let k = 0; k < Math.floor(FW / 14); k++) windowAt(K, Math.round(b.x0 + 6 + k * 14), b.top + 6, 6, 7, {});
-    K.rect(b.x0, b.yb, b.x1, FD - 1, R('#d4cbb3')[2]);
+    /* an open arcade of stone arches on the ground floor, the market inside in shadow, under a timbered upper floor */
+    const b = house(K, o, { wall: 'cream', wallTex: 'timber', roof: 'tiles', wallH: 40, floors: 2, rise: 16, door: false, windows: false });
+    const x0 = b.x0, x1 = b.x1, fh = (b.yb - b.top) / 2, ay = Math.round(b.top + fh), yb = b.yb, S = R('#c9bfa6'), D = R('#2e241b');
+    const n = Math.max(2, Math.round((x1 - x0) / 26)), bay = (x1 - x0) / n, colW = 6, ra = (bay - colW) / 2, ys = ay + 3 + ra;
+    for (let y = ay; y < yb; y++) for (let x = x0; x < x1; x++) {
+      const i = Math.min(n - 1, Math.floor((x - x0) / bay)), mx = x0 + (i + 0.5) * bay, dx = x + 0.5 - mx, colEdge = Math.abs(dx) > bay / 2 - colW / 2;
+      const inOpen = !colEdge && (y >= ys || (dx * dx + (y + 0.5 - ys) ** 2 <= ra * ra));
+      let c;
+      if (inOpen) c = y > yb - 4 ? D[1] : D[y < ay + 8 ? 4 : 3];                       /* the shadowed hall; its floor catches light */
+      else {
+        const rim = !colEdge && Math.abs(Math.hypot(dx, y + 0.5 - ys) - ra) < 1.5 && y < ys;   /* the arch's voussoirs */
+        c = rim ? S[1] : colEdge ? S[Math.abs(dx) > bay / 2 - 1.5 ? (dx < 0 ? 3 : 1) : 2] : wallTone('stone', S, x, y);
+      }
+      K.set(x, y, c);
+    }
+    /* capitals at the springing, and a beam carrying the upper floor */
+    for (let i = 0; i <= n; i++) { const cxi = Math.round(x0 + i * bay); K.rect(cxi - colW / 2 - 1, ys - 1, cxi + colW / 2 + 1, ys + 2, S[0]); }
+    K.rect(x0, ay - 2, x1, ay + 1, (x, y) => TIMBER[y === ay - 2 ? 1 : 3]);
+    /* market goods glimpsed inside: crates and a barrel in the shade */
+    for (let i = 0; i < n; i += 2) { const mx = Math.round(x0 + (i + 0.5) * bay); K.rect(mx - 5, yb - 9, mx + 3, yb - 3, R('#8e6a44')[3]); K.rect(mx - 5, yb - 9, mx + 3, yb - 8, R('#8e6a44')[2]); }
+    /* windows across the upper floor */
+    const wh = Math.min(16, Math.round(fh * 0.45)), wy = Math.round(b.top + (fh - wh) * 0.45);
+    for (const wx of windowSlots(x0 + 2, x1 - 2, 12, false)) windowAt(K, wx, wy, 12, wh, { shutter: '#7a4a2a' });
   },
   yurt: (K, o) => { const { FW, FD } = K, P = R('#d9c9a0'), cx = FW / 2; K.oval(cx, FD - 10, 14, 6, P[3]); K.rect(cx - 14, FD - 24, cx + 14, FD - 10, (x, y) => { const t = (x + 0.5 - cx) / 14; return P[(y % 6 === 0) ? 3 : t < -0.5 ? 1 : t < 0.4 ? 2 : 3]; }); K.oval(cx, FD - 24, 15, 13, (x, y, dx, dy) => (dy > 0.3 ? null : R('#cbb894')[dx < -0.4 ? 1 : dx > 0.5 ? 3 : 2])); K.oval(cx, FD - 34, 3, 2, R('#5a3f28')[2]); doorAt(K, cx, FD - 9, 8, 12, { col: '#b8483a' }); },
   ruin: (K, o) => {
