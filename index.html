@@ -137,17 +137,20 @@
   <div class="tc-bar">
     <button class="btn" id="tcBack">← Editor</button>
     <div class="tc-title"><span class="eyebrow">tactical view</span><span id="tcName"></span></div>
+    <div class="tc-turn" id="tcTurn" hidden aria-live="polite"><b id="tcTurnNo">Turn 1</b><span id="tcTurnSide">Player turn</span></div>
     <div class="tc-chips">
+      <button class="chip" id="tcEnd" title="End the turn: your units give up what they have left (T)">End turn</button>
       <button class="chip" id="tcRotL" title="Turn view (Q)">⟲ Turn</button>
       <button class="chip" id="tcRotR" title="Turn view (E)">Turn ⟳</button>
       <button class="chip" id="tcFast" aria-pressed="false" title="Fast-forward walking (F)">▶▶ 2×</button>
       <button class="chip" id="tcOut" aria-label="Zoom out (−)">−</button><span class="tc-zoom" id="tcZoom">×3</span><button class="chip" id="tcIn" aria-label="Zoom in (+)">+</button>
     </div>
   </div>
+  <div class="tc-win tc-phase" id="tcPhase" hidden aria-live="assertive"><b></b><span></span></div>
   <div class="tc-win tc-tile" id="tcTile" aria-live="polite"></div>
   <div class="tc-win tc-menu" id="tcMenu" hidden role="group" aria-label="Actions"><button id="tcActMove" aria-pressed="false">Move <kbd>1</kbd></button><button id="tcActAttack" aria-pressed="false">Attack <kbd>2</kbd></button><button id="tcActWait">Wait <kbd>3</kbd></button></div>
   <div class="tc-win tc-unit" id="tcUnit" hidden><canvas id="tcFace" width="72" height="72"></canvas><div><b id="tcUnitName"></b><span class="tc-hp" id="tcUnitHp" aria-hidden="true"><i></i></span><span id="tcUnitInfo"></span><span id="tcUnitMove"></span></div></div>
-  <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · 1/2/3 move, attack, wait · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc or right-click back</span></div>
+  <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · 1/2/3 move, attack, wait · T end turn · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc or right-click back</span></div>
 </div>
 <div class="tactical town" id="town" hidden tabindex="-1" aria-label="Town view">
   <canvas id="twCanvas" role="img" aria-label="Town view of the map, seen from above. Walk the hero with the arrow keys, by clicking a tile, or on a touch screen by dragging a finger; Space or the Talk button talks to whoever they face."></canvas>

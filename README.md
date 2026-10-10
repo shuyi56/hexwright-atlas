@@ -178,6 +178,15 @@ with the camera gliding after the cursor and the unit on the move.
   and down ledges, one stride to a tile at 4.2 tiles a second (8.4 with the ▶▶ 2× chip or F), so the arms swing at the pace the figure moves. The
   camera sits on whole art pixels and rides along the walker's path on the ground (not its hops), holding the
   walker still on screen while the ground scrolls under it. Moves are map edits, on the editor's undo stack.
+- **Turns:** a battle runs in turns, each a **player phase** and then an **enemy phase**. The player's side is the
+  [unit data](#unit-data)'s characters, the enemy's its enemies. In a phase each unit of that side still standing
+  moves once and acts once (Attack, or Wait to give up both); the phase passes on when every one of them is done, or
+  at once with **End turn** (`T`). A banner names each new phase and the turn and phase stay in the top bar. In the
+  enemy phase the computer plays each enemy in turn: it shows the enemy's range, walks it to where it can strike the
+  weakest foe in reach (or as close to the nearest one as it can get, round anything it cannot climb), and strikes;
+  the controls wait until it is done, and the ▶▶ 2× chip speeds it up. The battle is won when the last enemy falls
+  and lost when the last of yours does. A side with no units on the map has its phase skipped, and on a map of
+  enemies only they are yours to move.
 - **Camera:** the arrow keys or `WASD` step the cursor along the grid and the camera keeps it in view. Drag to
   pan, scroll or `+`/`-` to zoom, `Q`/`E` to turn the view, `PgUp`/`PgDn` to change storey, `Esc` to go back.
   Pieces standing in front of the unit in play or the cursor fade so neither is lost behind them.
@@ -446,6 +455,8 @@ src/
                       them on the map, the sprite sheet layout and its pixel font
   data/               Unit data: the fields and ranges of a unit's stats, and the registry the game reads
   units/              The unit data page (units.html)
+  battle/             The battle in the tactical view: sides, hit points, turns and the player and enemy phases
+                      (state.js), and how the computer plays an enemy (ai.js); pure, no DOM
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen
   town/               Town view: the painted height surface with its slopes, cliffs and depth buffer, the
