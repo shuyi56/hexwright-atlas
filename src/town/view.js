@@ -44,7 +44,7 @@ const FIGURE_SCALE = 0.75;
    NPC_SPEED tiles a second, STRIDES strides to a tile. A walker's feet are a circle FOOT_R across. */
 const HERO_SPEED = 90, RUN = 1.85, STRIDE = 7, NPC_SPEED = 0.8, STRIDES = 8, FOOT_R = 5;
 const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], FOOT = T / 2 + 6;
-const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, stick: null, F: null, gen: 0, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, dpr: 1, homes: [], rest: [] };
+const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, clamp: [false, false], trace: null, frame: null, onFrame: null, stats: { syncChunks: 0 }, steps: new Map(), path: [], held: [], run: false, stick: null, F: null, gen: 0, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, dpr: 1, homes: [], rest: [] };
 /* at most this many chunks are kept (about 40 MB), the furthest from the camera let go first; the workers paint
    ahead out to FILL chunks from the middle of the screen */
 const KEEP = 420, FILL = 9;
@@ -71,7 +71,7 @@ function keep(cx, cy, c) {
 /* the chunk, painted here and now if no worker has brought it yet */
 function chunk(cx, cy) {
   let c = TW.chunks.get(keyOf(cx, cy));
-  if (!c) { const r = renderChunk(TW.F, cx * CHUNK, cy * CHUNK); c = { can: toCanvas(CHUNK, CHUNK, r.px), depth: r.depth, empty: !r.depth.some(v => v) }; keep(cx, cy, c); }
+  if (!c) { TW.stats.syncChunks++; const r = renderChunk(TW.F, cx * CHUNK, cy * CHUNK); c = { can: toCanvas(CHUNK, CHUNK, r.px), depth: r.depth, empty: !r.depth.some(v => v) }; keep(cx, cy, c); }
   return c;
 }
 /* 1 + the row of ground shown at art pixel (X, Y), 0 for none; the last chunk looked in is kept to hand, as a sprite's
@@ -335,7 +335,7 @@ const offset = sc => [Math.round(cv.width / 2 - TW.cam.x * sc), Math.round(cv.he
    ResizeObserver's device-pixel-content-box), else the CSS size times the device pixel ratio. A store that missed by
    even a little would be stretched to fit, smearing the art and making it shimmer as it scrolls. */
 function size(box) {
-  const r = cv.getBoundingClientRect(); TW.cw = r.width; TW.ch = r.height; TW.dpr = Math.min(4, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect(); TW.cw = r.width; TW.ch = r.height; TW.dpr = window.devicePixelRatio || 1;
   /* (a box that disagrees with the CSS size by more than rounding is not believed: an emulated screen reports CSS pixels) */
   const good = box && Math.abs(box.inlineSize - r.width * TW.dpr) < 1.5 && Math.abs(box.blockSize - r.height * TW.dpr) < 1.5;
   const w = good ? box.inlineSize : Math.round(r.width * TW.dpr), h = good ? box.blockSize : Math.round(r.height * TW.dpr);
@@ -350,6 +350,8 @@ function follow() {
   const sc = scale(), hw = cv.width / sc / 2, hh = cv.height / sc / 2, top = -TW.F.maxH * LIFT, w = S() * T, h = S() * T;
   TW.cam.x = w <= hw * 2 ? w / 2 : Math.max(hw, Math.min(w - hw, x));
   TW.cam.y = h - top <= hh * 2 ? (top + h) / 2 : Math.max(top + hh, Math.min(h - hh, y));
+  /* held at the map's edge, off the hero */
+  TW.clamp[0] = TW.cam.x !== x; TW.clamp[1] = TW.cam.y !== y;
 }
 function setTop(L) { L = Math.max(0, Math.min(MAX_LEVEL, L)); if (L !== TW.top) { TW.top = L; buildField(); } place(); }
 
@@ -359,6 +361,8 @@ function paint() {
   const sc = scale(), Wd = cv.width, Hd = cv.height, [tx, ty] = offset(sc);
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#141b1c'; g.fillRect(0, 0, Wd, Hd);
   g.setTransform(sc, 0, 0, sc, tx, ty); g.imageSmoothingEnabled = false;
+  /* for the e2e test: what this frame drew and where, in art pixels (tools/town-e2e.mjs) */
+  const rec = TW.frame = TW.trace ? { sc, tx, ty, w: Wd, h: Hd, cam: [TW.cam.x, TW.cam.y], clamp: TW.clamp.slice(), drawn: [] } : null;
   const vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (Wd - tx) / sc, vy1 = (Hd - ty) / sc, M = TW.M, F = TW.F, n = S();
   /* the ground, chunk by chunk */
   for (let cy = Math.floor(vy0 / CHUNK); cy * CHUNK < vy1; cy++) for (let cx = Math.max(0, Math.floor(vx0 / CHUNK)); cx * CHUNK < Math.min(vx1, n * T); cx++) { const c = chunk(cx, cy); if (!c.empty) g.drawImage(c.can, cx * CHUNK, cy * CHUNK); }
@@ -376,12 +380,13 @@ function paint() {
   items.sort((a, b) => a.key - b.key || a.L - b.L || a.o - b.o);
   const hero = items.find(it => it.o === 2 && it.k === TW.hero), hb = hero ? [hero.q.fx - 8, hero.q.fy - 30, hero.q.fx + 8, hero.q.fy] : null;
   for (const it of items) {
-    if (it.o === 2) { drawChar(it.k, it.q, vx0, vy0, vx1, vy1, sc); continue; }
+    if (it.o === 2) { drawChar(it.k, it.q, vx0, vy0, vx1, vy1, sc, rec); continue; }
     const s = pieceOn(it, vx0, vy0, vx1, vy1); if (!s) continue;
     /* a piece standing in front of the hero fades, so they are never lost behind it */
     const fade = hb && it.key > hero.key && s.X < hb[2] && s.X + s.w > hb[0] && s.Y < hb[3] && s.Y + s.h > hb[1] && covers(s, s.X, s.Y, hb);
     if (fade) g.globalAlpha = 0.5;
     g.drawImage(s.can, s.X, s.Y); g.globalAlpha = 1;
+    if (rec) rec.drawn.push({ box: [s.X, s.Y, s.w, s.h] });
   }
 }
 /* piece it as it stands on the surface: its sprite placed at the height of the ground at the middle of its front,
@@ -422,7 +427,7 @@ function covers(s, X, Y, b) {
    showed every walker as whichever was cut last. */
 const cuts = [];
 const cutFor = k => cuts[k] || (cuts[k] = (c => ({ can: c, g: c.getContext('2d') }))(canvasOf(W, H)));
-function drawChar(k, q, vx0, vy0, vx1, vy1, sc) {
+function drawChar(k, q, vx0, vy0, vx1, vy1, sc, rec) {
   const c = TW.M.chars[k], ch = characterById(c.sprite) || characterById('villager'), pose = !q.moving ? 0 : q.dist != null ? WALK[Math.floor(q.dist / STRIDE) % WALK.length] : WALK[Math.floor(q.d * STRIDES) % WALK.length];
   /* placed to the nearest device pixel, so a walker glides with the camera; what hides it is worked out on the art
      pixel it is nearest */
@@ -430,11 +435,13 @@ function drawChar(k, q, vx0, vy0, vx1, vy1, sc) {
   if (X > vx1 || Y > vy1 || X + W < vx0 || Y + H < vy0) return;
   /* the figure and its shadow, cut away wherever the ground shown lies in front of where it stands */
   g.fillStyle = 'rgba(43,33,22,0.32)'; g.beginPath(); g.ellipse(x + 1, y, 7, 2.5, 0, 0, Math.PI * 2); g.fill();
-  const f = figure(ch, view, pose), ax = Math.round(X), ay = Math.round(Y); let can = f.can;
-  if (hidden(ax, ay, W, H, q.gy)) { const cut = cutFor(k), im = cut.g.createImageData(W, H); im.data.set(clip(f.px, W, H, ax, ay, q.gy, flip)); cut.g.putImageData(im, 0, 0); can = cut.can; }
+  const f = figure(ch, view, pose), ax = Math.round(X), ay = Math.round(Y), cut = hidden(ax, ay, W, H, q.gy); let can = f.can;
+  /* the figure, with its shadow (which lies over whatever was drawn before it) */
+  if (rec) rec.drawn.push({ k, id: ch.id, view, pose, flip, X, Y, ax, ay, gy: q.gy, cut, moving: q.moving, box: [X, Y, W, H + 3] });
+  if (cut) { const cut = cutFor(k), im = cut.g.createImageData(W, H); im.data.set(clip(f.px, W, H, ax, ay, q.gy, flip)); cut.g.putImageData(im, 0, 0); can = cut.can; }
   if (flip) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(can, -W / 2, Y); g.restore(); } else g.drawImage(can, X, Y);
   /* the hero wears a small gold marker overhead until they first move */
-  if (k === TW.hero && !TW.moved) { g.fillStyle = '#c9a24f'; const ty = y - 40 - (TW.tick % 2); g.beginPath(); g.moveTo(x - 4, ty); g.lineTo(x + 4, ty); g.lineTo(x, ty + 5); g.closePath(); g.fill(); g.strokeStyle = '#2b2116'; g.lineWidth = 1; g.stroke(); }
+  if (k === TW.hero && !TW.moved) { if (rec) rec.drawn.push({ box: [x - 5, y - 42, 11, 9] }); g.fillStyle = '#c9a24f'; const ty = y - 40 - (TW.tick % 2); g.beginPath(); g.moveTo(x - 4, ty); g.lineTo(x + 4, ty); g.lineTo(x, ty + 5); g.closePath(); g.fill(); g.strokeStyle = '#2b2116'; g.lineWidth = 1; g.stroke(); }
 }
 
 /* ---------- the place panel ---------- */
@@ -452,13 +459,19 @@ const touchy = () => window.matchMedia && window.matchMedia('(pointer: coarse)')
 let raf = 0;
 function loop(now) {
   raf = 0; if (!TW.open) return;
-  const dt = Math.min(0.1, (now - (TW.lastT || now)) / 1000); TW.lastT = now;
+  const t0 = performance.now(), dt = Math.min(0.1, (now - (TW.lastT || now)) / 1000); TW.lastT = now;
   for (const [k, st] of TW.steps) { st.t += dt * NPC_SPEED; if (st.t >= 1) TW.steps.delete(k); TW.dirty = true; }
   heroTick(dt);
   stroll(dt);
   /* the ripples, the fire and the hero's marker tick over a few times a second */
   const tick = Math.floor(now / 260); if (tick !== TW.tick) { TW.tick = tick; TW.dirty = true; }
   if (TW.dirty) { TW.dirty = false; paint(); }
+  /* the frame's record for the e2e test, with how long the frame took to work out and draw */
+  if (TW.trace && TW.frame) {
+    const f = TW.frame, m = TW.me; TW.frame = null; f.t = now; f.work = performance.now() - t0;
+    if (m) f.hero = { x: m.x, y: m.y, z: m.z, camZ: TW.camZ, moving: m.moving, run: TW.run || !!(TW.stick && Math.hypot(TW.stick.x, TW.stick.y) > 1.3) };
+    TW.trace.push(f); if (TW.onFrame) TW.onFrame(f);
+  }
   /* the painters work ahead of the camera; with none, the ground just off screen is painted here, one chunk a frame,
      only while the hero stands still so a walk never waits on it */
   if (painters.length) pump(); else if (!(TW.me && TW.me.moving)) fillOne();
@@ -614,6 +627,8 @@ const resized = new ResizeObserver(([en]) => {
 });
 try { resized.observe(cv, { box: 'device-pixel-content-box' }); } catch { resized.observe(cv); }
 /* test hook */
-window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
+window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, depthAt, figure: { W, H, BASE, scale: FIGURE_SCALE, speed: HERO_SPEED * RUN },
+  /* a character's frames drawn afresh, apart from the view's own caches, and whether the painters are still at work */
+  look: id => renderScaled(characterById(id) || characterById('villager'), FIGURE_SCALE), painting: () => painters.some(p => !Number.isNaN(p.busy)), walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
 
 export { closeTown, openTown };
