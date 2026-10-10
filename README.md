@@ -403,6 +403,13 @@ is built from. It fails when an interaction's p75 latency passes 200 ms, or when
 editor patched in place after those edits differs by a single pixel from a full render. CI runs it on
 every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust it.
 
+`npm run test:town` (after `npm run build`) walks the hero round Saltmere harbour in the town view on phones at
+2.625×, 3× and 4.5×, a tablet and desktops at 1× and 2×, by taps and clicks, the touch stick and the arrow keys. It
+fails when the main thread's work per frame passes its budget (p95 12 ms, worst 50 ms), when ground is painted on the
+main thread while walking, when the canvas is not one pixel per device pixel, when the camera jumps or the hero drifts
+on screen, or when any figure on screen, read back from the canvas, differs from its own character's frame (smeared,
+shifted, or showing another character). `TOWN_DEVICES` picks the devices; `TOWN_E2E_OUT=<file.json>` saves the numbers.
+
 ## Scripts
 
 | Command           | What it does                    |
@@ -418,6 +425,7 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm test`        | Unit tests (no browser needed)  |
 | `npm run test:e2e`| MCP end-to-end test (Chromium)  |
 | `npm run perf`    | Editor latency budget (Chromium)|
+| `npm run test:town`| Town view walk on phones and desktops (Chromium) |
 | `npm run mcp`     | Run the MCP server on stdio     |
 
 Requires Node 18+.
