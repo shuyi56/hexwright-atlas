@@ -190,35 +190,27 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 /* The actions menu and the unit's portrait have a thin gold rim, one pixel inside a dark outline. The actions menu
    is small, beside the unit like a tactics game's command list. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-/* the battle menu: a small banner of moss-green woven cloth hung beside the unit from a crooked branch with leaves
-   sprouting at its ends, bound with an aged-bronze trim and cut to a notched foot; rustic, and a little enchanted.
-   The commands are in the atlas's engraved small capitals, each with a little pixel glyph; the chosen one glows
-   like lamplight in a wood, with a firefly hovering beside it. The cloth is drawn behind the commands (::before) so
-   it can be cut to the notch while the shadow follows its shape. */
-.tc-win.tc-menu{background:none;border:0;border-radius:0;box-shadow:none;color:#efe8cf;padding:11px 6px 22px;
-  filter:drop-shadow(0 0 1px #10180c) drop-shadow(0 5px 6px rgba(0,0,0,.45))}
-.tc-menu{display:flex;flex-direction:column;min-width:0;z-index:2}
-.tc-menu::before{content:'';position:absolute;inset:0;z-index:-1;clip-path:polygon(0 0,100% 0,100% 100%,50% calc(100% - 12px),0 100%);
-  background:linear-gradient(#a8884a,#6f5428) 0 0/100% 2px no-repeat,
-    repeating-linear-gradient(0deg,rgba(0,0,0,.07) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px),
-    radial-gradient(90% 70% at 50% 20%,rgba(190,230,140,.18),transparent 70%),
-    linear-gradient(90deg,#8a6c38 0 1px,#2b3d22 1px,#3b5430 50%,#2b3d22 calc(100% - 1px),#8a6c38 calc(100% - 1px))}
-/* the branch, and a sprig of leaves at each end */
-.tc-menu::after{content:'';position:absolute;left:-9px;right:-9px;top:-5px;height:6px;border-radius:3px 2px 3px 2px;box-shadow:0 0 0 1px #24170b;
-  background:radial-gradient(ellipse 4px 2.5px at 3px 1px,#7fae4e 90%,transparent) no-repeat,radial-gradient(ellipse 3px 2px at calc(100% - 3px) 5px,#6c9a40 90%,transparent) no-repeat,
-    repeating-linear-gradient(90deg,transparent 0 11px,rgba(0,0,0,.25) 11px 12px),linear-gradient(#7a5a34,#5a3f22 60%,#3d2914)}
+/* the battle menu: an art nouveau frame beside the unit, a twilight panel under an arched crown of gold, vines
+   climbing both sides to buds at its shoulders and a flower opening at the top, with a few motes of light caught in
+   it (the drawing is the .tc-frame SVG in index.html). The commands are in the atlas's engraved small capitals,
+   each with a little pixel glyph; the chosen one glows, with a star twinkling beside it. */
+.tc-win.tc-menu{background:none;border:0;border-radius:0;box-shadow:none;color:#f4ead2;width:140px;height:108px;box-sizing:border-box;padding:22px 20px 12px;
+  filter:drop-shadow(0 4px 8px rgba(8,6,24,.55))}
+.tc-menu{display:flex;flex-direction:column;justify-content:center;z-index:2}
+.tc-menu .tc-frame{position:absolute;inset:0;width:100%;height:100%;z-index:-1;overflow:visible}
 .tc-menu[hidden]{display:none}
-.tc-menu button{display:flex;align-items:center;gap:7px;background:none;border:0;border-radius:1px;color:inherit;padding:4px 10px 4px 16px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #10180c}
+.tc-menu button{display:flex;align-items:center;gap:7px;background:none;border:0;border-radius:8px;color:inherit;padding:4px 8px 4px 16px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #0b0a1c}
 .tc-menu .tc-act{display:block;flex:1;font:400 14px/1 var(--display);letter-spacing:.04em;color:inherit}
-.tc-menu .tc-ico{width:12px;height:12px;flex:none;fill:currentColor;shape-rendering:crispEdges;opacity:.85}
-.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:linear-gradient(90deg,rgba(214,240,150,.12),rgba(214,240,150,0));outline:none}
-.tc-menu button[aria-pressed=true]{background:radial-gradient(70% 120% at 0% 50%,rgba(240,226,140,.32),rgba(240,226,140,0) 80%);color:#fbf1b8;text-shadow:0 0 6px rgba(246,230,140,.65),0 1px 0 #10180c}
-.tc-menu button[aria-pressed=true] .tc-ico{opacity:1;filter:drop-shadow(0 0 2px rgba(246,230,140,.8))}
-/* the firefly */
-.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:5px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:#fbffb0;box-shadow:0 0 4px 2px rgba(220,255,120,.75),0 0 10px 3px rgba(200,240,90,.35);animation:tc-firefly 1.6s ease-in-out infinite}
-@keyframes tc-firefly{0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-2px);opacity:.65}}
-.tc-menu button:disabled{color:rgba(239,232,207,.4);cursor:default;text-shadow:none}
-.tc-menu kbd{font:600 10px var(--ui);color:rgba(239,232,207,.55);margin-left:8px}
+.tc-menu .tc-ico{width:12px;height:12px;flex:none;fill:currentColor;shape-rendering:crispEdges;opacity:.8}
+.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:radial-gradient(80% 140% at 30% 50%,rgba(170,150,255,.18),rgba(170,150,255,0));outline:none}
+.tc-menu button[aria-pressed=true]{background:radial-gradient(80% 160% at 30% 50%,rgba(255,226,150,.26),rgba(170,150,255,.1) 60%,rgba(170,150,255,0));color:#fff3c8;text-shadow:0 0 6px rgba(255,226,150,.7),0 1px 0 #0b0a1c}
+.tc-menu button[aria-pressed=true] .tc-ico{opacity:1;filter:drop-shadow(0 0 2px rgba(255,226,150,.85))}
+/* the star */
+.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:4px;top:50%;width:8px;height:8px;margin-top:-4px;background:#fff6c8;
+  clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);filter:drop-shadow(0 0 3px #ffe9a0);animation:tc-twinkle 1.8s ease-in-out infinite}
+@keyframes tc-twinkle{0%,100%{transform:scale(1) rotate(0);opacity:1}50%{transform:scale(.7) rotate(45deg);opacity:.7}}
+.tc-menu button:disabled{color:rgba(244,234,210,.38);cursor:default;text-shadow:none}
+.tc-menu kbd{font:600 10px var(--ui);color:rgba(244,234,210,.5);margin-left:6px}
 .tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
