@@ -10,7 +10,9 @@ The **Tile editor** button opens an isometric workbench built on the same tile s
 districts. Paint 34 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
 turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
 builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
-fenland, ashlands). On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
+fenland, ashlands). The land is kept calm: the main ground covers most of it with the others in a few broad patches,
+heights rise in wide terraces, ponds, islets, plateaus and patches of only a few tiles are smoothed away, water
+deepens with distance from the shore, and woods gather in groves with only the odd tree in the open. On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
 generated from the atlas: its biome blended into its neighbours', coast or lake shore on the sides that touch
 water, rivers and roads crossing the same sides as on the map, farmland, and the village, town, keep, ruin or
 other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter
@@ -215,6 +217,68 @@ frames of an animated ground, then a left and right face two levels deep), with 
 
 ![The tactical tile sheet](docs/images/tactical-tile-sheet.png)
 
+### Town view
+
+**Town** (`O`) in the editor walks the map the way the old town RPGs do (Final Fantasy VI, Dragon Quest, Pokémon):
+seen from above and the south on square 96-pixel tiles (about six figures across), with the ground painted as one
+solid surface rather than a grid of blocks. Houses fill their tiles at the figures' scale: a door a little taller
+than a person, a cottage about twice their height, two-storey houses towering over the street.
+
+- **Solid ground:** every mark (grass tufts, flowers, cobbles, boards, ripples) is laid out in map pixels, so a
+  ground runs across tile edges without a seam. Where soft grounds meet (grass, a dirt road, sand, the sea) the border
+  wanders on a smooth noise instead of following the grid (a road only gently); paving, floors and fields keep
+  straight edges, and paving and roads climb slopes along their length only, so their courses stay straight. The
+  higher-ranked ground is inked along its edge and shades the lower one: grass overhangs a path, and the shore shows
+  a strip of bank and a line of foam on the water. Water takes its shape from the tiles round it rather than their
+  squares, and a chain of water tiles (diagonal steps too) flows as one smooth river. Water and lava ripple.
+- **Heights:** height is one continuous surface, 14 pixels up per level, drawn column by column from the south like
+  a height-field. Between tiles one level apart (a step anyone can walk) the ground rises in a smooth slope, lit
+  where it faces the upper left and shaded where it turns away. Only a jump of two levels or more (where no one can
+  walk) breaks into a cliff, its edge wandering like any other border: earth or rock under a ragged grass lip,
+  coursed blocks under paving, beams under floors, falling water. Cliffs throw a shadow east and darken the ground at
+  their foot. Upper floors that are shown join the surface a storey up.
+- **Camera:** it follows the hero's place on the ground and, through a gentle smoothing, their height, so climbing a
+  ramp or slope never shakes the view.
+- **Depth:** every screen pixel of ground remembers which row of the map it shows. A piece or figure is cut away
+  wherever the ground shown there lies in front of where it stands, so a rise or cliff hides exactly what is behind
+  it, and figures walking up a slope follow the ground.
+- **Pieces:** every building, prop, plant and piece of furniture is redrawn front-on. A house fills its own
+  footprint, wider than it is tall, seen from the south and a little east: a front wall (plaster, timber framing,
+  ashlar, planks) with its east wall receding beside it in shade, both on a stone plinth; a door set back in its
+  frame with iron straps, a ring handle and a step, with windows placed symmetrically round it (lintels, sills,
+  glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
+  capped ridge, a fascia board along the eave, its east end in shade, chimneys and smoke. So a row of houses never
+  covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
+  towers carry cones or battlements, trees are crowns of rounded leaf clumps, flatly lit (a sunlit band
+  along each clump's top, shade along its underside, a soft rim where it stands over the one behind) on tapered
+  trunks with roots, standing a little off the grid so a wood never grows in rows,
+  pines are tiers of slanting needles with drooping tips, and props and furniture keep the figures' scale in the
+  middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
+  front of the hero fades so they are never lost behind it.
+- **Walking:** the hero walks freely, not tile by tile: the arrow keys or `WASD` (diagonals too, `Shift` runs) move
+  them at a figure's pace, about three of their own heights a second, with a stride every few pixels so the feet plant
+  instead of gliding. Clicking a tile walks them there along the editor's walking route, up and down stairs. Only the
+  storeys up to the hero's own are shown, so stepping indoors upstairs takes the roof off. `Tab` (or **Next hero**)
+  walks as the next character. Everyone else strolls about near where they were put; enemies hold their ground.
+- **Collision:** each piece blocks only the ground it is drawn standing on: a tree its trunk, a bush, well or
+  haystack its round base, a house its walls (the doorstep stays open), a fence a strip along its rails, an interior
+  wall its band, joined to its neighbours. Flowers, toadstools, reeds, doorways and stairs block nothing. Water stops
+  the hero exactly at its painted edge, a cliff wherever the ground jumps two levels or more, and other walkers by a
+  small circle round their feet. Blocked one way, the hero slides along the other and eases round trunks and corners
+  (`src/town/collide.js`).
+- **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a classic blue window),
+  or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
+- **A stroll, not an edit:** the town view walks a copy of the map, so nothing it does changes the map or its undo
+  history, and it starts afresh each time it is opened.
+
+`src/town/` holds it: `ground.js` builds the height surface and paints it in 128-pixel chunks with their depth
+buffers (no DOM), `pieces.js` draws the pieces (no DOM), `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
+in it.
+
+![The town view](docs/images/town-view.png)
+
+![Greenwood glade, the foliage scene](docs/images/greenwood-glade.png)
+
 ### Test scenes
 
 `scenes/` holds self-contained HTML test pages. Each one is the whole app inlined into a single file that
@@ -227,13 +291,17 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   shows pass or fail, with the route's step count, heights and storey changes. **Re-run** repeats the checks,
   and clicking a check replays that walk on screen.
 - **Scripted browsers:** results are in `window.__sceneResults`.
-- **Editor and tactical view:** every scene page has both. The panel's **Editor** and **Tactical** buttons switch
-  between them, and what is edited in the editor shows in the tactical view when it is opened again.
+- **Editor, tactical and town views:** every scene page has all three. The panel's **Editor**, **Tactical** and
+  **Town** buttons switch between them, and what is edited in the editor shows in the tactical view when it is opened again.
 - **Tactical scenes:** `scenes/tactical/` holds pages that open straight in the tactical view.
   `scenes/tactical/scale-study.html` stands every kind of house, tower and tree on a flat green, with a figure in
   front of each, to judge their sizes against each other. Its map is `scenes/tactical/scale-study.json`, and
   `scale-study.scene.json` beside it gives the title, notes and the camera (`view: "tactical"`,
   `tactical: { zoom, center }`); a scene with nothing to check needs no checks file.
+  `scenes/town/saltmere-harbour.html` opens in the town view (`view: "town"`, `town: { zoom, hero }`), an island
+  harbour town to walk about in. `scenes/town/greenwood-glade.html` shows off the trees and plants: an oak grove with
+  copper beeches, a birch copse on the heath, a poplar avenue, pines climbing a hill to snowy firs, and a reed-fringed
+  pond fed by a stream, round a woodcutter's cottage. Its map is built by `node tools/make-greenwood.mjs`.
   `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
   villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
   clothes show, with the dragoon and the black mage beside them as the benchmark.
@@ -345,6 +413,8 @@ src/
   units/              The unit data page (units.html)
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen
+  town/               Town view: the painted height surface with its slopes, cliffs and depth buffer, the
+                      front-on pieces, townsfolk's lines and the walking screen
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
 tools/                Vite plugin that relays HTTP calls to the editor page and saves unit data (dev server only),

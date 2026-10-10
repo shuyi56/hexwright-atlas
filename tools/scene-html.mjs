@@ -15,7 +15,8 @@
 
    Every scene page has the tile editor and the tactical view, and the panel switches between them. view:
    'tactical' opens the page in the tactical view, with tactical: { zoom, center: [x, y] | 'map' } setting its
-   camera; edits made in the editor show in the tactical view when it is opened again. */
+   camera; edits made in the editor show in the tactical view when it is opened again. view: 'town' opens it in the
+   town view, with town: { zoom, hero } (hero: the index of the character to walk as). */
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -48,7 +49,7 @@ rmSync(dist, { recursive: true, force: true });
 /* the scene and the runner, after the app */
 const title = suite.title || map.name || 'Hexwright scene';
 html = html.replace(/<title>[^<]*<\/title>/, `<title>${title.replace(/</g, '&lt;')} · Hexwright</title>`);
-const data = safe(JSON.stringify({ title, about: suite.about || '', map, checks: suite.checks || [], view: suite.view || 'editor', tactical: suite.tactical || {} }));
+const data = safe(JSON.stringify({ title, about: suite.about || '', map, checks: suite.checks || [], view: suite.view || 'editor', tactical: suite.tactical || {}, town: suite.town || {} }));
 html = html.replace('</body>', `<script>window.__HEXWRIGHT_SCENE__ = ${data};</script>\n<script type="module">\n${safe(RUNNER())}\n</script>\n</body>`);
 writeFileSync(out, html);
 console.log(`wrote ${out} (${(html.length / 1024).toFixed(0)} KB, ${(suite.checks || []).length} checks)`);
@@ -71,7 +72,7 @@ css.textContent = '.scene-panel{position:fixed;z-index:60;top:84px;left:28px;wid
   + '.scene-panel .detail{grid-column:2;color:#a59c86;font-size:12px}.scene-panel .bad .detail{color:#e0a08a}.scene-panel.min ol,.scene-panel.min .about,.scene-panel.min .sum{display:none}';
 document.head.appendChild(css);
 const panel = document.createElement('section'); panel.className = 'scene-panel'; panel.setAttribute('aria-label', 'Scene checks');
-panel.innerHTML = '<header><h2></h2><button data-a="editor" title="Edit the scene in the tile editor">Editor</button><button data-a="tactical" title="Look at the scene in the tactical view (T in the editor)">Tactical</button><button data-a="rerun" title="Run every check again">Re-run</button><button data-a="min" title="Fold the list">–</button></header><div class="sum"></div><div class="about"></div><ol></ol>';
+panel.innerHTML = '<header><h2></h2><button data-a="editor" title="Edit the scene in the tile editor">Editor</button><button data-a="tactical" title="Look at the scene in the tactical view (T in the editor)">Tactical</button><button data-a="town" title="Walk the scene in the town view (O in the editor)">Town</button><button data-a="rerun" title="Run every check again">Re-run</button><button data-a="min" title="Fold the list">–</button></header><div class="sum"></div><div class="about"></div><ol></ol>';
 panel.querySelector('h2').textContent = S.title; panel.querySelector('.about').textContent = S.about + (S.checks.length ? ' Click a check to watch that walk.' : '');
 document.body.appendChild(panel);
 const list = panel.querySelector('ol'), sum = panel.querySelector('.sum');
@@ -80,10 +81,13 @@ panel.querySelector('[data-a=rerun]').onclick = () => runAll();
 if (!S.checks.length) panel.querySelector('[data-a=rerun]').hidden = true;
 /* the editor and the tactical view of the same map: what is edited in one shows in the other */
 const T = () => window.__tactical;
-const tactical = () => { if (T().isOpen()) T().close(); T().open(S.tactical); };
+const Tw = () => window.__town;
+const tactical = () => { if (Tw() && Tw().isOpen()) Tw().close(); if (T().isOpen()) T().close(); T().open(S.tactical); };
+const town = () => { if (T().isOpen()) T().close(); if (Tw().isOpen()) Tw().close(); Tw().open(S.town); };
 /* in the editor the panel folds to its header, out of the way of the map */
-panel.querySelector('[data-a=editor]').onclick = () => { if (T() && T().isOpen()) T().close(); panel.classList.add('min'); };
+panel.querySelector('[data-a=editor]').onclick = () => { if (T() && T().isOpen()) T().close(); if (Tw() && Tw().isOpen()) Tw().close(); panel.classList.add('min'); };
 panel.querySelector('[data-a=tactical]').onclick = () => { tactical(); panel.classList.remove('min'); };
+panel.querySelector('[data-a=town]').onclick = () => { town(); panel.classList.add('min'); };
 
 /* ---------- running a check ---------- */
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -151,7 +155,8 @@ async function watch(c) {
   await h.call('walkCharacter', { index: who.index, to: c.to });
 }
 window.__sceneRun = runAll;
-if (S.checks.length) await runAll(); else { sum.textContent = S.view === 'tactical' ? 'Editor: edit the scene. Tactical: look at it in the tactical view.' : 'No checks for this scene.'; await show(S.map); }
+if (S.checks.length) await runAll(); else { sum.textContent = S.view === 'tactical' ? 'Editor: edit the scene. Tactical: look at it in the tactical view.' : S.view === 'town' ? 'Editor: edit the scene. Town: walk it in the town view.' : 'No checks for this scene.'; await show(S.map); }
 if (S.view === 'tactical') tactical();
+if (S.view === 'town') { town(); panel.classList.add('min'); }
 `;
 }
