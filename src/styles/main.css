@@ -187,17 +187,45 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-tile{left:14px;bottom:40px;min-width:170px}
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
-/* The actions menu and the unit's portrait have a thin gold rim, one pixel inside a dark outline. The actions menu
-   is small, beside the unit like a tactics game's command list. */
-.tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-.tc-win.tc-menu{background:linear-gradient(#1d2829,#141c1d);color:var(--tc-text);border:1px solid var(--tc-gold);border-radius:2px;box-shadow:0 0 0 1px #0b1011,0 4px 10px rgba(0,0,0,.4)}
-.tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
-.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
-.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
-.tc-menu button[aria-pressed=true]{background:var(--tc-pick);color:var(--tc-mark)}
-.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:3px;top:50%;margin-top:-3px;border:3px solid transparent;border-left:4px solid currentColor}
-.tc-menu button:disabled{color:var(--tc-off);cursor:default;text-shadow:none}
-.tc-menu kbd{font:600 10px var(--ui);color:var(--tc-dim)}
+/* The unit's portrait has a thin gold rim, one pixel inside a dark outline. The actions menu, small beside the unit
+   like a tactics game's command list, is framed like the tiles and on their pixel grid: --px is one of the tiles' art
+   pixels in CSS pixels (the view sets it, from ×2 to ×3). An ink outline with its corners left out, as the figures
+   are inked; a gold rim lit along the top and left and in shade along the foot and right, as a tile's upper edges
+   catch the light and its lower ones fall away; a lit line under the rim and a shaded one above the foot; and a pixel
+   of shadow beneath. A lit row is a band with a lit top line, like a tile's top, and the row in play is lit in gold. */
+.tactical{--tc-gold:#c9a45a}
+.tc-win.tc-menu{--px:3px;--ink:#0b1011;--rim-lit:#d2b46f;--rim-dark:#9e773f;--fill:#1b2627;--bevel:#2b3938;--foot:#111819;--hot:#373a2f;--hot-lit:#454433;--on:#4f4c36;--on-lit:#6b603e;--on-foot:#3e3f31;
+  background:var(--fill);color:#ece2c8;border:0;border-radius:0;padding:calc(3*var(--px)) calc(2*var(--px));
+  box-shadow:inset 0 var(--px) var(--rim-lit),inset var(--px) 0 var(--rim-lit),inset 0 calc(-1*var(--px)) var(--rim-dark),inset calc(-1*var(--px)) 0 var(--rim-dark),
+    inset 0 calc(2*var(--px)) var(--bevel),inset 0 calc(-2*var(--px)) var(--foot),
+    0 calc(-1*var(--px)) var(--ink),0 var(--px) var(--ink),calc(-1*var(--px)) 0 var(--ink),var(--px) 0 var(--ink),0 calc(2*var(--px)) rgba(11,16,17,.5)}
+.tc-menu{display:flex;flex-direction:column;min-width:0;z-index:2}
+.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:0;color:inherit;font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;white-space:nowrap;cursor:pointer;position:relative;text-shadow:0 1px 0 var(--ink)}
+.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--hot);box-shadow:inset 0 var(--px) var(--hot-lit);outline:none}
+.tc-menu button[aria-pressed=true]{background:var(--on);box-shadow:inset 0 var(--px) var(--on-lit),inset 0 calc(-1*var(--px)) var(--on-foot);color:#fff4d0}
+.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:3px;top:50%;margin-top:-3px;border:3px solid transparent;border-left:4px solid var(--rim-lit)}
+.tc-menu button:disabled{color:var(--off,#6b665a);cursor:default;text-shadow:none}
+.tc-menu kbd{font:600 10px var(--ui);color:var(--kbd,#a39b86)}
+/* Other looks for the same frame, by data-skin on #tcMenu: blue (the town view's speech window), ink (the tiles' ink
+   with a cream rim, the action in play in the move tiles' blue), brackets (a dark glass inside the tile cursor's
+   corner brackets) and earth (the tiles' soil). With none it is slate, the windows' own colours. */
+.tc-win.tc-menu[data-skin=earth]{--ink:#2b2116;--fill:#3c2e1f;--bevel:#4f3d29;--foot:#201911;--hot:#534128;--hot-lit:#5e4a2d;--on:#665131;--on-lit:#7d643a;--on-foot:#55432a;--kbd:#b09a74}
+.tc-win.tc-menu[data-skin=blue]{--ink:#0b1011;--rim-lit:#f4efe2;--rim-dark:#b9b3a2;--fill:#2b3a72;--bevel:#3c4f8f;--foot:#1d2753;--hot:#404e80;--hot-lit:#55618e;--on:#556ba9;--on-lit:#8d9fc7;--on-foot:#445793;--kbd:#c9d2ee;
+  background:linear-gradient(#34468a 0 33%,#2b3a72 33% 67%,#232f60 67%)}
+.tc-win.tc-menu[data-skin=blue] button{color:#fff}
+.tc-win.tc-menu[data-skin=blue] button[aria-pressed=true]{color:#fff6d8}
+.tc-win.tc-menu[data-skin=ink]{--ink:#0b0907;--rim-lit:#fff4d0;--rim-dark:#cdbf9a;--fill:#221d17;--bevel:#221d17;--foot:#221d17;--hot:#3d3526;--hot-lit:#514631;--on:#3d506a;--on-lit:#8a93a2;--on-foot:#343f4f;--kbd:#a39b86;
+  box-shadow:inset 0 var(--px) var(--rim-lit),inset var(--px) 0 var(--rim-lit),inset 0 calc(-1*var(--px)) var(--rim-dark),inset calc(-1*var(--px)) 0 var(--rim-dark),
+    0 calc(-1*var(--px)) var(--ink),0 var(--px) var(--ink),calc(-1*var(--px)) 0 var(--ink),var(--px) 0 var(--ink),0 calc(2*var(--px)) rgba(11,9,7,.45)}
+.tc-win.tc-menu[data-skin=ink] button[aria-pressed=true]::before{border-left-color:#cfe2ff}
+/* the tile cursor's corner brackets in cream round a dark glass of the tiles' ink */
+.tc-win.tc-menu[data-skin=brackets]{--c:#fff4d0;--l:calc(5*var(--px));--hot:rgba(228,198,132,.2);--hot-lit:rgba(255,244,208,.35);--on:rgba(228,198,132,.38);--on-lit:#e4c684;--on-foot:rgba(228,198,132,.2);--kbd:#c8bc9e;
+  background:linear-gradient(var(--c),var(--c)) 0 0/var(--l) var(--px),linear-gradient(var(--c),var(--c)) 0 0/var(--px) var(--l),
+    linear-gradient(var(--c),var(--c)) 100% 0/var(--l) var(--px),linear-gradient(var(--c),var(--c)) 100% 0/var(--px) var(--l),
+    linear-gradient(var(--c),var(--c)) 0 100%/var(--l) var(--px),linear-gradient(var(--c),var(--c)) 0 100%/var(--px) var(--l),
+    linear-gradient(var(--c),var(--c)) 100% 100%/var(--l) var(--px),linear-gradient(var(--c),var(--c)) 100% 100%/var(--px) var(--l),
+    rgba(30,24,16,.86);background-repeat:no-repeat;
+  box-shadow:0 0 0 var(--px) rgba(11,9,7,.55)}
 .tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
