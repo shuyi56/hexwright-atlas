@@ -157,8 +157,8 @@ function windowAt(K, x, y, w = 6, h = 7, opts = {}) {
     for (let py = y + 1; py <= y + h; py++) K.shade(sx + 3, py, 0.28);
   }
   /* the lintel, standing a little proud, with its shadow on the frame below */
-  K.rect(x - 2, y - 3, x + w + 2, y - 1, (px, py) => (py === y - 3 ? F[1] : F[3]));
-  if (opts.arch) K.oval(x + w / 2, y - 1, w / 2 + 1, 3, (px, py) => (py < y - 1 ? F[1] : null));
+  K.rect(x - 1, y - 2, x + w + 1, y - 1, F[1]);
+  if (opts.arch) K.oval(x + w / 2, y - 1, w / 2 + 1, 2.5, (px, py) => (py < y - 1 ? F[1] : null));
   /* the frame */
   K.rect(x, y - 1, x + w, y + h, (px, py) => (py === y - 1 ? F[2] : px === x ? F[1] : px === x + w - 1 ? F[3] : F[2]));
   /* the glass, set back */
@@ -174,8 +174,8 @@ function windowAt(K, x, y, w = 6, h = 7, opts = {}) {
   if (bars) K.rect(mx, y, mx + 1, y + h - 1, F[2]);
   if (cross) K.rect(x + 1, my, x + w - 1, my + 1, F[2]);
   /* the sill, standing out, and its shadow on the wall */
-  K.rect(x - 2, y + h - 1, x + w + 2, y + h + 1, (px, py) => (py === y + h - 1 ? F[0] : px === x + w + 1 ? F[4] : F[3]));
-  for (let px = x - 1; px <= x + w + 2; px++) { K.shade(px, y + h + 1, 0.35); K.shade(px, y + h + 2, 0.15); }
+  K.rect(x - 1, y + h - 1, x + w + 1, y + h, F[0]);
+  for (let px = x; px <= x + w + 1; px++) K.shade(px, y + h, 0.3);
 }
 /* a door in its frame: stone or timber surround with a lintel, the door set back into it (shadowed along its top and
    left), boards with a rail across and iron straps, a ring handle, and a step on the ground in front */
