@@ -381,7 +381,6 @@ $('tcIn').addEventListener('click', () => { setZoom(TC.zoom + 1); req(); }); $('
 $('tcActMove').addEventListener('click', () => { setMode('move'); req(); root.focus({ preventScroll: true }); });
 $('tcActAttack').addEventListener('click', () => { setMode('attack'); req(); root.focus({ preventScroll: true }); });
 $('tcActWait').addEventListener('click', () => { wait(); req(); root.focus({ preventScroll: true }); });
-$('edTactical').addEventListener('click', () => openTactical());
 $('editor').addEventListener('keydown', e => { if (ED.open && !TC.open && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTactical(); } });
 new ResizeObserver(() => { if (TC.open) { size(); req(); } }).observe(root);
 /* test hook: the camera, cursor and units as the view has them */

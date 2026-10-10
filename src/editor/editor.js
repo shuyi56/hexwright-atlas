@@ -530,7 +530,13 @@ function openEditor(M, back = 'Atlas') {
 }
 function closeEditor() { if (!ED.open) return; ED.open = false; root.hidden = true; ED.hover = null; }
 
-buildChrome();
-$('openEditor').addEventListener('click', () => openEditor());
+/* the character maker from outside the editor (the module rail): on the selected made character, else the newest
+   one made, else a new one */
+function openCharacterMaker() {
+  const mine = customList(), sel = ED.char && ED.char.startsWith('custom-') && characterById(ED.char) ? ED.char : null;
+  maker(sel || (mine.length ? mine[mine.length - 1].id : 'new'));
+}
 
-export { ED, LEVEL_NAME, applyAt, characterBoxes, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };
+buildChrome();
+
+export { ED, LEVEL_NAME, openCharacterMaker, applyAt, characterBoxes, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };

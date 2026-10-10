@@ -35,7 +35,7 @@ try {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   if (CPU > 1) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: CPU });
   await page.goto(url);
-  await page.click('#openEditor');
+  await page.click('.rail-item[data-module="editor"]');
   const call = (method, params = {}) => page.evaluate(([m, p]) => window.hexwright.call(m, p), [method, params]);
   await call('generate', { seed: 'perf', size: SIZE, biome: 'vale' });
   await call('setView', { fit: true });

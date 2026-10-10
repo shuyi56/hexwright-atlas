@@ -20,8 +20,6 @@
       <input id="seedInput" name="seed" spellcheck="false" maxlength="40">
       <button type="submit" class="btn">Redraw</button>
       <button type="button" class="btn btn-brass" id="newRealm">New realm</button>
-      <button type="button" class="btn" id="openEditor">Tile editor</button>
-      <a class="btn btn-link" href="./units.html">Unit data</a>
     </form>
   </header>
   <main class="stage">
@@ -71,6 +69,13 @@
     </aside>
   </main>
 </div>
+<section class="scenes" id="scenes" hidden tabindex="-1" aria-labelledby="scTitle">
+  <header class="sc-bar">
+    <div class="sc-title"><span class="eyebrow">scenes</span><h1 id="scTitle">Maps to walk and play</h1></div>
+    <p class="sc-lede">Each scene is a finished map. Open it in the view it was laid out for, or take it into the map editor to change it. Opening one replaces the editor's map; Undo in the editor brings yours back.</p>
+  </header>
+  <div class="sc-grid" id="scGrid"></div>
+</section>
 <div class="editor" id="editor" hidden tabindex="-1" aria-label="Isometric tile editor">
   <header class="ed-bar">
     <button class="btn" id="edBack">← Atlas</button>
@@ -98,8 +103,6 @@
         <button class="chip" id="edRotL" title="Turn view ([)">⟲ Turn</button>
         <button class="chip" id="edRotR" title="Turn view (])">Turn ⟳</button>
         <button class="chip" id="edGrid" aria-pressed="true">Grid</button>
-        <button class="chip" id="edTactical" title="Tactical view: a close-up pixel camera for moving units (T)">Tactical</button>
-        <button class="chip" id="edTown" title="Town view: walk the map from above, as in a classic RPG town (O)">Town</button>
       </div>
       <div class="zoom">
         <button class="btn" id="edIn" aria-label="Zoom in">+</button>
