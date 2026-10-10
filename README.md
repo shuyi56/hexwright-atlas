@@ -266,7 +266,9 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   ashlar, planks) with its east wall receding beside it in shade, both on a stone plinth; a door set back in its
   frame with iron straps, a ring handle and a step, with windows placed symmetrically round it (lintels, sills,
   glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
-  capped ridge, a thick eave, its east end in shade, chimneys and smoke. Roofs keep one pitch, about four tenths of
+  capped ridge, a thick eave, its east end in shade, and brick chimneys with stone caps, lead flashing, a shadow on the
+  roof and soft smoke. Timber framing shows on the front only, in a mid brown that shadows still darken, so the
+  plain shaded east wall keeps the house's depth. Roofs keep one pitch, about four tenths of
   the house's depth (steeper for thatch), with the wall fitted below; a two-storey house on one tile takes a lower
   pitch so both storeys keep their full height. So a row of houses never
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round

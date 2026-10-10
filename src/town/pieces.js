@@ -98,16 +98,20 @@ function roofTone(tex, P, u, v, plane = 0) {
 const WALL = {
   plaster: '#efe3c4', cream: '#e9d6ae', ochre: '#e6cfa6', rose: '#e9c4b2', stone: '#d8cfb9', grey: '#c4bcab', planks: '#9a7650', barn: '#a4553b', logs: '#8e6a44', white: '#f2ece0', felt: '#d9c9a0', adobe: '#d7b48a'
 };
-const TIMBER = R('#5a3f28');
+const TIMBER = R('#7a5a3e');
 function wallTone(tex, P, x, y, wx0, wx1, floorH, top) {
   if (tex === 'stone' || tex === 'grey') { const row = Math.floor(y / 5), m = ((y % 5) + 5) % 5, c = ((x + (row % 2) * 4) % 8 + 8) % 8; return P[m === 4 ? 4 : c === 0 ? 3 : m === 0 ? 1 : h2(Math.floor((x + (row % 2) * 4) / 8), row, 9) < 0.25 ? 3 : 2]; }
   if (tex === 'planks' || tex === 'barn') { const c = ((x % 4) + 4) % 4; return P[c === 0 ? 4 : c === 1 ? 1 : h2(Math.floor(x / 4), Math.floor(y / 14), 3) < 0.3 ? 3 : 2]; }
   if (tex === 'logs') { const m = ((y % 4) + 4) % 4; return P[m === 0 ? 1 : m === 3 ? 4 : 2]; }
   if (tex === 'timber') {
-    /* plaster panels in a timber frame: posts at the ends and every 9 pixels, rails at each floor, a brace or two */
-    const lx = x - wx0, ly = y - top, fl = ((ly % floorH) + floorH) % floorH, n = Math.max(1, Math.round((wx1 - wx0) / 9)), pw = (wx1 - wx0) / n, px = ((lx % pw) + pw) % pw;
-    if (px < 1.5 || lx > wx1 - wx0 - 2 || fl < 2) return TIMBER[fl < 2 || px < 1 ? 2 : 3];
-    const panel = Math.floor(lx / pw), d = panel === 0 ? px - fl * pw / floorH : panel === n - 1 && n > 1 ? pw - px - fl * pw / floorH : 9; if (Math.abs(d) < 1) return TIMBER[2];
+    /* Plaster panels in a timber frame: a post at the west end and every 15 pixels, a rail at each floor, a brace in
+       the end panels. Beams are a mid brown, a step lighter on the top or west edge, so a shadow cast over the wall
+       still darkens them visibly and the frame never reads as part of the shading. The east end is left to the
+       corner and the shaded east wall. */
+    const lx = x - wx0, ly = y - top, fl = ((ly % floorH) + floorH) % floorH, n = Math.max(1, Math.round((wx1 - wx0) / 15)), pw = (wx1 - wx0) / n, px = ((lx % pw) + pw) % pw;
+    if (fl < 2) return TIMBER[fl === 0 ? 1 : 2];
+    if (px < 2 && lx < wx1 - wx0 - 3) return TIMBER[px < 1 ? 1 : 2];
+    const panel = Math.floor(lx / pw), d = panel === 0 ? px - fl * pw / floorH : panel === n - 1 && n > 1 ? pw - px - fl * pw / floorH : 99; if (Math.abs(d) < 1.1) return TIMBER[2];
     return P[h2(x, y, 5) < 0.06 ? 3 : 2];
   }
   return P[h2(x, y, 5) < 0.07 ? 3 : h2(x, y, 6) < 0.04 ? 1 : 2];
@@ -150,9 +154,32 @@ function doorAt(K, cx, yb, w = 12, h = 20, opts = {}) {
   /* the step, standing out on the ground */
   const St = R('#c4b99f'); K.rect(x0 - 3, yb, x1 + 3, yb + 3, (x, y) => (y === yb ? St[0] : x === x1 + 2 ? St[3] : St[2]));
 }
+/* A chimney stack standing h above the roof at (x, y): brick courses, lit on its west face and shaded on its east, a
+   band of lead flashing where it meets the roof, a stone cap that overhangs with the flue dark inside, the stack's
+   shadow falling east across the roof, and if lit, smoke rising and drifting east, thinning as it goes. */
 function chimney(K, x, y, h, smoke) {
-  const C = R('#b9a98a'); K.rect(x, y - h, x + 5, y, (px, py) => C[(py - y) % 3 === 0 ? 3 : px === x ? 1 : 2]); K.rect(x - 1, y - h - 2, x + 6, y - h, C[1]);
-  if (smoke) { const S = R('#e8e6e0'); [[2, -6, 3], [4, -12, 3.5], [1, -19, 4]].forEach(([dx, dy, r], i) => K.oval(x + dx, y - h + dy, r, r * 0.8, (px, py, a, b) => (K.get(px, py) ? null : S[a + b < -0.3 ? 0 : 1]))); }
+  const B = R('#a8664a'), S = R('#cfc6b2'), w = 9, top = y - h;
+  /* its shadow on the roof first, so the stack stands on it */
+  K.poly([[x + w, top + 3], [x + w + 6, top + 6], [x + w + 6, y + 3], [x + w, y]], (px, py) => (K.get(px, py) ? mix(B[4], INK, 0.55) : null));
+  K.rect(x, top, x + w, y, (px, py) => {
+    const row = Math.floor((py - top) / 3), m = (py - top) % 3, c = ((px - x + (row % 2) * 2) % 4 + 4) % 4;
+    const face = px < x + 2 ? 1 : px > x + w - 3 ? 3 : 2;
+    return m === 2 || c === 0 ? B[Math.min(4, face + 1)] : B[face];
+  });
+  K.rect(x - 1, y - 3, x + w + 1, y + 1, (px, py) => R('#7d8a8f')[py === y - 3 ? 1 : 3]);
+  K.rect(x - 2, top - 3, x + w + 2, top, (px, py) => S[py === top - 3 ? 0 : px > x + w ? 3 : 1]);
+  K.rect(x + 2, top - 3, x + w - 2, top - 2, INK);
+  if (smoke) {
+    const Sm = R('#ece9e2');
+    /* translucent (never inked: the outline only touches opaque pixels), lit on top, thinning as it rises */
+    [[0, -6, 3.5, 225], [3, -13, 4.5, 185], [7, -21, 5.5, 140], [12, -30, 6, 95]].forEach(([dx, dy, r, a]) => {
+      const cx = x + w / 2 + dx, cy = top + dy;
+      for (let py = Math.floor(cy - r); py <= cy + r; py++) for (let px = Math.floor(cx - r); px <= cx + r; px++) {
+        const ex = (px + 0.5 - cx) / r, ey = (py + 0.5 - cy) / (r * 0.8); if (ex * ex + ey * ey > 1 || K.get(px, py) === 255) continue;
+        K.set(px, py, Sm[ex + ey < -0.4 ? 0 : ex + ey < 0.5 ? 1 : 2], a);
+      }
+    });
+  }
 }
 
 /* ---------- buildings ---------- */
@@ -189,7 +216,10 @@ function house(K, o, p) {
   const tex = (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, xf, floorH, top);
   if (p.lift) for (const sx of [x0 + 2, xf - 6, x1 - 3]) K.rect(sx, yb, sx + 4, yb + Math.round(p.lift * HS) - (sx > xf ? k : 0), R('#c4b99f')[sx < FW / 2 ? 2 : 3]);
   /* walls: the east one in shade, then the front with a lit west corner and a dark east one */
-  K.poly([[xf, yb], [x1, yb - k], [x1, top], [xf, top]], (x, y) => mix(wallTone(p.wallTex || p.wall, Wl, x, y + Math.round((x - xf) * k / sw), xf, x1, floorH, top), INK, 0.3));
+  /* the east wall, turned from the light: plain in its shade (a timber frame shows only as the corner post), so the
+     shading reads as depth */
+  const sideTex = (p.wallTex || p.wall) === 'timber' ? (x, y) => (x >= x1 - 2 ? TIMBER[3] : Wl[h2(x, y, 5) < 0.06 ? 3 : 2]) : (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, xf, x1, floorH, top);
+  K.poly([[xf, yb], [x1, yb - k], [x1, top], [xf, top]], (x, y) => mix(sideTex(x, y), INK, 0.32));
   K.rect(x0, top, xf, yb, tex);
   K.rect(x0, top, x0 + 1, yb, (x, y) => mix(tex(x, y), [255, 250, 235], 0.35));
   K.rect(xf - 1, top, xf, yb, (x, y) => mix(tex(x, y), INK, 0.3));
