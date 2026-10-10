@@ -154,21 +154,18 @@ function doorAt(K, cx, yb, w = 12, h = 20, opts = {}) {
   /* the step, standing out on the ground */
   const St = R('#c4b99f'); K.rect(x0 - 3, yb, x1 + 3, yb + 3, (x, y) => (y === yb ? St[0] : x === x1 + 2 ? St[3] : St[2]));
 }
-/* A chimney stack standing h above the roof at (x, y): brick courses, lit on its west face and shaded on its east, a
-   band of lead flashing where it meets the roof, a stone cap that overhangs with the flue dark inside, the stack's
-   shadow falling east across the roof, and if lit, smoke rising and drifting east, thinning as it goes. */
+/* A chimney stack standing h above the roof at (x, y): pale coursed stone like the walls, lit on its west face and
+   shaded on its east, under a cap that overhangs by a pixel with the flue a dark slot in it; a faint shadow beside it
+   on the roof; and if lit, smoke rising and drifting east, thinning as it goes. */
 function chimney(K, x, y, h, smoke) {
-  const B = R('#a8664a'), S = R('#cfc6b2'), w = 9, top = y - h;
-  /* its shadow on the roof first, so the stack stands on it */
-  K.poly([[x + w, top + 3], [x + w + 6, top + 6], [x + w + 6, y + 3], [x + w, y]], (px, py) => (K.get(px, py) ? mix(B[4], INK, 0.55) : null));
+  const C = R('#bfb196'), w = 7, top = y - h;
+  K.rect(x + w, top + 3, x + w + 2, y, (px, py) => (K.get(px, py) ? mix(C[4], INK, 0.35) : null));
   K.rect(x, top, x + w, y, (px, py) => {
-    const row = Math.floor((py - top) / 3), m = (py - top) % 3, c = ((px - x + (row % 2) * 2) % 4 + 4) % 4;
-    const face = px < x + 2 ? 1 : px > x + w - 3 ? 3 : 2;
-    return m === 2 || c === 0 ? B[Math.min(4, face + 1)] : B[face];
+    const face = px === x ? 1 : px >= x + w - 2 ? 3 : 2, row = Math.floor((py - top) / 4), m = (py - top) % 4, joint = m === 3 || ((px - x + (row % 2) * 3) % 6 + 6) % 6 === 0;
+    return joint && face < 3 ? C[face + 1] : C[face];
   });
-  K.rect(x - 1, y - 3, x + w + 1, y + 1, (px, py) => R('#7d8a8f')[py === y - 3 ? 1 : 3]);
-  K.rect(x - 2, top - 3, x + w + 2, top, (px, py) => S[py === top - 3 ? 0 : px > x + w ? 3 : 1]);
-  K.rect(x + 2, top - 3, x + w - 2, top - 2, INK);
+  K.rect(x - 1, top - 2, x + w + 1, top, (px, py) => (py === top - 2 ? C[0] : px === x + w ? C[3] : C[1]));
+  K.rect(x + 2, top - 2, x + w - 2, top - 1, C[4]);
   if (smoke) {
     const Sm = R('#ece9e2');
     /* translucent (never inked: the outline only touches opaque pixels), lit on top, thinning as it rises */
