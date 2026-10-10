@@ -190,14 +190,27 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 /* The actions menu and the unit's portrait have a thin gold rim, one pixel inside a dark outline. The actions menu
    is small, beside the unit like a tactics game's command list. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-.tc-win.tc-menu{background:linear-gradient(#1d2829,#141c1d);color:var(--tc-text);border:1px solid var(--tc-gold);border-radius:2px;box-shadow:0 0 0 1px #0b1011,0 4px 10px rgba(0,0,0,.4)}
-.tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
-.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
-.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
-.tc-menu button[aria-pressed=true]{background:var(--tc-pick);color:var(--tc-mark)}
-.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:3px;top:50%;margin-top:-3px;border:3px solid transparent;border-left:4px solid currentColor}
+/* the battle menu: a small command list beside the unit, like a page of an old tome. The thin gold rim with a hairline
+   inside, gold corner brackets and a gem on its crown; the commands in the atlas's engraved small capitals, each with
+   a little pixel glyph, and the chosen one on a band of gold with a gem pointing at it. */
+.tc-win.tc-menu{color:var(--tc-text);border:1px solid var(--tc-gold);border-radius:2px;padding:9px 6px 6px;
+  box-shadow:inset 0 0 0 2px #0b1011,inset 0 0 0 3px rgba(201,164,90,.35),0 0 0 1px #0b1011,0 6px 14px rgba(0,0,0,.5);
+  background:linear-gradient(var(--tc-gold),var(--tc-gold)),linear-gradient(var(--tc-gold),var(--tc-gold)),linear-gradient(var(--tc-gold),var(--tc-gold)),linear-gradient(var(--tc-gold),var(--tc-gold)),linear-gradient(var(--tc-gold),var(--tc-gold)),linear-gradient(var(--tc-gold),var(--tc-gold)),linear-gradient(var(--tc-gold),var(--tc-gold)),linear-gradient(var(--tc-gold),var(--tc-gold)),radial-gradient(120% 90% at 50% 0%,#24343a,#131c1f 70%,#0e1517);
+  background-repeat:no-repeat;background-size:7px 1px,1px 7px,7px 1px,1px 7px,7px 1px,1px 7px,7px 1px,1px 7px,100% 100%;
+  background-position:5px 5px,5px 5px,calc(100% - 5px) 5px,calc(100% - 5px) 5px,5px calc(100% - 5px),5px calc(100% - 5px),calc(100% - 5px) calc(100% - 5px),calc(100% - 5px) calc(100% - 5px),0 0}
+.tc-menu{display:flex;flex-direction:column;min-width:0;z-index:2}
+.tc-menu::before{content:'';position:absolute;left:50%;top:-5px;width:7px;height:7px;margin-left:-4px;background:linear-gradient(135deg,#fff1c4,var(--tc-gold) 45%,#7a5a22);transform:rotate(45deg);box-shadow:0 0 0 1px #0b1011}
+.tc-menu[hidden]{display:none}
+.tc-menu button{display:flex;align-items:center;gap:7px;background:none;border:0;border-radius:1px;color:var(--tc-text);padding:4px 8px 4px 14px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
+.tc-menu .tc-act{display:block;flex:1;font:400 14px/1 var(--display);letter-spacing:.04em;color:inherit}
+.tc-menu .tc-ico{width:12px;height:12px;flex:none;fill:currentColor;shape-rendering:crispEdges;opacity:.8}
+.tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:linear-gradient(90deg,rgba(201,164,90,.16),rgba(201,164,90,0));outline:none}
+.tc-menu button[aria-pressed=true]{background:linear-gradient(90deg,rgba(201,164,90,.42),rgba(201,164,90,.08) 85%,rgba(201,164,90,0));color:#fff4d0;box-shadow:inset 0 1px 0 rgba(255,236,180,.25),inset 0 -1px 0 rgba(0,0,0,.35)}
+.tc-menu button[aria-pressed=true] .tc-ico{opacity:1;color:#f3d58e}
+.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:3px;top:50%;width:5px;height:5px;margin-top:-3px;background:linear-gradient(135deg,#fff1c4,var(--tc-gold) 45%,#7a5a22);transform:rotate(45deg);box-shadow:0 0 0 1px #0b1011}
 .tc-menu button:disabled{color:var(--tc-off);cursor:default;text-shadow:none}
-.tc-menu kbd{font:600 10px var(--ui);color:var(--tc-dim)}
+.tc-menu button:disabled .tc-ico{opacity:.5}
+.tc-menu kbd{font:600 10px var(--ui);color:var(--tc-dim);margin-left:6px}
 .tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
