@@ -10,13 +10,14 @@ import { TILE } from './ground.js';
    (ox, oy) in the sprite is the footprint's north-west corner on the ground, and everything rises from there.
    Front walls carry the door when the piece faces south, east or west; turned away, the front shows windows.
    No DOM. */
-/* The town's tiles are twice as wide as the tile set's 32, about four figures across, so a house is properly
-   wider than it is tall. Towers are drawn twice as wide (RS) and walls half as tall again (HS), keeping doors and
-   windows at the figures' scale. A house keeps inside its own footprint, front wall below and roof above, so a
-   row of houses never covers the fronts of the row behind; only towers, keeps and spires stand up over the tiles
-   north of them. Props, plants and furniture are drawn at the 32 scale (small buildings at 48) and stood in the
-   middle of their tiles. */
-const HS = 1.55, RS = TILE / 32;
+/* The town's tiles are three times as wide as the tile set's 32, about six figures across, so a house stands
+   well over the people walking past it: a cottage's door a little taller than a figure, its wall half as tall
+   again, its roof above. Towers are drawn three times as wide (RS) and walls a little over twice as tall (HS). A
+   house keeps inside its own footprint, front wall below and roof above, so a row of houses never covers the
+   fronts of the row behind; only towers, keeps and spires stand up over the tiles north of them. Props, plants
+   and furniture keep the figures' scale (drawn at 32, small buildings at 64) and stand in the middle of their
+   tiles. */
+const HS = 2.1, RS = TILE / 32;
 const T = TILE, INK = hexRgb(OUTLINE), SHADOW = [43, 33, 22, 72];
 const ramps = new Map();
 const R = hex => { let r = ramps.get(hex); if (!r) { r = ramp(hex).map(hexRgb); ramps.set(hex, r); } return r; };
@@ -161,7 +162,7 @@ function chimney(K, x, y, h, smoke) {
 /* Window positions across a wall from a to b, ww wide: symmetric about the middle, leaving the door's place (cx,
    width dw) clear when there is a door on this floor */
 function windowSlots(a, b, ww, door, cx, dw) {
-  const gap = 12, out = [];
+  const gap = 16, out = [];
   if (!door) { const n = Math.max(1, Math.floor((b - a - 8) / (ww + gap))); for (let k = 0; k < n; k++) out.push(Math.round(a + (b - a) * (k + 0.5) / n - ww / 2)); return out; }
   const left = cx - dw / 2 - 3 - a, n = Math.max(left >= ww + 4 ? 1 : 0, Math.floor((left - 4) / (ww + gap)));
   for (let k = 0; k < n; k++) { const off = dw / 2 + 3 + (left - 2) * (k + 0.5) / n; out.push(Math.round(cx - off - ww / 2), Math.round(cx + off - ww / 2)); }
@@ -190,10 +191,10 @@ function house(K, o, p) {
   const Pl = R('#b5aa94');
   K.rect(x0, yb - 4, xf, yb, (x, y) => (y === yb - 4 ? Pl[1] : ((x + (y % 2) * 3) % 7 === 0 ? Pl[4] : Pl[2])));
   K.poly([[xf, yb], [x1, yb - k], [x1, yb - k - 4], [xf, yb - 4]], Pl[3]);
-  const dx = p.doorX ?? (x0 + xf) / 2, doorW = Math.round((p.doorW || 10) * 1.2), doorH = Math.min(wallH - 8, Math.max(Math.round(floorH - 4), 19), Math.round((p.doorH || 16) * 1.35));
+  const dx = p.doorX ?? (x0 + xf) / 2, doorW = Math.round((p.doorW || 10) * 1.6), doorH = Math.min(wallH - 10, Math.max(Math.round(floorH - 5), 30), Math.round((p.doorH || 16) * 2.1));
   if (p.windows !== false) {
     for (let f = 0; f < floors; f++) {
-      const wh = Math.min(13, Math.round(floorH * 0.4)), wy = Math.round(top + floorH * (floors - 1 - f) + (floorH - wh) * (f ? 0.45 : 0.36)), ww = Math.round((p.winW || 6) * 1.5);
+      const wh = Math.min(18, Math.round(floorH * 0.4)), wy = Math.round(top + floorH * (floors - 1 - f) + (floorH - wh) * (f ? 0.45 : 0.36)), ww = Math.round((p.winW || 6) * 2);
       for (const wx of windowSlots(x0 + 2, xf - 2, ww, door && f === 0, dx, doorW)) windowAt(K, wx, wy, ww, wh, { shutter: p.shutter, lit: p.lit, arch: p.arch, glass: p.glass });
     }
   }
@@ -439,12 +440,12 @@ function conifer(K, P, cx, base, h, w, snow = false) {
   }
 }
 const NATURE = {
-  oak: (K, o) => broadleaf(K, o.v > 0.86 ? '#c99a3e' : '#7f9a4a', K.FW / 2, K.FD - 8, 40, 62, '#6e5236', o.v * 6, { clumps: 9 }),
-  beech: (K, o) => broadleaf(K, '#b8683a', K.FW / 2, K.FD - 8, 40, 62, '#7a6a5a', o.v * 6, { clumps: 9 }),
-  birch: (K, o) => broadleaf(K, '#9fb862', K.FW / 2, K.FD - 8, 44, 48, '#eeeae0', o.v * 6, { birch: true, clumps: 7 }),
-  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8; trunk(K, cx, b, b - 18, '#6e5236'); crown(K, leafRamp('#76924a'), cx, b - 52, 15, 34, o.v * 5, { clumps: 9, column: true }); },
-  pine: (K, o) => conifer(K, leafRamp('#4f7a3c'), K.FW / 2, K.FD - 6, 80, 54),
-  snowpine: (K, o) => conifer(K, leafRamp('#456f42'), K.FW / 2, K.FD - 6, 80, 54, true),
+  oak: (K, o) => broadleaf(K, o.v > 0.86 ? '#c99a3e' : '#7f9a4a', K.FW / 2, K.FD - 8, 50, 80, '#6e5236', o.v * 6, { clumps: 10 }),
+  beech: (K, o) => broadleaf(K, '#b8683a', K.FW / 2, K.FD - 8, 50, 80, '#7a6a5a', o.v * 6, { clumps: 10 }),
+  birch: (K, o) => broadleaf(K, '#9fb862', K.FW / 2, K.FD - 8, 56, 62, '#eeeae0', o.v * 6, { birch: true, clumps: 8 }),
+  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8; trunk(K, cx, b, b - 22, '#6e5236'); crown(K, leafRamp('#76924a'), cx, b - 64, 18, 42, o.v * 5, { clumps: 10, column: true }); },
+  pine: (K, o) => conifer(K, leafRamp('#4f7a3c'), K.FW / 2, K.FD - 6, 100, 66),
+  snowpine: (K, o) => conifer(K, leafRamp('#456f42'), K.FW / 2, K.FD - 6, 100, 66, true),
   palm: (K, o) => {
     const cx = K.FW / 2, b = K.FD - 8, B = R('#a38158'), P = R('#7fa04c');
     for (let y = 0; y < 34; y++) { const x = cx + Math.sin(y / 14) * 4; K.rect(x - 2, b - y - 1, x + 2, b - y, B[y % 3 === 0 ? 3 : x < cx + 1 ? 1 : 2]); }
@@ -550,8 +551,8 @@ const shadowOf = a => (a.group === 'Interior' ? 0 : Math.min(16, 4 + a.h * 0.3))
 /* drawn at the tile set's 32 scale and stood in the middle of the south edge of their footprint */
 const SMALL = new Set([...Object.keys(NATURE), ...Object.keys(PROPS).filter(id => id !== 'fence'), ...Object.keys(INTERIOR).filter(id => !ROOM.has(id))]), MID = new Set(['yurt', 'mine', 'watchtower', 'granary', 'dovecote', 'shrine']);
 function pieceSprite(o) {
-  const a = ASSET_BY_ID[o.id], [fw, fd] = footprint(o), U = SMALL.has(o.id) ? 32 : MID.has(o.id) ? 48 : T, small = U !== T, FW = fw * U, FD = fd * U, up = Math.round(Math.max(40, (a ? a.h : 16) * 3.2 + 60));
-  const K = kit(FW, FD, up, small ? 40 : 16), draw = DRAW[o.id];
+  const a = ASSET_BY_ID[o.id], [fw, fd] = footprint(o), U = SMALL.has(o.id) ? 32 : MID.has(o.id) ? 64 : T, small = U !== T, FW = fw * U, FD = fd * U, up = Math.round(Math.max(40, (a ? a.h : 16) * 4.4 + 60));
+  const K = kit(FW, FD, up, small ? 50 : 16), draw = DRAW[o.id];
   const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null };
   if (draw) draw(K, inst);
   else K.box(4, 4, FW - 4, FD - 4, Math.min(30, (a ? a.h : 8) * 1.4), R('#c4b99f')[1], R('#c4b99f')[3]);

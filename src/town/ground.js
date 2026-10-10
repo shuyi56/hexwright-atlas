@@ -19,7 +19,7 @@ import { TERRAIN } from '../tiles/terrain.js';
    paving, beams under floors, falling water). Every screen pixel remembers which row of ground it shows, so
    figures and pieces standing behind a rise are hidden by it exactly. Upper floors that are shown join the
    surface STOREY levels above the ground under them. No DOM. */
-const TILE = 64, LIFT = 14, FRAMES = 4, WOBBLE = 18, ROAD_WOBBLE = 6, CLIFF_WOBBLE = 16, CHUNK = 128;
+const TILE = 96, LIFT = 14, FRAMES = 4, WOBBLE = 26, ROAD_WOBBLE = 9, CLIFF_WOBBLE = 22, CHUNK = 128;
 
 /* ---------- noise ---------- */
 const h2 = (x, y, s = 0) => { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(s + 0x9e37, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
@@ -159,7 +159,7 @@ function waterShape(F, gx, gy, u) {
 function cellsOf(F, tx, ty) {
   const key = ty * F.S + tx; let c = F.cells.get(key);
   if (!c) {
-    if (F.cells.size > 1600) F.cells.delete(F.cells.keys().next().value);
+    if (F.cells.size > 600) F.cells.delete(F.cells.keys().next().value);
     const k = new Int16Array(TILE * TILE), own = new Int32Array(TILE * TILE);
     for (let j = 0; j < TILE; j++) for (let i = 0; i < TILE; i++) { const gx = tx * TILE + i, gy = ty * TILE + j, u = ownTile(F, gx, gy); own[j * TILE + i] = u; k[j * TILE + i] = classify(F, gx, gy, u); }
     c = { k, own }; F.cells.set(key, c);

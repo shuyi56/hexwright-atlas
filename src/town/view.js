@@ -32,7 +32,7 @@ const FIGURE_SCALE = 0.75;
 /* The hero walks HERO_SPEED art pixels a second (about three of their own heights; RUN times that with Shift) and
    takes a stride every STRIDE pixels, so the feet plant on the ground instead of gliding over it. The others stroll
    NPC_SPEED tiles a second, STRIDES strides to a tile. A walker's feet are a circle FOOT_R across. */
-const HERO_SPEED = 84, RUN = 1.85, STRIDE = 7, NPC_SPEED = 0.8, STRIDES = 8, FOOT_R = 5;
+const HERO_SPEED = 90, RUN = 1.85, STRIDE = 7, NPC_SPEED = 0.8, STRIDES = 8, FOOT_R = 5;
 const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], FOOT = T / 2 + 6;
 const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, F: null, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, homes: [], rest: [], pending: [], banner: 0 };
 
@@ -74,7 +74,7 @@ const S = () => TW.M.S;
 /* how high the surface stands at map pixel (gx, gy), in art pixels */
 const lift = (gx, gy) => heightAt(TW.F, Math.round(gx), Math.round(gy)) * LIFT;
 function charPos(k) {
-  if (k === TW.hero && TW.me) { const m = TW.me; return { fx: m.x, fy: m.y - heightOn(m.L, m.x, m.y) * LIFT, gy: Math.round(m.y), L: m.L, face: m.face, moving: m.moving, dist: m.dist }; }
+  if (k === TW.hero && TW.me) { const m = TW.me; return { fx: m.x, fy: m.y - m.z, gy: Math.round(m.y), L: m.L, face: m.face, moving: m.moving, dist: m.dist }; }
   const c = TW.M.chars[k], st = TW.steps.get(k);
   if (!st) { const gx = c.x * T + T / 2, gy = c.y * T + FOOT; return { fx: gx, fy: gy - lift(gx, gy), gy, L: levelOf(c), face: c.face, moving: false, d: 0 }; }
   const f = Math.min(1, st.t), ax = st.from[0] * T + T / 2, ay = st.from[1] * T + FOOT, bx = st.to[0] * T + T / 2, by = st.to[1] * T + FOOT, gx = ax + (bx - ax) * f, gy = ay + (by - ay) * f;
@@ -111,7 +111,7 @@ const DIRS = { ArrowDown: 0, s: 0, ArrowRight: 1, d: 1, ArrowUp: 2, w: 2, ArrowL
 function heightOn(L, x, y) {
   const M = TW.M, n = M.S, tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || ty < 0 || tx >= n || ty >= n) return null;
   const u = ty * n + tx; let h;
-  if (L) { if (!floorAt(M, L, u)) return null; h = M.elev[u] + STOREY * L; } else h = heightAt(TW.G0, Math.round(x), Math.round(y));
+  if (L) { if (!floorAt(M, L, u)) return null; h = M.elev[u] + STOREY * L; } else h = heightAt(TW.G0, x, y);
   const st = stairsAt(M, tx, ty, L);
   if (st) { const dx = st.up[0] - tx, dy = st.up[1] - ty, lx = x / T - tx, ly = y / T - ty; h += STOREY * (dx > 0 ? lx : dx < 0 ? 1 - lx : dy > 0 ? ly : 1 - ly); }
   return h;
@@ -155,8 +155,20 @@ function moveHero(dx, dy) {
   return gone;
 }
 const FACE_OF = (vx, vy) => (Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 1 : 3) : (vy > 0 ? 0 : 2));
+/* The hero's drawn height follows the ground through a short smoothing, so the small seams where tiles meet on a
+   ramp read as one even climb; the camera follows the hero's place on the ground and, more slowly still, their
+   height, so a climb never shakes the view. */
+function settle(dt) {
+  const m = TW.me; if (!m) return;
+  const z = (heightOn(m.L, m.x, m.y) ?? 0) * LIFT;
+  if (m.z == null || Math.abs(z - m.z) > 3 * LIFT) { m.z = z; TW.camZ = z; return; }
+  const a = 1 - Math.exp(-dt * 16), b = 1 - Math.exp(-dt * 5), before = m.z, cam = TW.camZ;
+  m.z += (z - m.z) * a; TW.camZ += (m.z - TW.camZ) * b;
+  if (Math.abs(m.z - before) > 0.01 || Math.abs(TW.camZ - cam) > 0.01) TW.dirty = true;
+}
 function heroTick(dt) {
   const m = TW.me; if (!m) return;
+  settle(dt);
   let vx = 0, vy = 0;
   for (const d of TW.held) { vx += FACE_DELTA[d][0]; vy += FACE_DELTA[d][1]; }
   if (vx || vy) TW.path = [];
@@ -232,7 +244,7 @@ function setZoom(z) { TW.zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length -
 /* on the hero, kept inside the map where the map is bigger than the screen */
 function follow() {
   const k = TW.hero, c = TW.M.chars[k]; let x = S() * T / 2, y = S() * T / 2;
-  if (c) { const p = charPos(k); x = p.fx; y = p.fy - 16; }
+  if (c) { const p = charPos(k); x = p.fx; y = k === TW.hero && TW.me ? TW.me.y - (TW.camZ ?? TW.me.z ?? 0) - 16 : p.fy - 16; }
   const sc = scale(), hw = cv.width / sc / 2, hh = cv.height / sc / 2, top = -TW.F.maxH * LIFT, w = S() * T, h = S() * T;
   TW.cam.x = w <= hw * 2 ? w / 2 : Math.max(hw, Math.min(w - hw, x));
   TW.cam.y = h - top <= hh * 2 ? (top + h) / 2 : Math.max(top + hh, Math.min(h - hh, y));
@@ -385,7 +397,8 @@ function nextHero(d = 1) {
 /* the hero's free position, from the tile the character stands on */
 function takeHero() {
   const c = TW.M.chars[TW.hero]; TW.steps.delete(TW.hero);
-  TW.me = c ? { x: c.x * T + T / 2, y: c.y * T + FOOT, L: levelOf(c), face: c.face | 0, dist: 0, moving: false } : null;
+  TW.me = c ? { x: c.x * T + T / 2, y: c.y * T + FOOT, L: levelOf(c), face: c.face | 0, dist: 0, moving: false, z: null } : null;
+  if (TW.me && TW.G0) settle(0);
 }
 
 /* ---------- open and close ---------- */

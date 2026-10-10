@@ -220,8 +220,9 @@ frames of an animated ground, then a left and right face two levels deep), with 
 ### Town view
 
 **Town** (`O`) in the editor walks the map the way the old town RPGs do (Final Fantasy VI, Dragon Quest, Pokémon):
-seen from above and the south on square 64-pixel tiles (about four figures across), with the ground painted as one
-solid surface rather than a grid of blocks.
+seen from above and the south on square 96-pixel tiles (about six figures across), with the ground painted as one
+solid surface rather than a grid of blocks. Houses fill their tiles at the figures' scale: a door a little taller
+than a person, a cottage about twice their height, two-storey houses towering over the street.
 
 - **Solid ground:** every mark (grass tufts, flowers, cobbles, boards, ripples) is laid out in map pixels, so a
   ground runs across tile edges without a seam. Where soft grounds meet (grass, a dirt road, sand, the sea) the border
@@ -236,6 +237,8 @@ solid surface rather than a grid of blocks.
   walk) breaks into a cliff, its edge wandering like any other border: earth or rock under a ragged grass lip,
   coursed blocks under paving, beams under floors, falling water. Cliffs throw a shadow east and darken the ground at
   their foot. Upper floors that are shown join the surface a storey up.
+- **Camera:** it follows the hero's place on the ground and, through a gentle smoothing, their height, so climbing a
+  ramp or slope never shakes the view.
 - **Depth:** every screen pixel of ground remembers which row of the map it shows. A piece or figure is cut away
   wherever the ground shown there lies in front of where it stands, so a rise or cliff hides exactly what is behind
   it, and figures walking up a slope follow the ground.

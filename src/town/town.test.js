@@ -45,14 +45,14 @@ test('a step of one level is a smooth slope; two or more is a cliff', () => {
 
 test('ground rising in front hides the rows behind it: the depth buffer says so', () => {
   const M = blankModel(6, 'grass'); for (let x = 0; x < 6; x++) M.elev[3 * 6 + x] = 4;
-  const c = renderChunk(fieldOf(M), 0, 64), X = 70;
+  const F = fieldOf(M), X = 70, depthAt = Y => { const c0 = Math.floor(Y / CHUNK) * CHUNK; return renderChunk(F, 0, c0).depth[(Y - c0) * CHUNK + X]; };
   /* row 3 stands 4 levels up, so its top shows at screen rows from 3 × TILE − 4 × LIFT down */
   const Y = 3 * TILE - 4 * LIFT + 6;
-  assert.ok(c.depth[(Y - 64) * CHUNK + X] - 1 >= 3 * TILE, 'the high row is what shows there');
-  const behind = 2 * TILE + 30;   /* the feet of someone standing on row 2 */
-  assert.ok(c.depth[(Y - 64) * CHUNK + X] - 1 > behind, 'so a figure standing on row 2 is cut away there');
+  assert.ok(depthAt(Y) - 1 >= 3 * TILE, 'the high row is what shows there');
+  const behind = 2 * TILE + TILE / 2 + 6;   /* the feet of someone standing on row 2 */
+  assert.ok(depthAt(Y) - 1 > behind, 'so a figure standing on row 2 is cut away there');
   /* below the brink hangs the cliff face, belonging to the high row too */
-  const face = 3 * TILE - 4 * LIFT + 30; assert.ok(c.depth[(face - 64) * CHUNK + X] - 1 >= 3 * TILE);
+  assert.ok(depthAt(3 * TILE - 4 * LIFT + 30) - 1 >= 3 * TILE);
 });
 
 test('floors that are shown join the surface a storey up; water lies flat', () => {

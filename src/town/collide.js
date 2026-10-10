@@ -64,7 +64,7 @@ function shapesOf(objs, links = new Map()) {
   const out = new Map();
   for (const p of objs) {
     if (OPEN.has(p.id) || !ASSET_BY_ID[p.id]) continue;
-    const [fw, fd] = footprint(p), U = SMALL.has(p.id) ? 32 : MID.has(p.id) ? 48 : T, FW = fw * U, FD = fd * U;
+    const [fw, fd] = footprint(p), U = SMALL.has(p.id) ? 32 : MID.has(p.id) ? 64 : T, FW = fw * U, FD = fd * U;
     /* drawings at a smaller scale stand in the middle of the south edge of their footprint */
     const ox = p.x * T + (fw * T - FW) / 2, oy = p.y * T + (fd * T - FD), L = p.level || 0;
     const list = out.get(L) || []; out.set(L, list);
