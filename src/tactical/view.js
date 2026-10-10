@@ -208,7 +208,7 @@ function panels() {
   }
   /* the actions window for the picked unit */
   const menu = $('tcMenu'), t = TC.sel >= 0 ? turnOf(TC.sel) : null;
-  menu.hidden = !t || !!TC.walk; if (menu.hidden) TC.menuPx = 0;
+  menu.hidden = !t || !!TC.walk;
   if (t) {
     $('tcActMove').disabled = t.moved; $('tcActAttack').disabled = t.acted;
     $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move')); $('tcActAttack').setAttribute('aria-pressed', String(TC.mode === 'attack'));
@@ -291,22 +291,13 @@ function paint() {
     g.globalAlpha = 1; g.textAlign = 'start';
   }
 }
-/* The actions window stands beside the picked unit on screen: to its right, or its left near the screen's edge. Its
-   frame is drawn in the tiles' art pixels (--px, styles/main.css) up to ×3 and down to ×2, so it keeps the size of a
-   command list closer in and its lines stay clear further out. It is a whole number of those pixels across and down,
-   and while they are the tiles' own it stands on their grid, so its lines fall on the tiles' pixels. */
+/* the actions window stands beside the picked unit on screen: to its right, or its left near the screen's edge */
 function placeMenu() {
   const menu = $('tcMenu'), f = !menu.hidden && TC.figs.find(q => q.k === TC.sel); if (!f) return;
-  const { k, tx, ty } = TC.view, d = state.dpr, km = Math.max(Math.round(2 * d), Math.min(k, Math.round(3 * d))), px = km / d;
-  if (TC.menuPx !== px) {
-    TC.menuPx = px; menu.style.setProperty('--px', px + 'px'); menu.style.width = menu.style.height = '';
-    const r = menu.getBoundingClientRect(); menu.style.width = Math.ceil(r.width / px - 0.01) * px + 'px'; menu.style.height = Math.ceil(r.height / px - 0.01) * px + 'px';
-  }
-  const [x, y] = P(f.X, f.Y, f.z), sx = (x * k + tx) / d, top = ((y - figureHeight(f)) * k + ty) / d, gap = 14 * k / d;
+  const { k, tx, ty } = TC.view, d = state.dpr, [x, y] = P(f.X, f.Y, f.z), sx = (x * k + tx) / d, top = ((y - figureHeight(f)) * k + ty) / d, gap = 14 * k / d;
   const w = menu.offsetWidth, h = menu.offsetHeight, left = sx + gap + w + 8 > TC.cw ? sx - gap - w : sx + gap;
-  const snap = (v, t) => (km === k ? (t + Math.round((v * d - t) / k) * k) / d : Math.round(v * d) / d) + 'px';
-  menu.style.left = snap(Math.max(8, Math.min(TC.cw - w - 8, left)), tx);
-  menu.style.top = snap(Math.max(64, Math.min(TC.ch - h - 40, top)), ty);
+  menu.style.left = Math.round(Math.max(8, Math.min(TC.cw - w - 8, left))) + 'px';
+  menu.style.top = Math.round(Math.max(64, Math.min(TC.ch - h - 40, top))) + 'px';
 }
 const req = () => { TC.dirty = true; if (!raf && TC.open) raf = requestAnimationFrame(loop); };
 
