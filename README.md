@@ -4,9 +4,28 @@ A procedural, hand-drawn-style hex-map atlas. Give it a seed and it generates a 
 (terrain, rivers, roads, settlements, names) on a canvas, and lets you "enter" any city to see an
 isometric district map.
 
+## Moving between modules
+
+A rail down the left edge (along the bottom on phones) holds every part of the app, on every page:
+
+- **View:** **Atlas** (the realm map and its cities), **Scenes** (the bundled maps, each ready to open), **Tactical**
+  and **Town** (the two play views, on the map editor's current map).
+- **Make:** **Map editor** (the tile editor) and **Characters** (the character maker).
+- **Data:** **Unit data** (`units.html`).
+
+`Alt+1` to `Alt+7` jump straight to each. The module showing is kept in the address (`index.html#editor`,
+`#tactical`, `#town`, `#characters`, `#scenes`), so a reload or a bookmark lands on it, and the rail on the unit
+data page goes back to the atlas page with the module in the address. The back buttons inside each module still
+step down one layer (tactical view to editor to atlas) and the rail follows them.
+
+**Scenes** lists the maps in `scenes/` and the editor's walking-test fixture as cards, each with a picture drawn by
+the editor's renderer, its size and figures, and what it is for. Its main button opens the map in the view it was
+laid out for (the tactical view, the town view or the editor, from its `.scene.json`); **Edit map** opens it in
+the editor instead. Opening a scene replaces the editor's map; **Undo** brings the previous one back.
+
 ## Tile editor
 
-The **Tile editor** button opens an isometric workbench built on the same tile set as the city
+The **Map editor** in the rail opens an isometric workbench built on the same tile set as the city
 districts. Paint 34 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
 turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
 builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
@@ -132,7 +151,7 @@ defines the fields, their ranges and defaults, and normalizes and validates a un
 as a custom character from the maker, plays with the defaults. The tactical view moves units by their Move and
 Jump and shows their HP, Attack and Range; adding a field means adding a line to `FIELDS` there.
 
-**Unit data** in the atlas header opens `units.html`, an editor for these files:
+**Unit data** in the module rail opens `units.html`, an editor for these files:
 
 - **Cards:** the list of units down the side, filterable, and a card for the picked one: its sprite walking (turn
   it with ⟲ ⟳), name and group, and HP, Attack, Range, Move and Jump listed on the right, each with a bar against the strongest unit.
@@ -421,7 +440,8 @@ tools/                Vite plugin that relays HTTP calls to the editor page and 
                       the character sheet writer and a minimal PNG and APNG encoder
 data/units/           One JSON file per character and enemy: HP, Attack, Range, Move, Jump
 mcp/                  MCP server, backend launcher and end-to-end test
-  ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view
+  ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view, the module
+                      rail (rail.js) and the shell that moves between modules and lists the scenes (shell.js)
 legacy/               The original single-file artifact, kept for reference
 ```
 

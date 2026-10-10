@@ -8,6 +8,7 @@ import { ROSTER, WALK, render } from '../characters/roster.js';
 import { figureThumb } from '../characters/draw.js';
 import { BASE } from '../characters/body.js';
 import { H as FH, W as FW } from '../characters/pixels.js';
+import { mountRail } from '../ui/rail.js';
 
 /* ================= the unit data page =================
    Every unit in data/units/ (src/data/units.js) to read and change: a list down the side, a card per unit with its
@@ -17,6 +18,8 @@ import { H as FH, W as FW } from '../characters/pixels.js';
    of the site can read the units and download a unit's file, but not save. */
 const $ = id => document.getElementById(id);
 const WRITABLE = import.meta.env.DEV;
+/* the module rail: every other module lives on the atlas page */
+mountRail(id => { if (id !== 'units') location.href = id === 'atlas' ? './index.html' : `./index.html#${id}`; }, 'units');
 const SAVE_URL = (group, id) => `/__hexwright/units/${group}/${id}`;
 
 /* id -> { group, draft, saved, savedGroup }: saved is null for a unit not yet written */
