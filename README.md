@@ -293,7 +293,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   the hero exactly at its painted edge, a cliff wherever the ground jumps two levels or more, and other walkers by a
   small circle round their feet. Blocked one way, the hero slides along the other and eases round trunks and corners
   (`src/town/collide.js`).
-- **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a classic blue window),
+- **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a slate and gold window with their portrait, like the tactical view's),
   or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
 - **Phones and tablets:** a finger dragged anywhere on the map is a stick the hero walks by (a small pull strolls,
   pulled further they run, and the stick follows a finger dragged past it); a tap walks them to the spot or up to

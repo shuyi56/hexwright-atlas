@@ -207,26 +207,32 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
 .tc-keys{color:#a39b86}
 @media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
-/* the town view: the tactical view's frame, a place banner on entering, and a classic blue speech window */
+/* the town view: the tactical view's frame, a place banner on entering, and a speech window in the same slate and
+   gold as the tactical view's windows, with the speaker's portrait framed like the unit's */
 .tw-banner{position:absolute;left:50%;top:18%;transform:translateX(-50%);padding:8px 28px;font:400 clamp(22px,3vw,34px)/1.1 var(--display);color:#f4ead2;text-shadow:0 2px 0 #0b1011,0 0 12px rgba(0,0,0,.6);border-top:1px solid rgba(201,164,90,.7);border-bottom:1px solid rgba(201,164,90,.7);background:linear-gradient(90deg,transparent,rgba(11,16,17,.55) 20%,rgba(11,16,17,.55) 80%,transparent);opacity:0;pointer-events:none;white-space:nowrap}
 .tw-banner.show{animation:tw-banner 2.8s ease forwards}
 @keyframes tw-banner{0%{opacity:0;transform:translate(-50%,8px)}15%,70%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
-.tw-say{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);width:min(640px,calc(100% - 32px));min-height:84px;padding:12px 18px 14px;background:linear-gradient(#3c4f8f,#1d2753);border:2px solid #e9e4d6;border-radius:6px;box-shadow:0 0 0 2px #0b1011,0 8px 20px rgba(0,0,0,.5);color:#fff;font:500 16px/1.45 var(--ui);text-shadow:1px 1px 0 #0b1011}
-.tw-say b{display:block;margin-bottom:2px;color:#f6d36a;font:600 15px var(--ui)}
-.tw-say i{position:absolute;right:12px;bottom:6px;font-style:normal;font-size:11px;color:#e9e4d6;animation:tw-blink 1s steps(2) infinite}
+.tw-say{left:50%;bottom:44px;transform:translateX(-50%);width:min(620px,calc(100% - 28px));min-height:92px;display:flex;align-items:flex-start;gap:14px;padding:12px 30px 14px 12px}
+.tw-say>div{min-width:0;flex:1}
+.tw-say b{margin:1px 0 3px;color:var(--brass-2);font:400 19px/1.1 var(--display);letter-spacing:.02em}
+.tw-say i{position:absolute;right:11px;bottom:7px;font-style:normal;font-size:10px;color:var(--tc-gold);animation:tw-blink 1s steps(2) infinite}
+#twFace{flex:none;width:64px;height:64px;image-rendering:pixelated;background:#0b1011;border:1px solid var(--tc-gold);box-shadow:0 0 0 1px #0b1011}
 @keyframes tw-blink{50%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.tw-banner.show{animation:none;opacity:0}.tw-say i{animation:none}}
 .town .tc-zoom{text-shadow:0 1px 2px #000,0 0 5px #000}
-.tw-say span{display:block;font:500 17px/1.45 var(--ui);color:#fff}
+.tc-win.tw-say span{display:block;color:var(--tc-text);font:500 16.5px/1.45 var(--ui);text-wrap:pretty}
+.town.saying #twPlace{visibility:hidden}
+@media (max-width:520px){.tw-say{gap:10px;padding:10px 26px 12px 10px;min-height:76px}#twFace{width:48px;height:48px}.tw-say b{font-size:17px}.tc-win.tw-say span{font-size:15.5px}}
 /* the town view on a phone: the page under it never pans, zooms or selects, the canvas keeps its pixels square, and
    a finger gets a stick to walk by and a Talk button */
 .town{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 #twCanvas{display:block;width:100%;height:100%;touch-action:none;image-rendering:pixelated;cursor:pointer}
-.tw-stick{position:absolute;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;border:2px solid rgba(233,228,214,.55);background:radial-gradient(rgba(11,16,17,.18),rgba(11,16,17,.38));box-shadow:0 0 0 1px rgba(11,16,17,.5);pointer-events:none}
+.tw-stick{position:absolute;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;border:2px solid rgba(201,164,90,.6);background:radial-gradient(rgba(11,16,17,.18),rgba(11,16,17,.38));box-shadow:0 0 0 1px rgba(11,16,17,.5);pointer-events:none}
 .tw-stick i{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f4ead2,#c9a45a 70%);box-shadow:0 2px 6px rgba(0,0,0,.5)}
-.tw-stick.run{border-color:#e4c684}
-.tw-talk{display:none;position:absolute;right:16px;bottom:calc(48px + env(safe-area-inset-bottom,0px));width:68px;height:68px;border-radius:50%;border:2px solid #e9e4d6;background:radial-gradient(circle at 40% 35%,#4d63ab,#1d2753 75%);box-shadow:0 0 0 2px #0b1011,0 6px 16px rgba(0,0,0,.5);color:#fff;font:600 15px var(--ui);text-shadow:1px 1px 0 #0b1011;cursor:pointer;touch-action:manipulation}
-.tw-talk:active{transform:scale(.94)}
+.tw-stick.run{border-color:var(--brass-2)}
+.tw-talk{display:none;position:absolute;right:16px;bottom:calc(48px + env(safe-area-inset-bottom,0px));width:66px;height:66px;border-radius:50%;border:2px solid var(--tc-gold);background:linear-gradient(#1d2829,#141c1d);box-shadow:0 0 0 2px #0b1011,0 6px 18px rgba(0,0,0,.45);color:var(--tc-text);font:500 14px/1 var(--ui-sc);letter-spacing:.1em;text-transform:lowercase;text-shadow:0 1px 0 #000;cursor:pointer;touch-action:manipulation}
+.tw-talk:active{background:linear-gradient(#26332f,#1a2322);color:var(--tc-mark);transform:scale(.95)}
+.tw-talk:focus-visible{outline:2px solid var(--brass-2);outline-offset:2px}
 .town.saying .tw-talk{display:none}
 .town .chip{backdrop-filter:none}
 @media (pointer:coarse){.tw-talk{display:block}.town .tc-chips .chip{min-width:40px;min-height:36px}}

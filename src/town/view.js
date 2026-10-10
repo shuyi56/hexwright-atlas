@@ -13,6 +13,7 @@ import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, render
 import { hits, shapesOf } from './collide.js';
 import { pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
+import { portrait } from '../tactical/render.js';
 import GroundWorker from './ground-worker.js?worker&inline';
 
 /* ================= town view: the screen =================
@@ -318,6 +319,9 @@ function talk(to = -1) {
     const line = sightFor(piece ? ASSET_BY_ID[piece.id] : null, ground, M.name); if (!line) return;
     TW.say = { k: -1, who: '', line };
   }
+  /* the speaker's face, as the tactical view shows a unit's; looking at something shows none */
+  const face = $('twFace'), who = TW.say.k >= 0 ? characterById(M.chars[TW.say.k].sprite) : null; face.hidden = !who;
+  if (who) { const fg = face.getContext('2d'); fg.clearRect(0, 0, face.width, face.height); fg.imageSmoothingEnabled = false; fg.drawImage(portrait(who), 0, 0, face.width, face.height); }
   $('twWho').textContent = TW.say.who; $('twWho').hidden = !TW.say.who; $('twLine').textContent = TW.say.line; $('twSay').hidden = false; root.classList.add('saying'); TW.dirty = true; place();
 }
 function closeSay() { TW.say = null; $('twSay').hidden = true; root.classList.remove('saying'); TW.dirty = true; if (TW.M) place(); }
