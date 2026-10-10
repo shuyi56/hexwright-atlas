@@ -424,7 +424,6 @@ function closeTown() { if (!TW.open) return; TW.open = false; root.hidden = true
 $('twBack').addEventListener('click', closeTown);
 $('twNext').addEventListener('click', () => { nextHero(1); root.focus({ preventScroll: true }); });
 $('twIn').addEventListener('click', () => { setZoom(TW.zoom + 1); req(); }); $('twOut').addEventListener('click', () => { setZoom(TW.zoom - 1); req(); });
-$('edTown').addEventListener('click', () => openTown());
 $('editor').addEventListener('keydown', e => { if (ED.open && !TW.open && (e.key === 'o' || e.key === 'O') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTown(); } });
 new ResizeObserver(() => { if (TW.open) { size(); req(); } }).observe(root);
 /* test hook */

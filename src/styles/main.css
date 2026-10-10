@@ -29,7 +29,6 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .seed input:focus-visible,.btn:focus-visible,.chip:focus-visible,.tab:focus-visible,.place:focus-visible,canvas:focus-visible{outline:2px solid var(--brass-2);outline-offset:2px}
 .btn{font:500 14px var(--ui);color:var(--vellum);background:var(--panel-2);border:1px solid var(--line);padding:7px 14px;border-radius:3px;cursor:pointer}
 .btn:hover{border-color:var(--brass)}
-.btn-link{text-decoration:none;display:inline-block}
 .btn-brass{background:var(--brass);color:#1b150c;border-color:var(--brass);font-weight:700}
 .btn-brass:hover{background:var(--brass-2)}
 .stage{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;min-height:0}
@@ -76,7 +75,6 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
   .map-wrap{height:68svh;min-height:380px}
   .pane{overflow:visible}
 }
-[hidden]{display:none!important}
 .city{position:absolute;inset:0;z-index:5;background:radial-gradient(ellipse at 50% 48%,#243032,#141b1c 62%,var(--table) 100%)}
 .city.entering{animation:cityIn .45s cubic-bezier(.2,.7,.2,1)}
 @keyframes cityIn{from{opacity:0;transform:scale(.965)}to{opacity:1;transform:none}}
@@ -189,13 +187,11 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-tile{left:14px;bottom:40px;min-width:170px}
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
-.tc-unit[hidden]{display:none}
 /* The actions menu and the unit's portrait have a thin gold rim, one pixel inside a dark outline. The actions menu
    is small, beside the unit like a tactics game's command list. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
 .tc-win.tc-menu{background:linear-gradient(#1d2829,#141c1d);color:var(--tc-text);border:1px solid var(--tc-gold);border-radius:2px;box-shadow:0 0 0 1px #0b1011,0 4px 10px rgba(0,0,0,.4)}
 .tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
-.tc-menu[hidden]{display:none}
 .tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
 .tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
 .tc-menu button[aria-pressed=true]{background:var(--tc-pick);color:var(--tc-mark)}
@@ -211,13 +207,11 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-keys{color:#a39b86}
 @media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
 /* the town view: the tactical view's frame, a place banner on entering, and a classic blue speech window */
-.town .tc-tile[hidden],.tw-say[hidden]{display:none}
 .tw-banner{position:absolute;left:50%;top:18%;transform:translateX(-50%);padding:8px 28px;font:400 clamp(22px,3vw,34px)/1.1 var(--display);color:#f4ead2;text-shadow:0 2px 0 #0b1011,0 0 12px rgba(0,0,0,.6);border-top:1px solid rgba(201,164,90,.7);border-bottom:1px solid rgba(201,164,90,.7);background:linear-gradient(90deg,transparent,rgba(11,16,17,.55) 20%,rgba(11,16,17,.55) 80%,transparent);opacity:0;pointer-events:none;white-space:nowrap}
 .tw-banner.show{animation:tw-banner 2.8s ease forwards}
 @keyframes tw-banner{0%{opacity:0;transform:translate(-50%,8px)}15%,70%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
 .tw-say{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);width:min(640px,calc(100% - 32px));min-height:84px;padding:12px 18px 14px;background:linear-gradient(#3c4f8f,#1d2753);border:2px solid #e9e4d6;border-radius:6px;box-shadow:0 0 0 2px #0b1011,0 8px 20px rgba(0,0,0,.5);color:#fff;font:500 16px/1.45 var(--ui);text-shadow:1px 1px 0 #0b1011}
 .tw-say b{display:block;margin-bottom:2px;color:#f6d36a;font:600 15px var(--ui)}
-.tw-say b[hidden]{display:none}
 .tw-say i{position:absolute;right:12px;bottom:6px;font-style:normal;font-size:11px;color:#e9e4d6;animation:tw-blink 1s steps(2) infinite}
 @keyframes tw-blink{50%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.tw-banner.show{animation:none;opacity:0}.tw-say i{animation:none}}

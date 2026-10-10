@@ -168,7 +168,7 @@ Jump and shows their HP, Attack and Range; adding a field means adding a line to
 
 ### Tactical view
 
-**Tactical** (`T`) in the editor shows the map through a close-up camera like the old tactics games (Final
+**Tactical** in the module rail (or `T` in the editor) shows the map through a close-up camera like the old tactics games (Final
 Fantasy Tactics, Tactics Ogre): pixel art at whole-pixel zoom (×1 to ×6, about a dozen tiles across by default),
 with the camera gliding after the cursor and the unit on the move.
 
@@ -238,7 +238,7 @@ frames of an animated ground, then a left and right face two levels deep), with 
 
 ### Town view
 
-**Town** (`O`) in the editor walks the map the way the old town RPGs do (Final Fantasy VI, Dragon Quest, Pokémon):
+**Town** in the module rail (or `O` in the editor) walks the map the way the old town RPGs do (Final Fantasy VI, Dragon Quest, Pokémon):
 seen from above and the south on square 96-pixel tiles (about six figures across), with the ground painted as one
 solid surface rather than a grid of blocks. Houses fill their tiles at the figures' scale: a door a little taller
 than a person, a cottage about twice their height, two-storey houses towering over the street.
