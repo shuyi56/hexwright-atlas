@@ -413,7 +413,11 @@ function covers(s, X, Y, b) {
   }
   return false;
 }
-const figCan = canvasOf(W, H), figG = figCan.getContext('2d');
+/* A figure that ground hides in part is cut away into a canvas of its own character's, never one shared: a phone's
+   browser may read a canvas drawn from only when the frame is shown, so one canvas rewritten for each walker in turn
+   showed every walker as whichever was cut last. */
+const cuts = [];
+const cutFor = k => cuts[k] || (cuts[k] = (c => ({ can: c, g: c.getContext('2d') }))(canvasOf(W, H)));
 function drawChar(k, q, vx0, vy0, vx1, vy1, sc) {
   const c = TW.M.chars[k], ch = characterById(c.sprite) || characterById('villager'), pose = !q.moving ? 0 : q.dist != null ? WALK[Math.floor(q.dist / STRIDE) % WALK.length] : WALK[Math.floor(q.d * STRIDES) % WALK.length];
   /* placed to the nearest device pixel, so a walker glides with the camera; what hides it is worked out on the art
@@ -423,7 +427,7 @@ function drawChar(k, q, vx0, vy0, vx1, vy1, sc) {
   /* the figure and its shadow, cut away wherever the ground shown lies in front of where it stands */
   g.fillStyle = 'rgba(43,33,22,0.32)'; g.beginPath(); g.ellipse(x + 1, y, 7, 2.5, 0, 0, Math.PI * 2); g.fill();
   const f = figure(ch, view, pose), ax = Math.round(X), ay = Math.round(Y); let can = f.can;
-  if (hidden(ax, ay, W, H, q.gy)) { const im = figG.createImageData(W, H); im.data.set(clip(f.px, W, H, ax, ay, q.gy, flip)); figG.putImageData(im, 0, 0); can = figCan; }
+  if (hidden(ax, ay, W, H, q.gy)) { const cut = cutFor(k), im = cut.g.createImageData(W, H); im.data.set(clip(f.px, W, H, ax, ay, q.gy, flip)); cut.g.putImageData(im, 0, 0); can = cut.can; }
   if (flip) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(can, -W / 2, Y); g.restore(); } else g.drawImage(can, X, Y);
   /* the hero wears a small gold marker overhead until they first move */
   if (k === TW.hero && !TW.moved) { g.fillStyle = '#c9a24f'; const ty = y - 40 - (TW.tick % 2); g.beginPath(); g.moveTo(x - 4, ty); g.lineTo(x + 4, ty); g.lineTo(x, ty + 5); g.closePath(); g.fill(); g.strokeStyle = '#2b2116'; g.lineWidth = 1; g.stroke(); }
@@ -571,7 +575,7 @@ function openTown(opts = {}) {
   if (!ED.M) return;
   TW.M = cloneModel(ED.M); TW.M.chars = TW.M.chars || []; TW.M.floors = TW.M.floors || [];
   TW.open = true; root.hidden = false; TW.steps.clear(); TW.path = []; TW.held = []; TW.talkTo = -1; TW.moved = false; TW.lastT = 0; TW.rest = [];
-  TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs);
+  TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs); cuts.length = 0;
   TW.hero = opts.hero ?? (ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0);
   TW.G0 = fieldOf(TW.M, 0); TW.shapes = shapesOf(TW.M.objs, TW.links); takeHero();
   TW.top = TW.me ? TW.me.L : 0;
