@@ -36,6 +36,8 @@ function kit(FW, FD, up, side = 16) {
     FW, FD, w, h, px, ox, oy,
     set(x, y, c, a = 255) { const i = idx(x, y); if (i < 0 || !c) return; px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = a; },
     get(x, y) { const i = idx(x, y); return i < 0 ? 0 : px[i + 3]; },
+    /* darken what is already drawn at (x, y) toward the ink by k: a cast shadow on whatever lies there */
+    shade(x, y, k) { const i = idx(x, y); if (i < 0 || px[i + 3] !== 255) return; px[i] += (INK[0] - px[i]) * k; px[i + 1] += (INK[1] - px[i + 1]) * k; px[i + 2] += (INK[2] - px[i + 2]) * k; },
     /* fill [x0, x1) × [y0, y1); c is a colour or fn(x, y) giving one (or null to skip) */
     rect(x0, y0, x1, y1, c) { for (let y = Math.ceil(y0); y < y1; y++) for (let x = Math.ceil(x0); x < x1; x++) K.set(x, y, typeof c === 'function' ? c(x, y) : c); },
     poly(pts, c) {
@@ -142,21 +144,39 @@ function wallTone(tex, P, x, y, wx0, wx1, floorH, top) {
 }
 /* a window set into the wall: a lintel over it, a frame, glass shadowed under the lintel with a glint, glazing bars,
    a sill that stands out with its shadow below, and shutters if asked */
+/* A window set into the wall, lit from the upper left. A lintel over it; a frame lit along its top and west edges
+   and dark along its bottom and east; the glass set back, so the reveal shades it along its top and west edge;
+   glazing bars, each casting a hairline shadow on the glass; a reflection of the sky streaking the upper panes (or,
+   lit from within, a warm glow); a sill that stands out from the wall with its shadow on the wall below; and
+   shutters of boards, each throwing a thin shadow on the wall to its east. */
 function windowAt(K, x, y, w = 6, h = 7, opts = {}) {
   const F = R(opts.frame || '#efe6d0'), G = R(opts.glass || '#3b4a5a'), S = opts.shutter ? R(opts.shutter) : null, lit = opts.lit ? R('#f2c25a') : null;
-  if (S) for (const sx of [x - 4, x + w + 1]) K.rect(sx, y, sx + 3, y + h, (px, py) => (py === y ? S[1] : (py - y) % 3 === 0 ? S[3] : px === sx ? S[1] : S[2]));
-  K.rect(x - 1, y - 2, x + w + 1, y - 1, inked(F[3], 0.35));
-  if (opts.arch) K.oval(x + w / 2, y, w / 2 + 1, 2.5, F[2]);
-  K.rect(x, y - 1, x + w, y + h, F[1]);
-  K.rect(x + 1, y, x + w - 1, y + h - 1, (px, py) => {
-    if (py === y) return lit ? lit[2] : inked(G[3], 0.4);
-    if (px === x + 2 && py > y + 1 && py < y + 4) return lit ? lit[0] : G[0];
-    return lit ? lit[py < y + h / 2 ? 0 : 1] : G[py < y + 3 ? 2 : 3];
-  });
-  if (w > 5) K.rect(x + Math.floor(w / 2), y, x + Math.floor(w / 2) + 1, y + h - 1, F[2]);
-  if (h > 7) K.rect(x + 1, y + Math.floor(h / 2), x + w - 1, y + Math.floor(h / 2) + 1, F[2]);
-  K.rect(x - 2, y + h - 1, x + w + 2, y + h + 1, (px, py) => (py === y + h - 1 ? F[0] : F[3]));
+  const mx = x + Math.floor(w / 2), my = y + Math.floor(h / 2), bars = w > 5, cross = h > 7;
+  if (S) for (const sx of [x - 4, x + w + 1]) {
+    K.rect(sx, y, sx + 3, y + h, (px, py) => (px === sx ? S[1] : px === sx + 2 ? S[3] : (py - y) === Math.floor(h / 2) ? S[3] : S[2]));
+    for (let py = y + 1; py <= y + h; py++) K.shade(sx + 3, py, 0.28);
   }
+  /* the lintel, standing a little proud, with its shadow on the frame below */
+  K.rect(x - 2, y - 3, x + w + 2, y - 1, (px, py) => (py === y - 3 ? F[1] : F[3]));
+  if (opts.arch) K.oval(x + w / 2, y - 1, w / 2 + 1, 3, (px, py) => (py < y - 1 ? F[1] : null));
+  /* the frame */
+  K.rect(x, y - 1, x + w, y + h, (px, py) => (py === y - 1 ? F[2] : px === x ? F[1] : px === x + w - 1 ? F[3] : F[2]));
+  /* the glass, set back */
+  K.rect(x + 1, y, x + w - 1, y + h - 1, (px, py) => {
+    const dy = py - y, dx = px - x - 1;
+    if (lit) { if (dy < 1 || dx < 1) return lit[3]; return lit[dy < h * 0.45 ? 0 : 1]; }
+    if (dy < 2 || dx < 1) return G[4];                                     /* the reveal's shadow */
+    if (bars && (px === mx + 1 || (cross && py === my + 1))) return G[4];   /* bar shadows */
+    const pane = (px > mx ? 1 : 0) + (cross && py > my ? 2 : 0), d = dx - dy;
+    if ((pane === 0 || pane === 1) && (d === 2 || d === 3) && dy < h * 0.6) return d === 2 ? G[0] : G[1];   /* the sky's reflection */
+    return G[dy < h * 0.5 ? 2 : 3];
+  });
+  if (bars) K.rect(mx, y, mx + 1, y + h - 1, F[2]);
+  if (cross) K.rect(x + 1, my, x + w - 1, my + 1, F[2]);
+  /* the sill, standing out, and its shadow on the wall */
+  K.rect(x - 2, y + h - 1, x + w + 2, y + h + 1, (px, py) => (py === y + h - 1 ? F[0] : px === x + w + 1 ? F[4] : F[3]));
+  for (let px = x - 1; px <= x + w + 2; px++) { K.shade(px, y + h + 1, 0.35); K.shade(px, y + h + 2, 0.15); }
+}
 /* a door in its frame: stone or timber surround with a lintel, the door set back into it (shadowed along its top and
    left), boards with a rail across and iron straps, a ring handle, and a step on the ground in front */
 function doorAt(K, cx, yb, w = 12, h = 20, opts = {}) {

@@ -264,8 +264,10 @@ than a person, a cottage about twice their height, two-storey houses towering ov
 - **Pieces:** every building, prop, plant and piece of furniture is redrawn front-on. A house fills its own
   footprint, wider than it is tall, seen from the south and a little east: a front wall (plaster, timber framing,
   ashlar, planks) with its east wall receding beside it in shade, both on a stone plinth; a door set back in its
-  frame with iron straps, a ring handle and a step, with windows placed symmetrically round it (lintels, sills,
-  glazing bars, shutters); and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
+  frame with iron straps, a ring handle and a step, with windows placed symmetrically round it, each set back into
+  the wall: the reveal shading the glass along its top and west edge, glazing bars with hairline shadows, the sky
+  reflected in the upper panes, a lintel above, a projecting sill with its shadow on the wall, and board shutters
+  casting thin shadows; and above, a thatch, clay tile, slate or shingle roof, square along every edge, with a
   capped ridge, a thick eave, its east end in shade, and pale stone chimneys with overhanging caps, a faint shadow on the
   roof and soft smoke. Timber framing shows on the front only: beams three pixels thick standing proud of the wall (lit
   along their tops and west edges, grained, dark underneath), each casting a shadow into the lime-washed plaster
