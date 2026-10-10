@@ -390,8 +390,8 @@ const BUILD = {
     const P = R('#efe8d8'); for (let x = b.x0 + 2; x < b.x1 - 3; x += 9) K.rect(x, b.top + 4, x + 4, b.yb - 3, (px) => P[px === x ? 0 : px === x + 3 ? 3 : 1]);
   },
   markethall: (K, o) => {
-    /* an open arcade of stone arches on the ground floor, the market inside in shadow, under a timbered upper floor */
-    const b = house(K, o, { wall: 'cream', wallTex: 'timber', roof: 'tiles', wallH: 40, floors: 2, rise: 16, door: false, windows: false });
+    /* an open arcade of stone arches on the ground floor, the market inside in shadow, under a plain plastered upper floor */
+    const b = house(K, o, { wall: 'cream', wallTex: 'plain', roof: 'tiles', wallH: 40, floors: 2, rise: 16, door: false, windows: false });
     const x0 = b.x0, x1 = b.x1, fh = (b.yb - b.top) / 2, ay = Math.round(b.top + fh), yb = b.yb, S = R('#c9bfa6'), D = R('#2e241b');
     const n = Math.max(2, Math.round((x1 - x0) / 26)), bay = (x1 - x0) / n, colW = 6, ra = (bay - colW) / 2, ys = ay + 3 + ra;
     for (let y = ay; y < yb; y++) for (let x = x0; x < x1; x++) {
@@ -405,14 +405,20 @@ const BUILD = {
       }
       K.set(x, y, c);
     }
-    /* capitals at the springing, and a beam carrying the upper floor */
+    /* capitals at the springing, and a stone string course carrying the upper floor */
     for (let i = 0; i <= n; i++) { const cxi = Math.round(x0 + i * bay); K.rect(cxi - colW / 2 - 1, ys - 1, cxi + colW / 2 + 1, ys + 2, S[0]); }
-    K.rect(x0, ay - 2, x1, ay + 1, (x, y) => TIMBER[y === ay - 2 ? 1 : 3]);
+    K.rect(x0, ay - 2, x1, ay + 1, (x, y) => S[y === ay - 2 ? 0 : y === ay ? 2 : 1]);
+    for (let x = x0; x < x1; x++) K.shade(x, ay + 1, 0.3);
     /* market goods glimpsed inside: crates and a barrel in the shade */
     for (let i = 0; i < n; i += 2) { const mx = Math.round(x0 + (i + 0.5) * bay); K.rect(mx - 5, yb - 9, mx + 3, yb - 3, R('#8e6a44')[3]); K.rect(mx - 5, yb - 9, mx + 3, yb - 8, R('#8e6a44')[2]); }
-    /* windows across the upper floor */
-    const wh = Math.min(16, Math.round(fh * 0.45)), wy = Math.round(b.top + (fh - wh) * 0.45);
-    for (const wx of windowSlots(x0 + 2, x1 - 2, 12, false)) windowAt(K, wx, wy, 12, wh, { shutter: '#7a4a2a' });
+    /* The upper storey: plain lime-washed plaster, one window centred over each arch, set below the eave's shadow,
+       with shutters where the bay is wide enough for them. */
+    const P = R(WALL.cream), u0 = b.top, u1 = ay - 2;
+    K.rect(x0, u0, x1, u1, (x, y) => { const m = vnoise_(x / 6, y / 6) * 0.7 + vnoise_(x / 2.5, y / 2.5) * 0.3; return h2(x, y, 5) < 0.03 ? P[3] : m > 0.66 ? P[1] : m < 0.3 ? mix(P[2], P[3], 0.45) : P[2]; });
+    /* the eave's shadow falls across the storey */
+    for (let y = b.eave + 3; y < b.eave + 6; y++) for (let x = x0; x < x1; x++) K.shade(x, y, y === b.eave + 3 ? 0.4 : 0.2);
+    const wh = Math.min(16, Math.round(fh * 0.42)), clear = b.eave + 7 - u0, wy = Math.round(u0 + Math.max(clear, (u1 - u0 - wh) * 0.55)), ww = 12, shut = bay - colW >= ww + 12;
+    for (let i = 0; i < n; i++) windowAt(K, Math.round(x0 + (i + 0.5) * bay - ww / 2), wy, ww, wh, shut ? { shutter: '#7a4a2a' } : {});
   },
   yurt: (K, o) => { const { FW, FD } = K, P = R('#d9c9a0'), cx = FW / 2; K.oval(cx, FD - 10, 14, 6, P[3]); K.rect(cx - 14, FD - 24, cx + 14, FD - 10, (x, y) => { const t = (x + 0.5 - cx) / 14; return P[(y % 6 === 0) ? 3 : t < -0.5 ? 1 : t < 0.4 ? 2 : 3]; }); K.oval(cx, FD - 24, 15, 13, (x, y, dx, dy) => (dy > 0.3 ? null : R('#cbb894')[dx < -0.4 ? 1 : dx > 0.5 ? 3 : 2])); K.oval(cx, FD - 34, 3, 2, R('#5a3f28')[2]); doorAt(K, cx, FD - 9, 8, 12, { col: '#b8483a' }); },
   ruin: (K, o) => {
