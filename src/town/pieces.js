@@ -85,15 +85,15 @@ const ROOF = {
   thatch: '#c9a463', tiles: '#a6533b', slate: '#6d7a86', shingle: '#7d6a55', copper: '#6f9c86', felt: '#cbb894', lead: '#8a8f90'
 };
 function roofTone(tex, P, u, v, plane = 0) {
-  /* u runs along the eave, v up the slope from it */
+  /* u runs along the eave, v up the slope from it; courses sized for the town's big houses */
   let t;
-  if (tex === 'thatch') { const row = Math.floor(v / 4), m = v % 4; t = m === 3 ? 3 : h2(u, row, 3) < 0.28 ? 3 : h2(u, row, 4) < 0.2 ? 1 : 2; if (m === 0 && h2(u, row, 5) < 0.4) t = 1; }
-  else if (tex === 'tiles') { const row = Math.floor(v / 4), m = v % 4, c = ((u + (row % 2) * 2) % 4 + 4) % 4; t = m === 0 ? 4 : c === 0 ? 3 : m === 3 && c === 1 ? 1 : 2; }
-  else if (tex === 'slate' || tex === 'lead') { const row = Math.floor(v / 3), m = v % 3, c = ((u + (row % 2) * 3) % 6 + 6) % 6; t = m === 0 ? 4 : c === 0 ? 3 : h2(Math.floor((u + (row % 2) * 3) / 6), row, 7) < 0.25 ? 1 : 2; }
-  else if (tex === 'shingle') { const row = Math.floor(v / 3), m = v % 3, c = ((u + Math.floor(h2(row, 1) * 5)) % 5 + 5) % 5; t = m === 0 ? 4 : c === 0 ? 3 : 2; }
-  else if (tex === 'copper') { t = ((u % 6) + 6) % 6 === 0 ? 3 : v % 7 === 0 ? 1 : 2; }
-  else { t = v % 5 === 0 ? 3 : 2; }
-  return P[Math.min(4, t + plane)];
+  if (tex === 'thatch') { const row = Math.floor(v / 5), m = v % 5; t = m === 4 ? 3 : h2(u, row, 3) < 0.26 ? 3 : h2(u, row, 4) < 0.2 ? 1 : 2; if (m === 0 && h2(u, row, 5) < 0.4) t = 1; }
+  else if (tex === 'tiles') { const row = Math.floor(v / 5), m = v % 5, c = ((u + (row % 2) * 3) % 6 + 6) % 6; t = m === 0 ? 4 : c === 0 ? 3 : m === 4 && c < 3 ? 1 : 2; }
+  else if (tex === 'slate' || tex === 'lead') { const row = Math.floor(v / 4), m = v % 4, c = ((u + (row % 2) * 4) % 8 + 8) % 8; t = m === 0 ? 4 : c === 0 ? 3 : h2(Math.floor((u + (row % 2) * 4) / 8), row, 7) < 0.25 ? 1 : 2; }
+  else if (tex === 'shingle') { const row = Math.floor(v / 4), m = v % 4, c = ((u + Math.floor(h2(row, 1) * 6)) % 6 + 6) % 6; t = m === 0 ? 4 : c === 0 ? 3 : 2; }
+  else if (tex === 'copper') { t = ((u % 8) + 8) % 8 === 0 ? 3 : v % 9 === 0 ? 1 : 2; }
+  else { t = v % 6 === 0 ? 3 : 2; }
+  return P[Math.max(0, Math.min(4, t + plane))];
 }
 const WALL = {
   plaster: '#efe3c4', cream: '#e9d6ae', ochre: '#e6cfa6', rose: '#e9c4b2', stone: '#d8cfb9', grey: '#c4bcab', planks: '#9a7650', barn: '#a4553b', logs: '#8e6a44', white: '#f2ece0', felt: '#d9c9a0', adobe: '#d7b48a'
@@ -174,10 +174,16 @@ function windowSlots(a, b, ww, door, cx, dw) {
    north-south and the front shows the gable end. It keeps inside its footprint. */
 function house(K, o, p) {
   const { FW, FD } = K, ins = p.inset ?? 4, x0 = ins, x1 = FW - ins, yb = FD - 5 - Math.round((p.lift || 0) * HS);
-  /* the wall takes what it needs, up to all but the room a roof needs above it */
-  const wallH = Math.round(Math.min((p.wallH ?? 24) * HS, yb - Math.max(16, FD * 0.28))), rise = Math.round((p.rise ?? 16) * HS);
+  /* The roof keeps its own proportion: on a house standing broadside its slope shows about four tenths of the
+     footprint's depth (steeper for thatch, lower for a hipped roof), so a cottage and a townhouse carry roofs of one
+     pitch; a two-storey house on a single tile takes a lower pitch, as a townhouse does, so both its storeys keep
+     their full height. The wall takes what it needs below it, and anything left over at the back of the footprint is
+     ground. */
+  const tall = (p.floors || 1) > 1 && FD <= T;   /* two storeys on one tile: a lower-pitched roof keeps both storeys full height */
+  const roofH = Math.round(FD * (tall ? 0.29 : p.roof === 'thatch' ? 0.44 : p.hip ? 0.36 : 0.4));
+  const wallH = Math.round(Math.min((p.wallH ?? 24) * HS, yb - roofH - 2)), rise = Math.round((p.rise ?? 16) * HS);
   const Wl = R(WALL[p.wall] || p.wall || WALL.plaster), Rf = R(ROOF[p.roof] || p.roof), floors = p.floors || 1, top = yb - wallH, floorH = wallH / floors;
-  const ov = p.overhang ?? 4, ridgeX = p.ridge ? p.ridge === 'x' : FW >= FD, door = p.door !== false && o.face !== 2;
+  const ov = p.overhang ?? 6, ridgeX = p.ridge ? p.ridge === 'x' : FW >= FD, door = p.door !== false && o.face !== 2;
   /* the east wall: a strip sw wide beside the front, turned away from the light */
   const sw = Math.max(4, Math.round((x1 - x0) * 0.09)), k = 0, xf = x1 - sw;
   const tex = (x, y) => wallTone(p.wallTex || p.wall, Wl, x, y, x0, xf, floorH, top);
@@ -191,7 +197,7 @@ function house(K, o, p) {
   const Pl = R('#b5aa94');
   K.rect(x0, yb - 4, xf, yb, (x, y) => (y === yb - 4 ? Pl[1] : ((x + (y % 2) * 3) % 7 === 0 ? Pl[4] : Pl[2])));
   K.poly([[xf, yb], [x1, yb - k], [x1, yb - k - 4], [xf, yb - 4]], Pl[3]);
-  const dx = p.doorX ?? (x0 + xf) / 2, doorW = Math.round((p.doorW || 10) * 1.6), doorH = Math.min(wallH - 10, Math.max(Math.round(floorH - 5), 30), Math.round((p.doorH || 16) * 2.1));
+  const dx = p.doorX ?? (x0 + xf) / 2, doorW = Math.round((p.doorW || 10) * 1.6), doorH = Math.min(wallH - 8, Math.max(Math.round(floorH - 3), 27), Math.round((p.doorH || 16) * 2.1));
   if (p.windows !== false) {
     for (let f = 0; f < floors; f++) {
       const wh = Math.min(18, Math.round(floorH * 0.4)), wy = Math.round(top + floorH * (floors - 1 - f) + (floorH - wh) * (f ? 0.45 : 0.36)), ww = Math.round((p.winW || 6) * 2);
@@ -200,21 +206,22 @@ function house(K, o, p) {
   }
   if (door) doorAt(K, dx, yb, doorW, doorH, { col: p.doorCol, arch: p.arch, open: p.open });
   if (ridgeX) {
-    /* The roof fills the footprint above both walls: its south slope from the eave up to a capped ridge, straight
-       along every edge, lighter toward the ridge and darker toward the eave, its east end (over the east wall) in
-       shade. */
-    const ridge = Math.min(top - 10, 2), eave = top + ov, l = x0 - ov, r = x1 + ov, hip = Math.min(rise, (eave - ridge) * 0.8), span = eave - ridge;
+    /* The roof over both walls: its south slope from a thick eave up to a capped ridge roofH above the wall, square
+       along every edge, overhanging the walls, lighter toward the ridge where it faces the sky and darker toward the
+       eave, its east end (over the east wall) in shade. */
+    const eave = top + ov, ridge = Math.max(1, eave - roofH - ov), l = x0 - ov, r = x1 + ov, span = eave - ridge, hip = Math.min(rise, span * 0.75);
     const pts = p.hip ? [[l, eave], [l + hip, ridge], [r - hip, ridge], [r, eave]] : [[l, eave], [l, ridge], [r, ridge], [r, eave]];
-    K.poly(pts, (x, y) => { const v = eave - y, band = v < 3 ? 1 : v > span * 0.72 ? -1 : 0; return roofTone(p.roof, Rf, x, v, band + (x >= xf + ov - 1 ? 1 : 0)) || Rf[1]; });
+    K.poly(pts, (x, y) => { const v = eave - y, band = v < 4 ? 1 : v > span * 0.66 ? -1 : 0; return roofTone(p.roof, Rf, x, v, band + (x >= xf + ov - 1 ? 1 : 0)) || Rf[1]; });
     /* the ridge cap: a row of capping tiles, lit along its top */
     const c0 = l + (p.hip ? hip : 0), c1 = r - (p.hip ? hip : 0);
-    K.rect(c0, ridge, c1, ridge + 3, (x, y) => (y === ridge ? Rf[0] : y === ridge + 2 ? Rf[4] : (x - c0) % 5 === 0 ? Rf[3] : Rf[1]));
-    if (!p.hip) { K.rect(l, ridge, l + 1, eave, Rf[3]); K.rect(r - 1, ridge, r, eave, Rf[4]); }
-    /* the fascia under the eave, lit along its top, and its shadow on the walls */
-    K.rect(l, eave - 1, r, eave + 1, (x, y) => (y === eave - 1 ? Rf[1] : inked(Rf[4], 0.4)));
-    K.rect(x0, eave + 1, xf, eave + 4, (x, y) => mix(tex(x, y), INK, y === eave + 1 ? 0.45 : 0.25));
-    if (p.chimney) chimney(K, Math.round(x0 + (xf - x0) * 0.7), Math.round(ridge + span * 0.4), 10, p.chimney > 1);
-    if (p.dormer && span > 18) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (xf - x0) * fx), cy = Math.round(ridge + span * 0.5); K.poly([[cx - 8, cy + 2], [cx, cy - 7], [cx + 8, cy + 2]], Rf[1]); K.rect(cx - 6, cy + 2, cx + 6, cy + 10, Wl[2]); windowAt(K, cx - 3, cy + 3, 6, 6, {}); }
+    K.rect(c0, ridge, c1, ridge + 4, (x, y) => (y === ridge ? Rf[0] : y === ridge + 3 ? Rf[4] : (x - c0) % 7 === 0 ? Rf[3] : Rf[1]));
+    if (!p.hip) { K.rect(l, ridge, l + 2, eave, (x) => Rf[x === l ? 3 : 1]); K.rect(r - 2, ridge, r, eave, (x) => (x === r - 1 ? inked(Rf[4], 0.4) : Rf[3])); }
+    else { K.line(l, eave, l + hip, ridge, Rf[1]); K.line(r - 1, eave, r - 1 - hip, ridge, Rf[4]); }
+    /* a thick eave: the fascia board lit along its top, its underside in shadow, and that shadow cast on the wall */
+    K.rect(l, eave - 1, r, eave + 3, (x, y) => (y === eave - 1 ? Rf[0] : y <= eave ? Rf[2] : inked(Rf[4], 0.45)));
+    K.rect(x0, eave + 3, xf, eave + 6, (x, y) => mix(tex(x, y), INK, y === eave + 3 ? 0.45 : 0.22));
+    if (p.chimney) chimney(K, Math.round(x0 + (xf - x0) * 0.7), Math.round(ridge + span * 0.38), 12, p.chimney > 1);
+    if (p.dormer && span > 24) for (const fx of [0.3, 0.7]) { const cx = Math.round(x0 + (xf - x0) * fx), cy = Math.round(ridge + span * 0.5); K.poly([[cx - 9, cy + 2], [cx, cy - 8], [cx + 9, cy + 2]], Rf[1]); K.rect(cx - 7, cy + 2, cx + 7, cy + 12, Wl[2]); windowAt(K, cx - 4, cy + 3, 8, 7, {}); }
     return { ridge, eave, top, yb, x0, x1: xf };
   }
   /* Ridge north-south: the gable end in front and the two slopes running back from it, drawn as parallelograms so
