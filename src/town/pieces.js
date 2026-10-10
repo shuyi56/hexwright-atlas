@@ -123,14 +123,17 @@ function wallTone(tex, P, x, y, wx0, wx1, floorH, top) {
     if (fl < B) return fl === 0 ? TIMBER[0] : fl === 1 ? TIMBER[grain(x, Math.floor(ly / floorH))] : TIMBER[4];
     /* the posts */
     if (px < B && !endEast) return px < 1 ? TIMBER[1] : px < 2 ? TIMBER[grain(y, Math.floor(lx / pw) + 50)] : TIMBER[4];
-    /* the braces, in the end panels, running from a post's foot up to the next post's head */
-    const panel = Math.floor(lx / pw), d = panel === 0 ? px - B - (fl - B) * (pw - B) / (floorH - B) : panel === n - 1 && n > 1 ? (pw - px) - (fl - B) * (pw - B) / (floorH - B) : 99;
-    const sd = panel === 0 ? d : -d;   /* signed so that positive is east of the brace */
-    if (Math.abs(d) < 1.5) return sd < -0.5 ? TIMBER[1] : sd > 0.5 ? TIMBER[4] : TIMBER[2];
+    /* The braces, in the end panels: rising from the foot of the end post toward the next one at a clean pitch (one
+       up for one across, or two up for one across in a tall panel) so the steps along them repeat evenly. Measured
+       in rows above the brace's lower edge (e), it is three rows thick: lit on top, dark below. */
+    const panel = Math.floor(lx / pw), slope = floorH - B > 1.6 * (pw - B) ? 2 : 1, inEnd = panel === 0 || (panel === n - 1 && n > 1);
+    const run = panel === 0 ? Math.floor(px) - B : Math.floor(pw) - 1 - Math.floor(px), e = inEnd ? (floorH - 1 - fl) - run * slope : 99;
+    if (run >= 0 && e >= 0 && e < 3 * slope) return e >= 3 * slope - slope ? TIMBER[1] : e < slope ? TIMBER[4] : TIMBER[2];
+    const sd = run >= 0 && e < 0 && e >= -2 * slope ? -e : 0;
     /* shadow cast on the plaster below a rail, east of a post, east of a brace */
     if (fl < B + 2) return fl === B ? P[4] : P[3];
     if (px < B + 2 && !endEast) return px < B + 1 ? P[4] : P[3];
-    if (sd >= 1.5 && sd < 3.2) return sd < 2.3 ? P[4] : P[3];
+    if (sd) return sd <= slope ? P[4] : P[3];
     /* lime-washed plaster */
     const m = vnoise_(x / 6, y / 6) * 0.7 + vnoise_(x / 2.5, y / 2.5) * 0.3, f = h2(x, y, 5);
     return f < 0.03 ? P[3] : m > 0.66 ? P[1] : m < 0.3 ? mix(P[2], P[3], 0.45) : P[2];
@@ -226,7 +229,7 @@ function house(K, o, p) {
      ground. */
   const tall = (p.floors || 1) > 1 && FD <= T;   /* two storeys on one tile: a lower-pitched roof keeps both storeys full height */
   const roofH = Math.round(FD * (tall ? 0.29 : p.roof === 'thatch' ? 0.44 : p.hip ? 0.36 : 0.4));
-  const wallH = Math.round(Math.min((p.wallH ?? 24) * HS, yb - roofH - 2)), rise = Math.round((p.rise ?? 16) * HS);
+  const wallH = Math.round(Math.min((p.wallH ?? 24) * HS, yb - roofH - 2));
   const Wl = R(WALL[p.wall] || p.wall || WALL.plaster), Rf = R(ROOF[p.roof] || p.roof), floors = p.floors || 1, top = yb - wallH, floorH = wallH / floors;
   const ov = p.overhang ?? 6, ridgeX = p.ridge ? p.ridge === 'x' : FW >= FD, door = p.door !== false && o.face !== 2;
   /* the east wall: a strip sw wide beside the front, turned away from the light */
@@ -257,7 +260,11 @@ function house(K, o, p) {
     /* The roof over both walls: its south slope from a thick eave up to a capped ridge roofH above the wall, square
        along every edge, overhanging the walls, lighter toward the ridge where it faces the sky and darker toward the
        eave, its east end (over the east wall) in shade. */
-    const eave = top + ov, ridge = Math.max(1, eave - roofH - ov), l = x0 - ov, r = x1 + ov, span = eave - ridge, hip = Math.min(rise, span * 0.75);
+    const eave = top + ov, l = x0 - ov, r = x1 + ov;
+    let ridge = Math.max(1, eave - roofH - ov);
+    /* a hipped roof's ends slope at 45°, so their steps repeat evenly; a short ridge brings the roof down to meet them */
+    const hip = p.hip ? Math.min(eave - ridge, Math.floor((r - l) / 2) - 8) : 0; if (p.hip) ridge = eave - hip;
+    const span = eave - ridge;
     const pts = p.hip ? [[l, eave], [l + hip, ridge], [r - hip, ridge], [r, eave]] : [[l, eave], [l, ridge], [r, ridge], [r, eave]];
     K.poly(pts, (x, y) => { const v = eave - y, band = v < 4 ? 1 : v > span * 0.66 ? -1 : 0; return roofTone(p.roof, Rf, x, v, band + (x >= xf + ov - 1 ? 1 : 0)) || Rf[1]; });
     /* the ridge cap: a row of capping tiles, lit along its top */
@@ -276,7 +283,7 @@ function house(K, o, p) {
      the ridge, the eaves and the bargeboards all keep one pitch. The gable rises gh above the wall; at the back the
      ridge meets the top of the footprint and the eaves sit gh below it, as they do at the front. The east slope is
      in shade. */
-  const cx = Math.round((x0 + xf) / 2), gh = Math.round(Math.min(rise * 1.2, (xf - x0) * 0.42)), apex = top - gh, back = 2, l = x0 - ov, r = x1 + ov;
+  const cx = Math.round((x0 + xf) / 2), gh = cx - x0, apex = top - gh, back = 2, l = x0 - ov, r = x1 + ov;   /* a 45° gable: its steps run one across for one up */
   const slope = (x, side) => gh * (side ? r - x : x - l) / (side ? r - cx : cx - l);   /* how far the slope's top edge drops at x */
   K.poly([[l, back + gh], [cx, back], [cx, apex], [l, top + ov]], (x, y) => { const v = x - l, edge = y - back - (gh - slope(x, 0)); return roofTone(p.roof, Rf, y, v, edge < 2 ? -1 : 0) || Rf[1]; });
   K.poly([[cx, back], [r, back + gh], [r, top + ov], [cx, apex]], (x, y) => roofTone(p.roof, Rf, y, r - x, 1) || Rf[3]);
@@ -284,7 +291,7 @@ function house(K, o, p) {
   K.rect(cx - 2, back, cx, apex, Rf[0]); K.rect(cx, back, cx + 2, apex, Rf[4]);
   K.rect(l, back + gh, l + 1, top + ov, Rf[3]); K.rect(r - 1, back + gh, r, top + ov, inked(Rf[4], 0.4));
   /* the gable end: the wall carried up to the apex, with a window in it, under bargeboards that stand proud */
-  K.poly([[x0, top + 1], [cx, apex + 3], [xf, top + 1]], tex);
+  K.poly([[x0, top + 1], [cx, apex + 1], [cx + (cx - x0), top + 1]], tex);
   if (gh > 18) windowAt(K, cx - 4, Math.round(apex + gh * 0.45), 8, Math.min(12, Math.round(gh * 0.3)), { arch: p.arch, glass: p.glass });
   for (let i = 0; i < 3; i++) {
     const c = i === 0 ? Rf[1] : i === 1 ? Rf[2] : inked(Rf[4], 0.45);
@@ -314,7 +321,8 @@ function tower(K, cx, yb, r, wallH, p) {
     K.oval(cx, topY, r, ry, (x, y) => (Math.hypot((x + 0.5 - cx) / r, (y + 0.5 - topY) / ry) > 0.72 ? Wl[1] : R('#8a8f90')[2]));
     for (let x = Math.floor(cx - r); x < cx + r; x += 4) { const t = (x + 2 - cx) / r, a = Math.sqrt(Math.max(0, 1 - t * t)) * ry; K.rect(x, topY + a - 4, x + 2, topY + a + 1, tone(x, Wl)); }
   } else if (p.top === 'cone') {
-    const Rf = R(ROOF[p.roof] || p.roof), rise = p.rise ?? r * 2.2, rr = r + 2;
+    /* a cone's flanks rise a whole number of pixels for each one across, so their steps repeat evenly */
+    const Rf = R(ROOF[p.roof] || p.roof), rr = r + 2, rise = Math.max(1, Math.round((p.rise ?? r * 2.2) / rr)) * rr;
     for (let x = Math.floor(cx - rr); x < cx + rr; x++) {
       const t = (x + 0.5 - cx) / rr, a = Math.sqrt(Math.max(0, 1 - t * t)) * (ry + 1), y0 = topY - rise * (1 - Math.abs(t));
       for (let y = Math.floor(y0); y < topY + a + 1; y++) { const v = Math.floor(topY + a - y); K.set(x, y, roofTone(p.roof, Rf, x, v, t > 0.35 ? 1 : t < -0.45 ? -1 : 0) || Rf[1]); }
