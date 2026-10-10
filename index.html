@@ -133,7 +133,7 @@
   </div>
 </div>
 <div class="tactical" id="tactical" hidden tabindex="-1" aria-label="Tactical view">
-  <canvas id="tcCanvas" role="img" aria-label="Tactical view of the map. Click a unit, then a blue tile to move it or a unit on a red tile to attack it; drag to pan; scroll to zoom."></canvas>
+  <canvas id="tcCanvas" role="img" aria-label="Tactical view of the map. Click a unit, then a blue tile to move it there; its actions open once it arrives, and Attack lights red tiles where a unit can be struck. Right-click steps back; drag to pan; scroll to zoom."></canvas>
   <div class="tc-bar">
     <button class="btn" id="tcBack">← Editor</button>
     <div class="tc-title"><span class="eyebrow">tactical view</span><span id="tcName"></span></div>
@@ -147,7 +147,7 @@
   <div class="tc-win tc-tile" id="tcTile" aria-live="polite"></div>
   <div class="tc-win tc-menu" id="tcMenu" hidden role="group" aria-label="Actions"><button id="tcActMove" aria-pressed="false">Move <kbd>1</kbd></button><button id="tcActAttack" aria-pressed="false">Attack <kbd>2</kbd></button><button id="tcActWait">Wait <kbd>3</kbd></button></div>
   <div class="tc-win tc-unit" id="tcUnit" hidden><canvas id="tcFace" width="72" height="72"></canvas><div><b id="tcUnitName"></b><span class="tc-hp" id="tcUnitHp" aria-hidden="true"><i></i></span><span id="tcUnitInfo"></span><span id="tcUnitMove"></span></div></div>
-  <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · 1/2/3 move, attack, wait · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc back</span></div>
+  <div class="tc-hint"><span id="tcHint"></span><span class="tc-keys">arrows move · Enter acts · Tab next unit · 1/2/3 move, attack, wait · Q/E turn · +/− zoom · F 2× walk · PgUp/PgDn storey · Esc or right-click back</span></div>
 </div>
 <div class="tactical town" id="town" hidden tabindex="-1" aria-label="Town view">
   <canvas id="twCanvas" role="img" aria-label="Town view of the map, seen from above. Walk the hero with the arrow keys, by clicking a tile, or on a touch screen by dragging a finger; Space or the Talk button talks to whoever they face."></canvas>

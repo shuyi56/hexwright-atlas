@@ -1,7 +1,7 @@
 import { characterById } from '../characters/library.js';
 import { FACES } from '../characters/draw.js';
 import { WALK } from '../characters/roster.js';
-import { ED, LEVEL_NAME, mutate } from '../editor/editor.js';
+import { ED, LEVEL_NAME, mutate, undo } from '../editor/editor.js';
 import { MAX_LEVEL, levelOf } from '../editor/model.js';
 import { walkChar } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
@@ -18,8 +18,10 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    after the cursor and the unit on the move. Pick a unit (click it, Enter on it, or Tab through them) and its move
    range lights up in blue; the route to the tile under the cursor is traced in gold; click a lit tile (or Enter)
    and it walks there, hopping up and down ledges, while the camera follows. Moves are edits of the map, on the
-   editor's undo stack. A picked unit has an actions window: Move, Attack (its pattern and range light up in red;
-   pick a unit of the other side there to strike it for its Attack) and Wait, beside the unit on screen. A unit
+   editor's undo stack. Once it has arrived (or been picked again to stay where it is) its actions window opens
+   beside it, as in the tactics games: Move, Attack (its pattern and range light up in red; pick a unit of the
+   other side there to strike it for its Attack) and Wait. Esc or a right-click steps back: from the attack to the
+   window, from the window to the move (taking the move back if it walked), from the move to no unit. A unit
    struck shows its health bar over its head for a moment, draining. Each unit moves once and acts once a round; once every
    unit still standing has done both, a new round begins. Hit points are the battle's, not the map's: they start
    full each time the view opens, and a unit brought to 0 stays where it fell, faded. Arrow keys or WASD move the cursor a tile at a time along the grid, Q and E turn the view,
@@ -27,7 +29,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 /* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
    what an overlay changes */
-const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, range: null, reach: null, hp: new Map(), turn: new Map(), pop: null, note: '', walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, from: null, range: null, reach: null, hp: new Map(), turn: new Map(), pop: null, note: '', walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
@@ -63,6 +65,8 @@ function startWalk(k, path) {
   const jump = unitFor(c.sprite).movement.jump, r = mutate(M2 => { const w = walkChar(M2, k, path, jump); return { changed: w.ok && path.length ? 1 : 0, ok: w.ok }; });
   if (!r || !r.ok) return false;
   TC.walk = { k, pts: [start, ...path.map(([x, y, L]) => ptOf(x, y, L || 0))], d: 0 }; TC.locked = false; TC.free = false;
+  /* the map as it was before the walk, for taking the move back from the actions window */
+  TC.from = { k, snap: ED.undo[ED.undo.length - 1] };
   TC.range = null; rebuild();
   return true;
 }
@@ -117,23 +121,46 @@ function setCursor(x, y, L, follow) {
   TC.cursor = { x, y, L }; if (follow) { const [ax, ay] = tileArt(x, y, L); keepInView(ax, ay - 16); }
   TC.dirty = true; panels();
 }
-/* pick unit k (-1 for none) with an action ready: mode, or the first of move and attack it has left this round */
-function select(k, mode) {
-  TC.sel = k; TC.mode = null; TC.range = null; TC.reach = null; TC.dirty = true;
+/* pick unit k (-1 for none): a unit yet to move shows its move range, with the actions window shut until it has
+   moved; one that has moved but not acted opens its actions window */
+function select(k) {
+  if (k !== TC.sel) TC.from = null;
+  TC.sel = k; TC.mode = null; TC.menu = false; TC.range = null; TC.reach = null; TC.dirty = true;
   if (k >= 0) {
     const c = ED.M.chars[k], t = turnOf(k); TC.note = '';
-    setMode(mode !== undefined ? mode : !t.moved ? 'move' : !t.acted ? 'attack' : null);
+    if (!t.moved) setMode('move'); else if (!t.acted) openMenu();
     if (levelOf(c) > TC.top) setTop(levelOf(c));
     setCursor(c.x, c.y, levelOf(c)); const [ax, ay] = tileArt(c.x, c.y, levelOf(c)); lookAt(ax, ay - 20);
   }
   panels();
 }
-/* the picked unit's action: 'move' lights its move range, 'attack' what its attack reaches, null neither */
+/* the picked unit's action: 'move' lights its move range, 'attack' what its attack reaches, null neither; choosing
+   one shuts the actions window */
 function setMode(m) {
   const k = TC.sel, t = k >= 0 ? turnOf(k) : null;
   if (!t || (m === 'move' && t.moved) || (m === 'attack' && t.acted)) m = null;
+  if (m) TC.menu = false;
   TC.mode = m; TC.range = m === 'move' ? rangeOf(k) : null; TC.reach = m === 'attack' ? reachOf(k) : null; TC.dirty = true;
   panels();
+}
+/* open the picked unit's actions window, with nothing lit until an action is chosen */
+function openMenu() { if (TC.sel < 0 || done(TC.sel)) return; TC.menu = true; setMode(null); }
+/* the walk unit k just made can still be taken back: nothing else has been done to the map since */
+const canUndoMove = k => !!TC.from && TC.from.k === k && turnOf(k).moved && !turnOf(k).acted && ED.undo[ED.undo.length - 1] === TC.from.snap;
+/* put the picked unit back where it stood before its walk, ready to move again */
+function undoMove() {
+  const k = TC.sel; if (!canUndoMove(k)) return false;
+  undo(); TC.from = null; TC.turn.set(k, { ...turnOf(k), moved: false }); rebuild();
+  select(k); return true;
+}
+/* Esc or a right-click: one step back */
+function back() {
+  if (TC.walk) return true;
+  const k = TC.sel; if (k < 0) return false;
+  if (TC.mode === 'attack') openMenu();
+  else if (TC.menu && !turnOf(k).moved) { TC.menu = false; setMode('move'); }
+  else if (!(TC.menu && undoMove())) select(-1);
+  return true;
 }
 /* how far unit k moves and climbs, and how far and in what pattern it strikes, come from its data (data/units/), looked up by its sprite */
 function rangeOf(k) { const { move, jump } = unitFor(ED.M.chars[k].sprite).movement; return moveRange(ED.M, k, move, jump); }
@@ -161,14 +188,15 @@ function finish(k) {
 }
 function attack(a, d) {
   const dmg = statsOf(a).attack, was = hpOf(d), hp = Math.max(0, was - dmg), max = Math.max(1, statsOf(d).hp);
-  TC.hp.set(d, hp); spend(a, 'acted');
+  TC.hp.set(d, hp); spend(a, 'acted'); TC.from = null;
   TC.pop = { k: d, text: String(dmg), t: 0, from: was / max, to: hp / max };
   const note = `${nameOf(a)} hits ${nameOf(d)} for ${dmg}${hp ? '' : `. ${nameOf(d)} falls`}`;
   finish(a); TC.note = note; panels();
 }
-function wait() { const k = TC.sel; if (k < 0 || TC.walk) return; spend(k, 'moved'); spend(k, 'acted'); finish(k); }
+function wait() { const k = TC.sel; if (k < 0 || TC.walk) return; spend(k, 'moved'); spend(k, 'acted'); TC.from = null; finish(k); }
 /* Enter or a click on (x, y, L): strike the unit there if the picked unit is attacking and reaches it, pick up the
-   unit there, or send the picked unit there if it can reach it */
+   unit there, send the picked unit there if it can reach it, or open its actions window where it stands if it is
+   picked again */
 function act(x, y, L) {
   if (TC.walk) return;
   let u = unitAt(x, y, L);
@@ -176,9 +204,15 @@ function act(x, y, L) {
   if (u >= 0 && !alive(u)) u = -1;
   if (u >= 0 && u !== TC.sel) { select(u); return; }
   if (TC.sel < 0) return;
-  if (u === TC.sel) { select(-1); return; }
-  const k = TC.sel, path = TC.range && routeTo(TC.range, placeId(ED.M, x, y, L));
-  if (path && path.length) { if (startWalk(k, path)) spend(k, 'moved'); } else select(-1);
+  const k = TC.sel;
+  if (TC.mode === 'move') {
+    if (u === k) { openMenu(); return; }
+    const path = routeTo(TC.range, placeId(ED.M, x, y, L));
+    if (path && path.length) { if (startWalk(k, path)) spend(k, 'moved'); } else select(-1);
+  }
+  /* off the red tiles, back to the actions window; with the window open a stray click leaves it be */
+  else if (TC.mode === 'attack') openMenu();
+  else if (!TC.menu) select(-1);
 }
 function setTop(L) { L = Math.max(0, Math.min(MAX_LEVEL, L)); if (L === TC.top) return; TC.top = L; rebuild(); if (TC.cursor) setCursor(TC.cursor.x, TC.cursor.y, Math.min(TC.cursor.L, L)); panels(); }
 function turn(d) {
@@ -208,15 +242,16 @@ function panels() {
   }
   /* the actions window for the picked unit */
   const menu = $('tcMenu'), t = TC.sel >= 0 ? turnOf(TC.sel) : null;
-  menu.hidden = !t || !!TC.walk;
+  menu.hidden = !t || !TC.menu || !!TC.walk;
   if (t) {
     $('tcActMove').disabled = t.moved; $('tcActAttack').disabled = t.acted;
     $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move')); $('tcActAttack').setAttribute('aria-pressed', String(TC.mode === 'attack'));
   }
   $('tcHint').textContent = TC.walk ? 'On the move…'
-    : TC.mode === 'move' ? 'Pick a blue tile to move there · Esc to cancel'
-    : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to attack it · Esc to cancel' : 'No one in reach: move, or Wait to end this unit\'s turn')
-    : TC.sel >= 0 ? 'Choose an action'
+    : TC.mode === 'move' ? 'Pick a blue tile to move there, or the unit to stay put · Esc to cancel'
+    : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to attack it · Esc to go back' : 'No one in reach · Esc to go back')
+    : TC.menu ? (canUndoMove(TC.sel) ? 'Choose an action · Esc to take the move back' : 'Choose an action · Esc to go back')
+    : TC.sel >= 0 && done(TC.sel) ? 'This unit is done for the round'
     : TC.note ? TC.note
     : (M.chars || []).length ? 'Click a unit or press Tab to pick one' : 'No one stands on this map: place characters in the editor first';
 }
@@ -310,7 +345,7 @@ function placeAt(e) {
   const hit = pickTile(TC.sc, wx, wy); if (!hit) return null;
   const t = toModel(hit.u); return [t % S(), (t / S()) | 0, hit.L];
 }
-cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); TC.drag = { x: e.clientX, y: e.clientY, cam: [TC.cam.x, TC.cam.y], moved: false }; });
+cv.addEventListener('pointerdown', e => { if (e.button !== 0) return; cv.setPointerCapture(e.pointerId); TC.drag = { x: e.clientX, y: e.clientY, cam: [TC.cam.x, TC.cam.y], moved: false }; });
 cv.addEventListener('pointermove', e => {
   const d = TC.drag;
   if (d) {
@@ -324,6 +359,8 @@ cv.addEventListener('pointerup', e => {
   const d = TC.drag; TC.drag = null; cv.style.cursor = ''; if (!d || d.moved) return;
   const p = placeAt(e); if (p) { setCursor(p[0], p[1], p[2], false); act(p[0], p[1], p[2]); }
 });
+/* a right-click steps back, as Esc does */
+cv.addEventListener('contextmenu', e => { e.preventDefault(); if (back()) req(); });
 cv.addEventListener('wheel', e => { e.preventDefault(); const i = ZOOMS.indexOf(TC.zoom); setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + (e.deltaY < 0 ? 1 : -1)))]); }, { passive: false });
 /* the arrow keys step along the grid as it is seen: up is up-right (view -y), right is down-right (view +x) */
 const STEPS = { ArrowUp: [0, -1], w: [0, -1], ArrowRight: [1, 0], d: [1, 0], ArrowDown: [0, 1], s: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0] };
@@ -344,7 +381,7 @@ root.addEventListener('keydown', e => {
   else if (k === '1') { if (TC.sel >= 0 && !TC.walk) setMode('move'); }
   else if (k === '2') { if (TC.sel >= 0 && !TC.walk) setMode('attack'); }
   else if (k === '3') wait();
-  else if (k === 'Escape') { if (TC.sel >= 0) select(-1); else closeTactical(); }
+  else if (k === 'Escape') { if (!back()) closeTactical(); }
   else if (k === 'q' || k === '[') turn(-1); else if (k === 'e' || k === ']') turn(1);
   else if (k === '+' || k === '=') setZoom(TC.zoom + 1); else if (k === '-' || k === '_') setZoom(TC.zoom - 1);
   else if (k === 'f') setFast(!TC.fast);
@@ -384,6 +421,6 @@ $('tcActWait').addEventListener('click', () => { wait(); req(); root.focus({ pre
 $('editor').addEventListener('keydown', e => { if (ED.open && !TC.open && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTactical(); } });
 new ResizeObserver(() => { if (TC.open) { size(); req(); } }).observe(root);
 /* test hook: the camera, cursor and units as the view has them */
-window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, select, setCursor, setMode, turn, wait };
+window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, back, select, setCursor, setMode, turn, undoMove, wait };
 
 export { closeTactical, openTactical };
