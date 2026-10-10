@@ -22,6 +22,7 @@ const T = TILE, INK = hexRgb(OUTLINE), SHADOW = [43, 33, 22, 72];
 const ramps = new Map();
 const R = hex => { let r = ramps.get(hex); if (!r) { r = ramp(hex).map(hexRgb); ramps.set(hex, r); } return r; };
 const h2 = (x, y, s = 0) => { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(s + 0x9e37, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
+const vnoise_ = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, a = h2(xi, yi, 31), b = h2(xi + 1, yi, 31), c = h2(xi, yi + 1, 31), d = h2(xi + 1, yi + 1, 31); return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy; };
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const inked = (c, k = 0.5) => mix(c, INK, k);
 
@@ -88,7 +89,13 @@ function roofTone(tex, P, u, v, plane = 0) {
   /* u runs along the eave, v up the slope from it; courses sized for the town's big houses */
   let t;
   if (tex === 'thatch') { const row = Math.floor(v / 5), m = v % 5; t = m === 4 ? 3 : h2(u, row, 3) < 0.26 ? 3 : h2(u, row, 4) < 0.2 ? 1 : 2; if (m === 0 && h2(u, row, 5) < 0.4) t = 1; }
-  else if (tex === 'tiles') { const row = Math.floor(v / 5), m = v % 5, c = ((u + (row % 2) * 3) % 6 + 6) % 6; t = m === 0 ? 4 : c === 0 ? 3 : m === 4 && c < 3 ? 1 : 2; }
+  else if (tex === 'tiles') {
+    /* curved clay tiles: each course casts a shadow on the one below where it overlaps; across a tile, a dark gap,
+       then its lit rounded crest, then the body turning away; some tiles fired a shade darker or paler */
+    const row = Math.floor(v / 6), m = v % 6, uu = u + (row % 2) * 3, c = ((uu % 6) + 6) % 6, tile = Math.floor(uu / 6), vary = h2(tile, row, 13);
+    if (m === 0) t = 4; else if (m === 1) t = c === 0 ? 4 : 3;
+    else { t = c === 0 ? 4 : c === 1 ? 1 : c === 2 ? (m === 5 ? 0 : 1) : c === 5 ? 3 : 2; if (vary < 0.18 && t > 0 && t < 4) t++; else if (vary > 0.88 && t > 1) t--; }
+  }
   else if (tex === 'slate' || tex === 'lead') { const row = Math.floor(v / 4), m = v % 4, c = ((u + (row % 2) * 4) % 8 + 8) % 8; t = m === 0 ? 4 : c === 0 ? 3 : h2(Math.floor((u + (row % 2) * 4) / 8), row, 7) < 0.25 ? 1 : 2; }
   else if (tex === 'shingle') { const row = Math.floor(v / 4), m = v % 4, c = ((u + Math.floor(h2(row, 1) * 6)) % 6 + 6) % 6; t = m === 0 ? 4 : c === 0 ? 3 : 2; }
   else if (tex === 'copper') { t = ((u % 8) + 8) % 8 === 0 ? 3 : v % 9 === 0 ? 1 : 2; }
@@ -98,21 +105,35 @@ function roofTone(tex, P, u, v, plane = 0) {
 const WALL = {
   plaster: '#efe3c4', cream: '#e9d6ae', ochre: '#e6cfa6', rose: '#e9c4b2', stone: '#d8cfb9', grey: '#c4bcab', planks: '#9a7650', barn: '#a4553b', logs: '#8e6a44', white: '#f2ece0', felt: '#d9c9a0', adobe: '#d7b48a'
 };
-const TIMBER = R('#7a5a3e');
+const TIMBER = R('#76553a');
 function wallTone(tex, P, x, y, wx0, wx1, floorH, top) {
   if (tex === 'stone' || tex === 'grey') { const row = Math.floor(y / 5), m = ((y % 5) + 5) % 5, c = ((x + (row % 2) * 4) % 8 + 8) % 8; return P[m === 4 ? 4 : c === 0 ? 3 : m === 0 ? 1 : h2(Math.floor((x + (row % 2) * 4) / 8), row, 9) < 0.25 ? 3 : 2]; }
   if (tex === 'planks' || tex === 'barn') { const c = ((x % 4) + 4) % 4; return P[c === 0 ? 4 : c === 1 ? 1 : h2(Math.floor(x / 4), Math.floor(y / 14), 3) < 0.3 ? 3 : 2]; }
   if (tex === 'logs') { const m = ((y % 4) + 4) % 4; return P[m === 0 ? 1 : m === 3 ? 4 : 2]; }
   if (tex === 'timber') {
-    /* Plaster panels in a timber frame: a post at the west end and every 15 pixels, a rail at each floor, a brace in
-       the end panels. Beams are a mid brown, a step lighter on the top or west edge, so a shadow cast over the wall
-       still darkens them visibly and the frame never reads as part of the shading. The east end is left to the
-       corner and the shaded east wall. */
+    /* Plaster panels set back in a timber frame: a post at the west end and every 15 pixels, a rail at each floor, a
+       brace in the end panels. The beams are three pixels thick and stand proud of the wall: lit along their top and
+       west edges, dark along their undersides and east edges, wood grain running along them; each casts a shadow two
+       pixels deep on the plaster below and to its east, so the panels read as recessed. The plaster is lime-washed,
+       mottled, with the odd fleck. The east end is left to the corner and the shaded east wall. */
     const lx = x - wx0, ly = y - top, fl = ((ly % floorH) + floorH) % floorH, n = Math.max(1, Math.round((wx1 - wx0) / 15)), pw = (wx1 - wx0) / n, px = ((lx % pw) + pw) % pw;
-    if (fl < 2) return TIMBER[fl === 0 ? 1 : 2];
-    if (px < 2 && lx < wx1 - wx0 - 3) return TIMBER[px < 1 ? 1 : 2];
-    const panel = Math.floor(lx / pw), d = panel === 0 ? px - fl * pw / floorH : panel === n - 1 && n > 1 ? pw - px - fl * pw / floorH : 99; if (Math.abs(d) < 1.1) return TIMBER[2];
-    return P[h2(x, y, 5) < 0.06 ? 3 : 2];
+    const endEast = lx >= wx1 - wx0 - 3, B = 3;
+    const grain = (a, b) => { const g = h2(Math.floor(a / 4), b, 21); return g < 0.25 ? 3 : g > 0.85 ? 1 : 2; };
+    /* the rails */
+    if (fl < B) return fl === 0 ? TIMBER[0] : fl === 1 ? TIMBER[grain(x, Math.floor(ly / floorH))] : TIMBER[4];
+    /* the posts */
+    if (px < B && !endEast) return px < 1 ? TIMBER[1] : px < 2 ? TIMBER[grain(y, Math.floor(lx / pw) + 50)] : TIMBER[4];
+    /* the braces, in the end panels, running from a post's foot up to the next post's head */
+    const panel = Math.floor(lx / pw), d = panel === 0 ? px - B - (fl - B) * (pw - B) / (floorH - B) : panel === n - 1 && n > 1 ? (pw - px) - (fl - B) * (pw - B) / (floorH - B) : 99;
+    const sd = panel === 0 ? d : -d;   /* signed so that positive is east of the brace */
+    if (Math.abs(d) < 1.5) return sd < -0.5 ? TIMBER[1] : sd > 0.5 ? TIMBER[4] : TIMBER[2];
+    /* shadow cast on the plaster below a rail, east of a post, east of a brace */
+    if (fl < B + 2) return fl === B ? P[4] : P[3];
+    if (px < B + 2 && !endEast) return px < B + 1 ? P[4] : P[3];
+    if (sd >= 1.5 && sd < 3.2) return sd < 2.3 ? P[4] : P[3];
+    /* lime-washed plaster */
+    const m = vnoise_(x / 6, y / 6) * 0.7 + vnoise_(x / 2.5, y / 2.5) * 0.3, f = h2(x, y, 5);
+    return f < 0.03 ? P[3] : m > 0.66 ? P[1] : m < 0.3 ? mix(P[2], P[3], 0.45) : P[2];
   }
   return P[h2(x, y, 5) < 0.07 ? 3 : h2(x, y, 6) < 0.04 ? 1 : 2];
 }
