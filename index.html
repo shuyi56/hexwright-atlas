@@ -188,7 +188,11 @@
   <div class="ed-body">
     <div class="ed-stage cm-stage">
       <canvas id="cmPreview" role="img" aria-label="The character in all four facings"></canvas>
-      <div class="ed-view"><button class="chip" id="cmWalk" aria-pressed="true" title="Walk in place, or stand">Walking</button></div>
+      <div class="ed-view cm-anim" role="group" aria-label="Animation">
+        <button class="chip" data-anim="stand" aria-pressed="false" title="Stand still">Standing</button>
+        <button class="chip" data-anim="walk" aria-pressed="true" title="Walk in place">Walking</button>
+        <button class="chip" data-anim="attack" aria-pressed="false" title="Wind up and strike, over and over">Attacking</button>
+      </div>
       <div class="ed-status" id="cmStatus" aria-live="polite">Changes save to your character library as you go.</div>
     </div>
     <aside class="ed-palette" aria-label="Choices"><div class="ed-items cm-choices" id="cmChoices"></div></aside>

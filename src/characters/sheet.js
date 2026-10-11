@@ -1,7 +1,7 @@
 import { ADVANCE, GLYPH_H, glyph, textWidth } from './font.js';
 import { H, OUTLINE, W, hexRgb, mixHex } from './pixels.js';
 import { BASE, BODY_TYPES } from './body.js';
-import { BODIES, ROSTER, WALK, render } from './roster.js';
+import { ATTACK, BODIES, POSES, ROSTER, WALK, attackOf, render } from './roster.js';
 import { ENEMIES } from './enemies.js';
 import { TOWNSFOLK } from './townsfolk.js';
 import { TERRAIN_BY_ID } from '../tiles/terrain.js';
@@ -13,7 +13,7 @@ import { TERRAIN_BY_ID } from '../tiles/terrain.js';
    grass tile, drawn as a pixel tile in the tile set's colours, so the sheet shows the figures against the ground
    they will walk on. South-east and north-west are the drawn views mirrored, as the games do. Below, everyone
    but the beasts in every build, so anyone can be read on any body. A second image (buildWalk) is the roster walking, as the
-   frames of an animation. Pure RGBA, so Node can write it (tools/character-sheet.mjs) and a test can check it. */
+   frames of an animation, and a third (buildAttack) the roster attacking. Pure RGBA, so Node can write it (tools/character-sheet.mjs) and a test can check it. */
 const FACINGS = [['SW', 'front', false], ['SE', 'front', true], ['NE', 'back', false], ['NW', 'back', true]];
 const C = { page: '#121819', win: ['#1d2829', '#141c1d'], rim: '#c9a45a', rimD: '#0b1011', text: '#ece2c8', dim: '#a39b86', shadow: '#4a341a' };
 /* the ground tile reaches this many sprite rows below the frame */
@@ -93,7 +93,7 @@ function buildSheet(roster = ROSTER, k = 4) {
     const y = head + 14 + r * (rowH + 10), frames = render(job);
     cv.win(margin - 10, y - 6, w - margin * 2 + 20, rowH);
     cv.text(job.name.toUpperCase(), margin + 8, y + rowH / 2 - 16, 3, C.text);
-    FACINGS.forEach(([, view, flip], f) => frames[view].forEach((rgba, p) => {
+    FACINGS.forEach(([, view, flip], f) => frames[view].slice(0, POSES).forEach((rgba, p) => {
       const x = margin + label + f * (3 * cell + gap) + p * cell, top = y + 2;
       groundTile(cv, x, top, k); cv.blit(rgba, x, top, k, flip);
     }));
@@ -117,12 +117,19 @@ function buildSheet(roster = ROSTER, k = 4) {
 
 /* The roster walking in place, a block of characters at a time: a window per facing with everyone in the block on
    their tiles, as the frames of an animation that steps through WALK. Returns { width, height, frames: [rgba, ...] }. */
-function buildWalk(roster = ROSTER, k = 3) {
+function buildWalk(roster = ROSTER, k = 3) { return animate(roster, k, WALK); }
+/* The roster attacking in place, laid out as the walk is, a beat to a frame: standing, the wind-up held, the strike
+   held a little longer, and standing again. An attack's frames are drawn moved forward by the figure's shift (roster.js
+   attackOf), so its feet stay on its tile. */
+const ATTACK_BEATS = [0, 0, ATTACK[0], ATTACK[0], ATTACK[1], ATTACK[1], ATTACK[1], 0];
+function buildAttack(roster = ROSTER, k = 3) { return animate(roster, k, ATTACK_BEATS); }
+/* the roster in blocks, a window per facing, one frame for each pose in beats */
+function animate(roster, k, beats) {
   const cell = W * k, step = Math.max(cell + 20, ...roster.map(j => textWidth(j.name.toUpperCase()) * 2 + 28)), groups = blocks(roster);
   const margin = 24, label = 70, head = 40, rowH = (H + TILE_DROP) * k + 12, blockH = head + FACINGS.length * (rowH + 10) + 14;
   const w = margin * 2 + label + Math.max(...groups.map(g => g.list.length)) * step, h = groups.length * blockH + margin;
   const all = new Map(roster.map(job => [job, render(job)]));
-  const frames = WALK.map(pose => {
+  const frames = beats.map(pose => {
     const cv = canvas(w, h); cv.rect(0, 0, w, h, C.page);
     groups.forEach(({ list: group }, g) => {
       const top0 = g * blockH;
@@ -131,7 +138,10 @@ function buildWalk(roster = ROSTER, k = 3) {
         const y = top0 + head + r * (rowH + 10);
         cv.win(margin - 10, y - 6, w - margin * 2 + 20, rowH);
         cv.text(name, margin + 6, y + rowH / 2 - 12, 3, C.text);
-        group.forEach((job, c) => { const x = margin + label + c * step + (step - cell) / 2, top = y + 2; groundTile(cv, x, top, k); cv.blit(all.get(job)[view][pose], x, top, k, flip); });
+        group.forEach((job, c) => {
+          const x = margin + label + c * step + (step - cell) / 2, top = y + 2, back = pose >= ATTACK[0] ? attackOf(job).shift * (view === 'front' ? -1 : 1) * (flip ? -1 : 1) : 0;
+          groundTile(cv, x, top, k); cv.blit(all.get(job)[view][pose], x + back * k, top, k, flip);
+        });
       });
     });
     return cv.px;
@@ -139,4 +149,4 @@ function buildWalk(roster = ROSTER, k = 3) {
   return { width: w, height: h, frames };
 }
 
-export { C, FACINGS, buildSheet, buildWalk, canvas };
+export { ATTACK_BEATS, C, FACINGS, buildAttack, buildSheet, buildWalk, canvas };

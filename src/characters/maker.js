@@ -4,7 +4,8 @@ import { APPLIES, CHOICES, COLOURS, SWATCHES, cleanSpec, describe, fromSpec, new
 import { BASE } from './body.js';
 import * as library from './library.js';
 import { H, W, hexRgb } from './pixels.js';
-import { VIEWS, WALK, frame, render } from './roster.js';
+import { ATTACK, FRAMES, VIEWS, WALK, attackOf, frame, render } from './roster.js';
+import { ATTACK_BEATS } from './sheet.js';
 import { TOWNSFOLK } from './townsfolk.js';
 
 /* ================= character sprites: the character maker =================
@@ -12,15 +13,22 @@ import { TOWNSFOLK } from './townsfolk.js';
    each of build, clothes, sleeves, hair, hat, beard, what is held, shield, cape and satchel, and a colour for each
    material it shows. Choices are chips; colours are rows (only those the character uses), set from the tile set's
    swatches or any colour. A character can start from any of the townsfolk. The preview shows it in all four
-   facings on grass, walking or standing, exactly as the map draws it. Every change saves to the character library
-   (library.js) at once, with its own undo. */
+   facings on grass, standing, walking or attacking (winding up and striking with whatever it holds, over and over),
+   exactly as the map draws it. Every change saves to the character library (library.js) at once, with its own undo. */
 const root = $('charMaker'), cv = $('cmPreview'), g = cv.getContext('2d'), panel = $('cmChoices'), statusEl = $('cmStatus');
 const GROUPS = [['Body', ['build', 'clothes', 'sleeves', 'cut', 'neckline', 'rope']], ['Head', ['hair', 'hat', 'beard']], ['Gear', ['held', 'shield', 'cape', 'satchel']]];
 const LABEL = { build: 'build', clothes: 'clothes', sleeves: 'sleeves', cut: 'sleeve cut', neckline: 'neckline', rope: 'belt', hair: 'hair', hat: 'hat', beard: 'beard', held: 'in hand', shield: 'shield', cape: 'cape', satchel: 'satchel' };
 const FACINGS = [['front', false], ['front', true], ['back', false], ['back', true]];
-const BEAT = 170;
+/* each animation: its poses in order and how long each is held, in milliseconds (the attack's as on the sheet) */
+const ANIMS = { stand: { beats: [0], ms: 0 }, walk: { beats: WALK, ms: 170 }, attack: { beats: ATTACK_BEATS, ms: 120 } };
+/* what each kind of attack looks like, for the status line */
+const BLOW = {
+  swing: 'raises the blade over the head and brings it down', chop: 'lifts the axe in both hands and brings it down',
+  thrust: 'draws the spear back in both hands and drives it forward', cast: 'lifts the staff in a glint of light and sweeps it forward',
+  shoot: 'draws the bow to the jaw and looses', punch: 'cocks a fist at the shoulder and throws it',
+  bite: 'crouches and lunges, jaws wide', pounce: 'squashes flat and pounces' };
 /* the maker's state: the spec being made, its history, how the editor gets it back, and the preview */
-const MK = { spec: null, undo: [], redo: [], back: null, canDelete: null, colour: 'cloth', walking: true, beat: 0, timer: 0, frames: null, crisp: new Map(), open: false, editing: false };
+const MK = { spec: null, undo: [], redo: [], back: null, canDelete: null, colour: 'cloth', anim: 'walk', beat: 0, timer: 0, frames: null, crisp: new Map(), open: false, editing: false };
 
 /* ---------- the spec, its history and saving ---------- */
 const clone = s => JSON.parse(JSON.stringify(s));
@@ -53,10 +61,11 @@ function chips(key) {
   }
   row.appendChild(box); return row;
 }
-/* the colours a character shows: those of the materials in its frames */
+/* the colours a character shows: those of the materials in its frames, its attack's too (an arrow's head and
+   fletching) */
 function usedColours() {
   const c = fromSpec(MK.spec), seen = new Set();
-  for (const v of VIEWS) for (let k = 0; k < 3; k++) for (const m of frame(c, v, k).mat) if (m) seen.add(m);
+  for (const v of VIEWS) for (let k = 0; k < FRAMES; k++) for (const m of frame(c, v, k).mat) if (m) seen.add(m);
   if (seen.has('P') && MK.spec.clothes === 'overalls') seen.delete('P');           /* the overalls' colour runs down the legs */
   return COLOURS.filter(([, letter]) => seen.has(letter));
 }
@@ -118,15 +127,22 @@ function draw() {
   const k = Math.max(1, Math.floor(Math.min(sw * dpr / (FACINGS.length * (W + 6)), sh * dpr / (H + 14)))), cellW = (W + 6) * k;
   cv.width = FACINGS.length * cellW; cv.height = (H + 14) * k; cv.style.width = `${cv.width / dpr}px`; cv.style.height = `${cv.height / dpr}px`;
   g.clearRect(0, 0, cv.width, cv.height); g.imageSmoothingEnabled = false;
-  const pose = MK.walking ? WALK[MK.beat % WALK.length] : 0;
+  const { beats } = ANIMS[MK.anim], pose = beats[MK.beat % beats.length], { shift } = attackOf(fromSpec(MK.spec));
   FACINGS.forEach(([view, flip], f) => {
-    const x = f * cellW + 3 * k, y = k;
+    /* an attack's frames stand the figure back for the blow: drawn moved forward again, the feet stay on the tile */
+    const x = f * cellW + 3 * k, y = k, back = pose >= ATTACK[0] ? shift * (view === 'front' ? -1 : 1) * (flip ? -1 : 1) * k : 0;
     tile(x, y, k);
-    g.save(); if (flip) { g.translate(x + W * k, 0); g.scale(-1, 1); g.drawImage(crisp(view, pose), 0, y, W * k, H * k); } else g.drawImage(crisp(view, pose), x, y, W * k, H * k); g.restore();
+    g.save(); if (flip) { g.translate(x + back + W * k, 0); g.scale(-1, 1); g.drawImage(crisp(view, pose), 0, y, W * k, H * k); } else g.drawImage(crisp(view, pose), x + back, y, W * k, H * k); g.restore();
   });
 }
 function tick() { MK.beat++; draw(); }
-function animate(on) { clearInterval(MK.timer); MK.timer = on ? setInterval(tick, BEAT) : 0; }
+function animate() { clearInterval(MK.timer); const { ms } = ANIMS[MK.anim]; MK.beat = 0; MK.timer = ms && MK.open ? setInterval(tick, ms) : 0; }
+/* pick the animation the preview plays */
+function play(anim) {
+  MK.anim = anim; for (const b of document.querySelectorAll('.cm-anim .chip')) b.setAttribute('aria-pressed', String(b.dataset.anim === anim));
+  animate(); draw();
+  if (anim === 'attack' && MK.spec) say(`${MK.spec.name} ${BLOW[attackOf(fromSpec(MK.spec)).kind]}.`);
+}
 
 /* ---------- opening and closing ---------- */
 /* the templates a character can start from: the townsfolk, and a plain one */
@@ -144,11 +160,11 @@ function openMaker(what, { back, canDelete, label = 'Tile editor' } = {}) {
   MK.back = back; MK.canDelete = canDelete; MK.undo = []; MK.redo = []; MK.colour = 'cloth'; MK.open = true;
   $('cmBack').textContent = `← ${label}`; root.hidden = false; templates();
   set(spec); say(mine ? 'Changes save to your character library as you go.' : 'A new character, saved to your character library. Changes save as you go.');
-  animate(MK.walking); root.focus({ preventScroll: true });
+  animate(); root.focus({ preventScroll: true });
 }
 function close() {
   if (!MK.open) return;
-  MK.open = false; animate(false); root.hidden = true;
+  MK.open = false; animate(); root.hidden = true;
   const id = MK.spec && library.get(MK.spec.id) ? MK.spec.id : null;
   if (MK.back) MK.back(id);
 }
@@ -175,7 +191,7 @@ $('cmDelete').addEventListener('click', () => {
   if (!window.confirm(`Delete ${MK.spec.name} from your character library?`)) return;
   library.remove(MK.spec.id); MK.spec = null; close();
 });
-$('cmWalk').addEventListener('click', () => { MK.walking = !MK.walking; $('cmWalk').setAttribute('aria-pressed', String(MK.walking)); $('cmWalk').textContent = MK.walking ? 'Walking' : 'Standing'; animate(MK.walking); draw(); });
+for (const b of document.querySelectorAll('.cm-anim .chip')) b.addEventListener('click', () => play(b.dataset.anim));
 root.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' && e.target.type !== 'color') return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }

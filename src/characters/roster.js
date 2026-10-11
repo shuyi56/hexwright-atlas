@@ -1,4 +1,4 @@
-import { BASE, BODY_TYPES, REF, measure } from './body.js';
+import { BASE, BODY_TYPES, REF, SHIFT, STRIKE, WINDUP, measure, phaseOf } from './body.js';
 import { BOW, BUCKLER, DAGGER, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, recolor, staff } from './parts.js';
 import { BANDANA, FEATHER_CAP, WIZARD_HAT } from './hats.js';
 import { finish, frameBuf, mixHex, ramp, shrink, stamp } from './pixels.js';
@@ -9,7 +9,8 @@ import { ENEMIES } from './enemies.js';
    Each job is a build, an outfit, a palette and a stack of hand-drawn parts. The body (torso, arms, legs, a
    cloak) is cut for the build by body.js; the rest hangs on its landmarks. A frame is built back to front
    through fixed slots; a job fills the slots it needs. Views: 'front' (south-west) and 'back' (north-east);
-   the other two facings are their mirror images. Poses: 0 standing, 1 and 2 the two strides. */
+   the other two facings are their mirror images. Poses: 0 standing, 1 and 2 the two strides, then the attack's:
+   3 the wind-up and 4 the strike (ATTACK). */
 const SLOTS = {
   front: ['cloak', 'behind', 'weapon', 'armFar', 'legs', 'torso', 'coat', 'overTorso', 'head', 'hair', 'hat', 'armNear', 'mantle', 'staff', 'fist', 'shield'],
   back: ['shield', 'armFar', 'legs', 'torso', 'coat', 'overTorso', 'cloak', 'weapon', 'head', 'hair', 'hat', 'behind', 'hairOver', 'armNear', 'mantle', 'staff', 'fist'] };
@@ -22,6 +23,18 @@ const ANCHOR = {
   front: { head: 'head', hair: 'head', hat: 'head', weapon: 'handFar', staff: 'handFar', shield: 'handNear', armNear: 'shoulderNear', armFar: 'shoulderFar' },
   back: { head: 'head', hair: 'head', hairOver: 'head', hat: 'head', weapon: 'handNear', staff: 'handNear', shield: 'handFar', armNear: 'shoulderNear', armFar: 'shoulderFar' } };
 const POSES = 3, VIEWS = ['front', 'back'], BODIES = Object.keys(BODY_TYPES);
+/* the attack's two poses, after the walk's three; FRAMES poses in all are drawn for each view */
+const ATTACK = [WINDUP, STRIKE], FRAMES = POSES + ATTACK.length;
+/* How a character attacks: what it holds says (parts.js, enemies.js: a blade or club swings, a spear or lance
+   thrusts, an axe chops, a bow shoots, a staff held forward casts), or the character itself (a beast bites or
+   pounces), and empty hands punch. shift is how far it stands back in its attack frames (body.js SHIFT; a beast
+   keeps its place, as it fills the frame already), for whoever draws them to move it forward again and keep its feet
+   where they were. ranged is what leaves it: an arrow or a spell, for the view to send on its way; tint, the colour
+   of the spell. */
+function attackOf(job) {
+  const kind = job.attack || (job.weapon && job.weapon.attack) || 'punch';
+  return { kind, shift: job.beast ? 0 : SHIFT, ranged: kind === 'shoot' ? 'arrow' : kind === 'cast' ? 'spell' : null, tint: job.spell || '#f2c460' };
+}
 /* the walk cycle, as the poses play: a stride, passing upright, the other stride, upright again */
 const WALK = [1, 0, 2, 0];
 /* slots that meet without a contour: the head with its hair and hat, the torso with what is worn over it */
@@ -30,7 +43,13 @@ const GROUP = { head: 1, hair: 1, hairOver: 1, hat: 1, torso: 2, overTorso: 2 };
 /* the build a job is drawn in: its own unless the caller names another */
 function frame(job, view, pose, body = job.body) {
   if (job.draw) return job.draw(view, pose);                                    /* a beast draws its own (enemies.js) */
-  const m = measure(body, view, pose, job.outfit), buf = frameBuf();
+  /* In an attack the body is measured for the blow (body.js attackArms) and stands sx pixels back. The weapon in the
+     hand on the facing side is made for the blow too: told the step (attack) and where the other fist is (other). */
+  const atk = pose >= WINDUP ? attackOf(job) : null, sx = atk ? (view === 'front' ? atk.shift : -atk.shift) : 0;
+  const lead = view === 'front' ? 'handFar' : 'handNear', other = view === 'front' ? 'handNear' : 'handFar';
+  const m = measure(body, view, pose, atk ? { ...job.outfit, attack: atk.kind, shield: !!job.shield } : job.outfit), buf = frameBuf();
+  /* drawing a bow takes the other hand to the jaw: a shield on that arm stays slung where the hand hangs */
+  const sling = atk && atk.kind === 'shoot' && job.shield ? (() => { const r = measure(body, view, 0, job.outfit); return [r.at[other][0], r.at[other][1] + m.top - r.top]; })() : null;
   const head = { ...((job.head && job.head[view]) || (view === 'front' ? HEAD_FRONT : HEAD_BACK)), anchor: 'head' };
   const own = (job.parts && job.parts[view]) || {};
   const held = job.weapon && job.weapon[view], forward = job.weapon && job.weapon.forward;
@@ -42,9 +61,14 @@ function frame(job, view, pose, body = job.body) {
     const generated = slot in m.parts;
     for (let part of [].concat(base[slot] || [], own[slot] || [])) {
       const at = (generated && part === base[slot]) || part.fixed ? null : part.anchor || ANCHOR[view][slot] || 'neck';
-      let dx = at ? m.at[at][0] - REF[at][0] : 0, dy = at ? m.at[at][1] - REF[at][1] : 0;
+      const held = sling && slot === 'shield' ? sling : at && m.at[at];
+      let dx = (at ? held[0] - REF[at][0] : 0) + sx, dy = at ? held[1] - REF[at][1] : 0;
       /* a weapon is made for the fist that holds it, its outward side away from the body */
-      if (part.make) { const [hx, hy] = m.at[at]; part = part.make({ hand: [hx, hy], dir: hx < 16 ? -1 : 1, face: view === 'front' ? m.at.head : null }); dx = dy = 0; }
+      if (part.make) {
+        const [hx, hy] = held, shifted = ([x, y]) => [x + sx, y];
+        part = part.make({ hand: [hx + sx, hy], dir: hx < 16 ? -1 : 1, face: view === 'front' ? shifted(m.at.head) : null, sx, attack: at === lead ? phaseOf(pose) : null, other: shifted(m.at[other]) });
+        dx = dy = 0;
+      }
       const g = part.group || GROUP[slot];
       stamp(buf, part.rows, part.x + dx, part.y + dy, layer, g ? 1000 + g : layer); layer++;
     }
@@ -54,21 +78,23 @@ function frame(job, view, pose, body = job.body) {
 /* the palette a job's letters resolve to: its own colours plus the marks drawn from them */
 function palette(job) {
   const p = { ...job.pal }, skin = ramp(p.K || '#e8b890'), hair = ramp(p.H || '#6b4a30');
-  const out = { E: { flat: '#1c1218' }, W: { flat: '#f4ece0' }, M: { flat: skin[4] }, Q: { flat: hair[4] }, I: { flat: mixHex(hair[0], '#fff4dc', 0.3) }, Y: '#dde2e6', ...p };
+  /* + is a glint of light (a staff raised to cast) */
+  const out = { E: { flat: '#1c1218' }, W: { flat: '#f4ece0' }, M: { flat: skin[4] }, Q: { flat: hair[4] }, I: { flat: mixHex(hair[0], '#fff4dc', 0.3) }, Y: '#dde2e6', '+': { flat: '#fff6d8' }, ...p };
   if (typeof out.K === 'string') out.K = { ramp: out.K, clean: true, cel: true };          /* skin: solid, cel-shaded, never inked inside */
   return out;
 }
 /* every frame of a job: { front: [rgba x3], back: [rgba x3] }, in its own build or the one named */
 /* every frame drawn smaller (scale < 1) about the feet, for a view that wants the figures less tall: the
    tactical camera draws them at about three quarters, so they stand closer to a tile's width */
+/* An attack's frames are shrunk about the feet where the figure stands in them, SHIFT pixels back. */
 function renderScaled(job, scale, body = job.body) {
-  const pal = palette(job), out = {};
-  for (const v of VIEWS) out[v] = Array.from({ length: POSES }, (_, k) => finish(shrink(frame(job, v, k, body), scale, 16, BASE + 1), pal));
+  const pal = palette(job), out = {}, { shift } = attackOf(job);
+  for (const v of VIEWS) out[v] = Array.from({ length: FRAMES }, (_, k) => finish(shrink(frame(job, v, k, body), scale, 16 + (k >= WINDUP ? (v === 'front' ? shift : -shift) : 0), BASE + 1), pal));
   return out;
 }
 function render(job, body = job.body) {
   const pal = palette(job), out = {};
-  for (const v of VIEWS) out[v] = Array.from({ length: POSES }, (_, k) => finish(frame(job, v, k, body), pal));
+  for (const v of VIEWS) out[v] = Array.from({ length: FRAMES }, (_, k) => finish(frame(job, v, k, body), pal));
   return out;
 }
 
@@ -128,7 +154,7 @@ const ARCHER = {
   id: 'archer', name: 'Archer', blurb: 'A feathered cap, a quiver at her back and a longbow in hand.',
   body: 'slim', outfit: { torso: 'tunic', strap: -1 }, hair: HAIR_PONYTAIL,
   weapon: BOW,
-  pal: { K: SKIN, H: '#a6533b', A: '#87a05a', B: '#e8dcc0', C: '#637d43', L: '#7a5434', G: '#c9a24f', P: '#6e6048', O: '#5c4231', T: '#8a6238', F: '#efe6d2', X: '#6c8549', R: '#b8483a' },
+  pal: { K: SKIN, H: '#a6533b', A: '#87a05a', B: '#e8dcc0', C: '#637d43', L: '#7a5434', G: '#c9a24f', P: '#6e6048', O: '#5c4231', T: '#8a6238', F: '#efe6d2', X: '#6c8549', R: '#b8483a', S: '#c8c9c2' },
   parts: {
     front: {
       behind: { x: 6, y: 12, rows: ['.R.R', 'RFRF', '.LL.', '.LL.', '.LL.'] },
@@ -273,7 +299,7 @@ const BM_COLLAR = {
     '.aaaaaaaaaaaa.',
     '..AAAAAAAAAA..'] } };
 const BLACK_MAGE = {
-  id: 'blackmage', name: 'Black Mage', blurb: 'A wide-brimmed hat, a face of shadow and two burning eyes over a high collar.',
+  id: 'blackmage', name: 'Black Mage', blurb: 'A wide-brimmed hat, a face of shadow and two burning eyes over a high collar.', spell: '#e8743a',
   body: 'stocky', outfit: { torso: 'gown', legs: 'gown', sleeves: { bell: true }, hands: 'D', steady: true }, head: { front: SHADOW_FACE, back: recolor(HEAD_BACK, { K: 'Z' }) },
   weapon: staff(['T...T', 'TT.TT', '.TTT.', '..T..', '..T..'], 19),
   pal: { K: SKIN, A: '#56688f', C: '#c9a24f', L: '#6b4a30', G: '#c9a24f', O: '#5c3d2c', T: '#8a6238', X: '#5d5a74', D: '#45404f', Z: { flat: '#251f2b' }, N: { flat: '#f2c460' } },
@@ -419,7 +445,7 @@ const SM_TAIL = { x: 12, y: 17, rows: [
   '....G....'] };
 
 const WHITE_MAGE = {
-  id: 'whitemage', name: 'White Mage', blurb: 'A white hooded robe edged in red teeth, and a staff crowned with an orb.',
+  id: 'whitemage', name: 'White Mage', blurb: 'A white hooded robe edged in red teeth, and a staff crowned with an orb.', spell: '#f6eed2',
   body: 'slim', outfit: { torso: 'robe', legs: 'robe', teeth: true, steady: true }, hair: HAIR_SHORT,
   weapon: staff(['..J..', '.JJJ.', 'GJJJG', '.GGG.', '..G..'], 22),
   pal: { K: SKIN, H: '#9a6238', A: '#efe6d4', C: '#b8483a', L: '#b8483a', G: '#c9a24f', O: '#8a6a4a', T: '#a8865e', X: '#f2eadb', J: '#c0503c' },
@@ -427,7 +453,7 @@ const WHITE_MAGE = {
 };
 
 const SUMMONER = {
-  id: 'summoner', name: 'Summoner', blurb: 'A horned hood, robes of moss green, and a rod set with a calling stone.',
+  id: 'summoner', name: 'Summoner', blurb: 'A horned hood, robes of moss green, and a rod set with a calling stone.', spell: '#6fb0b4',
   body: 'standard', outfit: { torso: 'robe', legs: 'robe', steady: true }, hair: HAIR_LONG,
   weapon: staff(['..J..', '.JJJ.', 'FJJJF', 'F.J.F', '.FGF.', '..G..'], 20),
   pal: { K: SKIN, H: '#6b3f2a', A: '#738f5a', C: '#c9a24f', L: '#8a6238', G: '#c9a24f', O: '#5c4231', T: '#8a6238', X: '#5f7c49', F: '#ece2cc', J: '#6fb0b4' },
@@ -440,4 +466,4 @@ const ROSTER = [...TOWNSFOLK, ...JOBS, ...ENEMIES];
 const BY_ID = new Map(ROSTER.map(c => [c.id, c]));
 const byId = id => BY_ID.get(id) || null;
 
-export { BODIES, ENEMIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render, renderScaled };
+export { ATTACK, BODIES, ENEMIES, FRAMES, JOBS, POSES, ROSTER, SHIFT, VIEWS, WALK, attackOf, byId, frame, palette, render, renderScaled };

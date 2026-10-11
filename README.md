@@ -89,7 +89,7 @@ Final Fantasy Tactics and Tactics Ogre.
 - **Enemies:** a big-eared goblin with a nail-studded club, a hooded and masked bandit, a tusked orc with war paint
   and a great axe, a skeleton with a rusted sword, a grey wolf that trots on four legs, and a round slime that heaves.
 
-Each character faces four ways, standing or walking, and is painted in the tile set's own soft palette and
+Each character faces four ways, standing, walking or attacking, and is painted in the tile set's own soft palette and
 outlined in the tiles' ink. On the map every zoom draws from one master per frame, rendered at 8× with each sprite
 pixel a crisp square and pre-shrunk in halving steps. So a figure keeps its pixel art up close and stays clean
 zoomed out. A figure stands about as tall as a cottage's eaves.
@@ -107,8 +107,10 @@ walk behind and in front of buildings correctly, and are on the same undo stack 
 - **Head:** hair, hat, beard.
 - **Gear:** what they hold, a shield, a cape, a satchel.
 
-Each material gets a colour from the tile set's swatches or any colour. The preview walks the character in all four
-facings. Characters can start from any of the townsfolk, and **Edit…** changes a made one or a copy of a
+Each material gets a colour from the tile set's swatches or any colour. The preview shows the character in all four
+facings, **Standing**, **Walking** or **Attacking**: the attack winds up and strikes over and over with whatever it
+holds, and the line under it says how (a sword raised and brought down, a bow drawn to the jaw). Changing what it
+holds while it attacks shows the new blow at once. Characters can start from any of the townsfolk, and **Edit…** changes a made one or a copy of a
 townsperson. Made characters save to your character library in the browser as you go, appear under **Made here**,
 and travel inside any map they stand on.
 
@@ -125,15 +127,42 @@ come back as villagers. The automation API has `listSprites`, `makeCharacter`, `
   and outlined in the tiles' umber ink.
 - **Walking.** The arms swing with the legs. `docs/images/character-walk.png` shows everyone walking in all four
   facings.
+- **Attacking.** Two more frames, a wind-up and a strike, toward whichever way the figure faces. What it holds
+  decides the blow:
+  - **Swing:** a sword, dagger or club is raised over the head and brought down forward.
+  - **Chop:** the orc's axe comes down the same way, in both hands.
+  - **Thrust:** a spear or the dragoon's lance is drawn back in both hands and driven at the next tile.
+  - **Cast:** a staff is lifted in a glint of light, then swept forward in a burst.
+  - **Shoot:** a bow is drawn to the jaw with an arrow on the string, then loosed.
+  - **Punch:** empty hands cock a fist at the shoulder and throw it.
+  - **Beasts:** the wolf crouches and lunges with its jaws wide; the slime squashes flat and pounces.
+
+  The blades and shields are drawn in detail:
+  - **Swords** have a fuller inked down the blade, a plain ricasso, a crossguard whose quillons darken toward their tips, a
+    leather grip and a pommel showing above the fist.
+  - **Daggers** have a lit edge beside a shaded spine, a guard and a pommel.
+  - **The kite shield** is riveted at its top corners, with a cross reaching the rim, a steel boss where its arms meet
+    and a steel-shod point.
+  - **The buckler** has a raised steel boss ringed round a gold centre.
+  - **From behind,** each shield shows its buckled strap.
+
+  The striking arm is drawn from the shoulder to wherever the blow puts its hand, and the weapon is laid along the
+  blow's line, so any build and any maker character attacks. In these frames the figure stands two pixels back from
+  the middle of the frame, away from its facing, to leave the blow room (`attackOf` in `characters/roster.js`).
+  `docs/images/character-attack.png` shows everyone attacking in all four facings.
 - **Builds.** Bodies come in four builds (slim, standard, stocky, tall), cut from measurements, and anyone can be
   drawn in any build.
 
 `npm run sheet` draws the sheet into `docs/images/character-sprite-sheet.png`, with every figure on the editor's grass
-tile, and the walk into `docs/images/character-walk.png`. Add `--strips` for one 1× strip per character.
+tile, the walk into `docs/images/character-walk.png` and the attack into `docs/images/character-attack.png`. Add
+`--strips` for one 1× strip per character: ten frames, the front view's and then the back view's (stand, step, step,
+wind-up, strike).
 
 ![The character roster](docs/images/character-sprite-sheet.png)
 
 ![The character roster walking](docs/images/character-walk.png)
+
+![The character roster attacking](docs/images/character-attack.png)
 
 ### Unit data
 
@@ -190,6 +219,16 @@ with the camera gliding after the cursor and the unit on the move.
   with the zoom, as the figures do. The battle is won when the last enemy falls
   and lost when the last of yours does. A side with no units on the map has its phase skipped, and on a map of
   enemies only they are yours to move.
+- **Attacks:** an attack plays out in the attacker's own frames, and the controls wait until it has.
+  - **Melee:** the attacker turns to face its target, winds up and lunges in to strike, and the blow lands with a
+    white spark.
+  - **Arrows and spells:** the archer looses an arrow that flies to the target on an arc. A staff sends a burst of
+    sparks over the target in the caster's colour: fire for the black mage, pale light for the white mage, teal for
+    the summoner.
+  - **The target:** when the blow lands it flashes white twice and reels back. Only then does the damage rise over
+    its head and its health bar drain, and a unit felled fades to a ghost.
+
+  Units keep facing the way they last struck until they walk again. The ▶▶ 2× chip plays attacks at double speed.
 - **Camera:** the arrow keys or `WASD` step the cursor along the grid and the camera keeps it in view. Drag to
   pan, scroll or `+`/`-` to zoom, `Q`/`E` to turn the view, `PgUp`/`PgDn` to change storey, `Esc` to go back
   a step (with no unit picked, it takes back the last Wait). `Esc` never leaves the view; **← Editor** does.
@@ -238,6 +277,9 @@ with the camera gliding after the cursor and the unit on the move.
   trees and plants come from their designs. The smaller props and the furniture are the tile set's own drawings,
   drawn once at one unit to the pixel and finished as pixel art (hard edges, a small palette, an inked rim,
   a dithered contact shadow).
+- **Attacks** (`blow.js`, no DOM). An attack's beats (the wind-up, the strike, when it lands, the step back), and
+  where everything is at any moment: the attacker's frame and lunge, the arrow or spell, the target's flash,
+  knockback and fade.
 - **Move range** (`move.js`, no DOM) and the screen itself (`view.js`).
 
 `npm run tactical-sheet` draws the sheet into `docs/images/tactical-tile-sheet.png`. Add `--atlas` for the packed
@@ -246,6 +288,8 @@ frames of an animated ground, then a left and right face two levels deep), with 
 `docs/images/tactical-tiles.json`. The sheet also shows every designed building, tree and plant.
 
 ![The tactical view](docs/images/tactical-view.png)
+
+![Attacks in the tactical view: a wind-up, a blow landing, an arrow in flight and a spell](docs/images/tactical-attack.png)
 
 ![The tactical tile sheet](docs/images/tactical-tile-sheet.png)
 
