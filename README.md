@@ -107,8 +107,10 @@ walk behind and in front of buildings correctly, and are on the same undo stack 
 - **Head:** hair, hat, beard.
 - **Gear:** what they hold, a shield, a cape, a satchel.
 
-Each material gets a colour from the tile set's swatches or any colour. The preview walks the character in all four
-facings. Characters can start from any of the townsfolk, and **Edit…** changes a made one or a copy of a
+Each material gets a colour from the tile set's swatches or any colour. The preview shows the character in all four
+facings, **Standing**, **Walking** or **Attacking**: the attack winds up and strikes over and over with whatever it
+holds, and the line under it says how (a sword raised and brought down, a bow drawn to the jaw). Changing what it
+holds while it attacks shows the new blow at once. Characters can start from any of the townsfolk, and **Edit…** changes a made one or a copy of a
 townsperson. Made characters save to your character library in the browser as you go, appear under **Made here**,
 and travel inside any map they stand on.
 
@@ -134,6 +136,15 @@ come back as villagers. The automation API has `listSprites`, `makeCharacter`, `
   - **Shoot:** a bow is drawn to the jaw with an arrow on the string, then loosed.
   - **Punch:** empty hands cock a fist at the shoulder and throw it.
   - **Beasts:** the wolf crouches and lunges with its jaws wide; the slime squashes flat and pounces.
+
+  The blades and shields are drawn in detail:
+  - **Swords** have a fuller inked down the blade, a plain ricasso, a crossguard whose quillons darken toward their tips, a
+    leather grip and a pommel showing above the fist.
+  - **Daggers** have a lit edge beside a shaded spine, a guard and a pommel.
+  - **The kite shield** is riveted at its top corners, with a cross reaching the rim, a steel boss where its arms meet
+    and a steel-shod point.
+  - **The buckler** has a raised steel boss ringed round a gold centre.
+  - **From behind,** each shield shows its buckled strap.
 
   The striking arm is drawn from the shoulder to wherever the blow puts its hand, and the weapon is laid along the
   blow's line, so any build and any maker character attacks. In these frames the figure stands two pixels back from

@@ -150,7 +150,7 @@ const SKELETON = {
   id: 'skeleton', name: 'Skeleton', blurb: 'Bones that will not lie still: a rusted blade, a cracked buckler and embers for eyes.',
   enemy: true, body: 'slim', outfit: { torso: 'ribs', bones: true, sleeves: { C: 'A' } }, head: { front: SKULL, back: HEAD_BACK },
   weapon: SWORD, shield: BUCKLER,
-  pal: { K: '#e6dcc0', A: '#e6dcc0', D: '#3a3238', L: '#6b5a48', P: '#e6dcc0', O: '#e6dcc0', C: '#8a8478', G: '#8a8478', U: '#7a5a3a', Y: '#b9ab8e', Z: { flat: '#2a2228' }, N: { flat: '#e0603f' } }
+  pal: { K: '#e6dcc0', A: '#e6dcc0', D: '#3a3238', L: '#6b5a48', P: '#e6dcc0', O: '#e6dcc0', C: '#8a8478', G: '#8a8478', U: '#7a5a3a', Y: '#b9ab8e', S: '#9a8e7a', Z: { flat: '#2a2228' }, N: { flat: '#e0603f' } }
 };
 
 /* ---------- the beasts ----------

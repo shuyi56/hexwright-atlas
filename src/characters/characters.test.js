@@ -424,3 +424,18 @@ test('the attack animates stand, wind-up, strike and stand, the same frames as t
   assert.deepEqual([hit.width, hit.height], [walk.width, walk.height]); assert.equal(hit.frames.length, ATTACK_BEATS.length);
   assert.ok(same(hit.frames[0], hit.frames[7]) && !same(hit.frames[0], hit.frames[2]) && !same(hit.frames[2], hit.frames[4]));
 });
+test('a sword has a fuller, a crossguard and a pommel above the fist; a dagger a bevelled blade; shields a boss and a strap', () => {
+  const made = (w, hand, dir, attack = null) => w.front.make({ hand, dir, attack });
+  for (const dir of [-1, 1]) {
+    const s = made(parts.SWORD, [9, 28], dir), at = (x, y) => (s.rows[y - s.y] || '')[x - s.x];
+    assert.ok(s.rows.some(r => r.includes('y')), 'a fuller inked down the blade');
+    assert.ok(s.rows.some(r => /g[G]+g/.test(r)), 'quillons darkening toward their tips');
+    assert.equal(at(9, 26), 'G', 'the pommel shows above the fist');
+    const d = made(parts.DAGGER, [9, 28], dir);
+    assert.ok(d.rows.some(r => /Yy|yY/.test(r)) && d.rows.some(r => /gGg/.test(r)), 'a lit edge beside a shaded spine, and a guard');
+    /* in an attack it keeps all of that, turned along the blow */
+    for (const phase of ['windup', 'strike']) { const a = made(parts.SWORD, [9, 26], dir, phase).rows.join(''); assert.ok(a.includes('y') && a.includes('g') && a.includes('L'), `${dir} ${phase}`); }
+  }
+  for (const sh of [parts.KITE, parts.BUCKLER]) { assert.ok(sh.front.rows.join('').includes('S'), 'a steel boss or rivets'); assert.ok(sh.back.rows.join('').includes('S'), 'a buckled strap'); }
+  assert.equal(parts.KITE.front.rows.filter(r => r.includes('C')).length, 8, 'a cross from rim to point');
+});

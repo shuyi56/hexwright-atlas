@@ -326,26 +326,34 @@ function wield(cells, build, hand, axis, butt = 0) {
   }
 }
 
-/* a sword held point-down: a crossguard under the fist and a long blade angling out from the body a pixel every
-   three rows, two pixels wide to a point. A dagger is the same in miniature, with a short guard. In an attack it is
-   raised over the head, point up, then brought down forward (swing). */
-function blade(len, guard) {
-  const w = 2 * guard + 1, up = n => ['.'.repeat(guard) + 'Y' + '.'.repeat(guard), ...Array(n).fill('.'.repeat(guard - 1) + 'YY' + '.'.repeat(guard)), 'G'.repeat(w)];
+/* A blade, drawn once as a grid pointing up from the grip (up(n), n rows of blade): the point, the blade, the
+   guard, three rows of grip and the pommel, authored for a hand on the left (dir -1) and mirrored for the right.
+   Held at rest it hangs point-down from the fist, the guard just under it and the pommel showing above it, the
+   blade angling out from the body a pixel every three rows; in an attack the same grid is raised over the head,
+   point up, then brought down forward (swing; wield).
+   - the sword: a long blade three pixels wide with a fuller inked down its middle, a plain ricasso above the
+     guard, a crossguard whose quillons darken toward their tips, a leather grip and a round pommel;
+   - the dagger: a short blade, its lit edge beside a shaded spine, a guard with darkened tips, a grip and a pommel. */
+const SWORD_UP = n => ['..Y..', ...Array(Math.max(0, n - 1)).fill('.YyY.'), '.YYY.', 'gGGGg', '..L..', '..L..', '..L..', '..G..'];
+const DAGGER_UP = n => ['Y..', ...Array(n).fill('Yy.'), 'gGg', '.L.', '.L.', '.L.', '.G.'];
+function blade(len, up) {
+  const grid = (n, dir) => (dir > 0 ? up(n).map(r => [...r].reverse().join('')) : up(n));
   return { attack: 'swing', ...both(({ hand: [hx, hy], dir, attack }) => {
     const cells = [];
     if (attack) {
-      wield(cells, r => { const n = Math.max(1, Math.min(len, r - 3)); return { rows: up(n), reach: n + 3 }; }, [hx, hy], attackAxis('swing', dir, attack));
+      wield(cells, r => { const n = Math.max(1, Math.min(len, r - 3)); return { rows: grid(n, dir), reach: n + 3 }; }, [hx, hy], attackAxis('swing', dir, attack));
       return cellsToPart(cells);
     }
-    const n = Math.min(len, BASE - hy - 5);
-    for (let i = -guard; i <= guard; i++) cells.push([hx + i, hy + 2, 'G']);
-    let bx = dir < 0 ? hx - 1 : hx;
-    for (let j = 0; j < n; j++) { bx = (dir < 0 ? hx - 1 : hx) + dir * Math.floor(j / 3); cells.push([bx, hy + 3 + j, 'Y'], [bx + 1, hy + 3 + j, 'Y']); }
-    cells.push([dir < 0 ? bx : bx + 1, hy + 3 + n, 'Y']);
+    /* row i of the grid stands d pixels below the fist: the guard at 2, the point at n + 3, the pommel at -2 */
+    const n = Math.min(len, BASE - hy - 5), rows = grid(n, dir), c = (rows[0].length - 1) >> 1;
+    rows.forEach((r, i) => {
+      const d = n + 3 - i, sh = d >= 3 ? dir * Math.floor((d - 3) / 3) : 0;
+      [...r].forEach((ch, col) => { if (ch !== '.') cells.push([hx + col - c + sh, hy + d, ch]); });
+    });
     return cellsToPart(cells);
   }) };
 }
-const SWORD = blade(10, 2), DAGGER = blade(3, 1);
+const SWORD = blade(10, SWORD_UP), DAGGER = blade(4, DAGGER_UP);
 /* a staff stood beside the fist, its foot on the ground, crowned with a hand-drawn head; it runs through the
    outer knuckles, and on a slim build never closer in than on the standard one so the head clears the headgear.
    Options: lean, rows per pixel the shaft tilts outward above the fist (and inward below it), so a long spear's
@@ -454,30 +462,35 @@ const BOW = { attack: 'shoot', ...both(({ hand: [hx, hy], dir, attack, other }) 
   for (const r of [-R - 1, R + 1]) cells.push([hx + dir * reach, hy + r, 'T']);
   return cellsToPart(cells);
 }) };
-/* a kite shield on the near arm; from behind, its rim shows past the body */
+/* A kite shield on the near arm: a gold rim riveted at its top corners, a cross in the trim colour reaching the rim
+   with a steel boss where its arms meet, the field tapering to a point shod in steel. From behind, its rim shows
+   past the body with the leather strap that holds it, buckled. A buckler is round: a gold rim, and in the middle a
+   raised steel boss ringed round a gold centre; from behind, its strap and buckle. */
 const KITE = {
   front: { x: 18, y: 20, rows: [
     '.GGGGG.',
-    'GUUUUUG',
-    'GUUCUUG',
-    'GUCCCUG',
+    'GSUUUSG',
     'GUUCUUG',
     'GUUCUUG',
-    '.GUUUG.',
-    '.GUUUG.',
+    'GCCSCCG',
+    'GUUCUUG',
+    'GUUCUUG',
+    '.GUCUG.',
+    '.GUCUG.',
+    '..GCG..',
     '..GUG..',
-    '...G...'] },
-  back: { x: 6, y: 20, rows: ['.G', 'GL', 'GL', 'GL', 'GL', 'GL', '.G', '.G'] } };
+    '...S...'] },
+  back: { x: 6, y: 20, rows: ['.G', 'GL', 'GL', 'GS', 'GL', 'GL', 'GL', 'GS', 'GL', '.G', '.G', '.G'] } };
 const BUCKLER = {
   front: { x: 18, y: 21, rows: [
     '..GGG..',
     '.GUUUG.',
-    'GUUUUUG',
-    'GUUCUUG',
-    'GUUUUUG',
+    'GUUSUUG',
+    'GUSCSUG',
+    'GUUSUUG',
     '.GUUUG.',
     '..GGG..'] },
-  back: { x: 6, y: 21, rows: ['.G', 'GL', 'GL', 'GL', 'GL', '.G'] } };
+  back: { x: 6, y: 21, rows: ['.G', 'GL', 'GS', 'GL', 'GL', '.G'] } };
 
 /* ---------- helpers ---------- */
 /* a part with some letters swapped, e.g. sleeves of steel: recolor(ARM_NEAR, { A: 'S' }); creases stay creases */
