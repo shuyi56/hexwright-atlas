@@ -192,13 +192,14 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
    with a sandstone rim. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
 .tc-win.tc-menu{--tc-dim:#b3aa98;--tc-pick:rgba(255,244,208,.2);background:linear-gradient(#4a4640,#2d2a26);color:var(--tc-text);border:1px solid #c4b89c;border-radius:2px;box-shadow:0 0 0 1px #141210,0 4px 10px rgba(0,0,0,.4)}
-.tc-menu{display:flex;flex-direction:column;min-width:0;padding:5px;z-index:2}
-.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 12px/1 var(--ui);padding:4px 6px 4px 12px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
+/* sized in em: the view sets its font-size from the zoom */
+.tc-menu{display:flex;flex-direction:column;min-width:0;padding:.42em;z-index:2;font-size:12px}
+.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:.83em;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 1em/1 var(--ui);padding:.33em .5em .33em 1em;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
 .tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
 .tc-menu button[aria-pressed=true]{background:var(--tc-pick);color:var(--tc-mark)}
-.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:3px;top:50%;margin-top:-3px;border:3px solid transparent;border-left:4px solid currentColor}
+.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:.25em;top:50%;margin-top:-.25em;border:.25em solid transparent;border-left:.33em solid currentColor}
 .tc-menu button:disabled{color:var(--tc-off);cursor:default;text-shadow:none}
-.tc-menu kbd{font:600 10px var(--ui);color:var(--tc-dim)}
+.tc-menu kbd{font:600 .83em var(--ui);color:var(--tc-dim)}
 .tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}

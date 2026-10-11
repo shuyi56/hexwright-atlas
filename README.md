@@ -184,11 +184,13 @@ with the camera gliding after the cursor and the unit on the move.
   at once with **End turn** (`T`). A banner names each new phase and the turn and phase stay in the top bar. In the
   enemy phase the computer plays each enemy in turn: it shows the enemy's range, walks it to where it can strike the
   weakest foe in reach (or as close to the nearest one as it can get, round anything it cannot climb), and strikes;
-  the controls wait until it is done, and the ▶▶ 2× chip speeds it up. The battle is won when the last enemy falls
+  the controls wait until it is done, and the ▶▶ 2× chip speeds it up. The actions window beside a unit scales
+  with the zoom, as the figures do. The battle is won when the last enemy falls
   and lost when the last of yours does. A side with no units on the map has its phase skipped, and on a map of
   enemies only they are yours to move.
 - **Camera:** the arrow keys or `WASD` step the cursor along the grid and the camera keeps it in view. Drag to
-  pan, scroll or `+`/`-` to zoom, `Q`/`E` to turn the view, `PgUp`/`PgDn` to change storey, `Esc` to go back.
+  pan, scroll or `+`/`-` to zoom, `Q`/`E` to turn the view, `PgUp`/`PgDn` to change storey, `Esc` to go back
+  a step (with no unit picked, it takes back the last Wait). `Esc` never leaves the view; **← Editor** does.
   Pieces standing in front of the unit in play or the cursor fade so neither is lost behind them.
 - **Panels:** the tile under the cursor (ground, piece, height, storey) and the unit's portrait and stats.
 - **Figures:** units are drawn at three quarters of their sprite size, about 30 pixels tall, a little under a
