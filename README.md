@@ -67,8 +67,34 @@ silver bark, gold leaf, and a cool pale light where the town's lamps are warm.
 - **Props:** the **elven lantern** (a teardrop of pale light hung from a silver crook) and the **moonwell** (a moonstone
   rim round glowing water under a carved arch).
 
+In the town view (`src/town/elven.js`) each building has its own silhouette and its own carving, on one shared kit:
+moonstone in long shallow courses (never brick), pilasters standing proud with gold caps and a shadow cast east, carved
+friezes of running gold vine, roofs of verdigris scale tiles that sweep down and flick up at the eaves under a gold
+ridge with a cresting of curls, concave gables with carved barge boards, a finial above and a pendant below, tracery
+lights set back in their reveals, rose windows, carved double doors under a lit tympanum with steps before them,
+lanterns hung from gold brackets, and ivy.
+
+- **Hall:** a long hall behind a tall gabled porch with a rose window, buttresses between its lights, ivy up its west
+  end, lanterns either side of the door; turned end on, one tall gable over its whole width.
+- **Manor:** a steep gable front with a balcony on carved brackets before a triple light, a lower wing to the east and
+  a round turret wound with ivy under a flared needle.
+- **Rotunda:** a drum ringed with tall tracery between pilasters, an arcade opening on a lit floor, a ribbed dome of
+  scales and an arcaded lantern.
+- **Spire:** a tapering shaft of stacked lights on a stepped base, a balcony on corbels, a lit bell stage and a flared
+  needle.
+- **Pavilion:** columns wound with gold vine, a bench and a hanging lantern within, an onion roof with drops at its eave.
+- **Archway:** clustered shafts and a pointed arch of voussoirs with a gold leaf trail, tracery in its head and lanterns
+  hung beneath.
+- **Flet:** a stair winding up the trunk to a railed platform, a round house of pale boards with a rose window under a
+  swept roof, lanterns hung below.
+
+Open pieces (the pavilion, the flet, the archway) cast a pool of shadow round their feet rather than a block, and the
+others cast theirs east from their own outline.
+
+![The elven buildings in the town view](docs/images/elven-town.png)
+
 The elves who live there are in the roster (see [Characters](#characters)). The editor's drawings are in
-`src/tiles/elven.js`, the tactical view's in `src/tactical/elven.js`, the town view's in `src/town/pieces.js`, and the
+`src/tiles/elven.js`, the tactical view's in `src/tactical/elven.js`, the town view's in `src/town/elven.js`, and the
 grounds beside the others in each. `scenes/town/silverleaf-hollow.html` is an elven hollow built to show it all (see
 [Test scenes](#test-scenes)).
 
@@ -405,7 +431,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   history, and it starts afresh each time it is opened.
 
 `src/town/` holds it: `ground.js` builds the height surface and paints it in 128-pixel chunks with their depth
-buffers (no DOM), `ground-worker.js` runs that painting in a worker, `pieces.js` draws the pieces (no DOM), `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
+buffers (no DOM), `ground-worker.js` runs that painting in a worker, `pieces.js` draws the pieces (no DOM), `elven.js` the elven wood's, `talk.js` holds the lines, and `view.js` is the screen. `scenes/town/saltmere-harbour.html` opens straight
 in it.
 
 ![The town view](docs/images/town-view.png)
