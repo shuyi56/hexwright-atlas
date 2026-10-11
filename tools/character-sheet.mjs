@@ -1,18 +1,20 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSheet, buildWalk } from '../src/characters/sheet.js';
+import { buildAttack, buildSheet, buildWalk } from '../src/characters/sheet.js';
 import { ROSTER, render } from '../src/characters/roster.js';
 import { H, W } from '../src/characters/pixels.js';
 import { encodeAPNG, encodePNG } from './png.mjs';
 
-/* Writes the character sprite sheet and the walk animation, and with --strips one plain 1× strip per job for use
-   in a game:
+/* Writes the character sprite sheet and the walk and attack animations, and with --strips one plain 1× strip per job
+   for use in a game:
      npm run sheet -- [--scale=4] [--strips] [--walk] [out.png]
    The sheet goes to docs/images/character-sprite-sheet.png unless a file is named. The walk (every job walking in
-   the four facings, an animated PNG) goes to docs/images/character-walk.png beside it, unless a sheet file is
-   named without --walk. A strip holds the six drawn frames left to right (front stand, step, step, back stand,
-   step, step), 32×48 each, on a clear background. */
+   the four facings, an animated PNG) goes to docs/images/character-walk.png beside it, and the attack (every job
+   winding up and striking) to docs/images/character-attack.png, unless a sheet file is named without --walk. A strip
+   holds the ten drawn frames left to right, the front view's then the back view's (stand, step, step, wind-up,
+   strike), 32×48 each, on a clear background; in the wind-up and strike the figure stands its attack shift
+   (roster.js attackOf) back from the middle of the frame, away from its facing. */
 const root = join(dirname(fileURLToPath(import.meta.url)), '..'), images = join(root, 'docs', 'images');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const named = process.argv.slice(2).find(a => !a.startsWith('--'));
@@ -26,6 +28,9 @@ if (!named || process.argv.includes('--walk')) {
   const walk = buildWalk(ROSTER), out = join(images, 'character-walk.png');
   mkdirSync(images, { recursive: true }); writeFileSync(out, encodeAPNG(walk.width, walk.height, walk.frames, 170));
   console.log(`wrote ${out} (${walk.width}×${walk.height}, ${walk.frames.length} frames)`);
+  const attack = buildAttack(ROSTER), hit = join(images, 'character-attack.png');
+  writeFileSync(hit, encodeAPNG(attack.width, attack.height, attack.frames, 110));
+  console.log(`wrote ${hit} (${attack.width}×${attack.height}, ${attack.frames.length} frames)`);
 }
 
 if (process.argv.includes('--strips')) {

@@ -1,5 +1,5 @@
-import { BASE } from './body.js';
-import { BUCKLER, HAIR_SHORT, HEAD_BACK, SWORD, staff } from './parts.js';
+import { BASE, STRIKE, WINDUP, attackAxis } from './body.js';
+import { BUCKLER, HAIR_SHORT, HEAD_BACK, SWORD, staff, wield } from './parts.js';
 import { CAPELET, COWL, COWL_POINT } from './hats.js';
 import { cellsToPart, frameBuf, ramp, stamp, W } from './pixels.js';
 
@@ -11,15 +11,26 @@ import { cellsToPart, frameBuf, ramp, stamp, W } from './pixels.js';
 
 const both = make => ({ front: { make }, back: { make } });
 /* a cudgel held head-down at the side: a grip through the fist, then a knotted head swelling outward a pixel every
-   three rows, studded with nails, angling away from the body like a sword */
-const CLUB = both(({ hand: [hx, hy], dir }) => {
+   three rows, studded with nails, angling away from the body like a sword. It is swung like a sword, raised over
+   the head and brought down (parts.js wield), drawn for that pointing up from the grip. */
+const clubWidth = (j, n) => (j < 2 ? 1 : j < 4 ? 2 : j < n - 1 ? 3 : 2);
+const clubUp = n => Array.from({ length: n }, (_, k) => {
+  const j = n - 1 - k, w = clubWidth(j, n);
+  return w === 1 ? '.T.' : w === 2 ? '.TT' : j === 4 || j === 7 ? 'STS' : j === 5 ? 'TtT' : 'TTT';
+});
+const CLUB = { attack: 'swing', ...both(({ hand: [hx, hy], dir, attack }) => {
+  if (attack) {
+    const cells = [];
+    wield(cells, r => { const n = Math.max(4, Math.min(10, r - 1)); return { rows: clubUp(n), reach: n + 1 }; }, [hx, hy], attackAxis('swing', dir, attack));
+    return cellsToPart(cells);
+  }
   const cells = [], n = Math.min(10, BASE - hy - 3);
   for (let j = 0; j < n; j++) {
-    const bx = hx + dir * Math.floor(j / 3), w = j < 2 ? 1 : j < 4 ? 2 : j < n - 1 ? 3 : 2;
+    const bx = hx + dir * Math.floor(j / 3), w = clubWidth(j, n);
     for (let i = 0; i < w; i++) cells.push([bx + dir * i, hy + 2 + j, (j === 4 || j === 7) && (i === w - 1 || (w === 3 && i === 0)) ? 'S' : j === 5 && i === 1 ? 't' : 'T']);
   }
   return cellsToPart(cells);
-});
+}) };
 
 /* ---------- the goblin ----------
    Small, sallow and spiteful: long ears swept out and up to points from a bald head, yellow eyes under a dark
@@ -112,7 +123,7 @@ const SPIKED_PAULDRON = { x: 19, y: 14, rows: [
 const ORC = {
   id: 'orc', name: 'Orc', blurb: 'Tusks, war paint and a great axe: the warband\'s front rank.',
   enemy: true, body: 'tall', outfit: { torso: 'tunic', strap: 1, sleeves: { A: 'K', C: 'L' }, steady: true }, head: { front: ORC_FACE, back: HEAD_BACK },
-  weapon: staff(['.S.T.S.', 'SS.T.SS', 'SSSTSSS', 'SSSTSSS', 'SSSTSSS', 'SS.T.SS', '.S.T.S.'], 23, { behind: true }),
+  weapon: staff(['.S.T.S.', 'SS.T.SS', 'SSSTSSS', 'SSSTSSS', 'SSSTSSS', 'SS.T.SS', '.S.T.S.'], 23, { behind: true, attack: 'chop' }),
   pal: { K: '#6c8248', R: '#8a3328', N: { flat: '#f2843a' }, M: { flat: '#2e1c18' }, Q: { flat: '#2a2a1e' }, A: '#4a3a30', B: '#6c8248', C: '#4a3526', L: '#4a3526', G: '#8a8478', P: '#5a4a3a', O: '#3e3029', S: '#8f908a', T: '#7a5434', F: '#ece2cc' },
   parts: { front: { hat: ORC_EARS.front, armNear: SPIKED_PAULDRON, armFar: FAR_PAULDRON }, back: { hat: ORC_EARS.back, armNear: SPIKED_PAULDRON, armFar: FAR_PAULDRON } }
 };
@@ -244,26 +255,38 @@ function wolfLeg(kind, x0, top, end, reach, lifted) {
   }
   return cellsToPart(cells);
 }
+/* It attacks with a bite: crouched to spring (WINDUP), its body low, head down and tail up, then lunging (STRIKE), its
+   forelegs reaching off the ground, its hind legs driving back and its head thrown up with its jaws wide, fangs bared
+   over a red tongue (seen from behind, only the head rising). */
+const WOLF_JAWS = { ...WOLF_HEAD.front, rows: [
+  ...WOLF_HEAD.front.rows.slice(0, 13),
+  '.FBBFBBAAAAAAAAAa',
+  '..ZRRRZZAAAAAAAa.',
+  '.FBBFBBBBAAAAAa..',
+  '..BBBBBBBBBAAa...',
+  '....BBBBBBBB.....'] };
 function wolfFrame(view, pose) {
-  const back = view === 'back', drop = pose ? 1 : 0;
+  const back = view === 'back', stride = pose === 1 || pose === 2 ? pose : 0, crouch = pose === WINDUP, lunge = pose === STRIKE, drop = crouch ? 2 : stride ? 1 : 0;
   /* the diagonal pairs: in stride 1 the near foreleg and far hind leg reach, in stride 2 the other pair. The far
      legs stand a row higher, further off. */
   const leg = (kind, near, x0, top) => {
-    const reaching = pose && (pose === 1) === (near === (kind === 'fore')), end = BASE - (near ? 0 : 1) - (reaching ? 2 : 0);
-    return wolfLeg(kind, x0, top + drop, end, !pose ? 0 : reaching ? -2 : 2, reaching);
+    const reaching = lunge ? kind === 'fore' : !!stride && (stride === 1) === (near === (kind === 'fore')), end = BASE - (near ? 0 : 1) - (reaching ? 2 : 0);
+    return wolfLeg(kind, x0, top + drop, end, lunge ? (reaching ? -3 : 2) : !stride ? 0 : reaching ? -2 : 2, reaching);
   };
   const farFore = leg('fore', false, 13, 35), farHind = leg('hind', false, 23, 34), nearFore = leg('fore', true, 10, 37), nearHind = leg('hind', true, 20, 36);
-  const sway = pose === 1 ? -1 : pose === 2 ? 1 : 0;
+  const sway = pose === 1 ? -1 : pose === 2 ? 1 : lunge ? 1 : 0, lift = crouch ? 3 : 0;
   /* the far legs stand behind; everything else is one coat of fur, lit as one piece without seams between its parts */
   const coat = p => ({ ...p, layer: 1 }), far = p => ({ ...p, layer: 0 });
-  const tail = coat({ x: 25 + sway, y: 27 + drop, rows: WOLF_TAIL }), body = coat({ ...WOLF_BODY, y: WOLF_BODY.y + drop }), head = coat({ ...WOLF_HEAD[view], y: WOLF_HEAD[view].y + drop });
+  const face = lunge && !back ? WOLF_JAWS : WOLF_HEAD[view], hy = face.y + drop + (crouch ? 1 : lunge ? -2 : 0);
+  const tail = coat({ x: 25 + sway, y: 27 + drop - lift, rows: WOLF_TAIL }), body = coat({ ...WOLF_BODY, y: WOLF_BODY.y + drop }), head = coat({ ...face, y: hy });
   const legs = [far(farFore), far(farHind)], near = [coat(nearFore), coat(nearHind)];
   return beastFrame(back ? [...legs, head, body, ...near, tail] : [...legs, tail, body, ...near, head], back);
 }
 const WOLF = {
   id: 'wolf', name: 'Wolf', blurb: 'Grey, lean and never alone: the pack that follows the road at dusk.',
   enemy: true, beast: true, body: 'standard', outfit: {}, draw: wolfFrame,
-  pal: { K: '#8f8c84', A: { ramp: '#8f8c84', clean: true }, D: { ramp: '#5f5a55', clean: true }, B: { ramp: '#ddd2b8', clean: true }, J: { flat: '#e2b048' }, Z: { flat: '#2a2228' }, F: '#f4efe4' }
+  attack: 'bite',
+  pal: { K: '#8f8c84', A: { ramp: '#8f8c84', clean: true }, D: { ramp: '#5f5a55', clean: true }, B: { ramp: '#ddd2b8', clean: true }, J: { flat: '#e2b048' }, Z: { flat: '#2a2228' }, F: '#f4efe4', R: '#a8483a' }
 };
 
 /* The slime. A ball of blue-green jelly sat on the ground, a shine (X) high on its upper left, and in front two eyes (E)
@@ -272,11 +295,13 @@ const WOLF = {
    of its jelly (U highlight, A light, B base, D shade, V deep) by how far its surface faces the light. Its outline is
    a pixel circle, eased a touch at the shoulders so its top stays round at this size, with its base pressed
    flat on the ground. It does not walk but heaves: squashed wide in one stride
-   and drawn up tall in the other. */
+   and drawn up tall in the other. It attacks by pouncing: squashed flatter still to spring (WINDUP), then stretched
+   tall and thrown forward toward the facing, its mouth gaping (STRIKE). */
 const SLIME_JELLY = '#72a8aa', SLIME_TONES = ['U', 'A', 'B', 'D', 'V'];
 const LIGHT = (() => { const v = [-0.55, -0.62, 0.56], n = Math.hypot(...v); return v.map(c => c / n); })();
 function slimeFrame(view, pose) {
-  const [w, h] = [[21, 19], [24, 15], [18, 22]][pose], rx = w / 2, ry = h / 2, cx = 16, cy = BASE + 2.5 - ry, cells = [];
+  const [w, h] = [[21, 19], [24, 15], [18, 22], [26, 13], [17, 23]][pose], lean = pose === STRIKE ? (view === 'front' ? -2 : 2) : 0;
+  const rx = w / 2, ry = h / 2, cx = 16 + lean, cy = BASE + 2.5 - ry, cells = [];
   for (let y = 0; y <= BASE; y++) for (let x = 0; x < W; x++) {
     const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry, d = nx * nx + ny * ny; if (Math.abs(nx) ** 1.8 + Math.abs(ny) ** 1.8 > 1) continue;
     const nz = Math.sqrt(Math.max(0, 1 - d)), lit = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
@@ -288,15 +313,16 @@ function slimeFrame(view, pose) {
   const sx = Math.round(cx - rx * 0.5), sy = Math.round(cy - ry * 0.62);
   at(sx, sy + 1, 'X'); at(sx, sy + 2, 'X'); at(sx + 1, sy, 'X'); at(sx + 2, sy, 'X'); at(sx + 3, sy - 1, 'X');
   if (view === 'front') {
-    const ey = top + Math.round(h * 0.45), mid = 14;
+    const ey = top + Math.round(h * 0.45), mid = 14 + lean;
     for (const ex of [mid - 3, mid + 2]) { at(ex, ey, 'E'); at(ex, ey + 1, 'E'); }
     at(mid - 1, ey + 3, 'M'); at(mid, ey + 3, 'M');
+    if (pose === STRIKE) { at(mid - 2, ey + 3, 'M'); at(mid - 2, ey + 4, 'M'); at(mid - 1, ey + 4, 'M'); at(mid, ey + 4, 'M'); }
   }
   return beastFrame([cellsToPart(cells)], false);
 }
 const SLIME = {
   id: 'slime', name: 'Slime', blurb: 'A heaving ball of blue-green jelly that swallows boots whole.',
-  enemy: true, beast: true, body: 'standard', outfit: {}, draw: slimeFrame,
+  enemy: true, beast: true, body: 'standard', outfit: {}, draw: slimeFrame, attack: 'pounce',
   pal: { K: SLIME_JELLY, ...Object.fromEntries(ramp(SLIME_JELLY).map((c, i) => [SLIME_TONES[i], { flat: c }])), X: { flat: '#f4f6e4' }, E: { flat: '#1c1218' }, M: { flat: '#2e4a4c' } }
 };
 

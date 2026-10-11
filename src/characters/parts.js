@@ -1,4 +1,4 @@
-import { BASE } from './body.js';
+import { BASE, attackAxis, unit } from './body.js';
 import { W, cellsToPart } from './pixels.js';
 
 /* ================= character sprites: hand-drawn parts =================
@@ -287,33 +287,104 @@ const line = (cells, x0, y0, x1, y1, ch) => {
   for (;;) { cells.push([x0, y0, ch]); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
 };
 const both = make => ({ front: { make }, back: { make } });
+
+/* ---------- weapons in an attack ----------
+   In the attack poses (body.js) make is also told attack ('windup' or 'strike') and other, the other fist. A weapon
+   then lies along the line body.js attackAxis gives its kind at that step, its hand-drawn head laid along it by
+   orient: the grid drawn pointing up (row 0 at the tip, columns across), turned so it points along the axis. Each
+   pixel round it samples the grid at its own place, so any angle draws without holes. */
+function orient(cells, rows, tip, axis) {
+  const [ux, uy] = unit(axis), w = rows[0].length, mid = (w - 1) / 2, R = Math.ceil(Math.hypot(rows.length, w)) + 1;
+  for (let y = Math.floor(tip[1]) - R; y <= tip[1] + R; y++) for (let x = Math.floor(tip[0]) - R; x <= tip[0] + R; x++) {
+    const dx = x - tip[0], dy = y - tip[1], j = Math.round(-(dx * ux + dy * uy)), i = Math.round(-dx * uy + dy * ux + mid);
+    const ch = j >= 0 && j < rows.length && i >= 0 && i < w ? rows[j][i] : '.';
+    if (ch !== '.') cells.push([x, y, ch]);
+  }
+}
+/* how far along the unit vector u a point can go from p and stay in the frame, a column and a row clear of its edges
+   for the outline */
+function room([px, py], [ux, uy]) {
+  const lim = (p, u, lo, hi) => (u > 1e-6 ? (hi - p) / u : u < -1e-6 ? (lo - p) / u : Infinity);
+  return Math.max(0, Math.min(lim(px, ux, 1, W - 2), lim(py, uy, 1, BASE)));
+}
+const along = ([px, py], [ux, uy], d) => [px + ux * d, py + uy * d];
+/* a held weapon in an attack, laid from the fist along the axis: build(r) is given the room in front of the fist (how
+   far the frame lets it reach) and returns { rows, reach }, its grid (pointing up) and how far out its tip stands, so
+   a blade can come shorter where the frame is tight. A polearm carries a wooden shaft from its head back through the
+   fist, butt pixels beyond it. */
+function wield(cells, build, hand, axis, butt = 0) {
+  const u = unit(axis), inside = ([x, y]) => x >= 1 && x <= W - 2 && y >= 1 && y <= BASE;
+  /* a head wider than its shaft can still overhang the frame's edge at the tip: then it comes in a pixel at a time */
+  for (let r = Math.floor(room(hand, u)); ; r--) {
+    const { rows, reach } = build(r), tip = along(hand, u, reach), out = [];
+    if (butt) {
+      const b = Math.min(butt, Math.floor(room(hand, [-u[0], -u[1]]))), [x0, y0] = along(tip, u, -rows.length).map(Math.round), [x1, y1] = along(hand, u, -b).map(Math.round);
+      line(out, x0, y0, x1, y1, 'T');
+    }
+    orient(out, rows, tip, axis);
+    if (out.every(inside) || r <= 0) { cells.push(...out); return; }
+  }
+}
+
 /* a sword held point-down: a crossguard under the fist and a long blade angling out from the body a pixel every
-   three rows, two pixels wide to a point. A dagger is the same in miniature, with a short guard. */
+   three rows, two pixels wide to a point. A dagger is the same in miniature, with a short guard. In an attack it is
+   raised over the head, point up, then brought down forward (swing). */
 function blade(len, guard) {
-  return both(({ hand: [hx, hy], dir }) => {
-    const cells = [], n = Math.min(len, BASE - hy - 5);
+  const w = 2 * guard + 1, up = n => ['.'.repeat(guard) + 'Y' + '.'.repeat(guard), ...Array(n).fill('.'.repeat(guard - 1) + 'YY' + '.'.repeat(guard)), 'G'.repeat(w)];
+  return { attack: 'swing', ...both(({ hand: [hx, hy], dir, attack }) => {
+    const cells = [];
+    if (attack) {
+      wield(cells, r => { const n = Math.max(1, Math.min(len, r - 3)); return { rows: up(n), reach: n + 3 }; }, [hx, hy], attackAxis('swing', dir, attack));
+      return cellsToPart(cells);
+    }
+    const n = Math.min(len, BASE - hy - 5);
     for (let i = -guard; i <= guard; i++) cells.push([hx + i, hy + 2, 'G']);
     let bx = dir < 0 ? hx - 1 : hx;
     for (let j = 0; j < n; j++) { bx = (dir < 0 ? hx - 1 : hx) + dir * Math.floor(j / 3); cells.push([bx, hy + 3 + j, 'Y'], [bx + 1, hy + 3 + j, 'Y']); }
     cells.push([dir < 0 ? bx : bx + 1, hy + 3 + n, 'Y']);
     return cellsToPart(cells);
-  });
+  }) };
 }
 const SWORD = blade(10, 2), DAGGER = blade(3, 1);
 /* a staff stood beside the fist, its foot on the ground, crowned with a hand-drawn head; it runs through the
    outer knuckles, and on a slim build never closer in than on the standard one so the head clears the headgear.
    Options: lean, rows per pixel the shaft tilts outward above the fist (and inward below it), so a long spear's
    head rises clear of the hair and helm; behind, drawn in the hand like any weapon instead of held forward over a
-   hood (the mages' staves are held forward so their heads show past hoods and brims). */
-function staff(head, rise, { lean = 0, behind = false } = {}) {
+   hood (the mages' staves are held forward so their heads show past hoods and brims); attack, how it is used (body.js):
+   a staff held forward casts, one held behind is a spear that thrusts, unless it says otherwise (the orc's axe chops).
+   Casting, the staff is lifted off the ground with glints (+) round its head, then swept forward, its head leaning
+   toward the facing in a burst of light. A spear or axe is laid along the attack's line instead (wield). */
+/* where the glints stand round a staff's head, in half its size plus a pixel: four at the corners as it is raised,
+   eight rays as it casts */
+const GLINT = [[-1, -1], [1, -1], [-1, 1], [1, 1]], BURST = [[0, -1.5], [-1.5, 0], [1.5, 0], [0, 1.5], ...GLINT];
+function staff(head, rise, { lean = 0, behind = false, attack = behind ? 'thrust' : 'cast' } = {}) {
   const w = head[0].length;
-  return { grounded: true, forward: !behind, ...both(({ hand: [hx, hy], dir, face }) => {
-    const x0 = dir < 0 ? Math.min(hx - 1, 8) : Math.max(hx + 1, 23), at = y => x0 + (lean ? dir * Math.trunc((hy - y) / lean) : 0);
+  return { grounded: true, forward: !behind, attack, ...both(({ hand: [hx, hy], dir, face, sx = 0, attack: phase }) => {
+    const cells = [];
+    if (phase && attack !== 'cast') {
+      /* a thrust drives the head a little beyond the fist; a chop swings it on a haft at arm's length */
+      const reach = attack === 'chop' ? head.length + 6 : head.length + 3;
+      wield(cells, r => ({ rows: head, reach: Math.max(head.length - 1, Math.min(reach, r)) }), [hx, hy], attackAxis(attack, dir, phase), attack === 'chop' ? 4 : 10);
+      return cellsToPart(cells);
+    }
+    const x0 = dir < 0 ? Math.min(hx - 1, 8 + sx) : Math.max(hx + 1, 23 + sx);
     /* a head that would reach across the face (a staff drawn in front, on a narrow build) rides above the brow */
     let top = hy - rise; if (!behind && face && dir < 0 && x0 - (w >> 1) + w - 1 >= face[0] + 1) top = Math.min(top, face[1] + 6 - head.length);
-    const cells = [], cx = at(top + head.length - 1);
+    /* lifted to cast, it keeps its length but leaves the ground, its head never past the top of the frame */
+    const foot = phase ? Math.min(BASE, Math.max(1, top) + rise + 18) : BASE; if (phase) top = Math.max(phase === 'windup' ? 2 : 3, top);
+    /* swept forward to cast, it leans a pixel every three rows, or stands straighter where the frame is too narrow */
+    const lx = t => x0 + (t ? dir * Math.trunc((hy - top - head.length + 1) / t) : 0) - (w >> 1);
+    let tilt = phase === 'strike' ? 3 : phase ? 0 : lean;
+    while (phase === 'strike' && (lx(tilt) < 1 || lx(tilt) + w > W - 2)) tilt++;
+    const at = y => x0 + (tilt ? dir * Math.trunc((hy - y) / tilt) : 0), cx = at(top + head.length - 1);
     head.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') cells.push([cx - (w >> 1) + i, top + j, ch]); }));
-    for (let y = top + head.length; y <= BASE; y++) cells.push([at(y), y, 'T']);
+    for (let y = top + head.length; y <= foot; y++) cells.push([at(y), y, 'T']);
+    if (phase) {
+      const mx = cx - (w >> 1) + (w - 1) / 2, my = top + (head.length - 1) / 2, ox = (w + 1) / 2, oy = (head.length + 1) / 2;
+      for (const [gx, gy] of phase === 'windup' ? GLINT : BURST) {
+        const x = Math.round(mx + gx * ox), y = Math.round(my + gy * oy); if (x >= 1 && x <= W - 2 && y >= 1) cells.push([x, y, '+']);
+      }
+    }
     return cellsToPart(cells);
   }) };
 }
@@ -337,7 +408,14 @@ const LANCE_HEAD = [
   '.RRR.',
   'RR.RR',
   'R...R'];
-const LANCE = both(({ hand: [hx, hy], dir }) => {
+/* In an attack the lance is drawn back in both hands and driven forward along the line to the next tile, its blade
+   and wings leading and the shaft running back past the fist. */
+const LANCE = { attack: 'thrust', ...both(({ hand: [hx, hy], dir, attack }) => {
+  if (attack) {
+    const cells = [], head = LANCE_HEAD.slice(0, 10);
+    wield(cells, r => ({ rows: head, reach: Math.max(head.length - 1, Math.min(head.length + 2, r)) }), [hx, hy], attackAxis('thrust', dir, attack), 10);
+    return cellsToPart(cells);
+  }
   const cells = [], half = LANCE_HEAD[0].length >> 1, n = LANCE_HEAD.length, tip = 0;
   const room = dir < 0 ? hx - half - 1 : W - 2 - half - hx, slope = Math.max(4, Math.ceil((hy - tip) / Math.max(1, room)));     /* a column spare for the outline */
   const at = y => hx + Math.round(dir * (hy - y) / slope), foot = Math.min(BASE - 1, hy + 12);
@@ -348,17 +426,34 @@ const LANCE = both(({ hand: [hx, hy], dir }) => {
   /* the butt: a gold ferrule and a steel spike */
   cells.push([at(foot - 2), foot - 2, 'G'], [at(foot - 1), foot - 1, 'S'], [at(foot), foot, 'S']);
   return cellsToPart(cells);
-});
+}) };
 /* a longbow held by its grip in the fist, carried at the side with its limbs sweeping outward to recurved tips
    and the string stretched straight between them, all clear of the body. Swung out near the frame's edge it
-   turns toward the viewer, so its sweep narrows to fit. */
-const BOW = both(({ hand: [hx, hy], dir }) => {
+   turns toward the viewer, so its sweep narrows to fit. In an attack it is held out toward the facing: drawn, its
+   limbs bend back toward the archer and the string runs from each tip to the hand at the jaw (other), an arrow on it
+   (a steel head, fletched in the accent) reaching past the grip; loosed, the limbs ease and the string springs
+   straight between them. */
+const BOW = { attack: 'shoot', ...both(({ hand: [hx, hy], dir, attack, other }) => {
+  if (attack) {
+    const cells = [], R = 9, drawn = attack === 'windup', reach = drawn ? 3 : 2, tx = hx - dir * reach, bend = r => Math.round(reach * (r / R) ** 2);
+    if (drawn) for (const ty of [hy - R - 1, hy + R + 1]) line(cells, tx, ty, other[0], other[1], 'F');
+    else for (let r = -R; r <= R; r++) cells.push([tx, hy + r, 'F']);
+    for (let r = -R; r <= R; r++) cells.push([hx - dir * bend(r), hy + r, Math.abs(r) <= 1 ? 'L' : 'T']);
+    for (const r of [-R - 1, R + 1]) cells.push([tx, hy + r, 'T']);
+    if (drawn) {
+      const [px, py] = other, ex = hx + dir * 3, ey = Math.round(py + ((hy - py) * (ex - px)) / (hx - px)), shaft = [];
+      line(shaft, px, py, ex, ey, 'T');
+      shaft.forEach((c, i) => { if (i < 2) c[2] = 'R'; });
+      cells.push(...shaft, [ex, ey, 'S'], [ex - dir, ey - 1, 'S'], [ex - dir, ey + 1, 'S']);
+    }
+    return cellsToPart(cells);
+  }
   const cells = [], R = 9, reach = Math.max(2, Math.min(4, dir < 0 ? hx - 1 : W - 2 - hx)), bend = r => Math.round((reach - 1) * (r / R) ** 2);
   for (let r = -R + 1; r <= R - 1; r++) cells.push([hx + dir * reach, hy + r, 'F']);
   for (let r = -R; r <= R; r++) cells.push([hx + dir * bend(r), hy + r, Math.abs(r) <= 1 ? 'L' : 'T']);
   for (const r of [-R - 1, R + 1]) cells.push([hx + dir * reach, hy + r, 'T']);
   return cellsToPart(cells);
-});
+}) };
 /* a kite shield on the near arm; from behind, its rim shows past the body */
 const KITE = {
   front: { x: 18, y: 20, rows: [
@@ -390,4 +485,4 @@ function recolor(part, map) {
   const sw = ch => { const up = ch.toUpperCase(), to = map[up]; return to ? (ch === up ? to : to.toLowerCase()) : ch; };
   return { ...part, rows: part.rows.map(r => [...r].map(sw).join('')) };
 }
-export { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, flipPart, recolor, staff };
+export { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, HEAD_BACK, HEAD_FRONT, KITE, LANCE, SKIN, SWORD, TAN, flipPart, orient, recolor, staff, wield };

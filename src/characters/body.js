@@ -39,7 +39,7 @@ function profile(bt) {
    turning away from the viewer, and it keeps what it holds in sight. */
 const SWING = { fwd: [4, 3], back: [-3, 2] }, CLEAR = 3, W_FRAME = 32;
 const SPLAY = 2;                                   /* [hand reach toward the facing, rows it rises] */
-function armPlan(bt, view, pose, side, steady) {
+function armPlan(bt, view, pose, side, steady, shift = 0) {
   const { rows } = profile(bt), w = bt.arm, s = side === 'near' ? 1 : -1, dir = view === 'front' ? -1 : 1;
   /* a hand carrying a staff or polearm keeps it upright: that arm rides with the body but does not swing */
   if (steady && side === (view === 'front' ? 'far' : 'near')) pose = 0;
@@ -48,15 +48,16 @@ function armPlan(bt, view, pose, side, steady) {
   const upper = s > 0 ? edge : edge - w + 1, lower = upper + s;                 /* left column of each section */
   /* a swinging hand stops CLEAR pixels short of the frame's side, leaving room for a blade held out beyond it */
   let sx = s < 0 && reach * dir > 0 ? 1 : reach * dir;
-  sx = Math.max(CLEAR - lower, Math.min(W_FRAME - 1 - CLEAR - (lower + w - 1), sx));
+  sx = Math.max(CLEAR - lower - shift, Math.min(W_FRAME - 1 - CLEAR - (lower + w - 1) - shift, sx));
   const cuff = bt.torso - 4 - rise;
   /* how far row j has leaned: nothing at the shoulder cap, the full reach at the cuff */
   const lean = j => (j < 1 ? 0 : Math.round(sx * j / cuff));
   return { w, s, dir, upper, lower, sx, cuff, lean, hand: bt.hand };
 }
-function armPart(bt, view, pose, side, top, o = {}) {
+/* shift: how far the frame moves the figure sideways (an attack's stand-back), for keeping a swinging hand in it */
+function armPart(bt, view, pose, side, top, o = {}, shift = 0) {
   const sl = o.sleeves || {}, sleeve = sl.A || 'A', cuffL = sl.C || 'C', skin = o.hands || 'K';
-  const a = armPlan(bt, view, pose, side, o.steady), cells = [];
+  const a = armPlan(bt, view, pose, side, o.steady, shift), cells = [];
   const put = (x, y, ch) => cells.push([x, y, ch]);
   /* A smooth arm (bt.smooth) hangs at a gentle angle instead of stepping out at the elbow: it leaves the shoulder
      against the body and moves a pixel outward at even intervals, SPLAY pixels by the wrist (one while it swings,
@@ -97,6 +98,87 @@ function armPart(bt, view, pose, side, top, o = {}) {
   const fistCells = [];
   fist.forEach((r, j) => [...r].forEach((c, i) => { if (c !== '.') fistCells.push([hx + i, hy + j, j === 2 ? skin.toLowerCase() : skin]); }));
   return { cells: cells.concat(fistCells), fist: fistCells, hand: [hx + Math.floor(hw / 2), hy + 1] };
+}
+
+/* ---------- attacks ----------
+   Two poses after the walk's: WINDUP, the blow drawn back, and STRIKE, the blow landing. The arm that strikes is the
+   one on the side the figure faces (the far arm in front, the near arm behind), so the blow goes toward the facing.
+   It is not hung from the shoulder row by row like a walking arm but drawn as a limb from the shoulder to wherever
+   the attack puts its hand, raised over the head if need be: a sleeve, a cuff at the wrist and a fist. The other
+   arm hangs, swings back as in a stride, or joins the first on the shaft of a spear or axe. The wind-up stands
+   square; the strike is a lunge, the leg on the facing side forward and the other heel lifted, which is the stride
+   that leads with that leg, so legs, robes and garments are cut for it as for the walk.
+
+   The kinds of attack, by what is held (parts.js and enemies.js name theirs): swing (a blade or club raised over the
+   head and brought down forward), chop (an axe the same, in both hands), thrust (a spear or lance drawn back in both
+   hands and driven forward), cast (a staff raised, then swept forward), shoot (a bow drawn to the jaw, then loosed)
+   and punch (a fist cocked at the shoulder, then thrown). attackAxis gives the line a weapon lies along at each step,
+   as a vector on screen with x toward the facing for dir 1; weapon and hands are both laid along it. */
+const WINDUP = 3, STRIKE = 4;
+/* In an attack the figure stands SHIFT pixels back from the frame's middle, away from its facing, so the blow has
+   room in front of it (roster.js attackOf; whoever draws the frame moves it forward again) */
+const SHIFT = 2;
+const phaseOf = pose => (pose === WINDUP ? 'windup' : pose === STRIKE ? 'strike' : null);
+function attackAxis(kind, dir, phase) {
+  const w = phase === 'windup';
+  if (kind === 'swing') return w ? [0, -1] : [dir, 2];
+  if (kind === 'chop') return w ? [0, -1] : [dir, 2];
+  if (kind === 'thrust') return [dir, -dir];                       /* toward the next tile: down-left in front, up-right behind */
+  if (kind === 'cast') return w ? [0, -1] : [dir, -3];
+  return [dir, 0];
+}
+const unit = ([x, y]) => { const n = Math.hypot(x, y) || 1; return [x / n, y / n]; };
+/* the leg pose for a pose: the walk's own, standing for the wind-up, the stride leading with the facing leg for the strike */
+const legPose = (view, pose) => (pose < WINDUP ? pose : pose === WINDUP ? 0 : view === 'front' ? 1 : 2);
+function bresenham(x0, y0, x1, y1) {
+  const out = [], dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+  for (;;) { out.push([x0, y0]); if (x0 === x1 && y0 === y1) return out; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
+}
+/* the middle of an arm's top on side ('near' or 'far'): the arm overlaps the body's edge by a column and runs outward */
+function shoulderOf(bt, side, top) {
+  const { rows } = profile(bt), s = side === 'near' ? 1 : -1, edge = s > 0 ? rows[2][1] : rows[2][0];
+  return [edge + s * ((bt.arm - 1) >> 1), top];
+}
+/* an arm reaching from its shoulder to a fist centred on hand: a sleeve as wide as the arm, a cuff where it meets
+   the wrist, and the fist, its last row in shadow. A rolled sleeve leaves the forearm bare. */
+function reachArm(bt, side, top, [hx, hy], o = {}) {
+  const sl = o.sleeves || {}, sleeve = sl.A || 'A', cuffL = sl.C || 'C', skin = o.hands || 'K';
+  const [sx, sy] = shoulderOf(bt, side, top), [ux, uy] = unit([hx - sx, hy - sy]), back = Math.max(1, Math.max(bt.hand, 2) >> 1) + 1;
+  const pts = bresenham(sx, sy, Math.round(hx - ux * back), Math.round(hy - uy * back)), steep = Math.abs(hy - sy) >= Math.abs(hx - sx);
+  const lo = (bt.arm - 1) >> 1, hi = bt.arm - 1 - lo, cells = [];
+  pts.forEach(([x, y], i) => {
+    const ch = i === pts.length - 1 ? cuffL : sl.roll && i > pts.length * 0.5 ? skin : sleeve;
+    for (let d = -lo; d <= hi; d++) cells.push(steep ? [x + d, y, ch] : [x, y + d, ch]);
+  });
+  const hw = Math.max(bt.hand, 2), x0 = hx - (hw >> 1), y0 = hy - (hw >> 1), fist = [];
+  for (let j = 0; j < hw; j++) for (let i = 0; i < hw; i++) fist.push([x0 + i, y0 + j, j === hw - 1 ? skin.toLowerCase() : skin]);
+  return { cells: cells.concat(fist), fist, hand: [hx, hy] };
+}
+/* both arms in an attack pose: the striking arm reached out to where the attack puts its hand, the other hanging,
+   swung back, or (o.shield aside) gripping the shaft behind the first */
+function attackArms(bt, view, pose, top, o = {}) {
+  const dir = view === 'front' ? -1 : 1, phase = phaseOf(pose), kind = o.attack || 'punch', w = phase === 'windup', fs = -dir * SHIFT;
+  /* a fist kept in the frame where the figure stands back, clear of its edge for the outline */
+  const keep = ([x, y]) => [Math.max(2 - fs, Math.min(W_FRAME - 3 - fs, x)), y];
+  const lead = view === 'front' ? 'far' : 'near', off = lead === 'far' ? 'near' : 'far', [ex] = shoulderOf(bt, lead, top);
+  /* a hand raised over the head stands clear of it on the facing side (the head spans columns 9 to 22) */
+  const raised = dir < 0 ? Math.min(ex - 3, 6) : Math.max(ex + 3, 26);
+  /* brought down, it lands out in front of the shoulder, and always beyond where it was raised */
+  const forward = dir < 0 ? Math.min(ex - 4, raised - 1) : Math.max(ex + 4, raised + 1);
+  let hand, other;
+  if (kind === 'swing') { hand = w ? [raised, top - 4] : [forward, top + 4]; other = w ? 'hang' : 'trail'; }
+  else if (kind === 'chop') { hand = w ? [raised, top - 2] : [forward, top + 5]; other = 'grip'; }
+  else if (kind === 'thrust') { hand = w ? [ex - dir, top + 5] : [ex + dir * 3, top + 5]; other = 'grip'; }
+  else if (kind === 'cast') { hand = w ? [raised, top + 1] : [forward, top + 5]; other = w ? 'hang' : 'trail'; }
+  else if (kind === 'shoot') { hand = [ex + dir * 5, top + 3]; other = w ? [CX - dir, top - 2] : [CX - dir * 7, top]; }
+  else { hand = w ? [ex + dir * 2, top - 1] : [ex + dir * 5, top + 3]; other = w ? 'hang' : 'trail'; }
+  if (other === 'grip') {
+    if (o.shield) other = 'hang';
+    else { const [ux, uy] = unit(attackAxis(kind, dir, phase)); other = [Math.round(hand[0] - ux * 4), Math.round(hand[1] - uy * 4)]; }
+  }
+  const arms = { [lead]: reachArm(bt, lead, top, keep(hand), o) };
+  arms[off] = Array.isArray(other) ? reachArm(bt, off, top, keep(other), o) : armPart(bt, view, other === 'trail' ? (off === 'near' ? 2 : 1) : 0, off, top, o, fs);
+  return arms;
 }
 
 /* ---------- legs ----------
@@ -288,18 +370,20 @@ function garmentContext(bt, view, pose, top, o) {
    its own torso and legs, and a coat: the piece worn over the torso, drawn as a layer of its own. */
 function measure(type, view, pose, o = {}) {
   const bt = BODY_TYPES[type]; if (!bt) throw new Error(`unknown body type "${type}"`);
-  const top = BASE + 1 - bt.legs - bt.torso + (pose ? 1 : 0), { rows } = profile(bt);
-  const near = armPart(bt, view, pose, 'near', top, o), far = armPart(bt, view, pose, 'far', top, o);
-  const g = o.garment ? GARMENTS[o.garment](garmentContext(bt, view, pose, top, o)) : null;
+  /* an attack's poses stand on the legs of a walking one (legPose); its arms are its own */
+  const lp = legPose(view, pose), top = BASE + 1 - bt.legs - bt.torso + (lp ? 1 : 0), { rows } = profile(bt);
+  const arms = pose >= WINDUP ? attackArms(bt, view, pose, top, o) : null;
+  const near = arms ? arms.near : armPart(bt, view, pose, 'near', top, o), far = arms ? arms.far : armPart(bt, view, pose, 'far', top, o);
+  const g = o.garment ? GARMENTS[o.garment](garmentContext(bt, view, lp, top, o)) : null;
   return {
     bt, top,
     parts: {
       torso: cellsToPart(g ? g.torso : torsoCells(bt, view, top, o)),
       coat: g ? cellsToPart(g.coat) : null,
-      legs: cellsToPart(g ? g.legs : o.legs === 'gown' ? gownCells(bt, view, pose) : o.legs === 'robe' ? robeCells(bt, view, pose, o.teeth) : pantsCells(bt, view, pose, o)),
+      legs: cellsToPart(g ? g.legs : o.legs === 'gown' ? gownCells(bt, view, lp) : o.legs === 'robe' ? robeCells(bt, view, lp, o.teeth) : pantsCells(bt, view, lp, o)),
       armNear: cellsToPart(near.cells), armFar: cellsToPart(far.cells), fistNear: cellsToPart(near.fist), fistFar: cellsToPart(far.fist),
       cloak: o.cloak ? cellsToPart(cloakCells(bt, view, top, o.cloak)) : null },
     at: { head: [9, top - 14], neck: [CX, top], shoulderNear: [rows[2][1], top], shoulderFar: [rows[2][0], top], handNear: near.hand, handFar: far.hand } };
 }
 
-export { BASE, BODY_TYPES, REF, measure, profile };
+export { BASE, BODY_TYPES, REF, SHIFT, STRIKE, WINDUP, attackAxis, measure, phaseOf, profile, unit };

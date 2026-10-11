@@ -1,7 +1,8 @@
 import { BASE } from '../characters/body.js';
 import { lookOf } from '../characters/draw.js';
 import { H, W, hexRgb } from '../characters/pixels.js';
-import { render, renderScaled } from '../characters/roster.js';
+import { ATTACK, attackOf, render, renderScaled } from '../characters/roster.js';
+import { SHIFT } from '../characters/body.js';
 import { INK } from '../render/palette.js';
 import { ASSET_BY_ID, drawAsset, footprint } from '../tiles/index.js';
 import { pieceImage, pieceKey } from './pieces.js';
@@ -122,18 +123,37 @@ function inShadow(s, it) {
   return c;
 }
 
-/* ---------- figures ---------- */
+/* ---------- figures ----------
+   A figure's canvas is FW wide, its frame centred with SHIFT columns spare either side: in an attack's frames the
+   figure stands back from the frame's middle (characters/roster.js attackOf), so the frame is drawn moved forward by
+   as much, putting the feet back over the middle of the canvas, which is where the figure stands. */
 const FACING = { sw: ['front', false], se: ['front', true], ne: ['back', false], nw: ['back', true] };
-const figFrames = new Map();
+const FW = W + 2 * SHIFT;
+const figFrames = new Map(), scaled = new Map();
+/* every frame of a character at the tactical size, drawn once for each look */
+function scaledOf(c) { let f = scaled.get(lookOf(c)); if (!f) { if (scaled.size > 64) scaled.clear(); f = renderScaled(c, FIGURE_SCALE); scaled.set(lookOf(c), f); } return f; }
 function figureCanvas(c, face, pose) {
   const [view, flip] = FACING[face] || FACING.sw, key = `${lookOf(c)}|${view}|${pose}`; let can = figFrames.get(key);
-  if (!can) { if (figFrames.size > 400) figFrames.clear(); const f = renderScaled(c, FIGURE_SCALE); can = toCanvas({ w: W, h: H, px: f[view][pose] }); figFrames.set(key, can); }
+  if (!can) {
+    if (figFrames.size > 400) figFrames.clear();
+    const f = scaledOf(c), back = pose >= ATTACK[0] ? attackOf(c).shift * (view === 'front' ? -1 : 1) : 0, one = toCanvas({ w: W, h: H, px: f[view][pose] });
+    can = canvasOf(FW, H); can.getContext('2d').drawImage(one, SHIFT + back, 0); figFrames.set(key, can);
+  }
   return [can, flip];
+}
+/* a figure as a white flash, for the moment it is struck */
+const flashes = new WeakMap();
+function flashOf(can) {
+  let w = flashes.get(can); if (w) return w;
+  w = canvasOf(can.width, can.height); const wg = w.getContext('2d');
+  wg.drawImage(can, 0, 0); wg.globalCompositeOperation = 'source-in'; wg.fillStyle = '#fff8ec'; wg.fillRect(0, 0, w.width, w.height);
+  flashes.set(can, w); return w;
 }
 
 /* Draw one frame. g is set up so one art pixel is k device pixels and (tx, ty) device pixels is art (0, 0);
    view is the art-space rectangle on screen. opts: frame (animation tick), figs (figure items, each { key, lv,
-   pri: 2, X, Y, z, ground, c, face, pose, ghost }), marks (Map of 'u,L' -> mark name for tile tops), cursor
+   pri: 2, X, Y, z, ground, c, face, pose, ghost, and optionally alpha, how solid it stands (else 0.55 for a ghost),
+   and flash, drawn white }), marks (Map of 'u,L' -> mark name for tile tops), cursor
    { u, L, z }, tick for its bob, and focus: art points { x, y, key } (the unit in play, the cursor) that pieces in
    front of them fade from. */
 function drawScene(g, sc, k, tx, ty, view, opts = {}) {
@@ -172,22 +192,22 @@ function drawScene(g, sc, k, tx, ty, view, opts = {}) {
      one, silhouette and all. */
   items.forEach((f, i) => {
     if (!f.c || !seen(figBox(f))) return;
-    const [px, py] = P(f.X, f.Y, f.z).map(Math.round), gy = Math.round(P(f.X, f.Y, f.ground)[1]), x0 = px - W / 2, y0 = py - BASE - 1, hid = hiders.get(i);
-    lg.setTransform(1, 0, 0, 1, 0, 0); lg.globalCompositeOperation = 'source-over'; lg.clearRect(0, 0, W, LH);
+    const [px, py] = P(f.X, f.Y, f.z).map(Math.round), gy = Math.round(P(f.X, f.Y, f.ground)[1]), x0 = px - FW / 2, y0 = py - BASE - 1, hid = hiders.get(i);
+    lg.setTransform(1, 0, 0, 1, 0, 0); lg.globalCompositeOperation = 'source-over'; lg.clearRect(0, 0, FW, LH);
     lg.setTransform(1, 0, 0, 1, -x0, -y0);
     lg.drawImage(mark('shadow'), px - 8, gy - 2);
     drawFigure(lg, f);
     if (hid) { lg.globalCompositeOperation = 'destination-out'; for (const j of hid) drawItem(lg, items[j], false); }
-    if (f.ghost) g.globalAlpha = 0.55;
+    g.globalAlpha = f.alpha ?? (f.ghost ? 0.55 : 1);
     g.drawImage(layer, x0, y0); g.globalAlpha = 1;
     /* the part that is hidden, drawn through what hides it in the figure's outline */
     if (!hid || opts.xray === false) return;
-    xg.setTransform(1, 0, 0, 1, 0, 0); xg.globalCompositeOperation = 'source-over'; xg.clearRect(0, 0, W, H);
+    xg.setTransform(1, 0, 0, 1, 0, 0); xg.globalCompositeOperation = 'source-over'; xg.clearRect(0, 0, FW, H);
     xg.setTransform(1, 0, 0, 1, -x0, -y0);
     for (const j of hid) drawItem(xg, items[j], false);
     xg.globalCompositeOperation = 'source-in'; xg.setTransform(1, 0, 0, 1, 0, 0);
     const [can, flip] = figureCanvas(f.c, f.face, f.pose), sil = silhouette(can);
-    if (flip) { xg.save(); xg.translate(W, 0); xg.scale(-1, 1); xg.drawImage(sil, 0, 0); xg.restore(); } else xg.drawImage(sil, 0, 0);
+    if (flip) { xg.save(); xg.translate(FW, 0); xg.scale(-1, 1); xg.drawImage(sil, 0, 0); xg.restore(); } else xg.drawImage(sil, 0, 0);
     g.globalAlpha = 0.7; g.drawImage(xray, x0, y0); g.globalAlpha = 1;
   });
   /* the pointer bobs over the cursor, or over the unit standing there */
@@ -198,30 +218,30 @@ function drawScene(g, sc, k, tx, ty, view, opts = {}) {
 }
 /* a figure's frame (no shadow) onto ctx, flipped for the faces that look the other way */
 function drawFigure(ctx, it) {
-  const [px, py] = P(it.X, it.Y, it.z).map(Math.round), [can, flip] = figureCanvas(it.c, it.face, it.pose);
-  if (flip) { ctx.save(); ctx.translate(px, 0); ctx.scale(-1, 1); ctx.drawImage(can, -W / 2, py - BASE - 1); ctx.restore(); } else ctx.drawImage(can, px - W / 2, py - BASE - 1);
+  const [px, py] = P(it.X, it.Y, it.z).map(Math.round), [frame, flip] = figureCanvas(it.c, it.face, it.pose), can = it.flash ? flashOf(frame) : frame;
+  if (flip) { ctx.save(); ctx.translate(px, 0); ctx.scale(-1, 1); ctx.drawImage(can, -FW / 2, py - BASE - 1); ctx.restore(); } else ctx.drawImage(can, px - FW / 2, py - BASE - 1);
 }
 /* how many art pixels a figure stands above its feet, from the top of its sprite (a slime is short, a knight with a
    plume tall), for what goes over its head */
 const tops = new WeakMap();
 function figureHeight(it) {
   const [can] = figureCanvas(it.c, it.face, it.pose); let top = tops.get(can);
-  if (top == null) { const d = can.getContext('2d').getImageData(0, 0, W, H).data; top = 0; while (top < H && !d.slice(top * W * 4, (top + 1) * W * 4).some((v, i) => i % 4 === 3 && v)) top++; tops.set(can, top); }
+  if (top == null) { const d = can.getContext('2d').getImageData(0, 0, FW, H).data; top = 0; while (top < H && !d.slice(top * FW * 4, (top + 1) * FW * 4).some((v, i) => i % 4 === 3 && v)) top++; tops.set(can, top); }
   return BASE + 1 - top;
 }
 /* the silhouette a hidden figure shows through what stands in front of it: a pale fill inside a dark rim */
-const xray = canvasOf(W, H), xg = xray.getContext('2d'), sils = new WeakMap();
+const xray = canvasOf(FW, H), xg = xray.getContext('2d'), sils = new WeakMap();
 /* a figure and its shadow, before what stands in front of it is cut out (taller than the frame: the shadow stays on
    the ground while the figure hops) */
-const LH = H + 24, layer = canvasOf(W, LH), lg = layer.getContext('2d');
+const LH = H + 24, layer = canvasOf(FW, LH), lg = layer.getContext('2d');
 function silhouette(can) {
   let s = sils.get(can); if (s) return s;
-  const src = can.getContext('2d').getImageData(0, 0, W, H).data; s = canvasOf(W, H);
-  const sg = s.getContext('2d'), d = sg.createImageData(W, H), on = (x, y) => x >= 0 && y >= 0 && x < W && y < H && src[(y * W + x) * 4 + 3] > 0;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const src = can.getContext('2d').getImageData(0, 0, FW, H).data; s = canvasOf(FW, H);
+  const sg = s.getContext('2d'), d = sg.createImageData(FW, H), on = (x, y) => x >= 0 && y >= 0 && x < FW && y < H && src[(y * FW + x) * 4 + 3] > 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < FW; x++) {
     if (!on(x, y)) continue;
     const rim = !on(x - 1, y) || !on(x + 1, y) || !on(x, y - 1) || !on(x, y + 1);
-    d.data.set(rim ? [40, 62, 98, 255] : [196, 216, 244, 150], (y * W + x) * 4);
+    d.data.set(rim ? [40, 62, 98, 255] : [196, 216, 244, 150], (y * FW + x) * 4);
   }
   sg.putImageData(d, 0, 0); sils.set(can, s);
   return s;
@@ -236,8 +256,8 @@ const solidity = s => s.alpha || (s.alpha = s.can.getContext('2d').getImageData(
 /* is the art point inside the drawn figure (its opaque pixels)? for clicking on units */
 function figureHit(it, wx, wy) {
   const [px, py] = P(it.X, it.Y, it.z).map(Math.round), [can, flip] = figureCanvas(it.c, it.face, it.pose);
-  let i = Math.floor(wx - (px - W / 2)); const j = Math.floor(wy - (py - BASE - 1)); if (i < 0 || j < 0 || i >= W || j >= H) return false;
-  if (flip) i = W - 1 - i;
+  let i = Math.floor(wx - (px - FW / 2)); const j = Math.floor(wy - (py - BASE - 1)); if (i < 0 || j < 0 || i >= FW || j >= H) return false;
+  if (flip) i = FW - 1 - i;
   return can.getContext('2d').getImageData(i, j, 1, 1).data[3] > 0;
 }
 /* a unit's face for the status window: the head of its south-west frame, at full size */

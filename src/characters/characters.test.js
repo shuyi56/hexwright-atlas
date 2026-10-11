@@ -3,15 +3,15 @@ import { test } from 'node:test';
 import { inflateSync } from 'node:zlib';
 import { encodeAPNG, encodePNG } from '../../tools/png.mjs';
 import { INK } from '../render/palette.js';
-import { BASE, BODY_TYPES, measure, profile } from './body.js';
+import { BASE, BODY_TYPES, SHIFT, STRIKE, WINDUP, measure, profile } from './body.js';
 import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
 import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
-import { BODIES, ENEMIES, JOBS, POSES, ROSTER, VIEWS, WALK, byId, frame, palette, render } from './roster.js';
+import { ATTACK, BODIES, ENEMIES, FRAMES, JOBS, POSES, ROSTER, VIEWS, WALK, attackOf, byId, frame, palette, render } from './roster.js';
 import { APPLIES, CHOICES, COLOURS, cleanSpec, fromSpec } from './custom.js';
 import * as hats from './hats.js';
 import { TOWNSFOLK } from './townsfolk.js';
-import { buildSheet, buildWalk } from './sheet.js';
+import { ATTACK_BEATS, buildAttack, buildSheet, buildWalk } from './sheet.js';
 
 const lum = hex => { const [r, g, b] = hexRgb(hex); return r * 0.3 + g * 0.59 + b * 0.11; };
 
@@ -339,4 +339,88 @@ test('the sheet is a valid PNG of the expected size', () => {
   assert.deepEqual([...png.subarray(1, 4)], [80, 78, 71]); assert.equal(png.readUInt32BE(16), s.width); assert.equal(png.readUInt32BE(20), s.height);
   const start = png.indexOf('IDAT') + 4, len = png.readUInt32BE(start - 8);
   assert.equal(inflateSync(png.subarray(start, start + len)).length, (s.width * 4 + 1) * s.height);
+});
+
+/* ---------- attacks ---------- */
+/* everyone who can attack: the roster, every held thing and shield the maker offers, and maker characters at random */
+function attackers() {
+  const out = [...ROSTER];
+  for (const [held] of CHOICES.held) for (const [shield] of CHOICES.shield) out.push(fromSpec({ id: `held-${held}-${shield}`, held, shield, clothes: 'overalls' }));
+  let seed = 11; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  for (let i = 0; i < 40; i++) out.push(fromSpec({ id: `mix-${i}`, ...Object.fromEntries(Object.entries(CHOICES).map(([k, o]) => [k, o[rnd(o.length)][0]])) }));
+  return out;
+}
+test('every character winds up and strikes inside the frame on every build, in colours it defines, its eyes whole', () => {
+  assert.deepEqual(ATTACK, [WINDUP, STRIKE]); assert.equal(FRAMES, POSES + 2);
+  for (const c of attackers()) {
+    const pal = palette(c), f = render(c);
+    for (const v of VIEWS) assert.equal(f[v].length, FRAMES, `${c.id} ${v}`);
+    for (const b of BODIES) for (const v of VIEWS) for (const k of ATTACK) {
+      const buf = frame(c, v, k, b), at = `${c.id} ${b} ${v} ${k}`;
+      assert.equal(buf.clipped, 0, `${at} runs off the frame`);
+      for (const m of new Set(buf.mat.filter(Boolean))) assert.ok(pal[m], `${at} uses "${m}" without a colour`);
+      if (v === 'front' && !c.head && !c.beast) { const n = ch => buf.mat.filter(x => x === ch).length; assert.deepEqual([n('E'), n('W')], [6, 2], `${at}: both eyes`); }
+    }
+  }
+});
+test('what a character holds decides how it attacks', () => {
+  const kind = id => attackOf(byId(id)).kind;
+  for (const id of ['squire', 'knight', 'thief', 'bandit', 'skeleton', 'goblin']) assert.equal(kind(id), 'swing', id);
+  for (const id of ['dragoon', 'valkyrie']) assert.equal(kind(id), 'thrust', id);
+  assert.equal(kind('orc'), 'chop'); assert.equal(kind('archer'), 'shoot'); assert.equal(kind('wolf'), 'bite'); assert.equal(kind('slime'), 'pounce');
+  for (const id of ['blackmage', 'whitemage', 'summoner']) { const a = attackOf(byId(id)); assert.equal(a.kind, 'cast', id); assert.equal(a.ranged, 'spell'); assert.match(a.tint, /^#[0-9a-f]{6}$/); }
+  for (const t of TOWNSFOLK.filter(c => !c.weapon)) assert.equal(kind(t.id), 'punch', t.id);
+  assert.equal(attackOf(byId('archer')).ranged, 'arrow'); assert.equal(attackOf(byId('squire')).ranged, null);
+  const held = h => attackOf(fromSpec({ held: h })).kind;
+  assert.deepEqual(['sword', 'dagger', 'daggers', 'spear', 'staff', 'bow', 'none'].map(held), ['swing', 'swing', 'swing', 'thrust', 'cast', 'shoot', 'punch']);
+  /* a figure stands back for its blow; a beast, which fills the frame, keeps its place */
+  for (const c of ROSTER) assert.equal(attackOf(c).shift, c.beast ? 0 : SHIFT, c.id);
+});
+test('a blow is drawn back and lands toward the facing, the weapon in the striking fist', () => {
+  for (const job of ROSTER.filter(j => !j.beast)) for (const b of BODIES) for (const v of VIEWS) {
+    const a = attackOf(job), o = { ...job.outfit, attack: a.kind, shield: !!job.shield }, dir = v === 'front' ? -1 : 1, lead = v === 'front' ? 'handFar' : 'handNear', at = `${job.id} ${b} ${v}`;
+    const [w, s] = [WINDUP, STRIKE].map(k => measure(b, v, k, o)), stand = measure(b, v, 0, job.outfit);
+    /* the striking hand ends further toward the facing than it began (a bow is held out the same, drawn and loosed) */
+    if (a.kind !== 'shoot') assert.ok((s.at[lead][0] - w.at[lead][0]) * dir > 0, `${at}: the blow travels toward the facing`);
+    /* a blade, an axe or a staff is raised to the shoulder or over it */
+    if (a.kind === 'swing' || a.kind === 'chop' || a.kind === 'cast') assert.ok(w.at[lead][1] <= w.top + 1, `${at}: raised`);
+    /* the strike lunges: the body drops a row, as in a stride */
+    assert.equal(s.top, stand.top + 1, `${at}: the strike drops into a lunge`); assert.equal(w.top, stand.top, `${at}: the wind-up stands square`);
+    if (!job.weapon) continue;
+    for (const k of ATTACK) {
+      const f = frame(job, v, k, b).mat, g = frame({ ...job, weapon: null }, v, k, b).mat, shown = f.filter((m, u) => m !== g[u]).length;
+      assert.ok(shown >= 6, `${at} ${k}: only ${shown} pixels of the weapon show`);
+      const [hx, hy] = (k === WINDUP ? w : s).at[lead], cx = hx - dir * SHIFT, near = f.some((m, u) => m !== g[u] && Math.abs(u % W - cx) <= 3 && Math.abs(((u / W) | 0) - hy) <= 3);
+      assert.ok(near, `${at} ${k}: the weapon is in the fist`);
+    }
+  }
+});
+test('moved forward by its shift, a figure attacking keeps its feet where it stood', () => {
+  const soles = (buf, dx) => { const xs = []; for (let x = 0; x < W; x++) if (buf.mat[BASE * W + x]) xs.push(x + dx); return xs; };
+  /* the feet alone: a staff or spear stands on the ground too, until it is lifted */
+  for (const job of ROSTER.map(j => ({ ...j, weapon: null }))) for (const v of VIEWS) {
+    const back = attackOf(job).shift * (v === 'front' ? -1 : 1), stand = soles(frame(job, v, 0), 0);
+    /* the wind-up stands square on the same ground; the strike's lunge moves a foot a pixel at most */
+    if (!job.beast) assert.deepEqual(soles(frame(job, v, WINDUP), back), stand, `${job.id} ${v}: the wind-up stands where it stood`);
+    /* the strike lunges, the leading foot a pixel forward and the other heel lifted (a beast's hind paws drive back two) */
+    const strike = soles(frame(job, v, STRIKE), back), [lo, hi] = [Math.min(...stand), Math.max(...stand)];
+    assert.ok(strike.length && strike.every(x => x >= lo - 2 && x <= hi + 2), `${job.id} ${v}: the strike keeps its feet (${strike} against ${lo}-${hi})`);
+  }
+});
+test('the wolf bites with its jaws open, the slime pounces, and the staves cast in a burst of light', () => {
+  const wolf = byId('wolf'), count = (buf, m) => buf.mat.filter(x => x === m).length;
+  assert.ok(count(frame(wolf, 'front', STRIKE), 'R') >= 3 && count(frame(wolf, 'front', STRIKE), 'F') > count(frame(wolf, 'front', 0), 'F'), 'tongue and fangs');
+  const top = buf => buf.mat.findIndex(Boolean), slime = byId('slime'), width = buf => { const xs = buf.mat.flatMap((m, u) => (m ? [u % W] : [])); return Math.max(...xs) - Math.min(...xs); };
+  assert.ok(top(frame(wolf, 'front', WINDUP)) > top(frame(wolf, 'front', 0)), 'the wolf crouches');
+  assert.ok(width(frame(slime, 'front', WINDUP)) > width(frame(slime, 'front', 0)) && top(frame(slime, 'front', STRIKE)) < top(frame(slime, 'front', 0)), 'the slime squashes, then stretches');
+  for (const id of ['blackmage', 'whitemage', 'summoner']) for (const v of VIEWS) {
+    const glints = k => count(frame(byId(id), v, k), '+');
+    assert.equal(glints(0), 0, `${id} ${v}: no glints standing`); assert.ok(glints(WINDUP) >= 2 && glints(STRIKE) > glints(WINDUP), `${id} ${v}: glints, then a burst`);
+  }
+});
+test('the attack animates stand, wind-up, strike and stand, the same frames as the walk is laid out in', () => {
+  assert.deepEqual(ATTACK_BEATS.filter((p, i) => p !== ATTACK_BEATS[i - 1]), [0, WINDUP, STRIKE, 0]);
+  const walk = buildWalk(ROSTER.slice(0, 2), 2), hit = buildAttack(ROSTER.slice(0, 2), 2), same = (a, b) => a.every((v, i) => v === b[i]);
+  assert.deepEqual([hit.width, hit.height], [walk.width, walk.height]); assert.equal(hit.frames.length, ATTACK_BEATS.length);
+  assert.ok(same(hit.frames[0], hit.frames[7]) && !same(hit.frames[0], hit.frames[2]) && !same(hit.frames[2], hit.frames[4]));
 });

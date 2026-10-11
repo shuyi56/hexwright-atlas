@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TI, blankModel } from '../editor/model.js';
-import { placeChar } from '../editor/walk.js';
+import { FACE_DELTA, placeChar } from '../editor/walk.js';
+import { STRIKE, WINDUP } from '../characters/body.js';
+import { ARROW_SPEED, GHOST, LUNGE, blowAt, blowPlan, faceToward } from './blow.js';
 import { TERRAIN } from '../tiles/terrain.js';
 import { MOVE, moveRange, placeId, routeTo } from './move.js';
 import { P, buildScene, liftOf, pickTile, withFigures } from './scene.js';
@@ -193,4 +195,46 @@ test('the ground under a piece of several tiles is drawn before the piece', () =
       const t = sc.items.find(it => it.kind === 'tile' && it.u === y * 10 + x); if (t) assert.ok(at(t) < at(p), `${p.o.id}: tile ${x},${y} before it`);
     }
   }
+});
+
+/* ---------- an attack as it plays (blow.js) ---------- */
+const sample = (p, f) => { const out = []; for (let t = 0; t <= p.end + 0.05; t += 0.01) out.push([t, f(blowAt(p, t), t)]); return out; };
+test('a blow winds up, strikes and stands again, lunging in to land and easing home', () => {
+  const p = blowPlan({ kind: 'swing', ranged: null }, 1);
+  assert.ok(p.strike < p.impact && p.impact < p.recover && p.recover < p.end);
+  assert.deepEqual([0.1, p.strike + 0.01, p.recover + 0.01].map(t => blowAt(p, t).pose), [WINDUP, STRIKE, 0]);
+  /* drawn back in the wind-up, at full stretch as it lands, home by the end */
+  assert.ok(blowAt(p, p.strike - 0.01).lunge < 0);
+  assert.ok(Math.abs(blowAt(p, p.impact).lunge - LUNGE.swing) < 1e-9);
+  assert.equal(blowAt(p, p.end).lunge, 0); assert.ok(blowAt(p, p.end).done && !blowAt(p, p.end - 0.01).done);
+  /* a spark where it lands, and nothing in the air */
+  assert.ok(sample(p, s => s.missile === null && s.burst === null).every(([, v]) => v));
+  assert.equal(blowAt(p, p.impact - 0.01).spark, null); assert.equal(blowAt(p, p.impact).spark, 0);
+});
+test('an arrow flies from the strike to the impact, taking longer the further it goes', () => {
+  const near = blowPlan({ kind: 'shoot', ranged: 'arrow' }, 2), far = blowPlan({ kind: 'shoot', ranged: 'arrow' }, 4);
+  assert.ok(far.impact > near.impact); assert.ok(Math.abs(far.impact - far.strike - 4 / ARROW_SPEED) < 1e-9);
+  const flight = sample(far, s => s.missile).filter(([, q]) => q !== null);
+  assert.ok(flight[0][0] >= far.strike - 1e-9 && flight[flight.length - 1][0] < far.impact);
+  assert.ok(flight.every(([, q], i) => q >= 0 && q < 1 && (!i || q > flight[i - 1][1])), 'the arrow only goes forward');
+  /* the archer stands its ground */
+  assert.ok(sample(far, s => s.lunge).every(([, v]) => v === 0));
+});
+test('a spell bursts over the target and lands inside the burst', () => {
+  const p = blowPlan({ kind: 'cast', ranged: 'spell' }, 3);
+  assert.ok(p.burst[0] > p.strike && p.burst[0] < p.impact && p.impact < p.burst[1] && p.end >= p.burst[1]);
+  assert.equal(blowAt(p, p.burst[0] - 0.01).burst, null); assert.ok(blowAt(p, p.impact).burst > 0);
+});
+test('the target flashes twice and reels when the blow lands, and fades to a ghost if it falls', () => {
+  for (const fell of [false, true]) {
+    const p = blowPlan({ kind: 'chop', ranged: null }, 1, fell), after = t => blowAt(p, p.impact + t);
+    assert.ok(!blowAt(p, p.impact - 0.01).hit && after(0).hit);
+    assert.deepEqual([0.02, 0.08, 0.13, 0.25].map(t => after(t).flash), [true, false, true, false]);
+    assert.equal(blowAt(p, p.impact - 0.01).knock, 0); assert.ok(after(0.1).knock > 0); assert.equal(blowAt(p, p.end).knock, 0);
+    assert.equal(after(0).alpha, 1);
+    assert.ok(Math.abs(blowAt(p, p.end).alpha - (fell ? GHOST : 1)) < 1e-9, `fell ${fell}`);
+  }
+});
+test('a unit turns to face its target the way a walk would face it', () => {
+  FACE_DELTA.forEach((d, f) => { assert.equal(faceToward([5, 5], [5 + d[0], 5 + d[1]]), f); assert.equal(faceToward([5, 5], [5 + 3 * d[0], 5 + 3 * d[1] + (d[0] ? 1 : 0)]), f); });
 });

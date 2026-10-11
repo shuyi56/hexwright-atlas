@@ -1,6 +1,6 @@
 import { characterById } from '../characters/library.js';
 import { FACES } from '../characters/draw.js';
-import { WALK } from '../characters/roster.js';
+import { WALK, attackOf } from '../characters/roster.js';
 import { ED, LEVEL_NAME, mutate, undo } from '../editor/editor.js';
 import { MAX_LEVEL, levelOf } from '../editor/model.js';
 import { walkChar } from '../editor/walk.js';
@@ -10,6 +10,7 @@ import { moveRange, placeId, routeTo } from './move.js';
 import '../data/unit-files.js';
 import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
 import { attackReach } from './attack.js';
+import { blowAt, blowPlan, faceToward } from './blow.js';
 import { planTurn } from '../battle/ai.js';
 import * as battle from '../battle/state.js';
 import { drawScene, figureHeight, figureHit, portrait } from './render.js';
@@ -24,8 +25,11 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    beside it, as in the tactics games: Move, Attack (its pattern and range light up in red; pick a unit of the
    other side there to strike it for its Attack) and Wait. Esc or a right-click steps back: from the attack to the
    window, from the window to the move (taking the move back if it walked), from the move to no unit, and with no
-   unit picked it takes back the last Wait, until anything else is done. Esc never leaves the view (← Editor does). A unit
-   struck shows its health bar over its head for a moment, draining. The fight is kept by battle/state.js: a turn is
+   unit picked it takes back the last Wait, until anything else is done. Esc never leaves the view (← Editor does). An
+   attack plays out (tactical/blow.js): the attacker turns to its target, winds up and strikes in its own frames
+   (characters/roster.js), lunging in for a blow, loosing an arrow or casting a spell, and the target flashes and
+   reels when it lands, then shows its health bar over its head for a moment, draining; a unit felled fades to a
+   ghost. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.js: a turn is
    the player's phase and then the enemy's, each unit of the side in play moves once and acts once, and the phase
    passes when every one of them is done or End turn (T) is pressed, with a banner for each new phase. In the enemy
    phase the computer plays each enemy in turn (battle/ai.js), showing its range, walking and striking, while the
@@ -35,14 +39,15 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 /* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
    what an overlay changes */
-const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, note: '', walk: null, fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, note: '', walk: null, blow: null, turned: new Map(), fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
 /* how long a phase's banner shows, and the computer's pauses between showing an enemy's range, walking, aiming and
-   striking (all halved by the 2× chip) */
+   striking (all halved by the 2× chip); after a strike it pauses once the blow has played out, while the damage still
+   shows */
 const MENU_FONT = 12, MENU_SCALE = [0.75, 2], RESTART_ARM = 3;
-const BANNER_TIME = 1.5, AI_PAUSE = { pick: 0.45, aim: 0.5, after: 1.1, stay: 0.3 };
+const BANNER_TIME = 1.5, AI_PAUSE = { pick: 0.45, aim: 0.5, after: 0.6, stay: 0.3 };
 
 /* ---------- the scene and where things are ---------- */
 function rebuild() { TC.sc = buildScene(ED.M, { rot: TC.rot, top: TC.top }); TC.bounds = bounds(TC.sc); TC.dirty = true; }
@@ -74,7 +79,7 @@ function startWalk(k, path) {
   const M = ED.M, c = M.chars[k], start = ptOf(c.x, c.y, levelOf(c));
   const jump = unitFor(c.sprite).movement.jump, r = mutate(M2 => { const w = walkChar(M2, k, path, jump); return { changed: w.ok && path.length ? 1 : 0, ok: w.ok }; });
   if (!r || !r.ok) return false;
-  TC.walk = { k, pts: [start, ...path.map(([x, y, L]) => ptOf(x, y, L || 0))], d: 0 }; TC.locked = false; TC.free = false; TC.rewind = null;
+  TC.walk = { k, pts: [start, ...path.map(([x, y, L]) => ptOf(x, y, L || 0))], d: 0 }; TC.locked = false; TC.free = false; TC.rewind = null; TC.turned.delete(k);
   /* the map as it was before the walk, for taking the move back from the actions window */
   TC.from = { k, snap: ED.undo[ED.undo.length - 1] };
   TC.range = null; rebuild();
@@ -83,15 +88,21 @@ function startWalk(k, path) {
 
 /* ---------- figures for the scene ---------- */
 function figures() {
-  const M = ED.M, out = [], sz = S();
+  const M = ED.M, out = [], sz = S(), b = TC.blow, now = b && blowAt(b.plan, b.t);
+  /* the way from the attacker to its target on screen, in view tiles, for the lunge and the knockback */
+  const toward = b && (() => { const [ax, ay] = viewPoint(sz, TC.rot, M.chars[b.a].x + 0.5, M.chars[b.a].y + 0.5), [dx, dy] = viewPoint(sz, TC.rot, M.chars[b.d].x + 0.5, M.chars[b.d].y + 0.5), n = Math.hypot(dx - ax, dy - ay) || 1; return [(dx - ax) / n, (dy - ay) / n]; })();
   (M.chars || []).forEach((c, k) => {
-    const w = TC.walk && TC.walk.k === k ? TC.walk : null, p = w ? walkerPos(w) : Object.assign(ptOf(c.x, c.y, levelOf(c)), { face: c.face, ground: zAt(c.x, c.y, levelOf(c)) });
+    const w = TC.walk && TC.walk.k === k ? TC.walk : null, p = w ? walkerPos(w) : Object.assign(ptOf(c.x, c.y, levelOf(c)), { face: TC.turned.get(k) ?? c.face, ground: zAt(c.x, c.y, levelOf(c)) });
     const L = w ? p.L : levelOf(c); if (L > TC.top) return;
-    const [X, Y] = viewPoint(sz, TC.rot, p.x, p.y);
+    let [X, Y] = viewPoint(sz, TC.rot, p.x, p.y);
     /* the nearer of the two tiles it is stepping between decides when it is drawn */
     const keyOf = q => { const [a, b] = viewPoint(sz, TC.rot, Math.floor(q.x) + 0.5, Math.floor(q.y) + 0.5); return a + b; };
     const key = w && p.seg ? Math.max(keyOf(p.seg[0]), keyOf(p.seg[1])) : keyOf(p);
-    out.push({ key, lv: L, pri: 2, X, Y, z: p.z, ground: p.ground ?? p.z, c: characterById(c.sprite) || characterById('villager'), k, face: FACES[(p.face + 3 * TC.rot) % 4], pose: w ? WALK[Math.floor(w.d * STRIDES) % WALK.length] : 0, ghost: !alive(k) });
+    const f = { key, lv: L, pri: 2, X, Y, z: p.z, ground: p.ground ?? p.z, c: characterById(c.sprite) || characterById('villager'), k, face: FACES[(p.face + 3 * TC.rot) % 4], pose: w ? WALK[Math.floor(w.d * STRIDES) % WALK.length] : 0, ghost: !alive(k) };
+    /* in an attack, the attacker in its frames lunging at the target, and the target reeling, flashing and fading */
+    if (b && k === b.a) { f.pose = now.pose; X += toward[0] * now.lunge; Y += toward[1] * now.lunge; }
+    if (b && k === b.d) { X += toward[0] * now.knock; Y += toward[1] * now.knock; f.flash = now.flash; f.ghost = false; if (b.plan.fell) f.alpha = now.alpha; }
+    f.X = X; f.Y = Y; out.push(f);
   });
   return out;
 }
@@ -190,14 +201,16 @@ const nameOf = k => { const c = ED.M.chars[k]; return characterById(c.sprite)?.n
    and its full hit points */
 const rosterOf = () => (ED.M.chars || []).map(c => { const u = unitFor(c.sprite); return { side: battle.sideOfGroup(u.group), hp: u.stats.hp }; });
 const hpOf = k => TC.battle.units[k].hp;
+/* the hit points a unit shows: the battle has them already lowered by a blow still on its way */
+const shownHp = k => (TC.blow && !TC.blow.hit && TC.blow.d === k ? TC.blow.r.from : hpOf(k));
 const alive = k => battle.alive(TC.battle, k);
 const turnOf = k => TC.battle.units[k] || { moved: false, acted: false };
 const done = k => battle.done(TC.battle, k);
 /* the computer plays the enemy when there is a side of the player's for it to fight; on a map of enemies only, they
    are the player's to move */
 const aiPlays = side => side === 'enemy' && TC.battle.sides.includes('player');
-/* a walk or the computer's phase is under way: the controls wait */
-const busy = () => !!TC.walk || !!TC.ai;
+/* a walk, an attack or the computer's phase is under way: the controls wait */
+const busy = () => !!TC.walk || !!TC.blow || !!TC.ai;
 /* the banner across the top of the screen: a new phase for a moment, or the battle's end for good */
 function banner(title, sub, kind, stay) {
   const el = $('tcPhase'); el.firstElementChild.textContent = title; el.lastElementChild.textContent = sub;
@@ -227,7 +240,7 @@ function restart() {
   if (!TC.start) return;
   if (!TC.battle.outcome && !TC.armed) { TC.armed = setTimeout(disarm, RESTART_ARM * 1000); panels(); return; }
   disarm();
-  TC.ai = null; TC.walk = null; TC.locked = false; TC.free = false; TC.pop = null; TC.from = null; TC.rewind = null; TC.note = '';
+  TC.ai = null; TC.walk = null; TC.blow = null; TC.turned.clear(); TC.locked = false; TC.free = false; TC.pop = null; TC.from = null; TC.rewind = null; TC.note = '';
   const chars = structuredClone(TC.start);
   mutate(M => { const same = JSON.stringify(M.chars || []) === JSON.stringify(chars); M.chars = chars; return { changed: same ? 0 : 1 }; });
   rebuild(); TC.battle = battle.createBattle(rosterOf()); select(-1);
@@ -237,13 +250,31 @@ function restart() {
 function disarm() { if (TC.armed) clearTimeout(TC.armed); TC.armed = 0; if (TC.open && TC.battle) panels(); }
 /* End turn (T): the player's side gives up whatever its units have left this phase */
 function endTurn() { if (busy() || !TC.battle || TC.battle.outcome || !TC.battle.sides.length) return; nextPhase(); }
+/* Unit a strikes unit d. The battle takes the blow at once; the screen plays it (tactical/blow.js): a turns to face d
+   and attacks in its own way, and the damage shows when the blow lands (land). Once it has played out (settle) play
+   goes on as after any action. */
 function attack(a, d) {
   const r = battle.strike(TC.battle, a, d, statsOf(a).attack); if (!r) return;
-  TC.from = null; TC.rewind = null; TC.pop = { k: d, text: String(r.dmg), t: 0, from: r.from / r.max, to: r.to / r.max };
-  const note = `${nameOf(a)} hits ${nameOf(d)} for ${r.dmg}${r.fell ? `. ${nameOf(d)} falls` : ''}`;
-  const end = TC.battle.outcome;
+  const A = ED.M.chars[a], D = ED.M.chars[d], how = attackOf(characterById(A.sprite) || characterById('villager'));
+  TC.from = null; TC.rewind = null; TC.pop = null; TC.menu = false; TC.note = `${nameOf(a)} attacks ${nameOf(d)}`; setMode(null);
+  TC.turned.set(a, faceToward([A.x, A.y], [D.x, D.y]));
+  TC.blow = { a, d, r, how, plan: blowPlan(how, Math.hypot(D.x - A.x, D.y - A.y), r.fell), t: 0, hit: false };
+  /* both in sight: the camera eases over to take in the target as well */
+  const [ax, ay] = tileArt(A.x, A.y, levelOf(A)), [dx, dy] = tileArt(D.x, D.y, levelOf(D)); keepInView((ax + dx) / 2, (ay + dy) / 2 - 16);
+  panels();
+}
+/* the blow lands: the damage rises over the target and its health bar drains */
+function land(b) {
+  const { a, d, r } = b; b.hit = true;
+  TC.pop = { k: d, text: String(r.dmg), t: 0, from: r.from / r.max, to: r.to / r.max };
+  TC.note = `${nameOf(a)} hits ${nameOf(d)} for ${r.dmg}${r.fell ? `. ${nameOf(d)} falls` : ''}`; panels();
+}
+/* the attack has played out: the battle's end, or play goes on */
+function settle(b) {
+  TC.blow = null;
+  const end = TC.battle.outcome, note = TC.note;
   if (end) { TC.ai = null; select(-1); banner(battle.OUTCOME_LABEL[end], end === 'victory' ? 'Every enemy has fallen' : 'Every one of your units has fallen', end, true); }
-  else finish(a);
+  else finish(b.a);
   TC.note = note; panels();
 }
 /* Wait: the picked unit ends its part in the phase where it stands. Until anything else happens it can be taken back
@@ -265,7 +296,7 @@ function rewindWait() {
    by its plan (battle/ai.js), aims (the red tiles showing) and strikes, or waits where it stands. When none is left
    play passes back to the player. */
 function aiStep(dt) {
-  const A = TC.ai; if (!A || TC.walk) return;
+  const A = TC.ai; if (!A || TC.walk || TC.blow) return;
   A.t -= dt * (TC.fast ? 2 : 1); if (A.t > 0) return;
   const B = TC.battle, k = A.k;
   if (A.step === 'pick') {
@@ -330,11 +361,11 @@ function panels() {
     $('tcUnitName').textContent = s ? s.name : c.sprite;
     const u = unitFor(c.sprite), st = u.stats, mv = u.movement;
     const pat = (PATTERNS.find(([id]) => id === st.pattern) || PATTERNS[0])[1], t = turnOf(k);
-    const bar = $('tcUnitHp').firstElementChild, frac = hpOf(k) / Math.max(1, st.hp);
+    const hp = shownHp(k), bar = $('tcUnitHp').firstElementChild, frac = hp / Math.max(1, st.hp);
     bar.style.width = Math.round(100 * frac) + '%'; bar.className = frac > 0.5 ? '' : frac > 0.25 ? 'mid' : 'low';
-    $('tcUnitInfo').textContent = `HP ${hpOf(k)}/${st.hp} · Attack ${st.attack} · ${st.pattern === 'melee' ? pat : `${pat} ${st.range}`}`;
+    $('tcUnitInfo').textContent = `HP ${hp}/${st.hp} · Attack ${st.attack} · ${st.pattern === 'melee' ? pat : `${pat} ${st.range}`}`;
     const off = t.side !== TC.battle.phase;
-    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${!alive(k) ? ' · fallen' : off ? '' : done(k) ? ' · done' : t.moved ? ' · moved' : t.acted ? ' · acted' : TC.sel === k ? ' · ready' : ''}`;
+    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${!hp ? ' · fallen' : off ? '' : done(k) ? ' · done' : t.moved ? ' · moved' : t.acted ? ' · acted' : TC.sel === k ? ' · ready' : ''}`;
     box.dataset.side = t.side;
   }
   /* the actions window for the picked unit */
@@ -354,6 +385,7 @@ function panels() {
     : TC.armed ? 'Press Restart (R) again to start the battle over'
     : B.outcome ? `${TC.note ? `${TC.note} · ${battle.OUTCOME_LABEL[B.outcome]}` : `${battle.OUTCOME_LABEL[B.outcome]}: the battle is over`} · R to restart`
     : TC.walk ? 'On the move…'
+    : TC.blow ? TC.note
     : TC.mode === 'move' ? 'Pick a blue tile to move there, or the unit to stay put · Esc to cancel'
     : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to attack it · Esc to go back' : 'No one in reach · Esc to go back')
     : TC.menu ? (canUndoMove(TC.sel) ? 'Choose an action · Esc to take the move back' : 'Choose an action · Esc to go back')
@@ -378,6 +410,13 @@ function loop(now) {
       else { lookAt(ax, ay - 20); if (Math.abs(TC.cam.x - ax) < 1.5 && Math.abs(TC.cam.y - (ay - 20)) < 1.5) TC.locked = true; }
     }
     if (w.d >= w.pts.length - 1) { TC.walk = null; TC.locked = false; const k = w.k; TC.cam.x = ax; TC.cam.y = ay - 20; finish(k); }
+    TC.dirty = true;
+  }
+  /* an attack plays out, landing part way */
+  if (TC.blow) {
+    const b = TC.blow; b.t += dt * (TC.fast ? 2 : 1);
+    if (!b.hit && b.t >= b.plan.impact) land(b);
+    if (b.t >= b.plan.end) settle(b);
     TC.dirty = true;
   }
   /* the computer's phase, a step at a time; a phase's banner shows for a moment, the battle's end stays */
@@ -420,6 +459,7 @@ function paint() {
   drawScene(g, TC.sc, k, tx, ty, view, { frame: TC.tick >> 1, tick: TC.tick >> 1, figs: TC.figs, marks, cursor, focus, ...TC.debug });
   TC.view = { k, tx, ty };
   g.setTransform(1, 0, 0, 1, 0, 0);
+  if (TC.blow) drawBlow(TC.blow, k, tx, ty);
   placeMenu();
   const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);
   if (pf) {
@@ -435,6 +475,37 @@ function paint() {
     g.lineWidth = Math.max(2, Math.round(1.5 * k)); g.strokeStyle = '#0b1011'; g.strokeText(TC.pop.text, sx, sy); g.fillStyle = '#ffd2c4'; g.fillText(TC.pop.text, sx, sy);
     g.globalAlpha = 1; g.textAlign = 'start';
   }
+}
+/* What an attack sends through the air, drawn over the scene in art pixels: an arrow on its arc from the archer to the
+   target, turned along its flight; a spell bursting over the target in the caster's colour, a flash and a ring of
+   sparks flying out; and where a blow lands in close, a white star at the point of contact. */
+const INK_RGB = '#2b2116', ARROW = ['#dde2e6', '#8a6238', '#8a6238', '#8a6238', '#8a6238', '#8a6238', '#b8483a'];
+function drawBlow(b, k, tx, ty) {
+  const s = blowAt(b.plan, b.t), fa = TC.figs.find(f => f.k === b.a), fd = TC.figs.find(f => f.k === b.d); if (!fa || !fd) return;
+  const chest = f => { const [x, y] = P(f.X, f.Y, f.z); return [x, y - 13]; }, [ax, ay] = chest(fa), [dx, dy] = chest(fd);
+  const dot = (x, y, col, a = 1) => { g.globalAlpha = a; g.fillStyle = col; g.fillRect(Math.round(x) * k + tx, Math.round(y) * k + ty, k, k); };
+  if (s.missile !== null) {
+    const q = s.missile, arc = 3 + 2 * b.plan.dist, x = ax + (dx - ax) * q, y = ay + (dy - ay) * q - arc * Math.sin(Math.PI * q);
+    const vx = dx - ax, vy = dy - ay - arc * Math.PI * Math.cos(Math.PI * q), n = Math.hypot(vx, vy) || 1, pts = ARROW.map((c, i) => [x - (vx / n) * i, y - (vy / n) * i, c]);
+    for (const [px, py] of pts) for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) dot(px + ox, py + oy, INK_RGB, 0.55);
+    for (const [px, py, c] of pts) dot(px, py, c);
+  }
+  if (s.burst !== null) {
+    const q = s.burst, tint = b.how.tint, fade = 1 - q;
+    if (q < 0.4) { const r = 2 + 7 * q, a = 0.85 * (1 - q / 0.4); for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) if (Math.abs(i) + Math.abs(j) <= r) dot(dx + i, dy + j, Math.abs(i) + Math.abs(j) < r * 0.45 ? '#fffaf0' : tint, a); }
+    for (let n = 0; n < 8; n++) {
+      const ang = (n / 8) * Math.PI * 2 + q * 1.2, r = 3 + 11 * q, x = dx + Math.cos(ang) * r, y = dy + Math.sin(ang) * r * 0.8;
+      dot(x, y, '#fffaf0', fade); for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) dot(x + ox, y + oy, tint, fade * 0.9);
+    }
+    for (let n = 0; n < 5; n++) dot(dx - 6 + n * 3, dy + 6 - 22 * q - (n % 2) * 4, tint, fade);
+  }
+  if (s.spark !== null) {
+    const q = s.spark, n = Math.hypot(dx - ax, dy - ay) || 1, cx = dx - ((dx - ax) / n) * 5, cy = dy - ((dy - ay) / n) * 3, L = 1 + Math.round(3 * q), a = 1 - q * q;
+    dot(cx, cy, '#fffaf0', a);
+    for (let i = 1; i <= L; i++) for (const [ox, oy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) dot(cx + ox * i, cy + oy * i, i === L ? '#ffd2a0' : '#fffaf0', a);
+    for (let i = 1; i < L; i++) for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) dot(cx + ox * (i + 1), cy + oy * (i + 1), '#fffaf0', a * 0.8);
+  }
+  g.globalAlpha = 1;
 }
 /* the actions window stands beside the picked unit on screen: to its right, or its left near the screen's edge. Its
    type, and everything else in it (sized in em), scales with the zoom as the figures do: MENU_FONT at ×3, kept within
@@ -513,7 +584,7 @@ function openTactical(opts = {}) {
   if (!ED.M) return;
   TC.open = true; root.hidden = false; TC.rot = ED.rot; TC.top = ED.level; TC.sel = -1; TC.walk = null; TC.range = null; TC.reach = null; TC.mode = null; TC.lastT = 0;
   TC.start = structuredClone(ED.M.chars || []); if (TC.armed) clearTimeout(TC.armed); TC.armed = 0;
-  TC.battle = battle.createBattle(rosterOf()); TC.ai = null; TC.rewind = null; TC.pop = null; TC.note = ''; TC.banner = null; $('tcPhase').hidden = true;
+  TC.battle = battle.createBattle(rosterOf()); TC.ai = null; TC.blow = null; TC.turned.clear(); TC.rewind = null; TC.pop = null; TC.note = ''; TC.banner = null; $('tcPhase').hidden = true;
   $('tcName').textContent = ED.M.name;
   size(); rebuild();
   /* a comfortable close-up: about a dozen tiles across */
@@ -527,7 +598,7 @@ function openTactical(opts = {}) {
   if (TC.battle.sides.length) banner('Turn 1', battle.SIDE_LABEL[TC.battle.phase], TC.battle.phase);
   panels(); root.focus({ preventScroll: true }); req();
 }
-function closeTactical() { if (!TC.open) return; TC.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TC.walk = null; TC.ai = null; $('edCanvas').focus({ preventScroll: true }); }
+function closeTactical() { if (!TC.open) return; TC.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TC.walk = null; TC.blow = null; TC.ai = null; $('edCanvas').focus({ preventScroll: true }); }
 
 $('tcBack').addEventListener('click', closeTactical);
 $('tcRotL').addEventListener('click', () => { turn(-1); req(); }); $('tcRotR').addEventListener('click', () => { turn(1); req(); });
