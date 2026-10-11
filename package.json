@@ -12,6 +12,7 @@
     "test": "node --test \"src/**/*.test.js\"",
     "test:e2e": "node mcp/e2e.mjs",
     "perf": "node tools/perf.js",
+    "test:town": "node tools/town-e2e.mjs",
     "mcp": "node mcp/server.mjs",
     "scene": "node tools/scene-html.mjs",
     "sheet": "node tools/character-sheet.mjs",

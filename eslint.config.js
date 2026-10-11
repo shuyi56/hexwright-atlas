@@ -7,5 +7,5 @@ export default [
   { files: ['src/**/*.js'], languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: globals.browser }, rules },
   { files: ['src/**/*.test.js', 'tools/**/*.js', 'tools/**/*.mjs', 'mcp/**/*.mjs'], languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: globals.node }, rules },
   /* drives a browser page, so half of it runs there */
-  { files: ['tools/perf.js'], languageOptions: { globals: { ...globals.node, ...globals.browser } } },
+  { files: ['tools/perf.js', 'tools/town-e2e.mjs'], languageOptions: { globals: { ...globals.node, ...globals.browser } } },
 ];
