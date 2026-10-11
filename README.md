@@ -400,9 +400,13 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   the house's depth (steeper for thatch), with the wall fitted below; a two-storey house on one tile takes a lower
   pitch so both storeys keep their full height. So a row of houses never
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
-  towers carry cones or battlements, trees are crowns of rounded leaf clumps, flatly lit (a sunlit band
-  along each clump's top, shade along its underside, a soft rim where it stands over the one behind) on tapered
-  trunks with roots, standing a little off the grid so a wood never grows in rows,
+  towers carry cones or battlements, broadleaf trees are a few big lobes of leaves, each lit on its upper left as a rounded volume and textured in small
+  clumps of leaves (a lit leaf over a darker crease), the lower lobes standing in front and the ones tucked behind them
+  in shade, so they part without ink; the tones run warm in the light and cool in the shade, the edges are scalloped
+  and soft (the rim a little translucent, a faint halo outside it) rather than cut out, and the trunks are shaded as
+  cylinders, their bark broken into plates, flaring into roots, with limbs reaching up into the crown; trees stand a
+  little off the grid so a wood never grows in rows; the willow is one bell of hanging strands lit over its crown, a
+  darker curtain behind its trunk and the front one parting round it;
   pines are tiers of slanting needles with drooping tips, and props and furniture keep the figures' scale in the
   middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
   front of the hero fades so they are never lost behind it.

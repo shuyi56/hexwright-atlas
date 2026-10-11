@@ -26,7 +26,7 @@
 
    elvenTown(H) is handed the raster helpers it needs from town/pieces.js and returns the drawings by asset id. */
 function elvenTown(H) {
-  const { R, mix, INK, h2, hexRgb, crown, leafRamp, trunk, broadleaf, wallTone, ROOF } = H;
+  const { R, mix, INK, h2, hexRgb, crown, foliageRamp, leafRamp, leafClump, trunk, broadleaf, wallTone, ROOF } = H;
   const ELF = { moon: '#ece9df', moonD: '#d6d2c4', verd: ROOF.copper, glass: '#5f8f8c', door: '#4f6e5c', bark: '#d6d1c2', gold: '#c9a24f', mallorn: '#d8b84a', willow: '#a9bf8a', glow: '#e4f6ea', ivy: '#5f7f4a', dark: '#2a3a36', lit: '#f2e2a0' };
   const M = R(ELF.moon), MD = R(ELF.moonD), G = R(ELF.gold), V = R(ELF.verd), Gl = R(ELF.glass), D = R(ELF.door), L = R(ELF.lit), GLOW = R(ELF.glow), IVY = leafRamp(ELF.ivy), DK = R(ELF.dark);
 
@@ -464,26 +464,49 @@ function elvenTown(H) {
       for (let x = Math.ceil(cx - 47); x < cx + 47; x++) { const t = (x + 0.5 - cx) / 48, a = Math.sqrt(Math.max(0, 1 - t * t)) * 12; K.set(x, py + a - 12, G[1]); K.set(x, py + a - 11, G[3]); }
       for (const d of [-1, 1]) lantern(K, cx + d * 34, py + 8, d);
       glow(K, cx + 13, hy - 22, 12);
-      crown(K, leafRamp(ELF.mallorn), cx, base - 258, 68, 46, seed, { clumps: 12 });
+      crown(K, ELF.mallorn, cx, base - 258, 68, 46, seed);
     }
   };
 
   /* ---------- nature ---------- */
-  /* a weeping willow: a low dome of leaves with strands falling from its rim nearly to the ground */
+  /* A weeping willow, as one mass rather than a dome hung with sticks: a bell of foliage, rounded on top, falling in
+     a curtain of hanging leaves almost to the ground, its hem ragged where the strands end at different lengths. The
+     curtain is painted strand by strand, each a pixel wide, swaying a little and a shade off its neighbours, with
+     leaves along it; it is lit on the west and over its crown, and darkens toward the hem. A darker curtain hangs
+     behind the trunk; the front one parts round the trunk and here and there elsewhere, so the shade within and the
+     trunk show through. */
   function weeping(K, cx, base, seed) {
-    const Lw = leafRamp(ELF.willow), top = base - 60;
-    trunk(K, cx, base, top + 8, ELF.bark);
-    /* each strand a ribbon three pixels wide, so the ink only rims it; the ones behind first, a shade darker */
-    const strand = (k, back) => {
-      const f = k / 15, x0 = cx - 36 + f * 72, y0 = top + 10 + Math.round(8 * (1 - Math.sin(f * Math.PI))), len = 28 + Math.round(14 * Math.sin(f * Math.PI)) + Math.round(h2(k, 3, seed * 7) * 8), sway = (f - 0.5) * 5;
-      for (let i = 0; i < len; i++) { const x = Math.round(x0 + sway * (i / len) ** 2), t = i / len; for (let w = -1; w <= 1; w++) K.set(x + w, y0 + i, Lw[(back ? 3 : 1) + (w > 0 ? 1 : 0) + ((i + k) % 5 === 0 ? 1 : 0) + (t > 0.75 ? 1 : 0)]); }
+    const P = foliageRamp('#86a476'), s = Math.floor(seed * 61) + 5, W = 44, crownTop = base - 88, dome = 30;
+    /* the crown's top: a dome scalloped into rounded bulges of leaves */
+    const top = x => crownTop + Math.round(dome * (1 - Math.sqrt(Math.max(0, 1 - ((x + 0.5 - cx) / W) ** 2))) + 1.6 * Math.abs(Math.sin((x - cx) / 3.4 + s)));
+    const hem = (x, id) => base - 4 - Math.round(16 * ((x + 0.5 - cx) / W) ** 4) - Math.round(h2(id, 7, s) * 10);
+    const paint = (front) => {
+      for (let x = Math.ceil(cx - W); x < cx + W; x++) {
+        const u = (x + 0.5 - cx) / W, y0 = top(x), y1 = hem(x, x), strand = h2(Math.floor((x + 400) / 2), 3, s) - 0.5, groove = ((x % 3) + 3) % 3 === 0;
+        for (let y = y0; y < y1; y++) {
+          const g = (y - crownTop) / (base - crownTop);
+          /* the front curtain parts round the trunk's foot and in a few narrow slits */
+          if (front && ((Math.abs(u) < 0.22 && g > 0.6 - Math.abs(u) * 0.8) || (h2(Math.floor(x / 2), 5, s) < 0.14 && g > 0.4))) continue;
+          const sway = g > 0.35 ? Math.round(Math.sin(y / 9 + x * 0.7) * 0.6 * g) : 0;
+          let v;
+          if (!front) v = -1.05 + strand * 0.4 - g * 0.2;
+          else {
+            v = 0.05 - u * 0.5 - g * 0.85 + strand * 0.9 - (groove && g > 0.3 ? 0.35 : 0);
+            /* over the crown the leaves clump, lit from the upper left like any crown */
+            if (g < 0.36) { const lc = leafClump(x, y, s, 6, 4), k = 1 - g / 0.36; v += k * (0.55 * (1 - Math.abs(u)) - 0.25 * u + 0.35 * lc.lit) + (lc.crease ? -0.3 : 0); }
+            const leaf = (y + Math.floor(h2(x, 9, s) * 4)) % 4; if (g >= 0.3) { if (leaf === 0) v += 0.3; else if (leaf === 2) v -= 0.2; }
+          }
+          const tq = Math.round((0.32 - v) * 2.4 + (y - y0 < 2 ? -0.5 : 0));
+          K.set(x + sway, y, P[Math.max(0, Math.min(5, tq))]);
+        }
+      }
     };
-    for (let k = 1; k < 16; k += 2) strand(k, true);
-    crown(K, Lw, cx, top, 42, 22, seed, { clumps: 9 });
-    for (let k = 0; k < 16; k += 2) strand(k, false);
+    paint(false);
+    trunk(K, cx, base, crownTop + 26, ELF.bark, false, 3.4, 2);
+    paint(true);
   }
   const nature = {
-    mallorn: (K, o) => broadleaf(K, ELF.mallorn, K.FW / 2, K.FD - 8, 66, 84, ELF.bark, o.v * 6, { clumps: 10 }),
+    mallorn: (K, o) => broadleaf(K, ELF.mallorn, K.FW / 2, K.FD - 8, 68, 84, ELF.bark, o.v * 6),
     willow: (K, o) => weeping(K, K.FW / 2, K.FD - 8, o.v * 5 + 1),
     moonflowers: (K, o) => {
       /* each a five-petalled star three pixels across round a blue heart, on a short stem */

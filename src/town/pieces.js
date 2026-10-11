@@ -62,6 +62,20 @@ function kit(FW, FD, up, side = 16) {
     },
     /* an oblique box: footprint [x0, x1) × [y0, y1) on the ground, h high; top and front are colours or fns */
     box(x0, y0, x1, y1, h, top, front) { K.rect(x0, y1 - h, x1, y1, front); K.rect(x0, y0 - h, x1, y1 - h, top); },
+    /* a soft edge for foliage: the rim pixels turn a little translucent (a touch darker on the shaded underside and
+       east), and a faint halo of their colour lies just outside them, so a crown's edge blends into whatever ground
+       it stands over instead of being cut out against it */
+    softEdge(rim = 210, glow = 80) {
+      const A = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : px[(y * w + x) * 4 + 3]), edge = [], halo = new Map();
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (A(x, y) !== 255) continue;
+        const lo = A(x, y + 1) === 0 || A(x + 1, y) === 0, hi = A(x, y - 1) === 0 || A(x - 1, y) === 0; if (!lo && !hi) continue;
+        const i = (y * w + x) * 4; edge.push([i, lo ? 0.2 : 0.05]);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (A(x + dx, y + dy) === 0) { const j = ((y + dy) * w + x + dx) * 4; if (!halo.has(j)) halo.set(j, [px[i], px[i + 1], px[i + 2], dy > 0 || dx > 0]); }
+      }
+      for (const [i, k] of edge) { px[i] += (INK[0] - px[i]) * k; px[i + 1] += (INK[1] - px[i + 1]) * k; px[i + 2] += (INK[2] - px[i + 2]) * k; px[i + 3] = rim; }
+      for (const [j, [r, g, b, lo]] of halo) { const k = lo ? 0.35 : 0.15; px[j] = r + (INK[0] - r) * k; px[j + 1] = g + (INK[1] - g) * k; px[j + 2] = b + (INK[2] - b) * k; px[j + 3] = glow; }
+    },
     /* ink every opaque pixel that touches a clear one */
     outline(k = 0.75) {
       const on = (x, y) => x >= 0 && y >= 0 && x < w && y < h && px[(y * w + x) * 4 + 3] === 255, edge = [];
@@ -469,69 +483,133 @@ function leafRamp(hex) {
   if (!L) { const c = hexRgb(hex), sun = [232, 226, 140], sh = [30, 44, 34]; L = [mix(c, sun, 0.3), mix(c, sun, 0.14), c, mix(c, sh, 0.2), mix(c, sh, 0.38), mix(c, sh, 0.55)]; leafRamps.set(hex, L); }
   return L;
 }
-/* A crown of leaf clumps round (cx, cy) within rx × ry. Each clump is lit on its upper left and shaded underneath,
-   the ones higher in the crown lighter, the lower ones (drawn after, in front) darker, with a dark rim where a clump
-   overlaps the one behind it. Inside, the leaves show as small dabs, a lit leaf over a darker one. Gaps between
-   clumps open onto shadow, and the crown's lower edge hangs in its own shade. */
-function crown(K, Lr, cx, cy, rx, ry, seed, opts = {}) {
-  const n = opts.clumps || 7, clumps = [];
-  /* a column (a poplar): clumps stacked up the stem, narrowing toward the top */
-  if (opts.column) for (let i = 0; i < n; i++) { const f = i / (n - 1); clumps.push({ x: cx, y: cy + ry * 0.72 - f * ry * 1.6, r: rx * (f < 0.55 ? 0.92 : 0.92 - (f - 0.55) * 1.25) }); }
-  else clumps.push({ x: cx, y: cy - ry * 0.35, r: Math.min(rx, ry) * 0.5 });
-  for (let i = 0; i < (opts.column ? 0 : n); i++) {
-    const a = (i / n) * Math.PI * 2 + seed * 1.7 + (h2(i, 1, seed * 13) - 0.5) * 0.6, d = 0.5 + h2(i, 2, seed * 13) * 0.22;
-    clumps.push({ x: cx + Math.cos(a) * rx * d, y: cy + Math.sin(a) * ry * d * 0.9, r: Math.min(rx, ry) * (0.36 + h2(i, 3, seed * 13) * 0.12) });
+/* ---------- broadleaf trees ----------
+   A crown is drawn the way a pixel artist paints foliage, not as a few polished balls. Its shape is many small leaf
+   clusters scattered through an ellipse (a column for a poplar), each with a scalloped edge of rounded bulges of
+   leaves. Light comes from the upper left and falls on
+   the crown as one mass and on each cluster a little, so the clusters read apart without any ink between them: a
+   cluster's lit upper edge stands against the shade of the one behind. The tones come from a ramp shifted warm in
+   the light and cool in the shade, dithered where they meet instead of banded, broken up by leaf dabs (a lighter leaf
+   in the light, a darker one in the shade). A last pass smooths any lone pixel that stands two tones off all its
+   neighbours, so no specks or holes are left in the leaves. */
+const foliageRamps = new Map();
+function foliageRamp(hex) {
+  let F = foliageRamps.get(hex);
+  if (!F) { const c = hexRgb(hex), warm = [228, 220, 146], cool = [40, 64, 62]; F = [mix(c, warm, 0.32), mix(c, warm, 0.16), c, mix(c, cool, 0.2), mix(c, cool, 0.38), mix(c, cool, 0.56)]; foliageRamps.set(hex, F); }
+  return F;
+}
+const BAYER = [[0, 0.5, 0.125, 0.625], [0.75, 0.25, 0.875, 0.375], [0.1875, 0.6875, 0.0625, 0.5625], [0.9375, 0.4375, 0.8125, 0.3125]];
+/* Leaf texture: the crown's pixels fall into small clumps of leaves (the cells of a jittered grid about cw × ch
+   pixels), each lit on its upper left and turning into shade on its lower right, with a crease of shade where one
+   clump meets the one below it. For pixel (x, y): { lit (-1..1), crease (true on a lower boundary) }. */
+function leafClump(x, y, s, cw = 6, ch = 5) {
+  const gx = Math.floor(x / cw), gy = Math.floor(y / ch); let d1 = 1e9, d2 = 1e9, nx = 0, ny = 0;
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const a = gx + i, b = gy + j, px = (a + 0.2 + 0.6 * h2(a, b, s)) * cw, py = (b + 0.2 + 0.6 * h2(a, b, s + 1)) * ch, dx = (x + 0.5 - px) / cw, dy = (y + 0.5 - py) / ch, d = dx * dx + dy * dy;
+    if (d < d1) { d2 = d1; d1 = d; nx = dx; ny = dy; } else if (d < d2) d2 = d;
   }
-  if (!opts.column) clumps.push({ x: cx + rx * 0.05, y: cy + ry * 0.3, r: Math.min(rx, ry) * 0.42 });
-  clumps.sort((p, q) => p.y - q.y);
-  const own = new Map(), key = (x, y) => (Math.floor(y) + 512) * 4096 + Math.floor(x) + 512;
-  clumps.forEach((c, j) => {
-    const depth = (c.y - (cy - ry)) / (2 * ry);           /* 0 at the crown's top, 1 at its foot */
-    for (let y = Math.floor(c.y - c.r - 2); y <= c.y + c.r; y++) for (let x = Math.floor(c.x - c.r - 2); x <= c.x + c.r + 1; x++) {
-      const dx = (x + 0.5 - c.x) / c.r, dy = (y + 0.5 - c.y) / c.r;
-      /* a scalloped edge: the clump's outline bulges in small leafy lobes */
-      const ang = Math.atan2(dy, dx), lobe = 1 + 0.05 * Math.sin(ang * 5 + j * 2.1 + seed), d = Math.sqrt(dx * dx + dy * dy) / lobe;
-      if (d > 1) continue;
-      const under = own.has(key(x, y));
-      /* flat, cel-like light: a lit band along the clump's top, shade along its underside, the body between in
-         one tone; no rounded gradient, which reads as a polished ball */
-      let l = -dy * 0.95 - dx * 0.2 - depth * 0.6 + 0.15 + (h2(j, 9, seed * 11) - 0.5) * 0.3;
-      /* leaf dabs: a lit leaf above a dark notch, on a staggered grid */
-      const gx = Math.floor((x + (Math.floor(y / 3) % 2) * 2) / 4), gy = Math.floor(y / 3), lx = ((x + (Math.floor(y / 3) % 2) * 2) % 4 + 4) % 4, ly = ((y % 3) + 3) % 3;
-      const dab = h2(gx, gy, seed * 7 + 5);
-      if (dab < 0.45) { if (ly === 0 && lx < 2) l += 0.2; else if (ly === 2 && lx === 1) l -= 0.25; }
-      let t = l > 0.62 ? 1 : l > -0.12 ? 2 : l > -0.62 ? 3 : 4;
-      if (t === 1 && dab < 0.25 && ly === 0) t = 0;
-      /* the rim where this clump stands over the one behind, on its lower side */
-      if (under && d > 0.88 && dy > -0.2) t = Math.max(t, 4);
-      else if (d > 0.92 && dy > 0.4) t = Math.max(t, 3);
-      K.set(x, y, Lr[t]); own.set(key(x, y), j);
+  return { lit: -nx * 0.9 - ny * 1.3, crease: Math.sqrt(d2) - Math.sqrt(d1) < 0.12 && ny > 0.05 };
+}
+/* the crown round (cx, cy) within rx × ry; col a hex (or a ready ramp of six). opts: column (a poplar's tall
+   narrow crown), airy (a birch: its leaf clumps smaller), fruit (a colour). Returns the set of pixels it covers.
+   The crown is a handful of big lobes (a column of them for a poplar), each a rounded mass of leaves lit on its upper
+   left; the lower lobes stand in front of the upper ones, and where a lobe tucks in behind the one before it, it
+   falls into shade, which is what parts them (no ink). */
+function crown(K, col, cx, cy, rx, ry, seed, opts = {}) {
+  const P = typeof col === 'string' ? foliageRamp(col) : col, s = Math.floor(seed * 97) + 11, rnd = (i, j) => h2(i, j, s);
+  const lobes = [];
+  if (opts.column) {
+    const n = 4, rl = rx * 0.95;
+    for (let k = 0; k < n; k++) { const f = k / (n - 1); lobes.push({ x: cx + (rnd(k, 1) - 0.5) * rx * 0.3, y: cy + ry - rl * 0.9 - f * (2 * ry - rl * 1.7), r: rl * (1 - f * 0.25) }); }
+  } else {
+    const rl = Math.min(rx, ry) * 0.62, n = rx > 36 ? 6 : 5;
+    lobes.push({ x: cx - rx * 0.05, y: cy - ry + rl * 0.95, r: rl * 1.05 });
+    for (let k = 0; k < n - 1; k++) {
+      const a = Math.PI * (0.92 + (k / (n - 2)) * 1.16) + (rnd(k, 2) - 0.5) * 0.3;
+      lobes.push({ x: cx + Math.cos(a) * (rx - rl * 0.9), y: cy - Math.sin(a) * (ry - rl * 0.95) * -1 + rl * 0.15, r: rl * (0.88 + rnd(k, 3) * 0.2) });
+    }
+    lobes.push({ x: cx + rx * 0.05, y: cy + ry * 0.25, r: rl * 1.05 });
+  }
+  lobes.sort((a, b) => a.y - b.y);
+  const own = new Map(), key = (x, y) => (y + 1024) * 8192 + x + 1024;
+  lobes.forEach((c, j) => {
+    for (let y = Math.floor(c.y - c.r - 2); y <= c.y + c.r + 2; y++) for (let x = Math.floor(c.x - c.r - 2); x <= c.x + c.r + 2; x++) {
+      const dx = (x + 0.5 - c.x) / c.r, dy = (y + 0.5 - c.y) / c.r, d = Math.hypot(dx, dy);
+      /* a scalloped edge: rounded bulges of leaves round the lobe, not pixel noise */
+      const ang = Math.atan2(dy, dx), scallop = 0.07 * Math.sin(ang * (6 + (j % 3)) + j * 1.9 + s) + 0.04 * Math.sin(ang * 13 + j);
+      if (d > 1 + scallop) continue;
+      own.set(key(x, y), { j, dx, dy, d });
     }
   });
-  /* sun flecks on the top clumps, and fruit or blossom if asked */
-  for (let k = 0; k < 10; k++) { const x = Math.round(cx - rx * 0.6 + h2(k, 4, seed * 5) * rx * 0.9), y = Math.round(cy - ry * 0.9 + h2(k, 5, seed * 5) * ry * 0.8); if (own.has(key(x, y)) && own.has(key(x + 1, y))) { K.set(x, y, Lr[1]); K.set(x + 1, y, Lr[1]); } }
-  if (opts.fruit) for (let k = 0; k < 7; k++) { const x = Math.round(cx + (h2(k, 6, seed * 3) - 0.5) * rx * 1.5), y = Math.round(cy + (h2(k, 7, seed * 3) - 0.4) * ry * 1.2); if (own.has(key(x, y))) { const F = R(opts.fruit); K.set(x, y, F[1]); K.set(x + 1, y, F[2]); K.set(x, y + 1, F[3]); } }
+  const tone = new Map();
+  for (const [k, o] of own) {
+    const x = (k % 8192) - 1024, y = Math.floor(k / 8192) - 1024, gx = (x + 0.5 - cx) / rx, gy = (y + 0.5 - cy) / ry;
+    /* light on the crown as one mass, on its lobe as a rounded volume, and on each clump of leaves */
+    const mass = -0.4 * gx - 0.75 * gy, z = Math.sqrt(Math.max(0, 1 - o.d * o.d)), lobe = -0.5 * o.dx - 0.85 * o.dy + 0.35 * z - 0.15;
+    const lc = leafClump(x, y, s, opts.column || opts.airy ? 5 : 6, opts.column || opts.airy ? 4 : 5);
+    /* tucked behind a lobe in front of it: in that lobe's shade */
+    let tuck = 0; for (let m = o.j + 1; m < lobes.length; m++) { const c = lobes[m], d = Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y) / c.r; if (d < 1.22) { tuck = d < 1.1 ? 0.5 : 0.28; break; } }
+    const ao = Math.max(0, gy + 0.25) * 0.45 + Math.max(0, gx - 0.35) * 0.3;
+    const v = 0.4 * mass + 0.55 * lobe + 0.3 * lc.lit - ao - tuck;
+    let t = Math.round((0.42 - v) * 2.6 + (o.d > 0.85 ? 0 : (BAYER[((y % 4) + 4) % 4][((x % 4) + 4) % 4] - 0.5) * 0.6));
+    if (lc.crease) t += 1;
+    tone.set(k, Math.max(0, Math.min(4, t)));
+  }
+  /* smooth away lone pixels: one standing two or more tones off every neighbour takes their middle tone */
+  for (const [k, t] of tone) {
+    const nb = [k - 1, k + 1, k - 8192, k + 8192].map(n => tone.get(n)).filter(v => v !== undefined);
+    const out = nb.length >= 2 && nb.every(v => Math.abs(v - t) >= 2) ? nb.sort((a, b) => a - b)[nb.length >> 1] : t;
+    const x = (k % 8192) - 1024, y = Math.floor(k / 8192) - 1024; K.set(x, y, P[out]);
+  }
+  if (opts.fruit) { const F = R(opts.fruit); for (let k = 0; k < Math.round(rx * ry / 120); k++) { const x = Math.round(cx + (rnd(k, 41) - 0.5) * rx * 1.5), y = Math.round(cy + (rnd(k, 42) - 0.35) * ry * 1.4); if (own.has(key(x, y)) && own.has(key(x + 1, y + 1))) { K.set(x, y, F[1]); K.set(x + 1, y, F[2]); K.set(x, y + 1, F[3]); } } }
   return own;
 }
-/* a trunk tapering from roots to crown, lit on its left, with bark and two boughs reaching into the crown */
-function trunk(K, cx, base, top, col, birch = false) {
-  const B = R(col), W = R('#eeeae0');
-  for (let y = Math.floor(top); y < base; y++) {
-    const f = (y - top) / (base - top), hw = 2 + f * 1.2 + (y > base - 4 ? (y - base + 4) * 0.9 : 0);
-    for (let x = Math.floor(cx - hw); x < cx + hw; x++) {
-      const u = (x + 0.5 - (cx - hw)) / (2 * hw);
-      let c = birch ? W[u < 0.3 ? 0 : u < 0.7 ? 1 : 3] : B[u < 0.28 ? 1 : u < 0.62 ? 2 : u < 0.85 ? 3 : 4];
-      if (birch && h2(Math.floor(y / 2), x, 3) < 0.16) c = INK;
-      else if (!birch && h2(x, Math.floor(y / 3), 5) < 0.18) c = B[4];
-      K.set(x, y, c);
+/* A trunk from its roots at (cx, base) up to `top`, `w` wide at the foot, shaded as a cylinder: a lit strip on its west
+   third, the body, a deep shade turning east, and a thin rim of light reflected back on the far edge. Its bark is
+   broken into plates by wandering furrows (each plate lit along its west lip and dark in its furrow); a birch is
+   white with dark lenticels and scars instead. Where it rises into the crown the leaves shade it. At its foot it
+   flares into roots that spread over the ground, each a small rounded lobe lit on top. Limbs fork from its top into
+   the crown. */
+function trunk(K, cx, base, top, col, birch = false, w = 3.4, limbs = 3) {
+  const B0 = R(col), B = [mix(B0[0], [255, 246, 220], 0.15), B0[1], B0[2], B0[3], B0[4], mix(B0[4], INK, 0.45)], W = R('#eeeae0'), H = base - top;
+  const half = y => { const f = (y - top) / H; return w * (0.6 + 0.4 * f) + (y > base - 8 ? (y - base + 8) ** 1.7 * 0.32 : 0); };
+  const tone = (u, t) => (t ? [W[0], W[1], W[2], W[3], R('#b9b2a2')[3], R('#8a8274')[3]] : B)[Math.max(0, Math.min(5, u))];
+  /* the limbs first, so the trunk's top covers where they spring from */
+  for (let k = 0; k < limbs; k++) {
+    const d = k % 2 ? 1 : -1, len = H * (0.3 + h2(k, 3, cx) * 0.2) + 10, ang = Math.PI / 2 + d * (0.5 + h2(k, 4, cx) * 0.35), x0 = cx + d * 0.5, y0 = top + 10 + k * 3;
+    for (let i = 0; i < len; i++) {
+      const t = i / len, x = x0 + Math.cos(ang) * i, y = y0 - Math.sin(ang) * i, lw = Math.max(0.7, w * 0.6 * (1 - t * 0.8));
+      for (let o = -Math.ceil(lw); o <= Math.ceil(lw); o++) if (Math.abs(o) <= lw) K.set(Math.round(x + o), Math.round(y), tone(o < -lw / 3 ? 1 : o > lw / 3 ? 4 : 2, birch));
     }
   }
-  for (const [d, len] of [[-1, 9], [1, 8]]) for (let i = 0; i < len; i++) { const x = cx + d * (2 + i * 0.8), y = top + 6 - i * 0.9; K.set(x, y, B[d < 0 ? 2 : 3]); K.set(x, y + 1, B[4]); }
+  for (let y = Math.floor(top); y < base; y++) {
+    const hw = half(y), shade = Math.max(0, 1 - (y - top) / 14);   /* the crown's shade on the trunk's top */
+    for (let x = Math.floor(cx - hw); x < cx + hw; x++) {
+      const u = (x + 0.5 - (cx - hw)) / (2 * hw);
+      let t = u < 0.1 ? 2 : u < 0.34 ? 1 : u < 0.58 ? 2 : u < 0.8 ? 3 : u < 0.93 ? 4 : 3;
+      if (birch) {
+        if (h2(Math.floor(y / 2), x >> 1, 3) < 0.11 && u > 0.12 && u < 0.92) { K.set(x, y, R('#3b3530')[u > 0.6 ? 3 : 2]); continue; }
+      } else {
+        /* bark plates: furrows wander up the trunk; the plate edge west of each furrow catches the light */
+        const fx = x + 0.5 - cx + Math.sin(y / 6 + Math.floor((x + 0.5 - cx + 20) / 3) * 2.1) * 0.9, f = ((fx % 3) + 3) % 3;
+        if (f < 0.9 && u > 0.1 && u < 0.92) t = Math.min(5, t + 2); else if (f < 1.8 && u < 0.6 && h2(Math.floor(fx / 3), y >> 2, 7) < 0.6) t = Math.max(0, t - 1);
+      }
+      t = Math.min(5, t + Math.round(shade * 2));
+      K.set(x, y, tone(t, birch));
+    }
+  }
+  /* roots: lobes spreading over the ground either side, lit on top, dark beneath */
+  const nroots = 3 + Math.round(w / 2);
+  for (let k = 0; k < nroots; k++) {
+    const side = k % 2 ? 1 : -1, reach = w * (1.2 + h2(k, 11, cx) * 1.1), x0 = cx + side * (w * 0.5 + (k >> 1) * 0.6);
+    for (let i = 0; i < reach; i++) { const x = Math.round(x0 + side * i), yy = base - 1 - Math.round((1 - i / reach) * 2.2); K.set(x, yy, tone(birch ? 1 : 2, birch)); K.set(x, yy + 1, tone(4, birch)); if (i < reach * 0.4) K.set(x, yy - 1, tone(1, birch)); }
+  }
 }
+/* a broadleaf tree: trunk and limbs, then the crown over them */
 function broadleaf(K, col, cx, base, h, rw, bark = '#6e5236', s = 0, opts = {}) {
-  const top = base - h, ry = rw * 0.48;
-  trunk(K, cx, base, top + 2, bark, opts.birch);
-  crown(K, leafRamp(col), cx, top - ry * 0.35, rw * 0.58, ry, s, opts);
+  const top = base - h, ry = rw * 0.46, rx = rw * 0.56;
+  trunk(K, cx, base, top - ry * 0.2, bark, opts.birch, opts.birch ? 3 : Math.max(3.6, rw / 18));
+  crown(K, col, cx, top - ry * 0.35, rx, ry, s, opts);
 }
 function conifer(K, P, cx, base, h, w, snow = false) {
   const B = R('#6e5236'), tiers = 5;
@@ -551,10 +629,10 @@ function conifer(K, P, cx, base, h, w, snow = false) {
   }
 }
 const NATURE = {
-  oak: (K, o) => broadleaf(K, o.v > 0.86 ? '#c99a3e' : '#7f9a4a', K.FW / 2, K.FD - 8, 50, 80, '#6e5236', o.v * 6, { clumps: 10 }),
-  beech: (K, o) => broadleaf(K, '#b8683a', K.FW / 2, K.FD - 8, 50, 80, '#7a6a5a', o.v * 6, { clumps: 10 }),
-  birch: (K, o) => broadleaf(K, '#9fb862', K.FW / 2, K.FD - 8, 56, 62, '#eeeae0', o.v * 6, { birch: true, clumps: 8 }),
-  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8; trunk(K, cx, b, b - 22, '#6e5236'); crown(K, leafRamp('#76924a'), cx, b - 64, 18, 42, o.v * 5, { clumps: 10, column: true }); },
+  oak: (K, o) => broadleaf(K, o.v > 0.86 ? '#c99a3e' : '#7f9a4a', K.FW / 2, K.FD - 8, 50, 80, '#6e5236', o.v * 6),
+  beech: (K, o) => broadleaf(K, '#b8683a', K.FW / 2, K.FD - 8, 50, 80, '#7a6a5a', o.v * 6),
+  birch: (K, o) => broadleaf(K, '#9fb862', K.FW / 2, K.FD - 8, 56, 62, '#eeeae0', o.v * 6, { birch: true, airy: true }),
+  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8; trunk(K, cx, b, b - 40, '#6e5236', false, 2.8, 0); crown(K, '#76924a', cx, b - 64, 17, 44, o.v * 5, { column: true }); },
   pine: (K, o) => conifer(K, leafRamp('#4f7a3c'), K.FW / 2, K.FD - 6, 100, 66),
   snowpine: (K, o) => conifer(K, leafRamp('#456f42'), K.FW / 2, K.FD - 6, 100, 66, true),
   palm: (K, o) => {
@@ -565,7 +643,7 @@ const NATURE = {
     K.oval(tx, ty + 1, 2, 2, R('#6e5236')[2]);
   },
   deadtree: (K, o) => { const cx = K.FW / 2, b = K.FD - 8, B = R('#7a6a58'); K.rect(cx - 2, b - 22, cx + 1, b, (x) => B[x < cx - 1 ? 1 : 3]); for (const [dx, dy, l] of [[-1, -1, 9], [1, -1, 10], [-1, -0.4, 7], [1, -0.5, 6]]) { const y0 = b - 14 - l * 0.6; for (let i = 0; i < l; i++) K.set(cx + dx * i, y0 + dy * i * 0.7, B[2]); } },
-  bush: (K, o) => { const cx = K.FW / 2, b = K.FD - 6; crown(K, leafRamp('#86a058'), cx, b - 9, 14, 9, o.v * 4 + 1, { clumps: 5, fruit: o.v > 0.5 ? '#c4503e' : null }); },
+  bush: (K, o) => { const cx = K.FW / 2, b = K.FD - 6; crown(K, '#86a058', cx, b - 9, 15, 9, o.v * 4 + 1, { fruit: o.v > 0.5 ? '#c4503e' : null }); },
   cactus: (K, o) => { const P = R('#7f9a5a'), cx = K.FW / 2, b = K.FD - 6, arm = (x0, y0, x1, y1) => K.rect(x0, y0, x1, y1, (x) => P[x === x0 ? 1 : x === x1 - 1 ? 3 : 2]); arm(cx - 3, b - 26, cx + 3, b); arm(cx - 10, b - 18, cx - 6, b - 10); arm(cx - 10, b - 12, cx - 3, b - 8); arm(cx + 6, b - 22, cx + 10, b - 14); arm(cx + 3, b - 16, cx + 10, b - 12); },
   reeds: (K, o) => { const P = R('#8a9a50'); for (let k = 0; k < 9; k++) { const x = 6 + h2(k, 1) * (K.FW - 12), h = 8 + h2(k, 2) * 10, b = K.FD - 6 - h2(k, 3) * 8; K.line(x, b, x + (h2(k, 4) - 0.5) * 3, b - h, P[k % 2 ? 2 : 3]); if (k % 3 === 0) K.rect(x, b - h - 3, x + 2, b - h + 1, R('#7a5a3a')[2]); } },
   mushrooms: (K, o) => { for (let k = 0; k < 3; k++) { const x = 8 + k * 7, b = K.FD - 8 - (k % 2) * 4, C = R('#c4503e'); K.rect(x, b - 3, x + 2, b, R('#eeeae0')[2]); K.oval(x + 1, b - 4, 3.5, 2.2, (px, py, dx, dy) => (h2(px, py, 1) < 0.15 ? R('#f4ecd8')[0] : C[dy < 0 ? 1 : 3])); } },
@@ -650,7 +728,7 @@ const INTERIOR = {
 
 /* ---------- the elven wood (town/elven.js) ---------- */
 {
-  const E = elvenTown({ R, mix, INK, h2, hexRgb, crown, leafRamp, trunk, broadleaf, wallTone, ROOF });
+  const E = elvenTown({ R, mix, INK, h2, hexRgb, crown, foliageRamp, leafRamp, leafClump, trunk, broadleaf, wallTone, ROOF });
   Object.assign(BUILD, E.build); Object.assign(NATURE, E.nature); Object.assign(PROPS, E.props);
 }
 
@@ -659,6 +737,8 @@ const DRAW = { ...BUILD, ...NATURE, ...PROPS, ...INTERIOR };
 /* how far a piece's shadow falls east of it, in art pixels */
 const FLAT = new Set(['flowers', 'mushrooms', 'rocks', 'rowboat', 'reeds', 'fence', 'moonflowers']);
 const TREES = new Set(['oak', 'beech', 'birch', 'poplar', 'pine', 'snowpine', 'palm', 'deadtree', 'mallorn', 'willow']);
+/* the leafy pieces, whose edges are kept soft (kit softEdge) */
+const SOFT = new Set(['oak', 'beech', 'birch', 'poplar', 'bush', 'mallorn', 'willow']);
 /* how far a tree stands off its tile's middle: [east, north] in art pixels (collision follows it) */
 const treeOffset = o => { const v = Math.floor((o.v ?? 0.5) * 1e4); return [Math.round((h2(v, 1) - 0.5) * 18), Math.round(h2(v, 2) * 8)]; };
 /* a shadow cast east from a piece's own outline: on each of its lowest `rows` rows, ground beyond its rightmost drawn
@@ -690,7 +770,7 @@ function pieceSprite(o) {
   const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null };
   if (draw) draw(K, inst);
   else K.box(4, 4, FW - 4, FD - 4, Math.min(30, (a ? a.h : 8) * 1.4), R('#c4b99f')[1], R('#c4b99f')[3]);
-  K.outline(a && a.group === 'Interior' ? 0.6 : TREES.has(o.id) || o.id === 'bush' ? 0.5 : 0.75);
+  if (SOFT.has(o.id)) K.softEdge(); else K.outline(a && a.group === 'Interior' ? 0.6 : TREES.has(o.id) ? 0.5 : 0.75);
   /* the shadow falls on the ground to the east, and under trees and props as a pool round their foot */
   const len = a ? shadowOf(a) : 6;
   if (a && (a.group === 'Nature' || a.group === 'Props')) { if (!FLAT.has(o.id)) K.ovalShadow(FW / 2 + 3, FD - 7, FW * 0.4, Math.min(8, FD * 0.18)); }
