@@ -34,6 +34,8 @@ function local(o, FW, FD) {
     case 'scarecrow': case 'lamppost': case 'signpost': case 'elvenlantern': return [circle(FW / 2, FD - 6, 3)];
     case 'moonwell': return [circle(FW / 2, FD - 9, 12)];
     case 'flet': return [circle(FW / 2, FD - 9, 12)];
+    case 'elvenpavilion': return [circle(15, FD - 12, 5), circle(FW - 15, FD - 12, 5), circle(25, FD - 40, 4), circle(FW - 25, FD - 40, 4)];
+    case 'elvenarch': return (o.face || 0) % 2 ? [circle(FW / 2, 14, 6), circle(FW / 2, FD - 14, 6)] : [circle(18, FD / 2 + 8, 7), circle(FW - 18, FD / 2 + 8, 7)];
     case 'stones': return Array.from({ length: 7 }, (_, k) => { const a = k / 7 * Math.PI * 2; return circle(FW / 2 + Math.cos(a) * FW * 0.34, FD / 2 + Math.sin(a) * FD * 0.3, 4); });
     case 'stall': return [rect(3, FD - 14, FW - 3, FD - 4)];
     case 'beehives': return [rect(3, FD - 11, FW - 3, FD - 5)];

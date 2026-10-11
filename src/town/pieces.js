@@ -663,8 +663,11 @@ function elfFinial(K, x, y, h) {
 function elfGlow(K, cx, cy, r) { const G = hexRgb(ELF.glow); for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) { const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / r; if (d < 1 && K.get(x, y) && (d < 0.5 || (x + y) % 2 === 0)) { const i = (Math.floor(y) + K.oy) * K.w + Math.floor(x) + K.ox; const q = i * 4; K.px[q] += (G[0] - K.px[q]) * 0.35; K.px[q + 1] += (G[1] - K.px[q + 1]) * 0.35; K.px[q + 2] += (G[2] - K.px[q + 2]) * 0.35; } } }
 const ELVEN_BUILD = {
   elvenhall: (K, o) => {
-    const b = house(K, o, { wall: ELF.moon, wallTex: 'stone', roof: 'copper', wallH: 32, rise: 18, arch: true, glass: ELF.glass, doorCol: ELF.door, winW: 5, doorW: 11, doorH: 18 });
-    const G = R(ELF.gold);
+    const b = house(K, o, { wall: ELF.moon, wallTex: 'stone', roof: 'copper', wallH: 32, rise: 18, windows: false, door: false }), G = R(ELF.gold);
+    /* tall tracery windows either side of a pointed door with a tracery fanlight */
+    const n = Math.max(2, Math.round((b.x1 - b.x0) / 26)), dx = Math.round((b.x0 + b.x1) / 2);
+    for (let k = 0; k < n; k++) { const x = Math.round(b.x0 + (b.x1 - b.x0) * (k + 0.5) / n); if (o.face !== 2 && Math.abs(x - dx) < 22) continue; traceryAt(K, x, b.yb - 10, 12, Math.round((b.yb - b.top) * 0.6), { lit: k === 1 }); }
+    if (o.face !== 2) { archOpening(K, dx, b.yb - 4, 11, 42, G, R(ELF.door)); traceryAt(K, dx, b.yb - 32, 14, 12, { lit: true }); }
     if (K.FW >= K.FD) { K.rect(b.x0, b.eave + 6, b.x1, b.eave + 8, (x, y) => G[y === b.eave + 6 ? 1 : 2]); for (const x of [b.x0 - 4, K.FW - b.x0 + 2]) elfFinial(K, x, b.ridge + 1, 12); }
   },
   elvenspire: (K, o) => {
@@ -749,6 +752,111 @@ const ELVEN_PROPS = {
     elfGlow(K, cx, yb - 12, 12);
   }
 };
+/* ---------- the high elven buildings ----------
+   After Rivendell: tall pointed windows filled with stone tracery (a mullion branching in a Y, an oculus in the
+   head, a gold hood-mould), roofs flicking up at their eaves, slender columns and open arcades. */
+/* how wide a pointed arch hw half-wide and h high is at height dy above its sill: its sides run straight up to the
+   springing line, then draw in to a point */
+const archHalf = (hw, h, dy) => { const sh = h - hw * 1.9; return dy < sh ? hw : hw * (1 - Math.pow((dy - sh) / (h - sh), 1.5)); };
+function traceryAt(K, cx, yb, w, h, opts = {}) {
+  const hw = w / 2, sh = h - hw * 1.9, St = R(ELF.moon), G = R(ELF.gold), Gl = R(opts.lit ? '#f2e2a0' : ELF.glass), oc = sh + (h - sh) * 0.5, r = hw * 0.42;
+  for (let dy = -2; dy < h + 3; dy++) {
+    const y = yb - dy, hood = archHalf(hw + 2, h + 3, dy), lim = archHalf(hw, h, dy);
+    for (let x = Math.floor(cx - hw - 3); x <= cx + hw + 3; x++) {
+      const dx = x + 0.5 - cx, ad = Math.abs(dx);
+      if (dy < 0) { if (dy === -1 && ad < hw + 2) K.set(x, y, St[dy === -1 ? 1 : 3]); if (dy === -2 && ad < hw + 2) K.set(x, y, mix(St[3], INK, 0.3)); continue; }
+      if (ad >= lim) { if (ad < hood && dy > sh - 1) K.set(x, y, G[ad > hood - 1 ? 2 : 1]); continue; }
+      let c;
+      if (ad >= lim - 1.2 || dy < 1) c = St[ad > 0 && dx < 0 ? 1 : 2];
+      else if (ad < 0.8 && dy < sh + 1) c = St[2];
+      else if (dy >= sh && dy < sh + hw * 1.1 && Math.abs(ad - (dy - sh) * 0.85) < 0.8) c = St[2];
+      else if (hw >= 3.5 && Math.abs(Math.hypot(dx, dy - oc) - r) < 0.8) c = St[2];
+      else if (hw >= 3.5 && Math.hypot(dx, dy - oc) < r) c = R(opts.lit ? '#f8eebe' : '#a8d0c8')[1];
+      else if (h > 16 && Math.abs(dy - sh * 0.55) < 0.8) c = St[2];
+      else c = Gl[dy > h * 0.55 ? 1 : (x + dy) % 9 === 0 ? 1 : 3];
+      K.set(x, y, c);
+    }
+  }
+}
+/* a pointed opening (an arcade's bay or a gateway): the dark beyond, a stone rim, tracery hung in its head */
+function archOpening(K, cx, yb, hw, h, P = R(ELF.moon), dark = R('#2a3a36')) {
+  const sh = h - hw * 1.9;
+  for (let dy = 0; dy < h; dy++) { const lim = archHalf(hw, h, dy); for (let x = Math.floor(cx - lim); x < cx + lim; x++) { const dx = x + 0.5 - cx, ad = Math.abs(dx); let c = dark[dy < 4 ? 3 : 2]; if (ad > lim - 1.6) c = P[dx < 0 ? 1 : 3]; else if (dy > sh && dy < sh + hw * 0.9 && Math.abs(ad - (dy - sh) * 0.9) < 0.9) c = P[2]; else if (dy > sh && Math.abs(Math.hypot(dx, dy - (sh + (h - sh) * 0.55)) - hw * 0.36) < 0.8) c = P[2]; K.set(x, yb - dy, c); } }
+}
+/* an ogee roof standing on (cx, y) rx wide and h tall, verdigris ribbed in gold under a finial */
+function ogeeRoof(K, cx, y, rx, h) {
+  const Rf = R(ELF.verd), G = R(ELF.gold);
+  for (let dy = 0; dy < h; dy++) { const t = dy / h, w = rx * (Math.pow(1 - t, 1.6) + 0.35 * Math.sin(Math.PI * Math.min(1, t * 1.4)) * (1 - t)); for (let x = Math.floor(cx - w); x < cx + w; x++) { const u = (x + 0.5 - cx) / Math.max(1, w); K.set(x, y - dy, Math.abs(Math.abs(u) - 0.5) < 0.06 || Math.abs(u) < 0.05 ? G[t > 0.5 ? 1 : 2] : Rf[u < -0.5 ? 1 : u < 0.3 ? 2 : 3]); } }
+  K.rect(cx - rx - 1, y - 1, cx + rx + 1, y + 2, (x, yy) => G[yy === y - 1 ? 1 : 3]);
+  elfFinial(K, cx - 1, y - h, 8);
+}
+Object.assign(BUILD, {
+  elvenpavilion: (K) => {
+    const { FW, FD } = K, cx = FW / 2, yb = FD - 8, M = R(ELF.moon), top = yb - 62;
+    K.rect(10, yb - 6, FW - 10, yb + 2, (x, y) => (y === yb - 6 ? M[0] : y > yb ? M[4] : M[(x >> 3) % 2 ? 2 : 3]));
+    K.rect(18, top + 8, FW - 18, yb - 6, R('#2f3e3a')[3]);
+    for (const x of [24, FW - 26]) K.rect(x, top + 6, x + 3, yb - 6, (px) => M[px === x ? 2 : 3]);
+    K.oval(cx, yb - 32, 3, 4, R(ELF.glow)[0]); K.rect(cx, top + 6, cx + 1, yb - 36, R(ELF.gold)[2]);
+    for (const x of [12, FW - 18]) K.rect(x, top + 2, x + 6, yb - 6, (px) => M[px < x + 2 ? 0 : px < x + 4 ? 1 : 3]);
+    K.rect(12, top - 2, FW - 12, top + 4, (x, y) => (y === top - 2 ? R(ELF.gold)[1] : M[y < top + 2 ? 1 : 3]));
+    /* tracery hanging in the head of the front arch */
+    for (let dy = 0; dy < 22; dy++) { const lim = archHalf(30, 34, dy + 12); for (const sx of [-1, 1]) for (let k = 0; k < 2; k++) K.set(cx + sx * (lim + k), top + 4 + 22 - dy, M[k ? 3 : 1]); }
+    for (let i = -14; i <= 14; i++) K.set(cx + i, top + 14 - Math.round(Math.abs(i) * 0.5), M[1]);
+    elfGlow(K, cx, yb - 32, 12);
+    ogeeRoof(K, cx, top - 2, 42, 54);
+  },
+  elvenrotunda: (K) => {
+    const { FW, FD } = K, cx = FW / 2, yb = FD - 8, M = R(ELF.moon), G = R(ELF.gold), cyl = (x, r) => { const t = (x + 0.5 - cx) / r; return t < -0.6 ? 1 : t < 0.2 ? 2 : t < 0.7 ? 3 : 4; };
+    K.rect(cx - 86, yb - 6, cx + 86, yb + 2, (x, y) => M[y === yb - 6 ? 0 : cyl(x, 86)]);
+    /* the drum, its clerestory ringed with tracery */
+    const dr = 52, dTop = yb - 150;
+    K.rect(cx - dr, dTop, cx + dr, yb - 6, (x, y) => (((y % 6) + 6) % 6 === 0 ? mix(M[cyl(x, dr)], INK, 0.2) : M[cyl(x, dr)]));
+    for (const dx of [-36, -12, 12, 36]) traceryAt(K, cx + dx, yb - 84, 12, 40, { lit: dx === 12 });
+    K.rect(cx - dr, yb - 80, cx + dr, yb - 78, G[2]); K.rect(cx - dr, dTop, cx + dr, dTop + 3, G[1]);
+    /* the arcade round its foot: columns and pointed openings under a lean-to of verdigris */
+    const ar = 80, aTop = yb - 66;
+    K.rect(cx - ar, aTop, cx + ar, yb - 6, (x) => M[cyl(x, ar)]);
+    for (let k = -3; k <= 3; k++) archOpening(K, cx + k * 22, yb - 6, 8, 54);
+    K.rect(cx - ar - 2, aTop - 4, cx + ar + 2, aTop, (x, y) => (y === aTop - 4 ? G[1] : G[3]));
+    K.poly([[cx - ar - 4, aTop - 4], [cx - dr, aTop - 18], [cx + dr, aTop - 18], [cx + ar + 4, aTop - 4]], (x, y) => (((x - cx) % 8 + 8) % 8 === 0 ? G[2] : R(ELF.verd)[cyl(x, ar + 4)]));
+    /* the dome, a lantern and its finial */
+    ogeeRoof(K, cx, dTop, dr + 4, 74);
+    elfGlow(K, cx + 12, yb - 64, 18);
+  },
+  elvenmanor: (K, o) => {
+    const b = house(K, o, { wall: ELF.moon, wallTex: 'stone', roof: 'copper', wallH: 46, floors: 2, rise: 20, windows: false, door: false, inset: 6 }), G = R(ELF.gold), M = R(ELF.moon);
+    const fh = (b.yb - b.top) / 2;
+    for (let f = 0; f < 2; f++) { const yb = Math.round(b.yb - f * fh - 10); for (let k = 0; k < 4; k++) { const x = Math.round(b.x0 + (b.x1 - b.x0 - 50) * (k + 0.5) / 4); if (f === 0 && Math.abs(x - (b.x0 + b.x1 - 50) / 2) < 22) continue; traceryAt(K, x, yb, 12, Math.round(fh * 0.62), { lit: f === 1 && k === 2 }); } }
+    K.rect(b.x0, Math.round(b.yb - fh) - 1, b.x1, Math.round(b.yb - fh) + 1, G[2]);
+    /* a pointed door with a tracery fanlight */
+    const dx = Math.round((b.x0 + b.x1 - 50) / 2); archOpening(K, dx, b.yb - 4, 11, 40, G, R(ELF.door)); traceryAt(K, dx, b.yb - 30, 14, 12, { lit: true });
+    /* a balcony across the upper floor, a balustrade of little arches */
+    const by = Math.round(b.yb - fh) + 8, bx0 = b.x0 + 14, bx1 = b.x1 - 66;
+    K.rect(bx0 - 2, by, bx1 + 2, by + 4, (x, y) => (y === by ? G[1] : M[3])); K.rect(bx0 - 2, by - 12, bx1 + 2, by - 10, G[1]);
+    for (let x = bx0; x < bx1; x += 8) { K.rect(x, by - 10, x + 2, by, M[1]); for (let i = 0; i < 6; i++) K.set(x + 2 + i, by - 6 - Math.round(3 * Math.sin(Math.PI * i / 5)), M[1]); }
+    /* the eaves flick up at the corners, gold finials stand on the ridge */
+    for (const [x, d] of [[b.x0 - 6, -1], [K.FW - b.x0 + 4, 1]]) for (let i = 0; i < 6; i++) K.set(x + d * i, b.eave + 2 - Math.round(i * i / 6), G[1]);
+    for (const x of [b.x0 - 2, b.x1 - 30]) elfFinial(K, x, b.ridge + 1, 12);
+    /* the turret on the east corner */
+    tower(K, K.FW - 22, K.FD - 4, 7, 74, { wall: ELF.moon, top: 'cone', roof: 'copper', rise: 40, windows: false });
+    traceryAt(K, K.FW - 22, K.FD - 60, 10, 26, { lit: true }); traceryAt(K, K.FW - 22, K.FD - 120, 10, 26);
+  },
+  elvenarch: (K, o) => {
+    const { FW, FD } = K, cx = FW / 2, yb = FD - FD / 2 + 10, M = R(ELF.moon), G = R(ELF.gold), side = (o.face || 0) % 2 === 1;
+    if (side) {
+      K.rect(cx - 4, yb - 70, cx + 4, yb + 30, (x) => M[x < cx - 1 ? 1 : x < cx + 2 ? 2 : 3]);
+      K.rect(cx - 6, yb - 76, cx + 6, yb - 68, (x, y) => (y === yb - 76 ? G[1] : M[2])); elfFinial(K, cx - 1, yb - 76, 8); return;
+    }
+    for (const x of [14, FW - 22]) { K.rect(x - 2, yb - 4, x + 10, yb + 2, M[2]); K.rect(x, yb - 66, x + 8, yb - 4, (px) => M[px < x + 3 ? 1 : px < x + 6 ? 2 : 3]); }
+    /* the arch: a pointed band of moonstone from pillar to pillar, gold along its rim, tracery in its head */
+    for (let dy = 0; dy < 46; dy++) { const o2 = archHalf(42, 82, dy + 36), i2 = archHalf(30, 70, dy + 36); for (let x = Math.floor(cx - o2); x < cx + o2; x++) { const ad = Math.abs(x + 0.5 - cx); if (ad < i2 && dy < 34) continue; K.set(x, yb - 66 - dy, ad > o2 - 1.5 ? G[1] : ad > i2 + 1 && ad < i2 + 2.5 && dy < 34 ? M[3] : M[x < cx ? 1 : 2]); } }
+    for (let i = -16; i <= 16; i++) for (const k of [0, 1]) K.set(cx + i, yb - 84 + k + Math.round(Math.abs(i) * 0.6), M[k ? 3 : 1]);
+    K.rect(cx - 1, yb - 98, cx + 1, yb - 84, M[1]);
+    elfFinial(K, cx - 1, yb - 110, 6);
+    for (const x of [cx - 20, cx + 18]) { K.rect(x, yb - 66, x + 1, yb - 58, G[2]); K.rect(x - 1, yb - 58, x + 2, yb - 52, R(ELF.glow)[0]); elfGlow(K, x, yb - 55, 10); }
+  }
+});
+
 Object.assign(BUILD, ELVEN_BUILD); Object.assign(NATURE, ELVEN_NATURE); Object.assign(PROPS, ELVEN_PROPS);
 
 /* ---------- a piece ---------- */

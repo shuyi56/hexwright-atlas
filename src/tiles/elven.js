@@ -20,16 +20,6 @@ function finial(g, x, y, h) {
   g.strokeStyle = GOLD; g.lineWidth = 0.6; g.stroke();
   g.beginPath(); g.moveTo(x, y - h - 3.4); g.quadraticCurveTo(x + 1.6, y - h - 1.4, x, y - h + 0.3); g.quadraticCurveTo(x - 1.6, y - h - 1.4, x, y - h - 3.4); g.fillStyle = GOLD; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.4; g.stroke();
 }
-/* lancet windows: pointed arches of teal glass along a seen wall */
-function lancets(K, fc, c, a0, a1, z, n, h = 6, w = 0.1) {
-  const g = K.g;
-  for (let k = 0; k < n; k++) {
-    const m = a0 + (a1 - a0) * (k + 0.5) / n, pt = (a, zz) => K.P(...(fc === 'y' ? [a, c, zz] : [c, a, zz]));
-    const p = pt(m - w / 2, z), q = pt(m + w / 2, z), r = pt(m + w / 2, z + h * 0.7), s = pt(m - w / 2, z + h * 0.7), tip = pt(m, z + h);
-    g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(s[0], s[1]); g.quadraticCurveTo(s[0], tip[1] + 1, tip[0], tip[1]); g.quadraticCurveTo(r[0], tip[1] + 1, r[0], r[1]); g.lineTo(q[0], q[1]); g.closePath();
-    g.fillStyle = fc === 'y' ? GLASS : shade(GLASS, 0.8); g.fill(); g.strokeStyle = GOLD; g.lineWidth = 0.5; g.stroke();
-  }
-}
 /* a leaf-pointed door on the seen wall the piece faces */
 function leafDoor(K, o, x0, y0, x1, y1, z, h = 8) {
   const fc = o.face === 0 ? 'y' : o.face === 1 ? 'x' : null; if (!fc) return;
@@ -38,20 +28,114 @@ function leafDoor(K, o, x0, y0, x1, y1, z, h = 8) {
   const [px, py] = K.P(...(fc === 'y' ? [m, c, z + h + 2.2] : [c, m, z + h + 2.2])); finial(K.g, px, py + 1, 0);
 }
 
+/* ---------- the high elven buildings: tracery ----------
+   A pointed arch in a plane: pt(s, z) gives the screen point s (across, -1..1 of the half-width hw) and z up from
+   the sill; the arch springs at sh and rises to a point at h. */
+function archPath(g, pt, hw, sh, h, n = 10) {
+  g.beginPath(); const a = pt(-hw, 0); g.moveTo(a[0], a[1]);
+  const L = pt(-hw, sh); g.lineTo(L[0], L[1]);
+  for (let k = 1; k <= n; k++) { const t = k / n, q = pt(-hw * (1 - Math.pow(t, 1.5)), sh + (h - sh) * t); g.lineTo(q[0], q[1]); }
+  for (let k = n - 1; k >= 0; k--) { const t = k / n, q = pt(hw * (1 - Math.pow(t, 1.5)), sh + (h - sh) * t); g.lineTo(q[0], q[1]); }
+  const b = pt(hw, 0); g.lineTo(b[0], b[1]); g.closePath();
+}
+/* a tracery window: teal glass in a pointed arch, a mullion branching in a Y, an oculus in the head, a gold hood */
+function traceryWindow(g, pt, hw, h, lit = false) {
+  const sh = h - hw * 1.9;
+  archPath(g, (s, z) => pt(s * 1.3, z), hw, sh, h + hw * 0.4); g.strokeStyle = GOLD; g.lineWidth = 0.5; g.stroke();
+  archPath(g, pt, hw, sh, h); g.fillStyle = lit ? '#f0dc96' : GLASS; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.45; g.stroke();
+  g.strokeStyle = MOON; g.lineWidth = 0.45; g.beginPath();
+  const m0 = pt(0, 0), m1 = pt(0, sh), l = pt(-hw * 0.8, sh + hw * 0.8), r = pt(hw * 0.8, sh + hw * 0.8);
+  g.moveTo(m0[0], m0[1]); g.lineTo(m1[0], m1[1]); g.moveTo(l[0], l[1]); g.lineTo(m1[0], m1[1]); g.lineTo(r[0], r[1]); g.stroke();
+  const o = pt(0, sh + (h - sh) * 0.5), e = pt(hw * 0.4, sh + (h - sh) * 0.5); g.beginPath(); g.arc(o[0], o[1], Math.max(0.6, Math.abs(e[0] - o[0])), 0, TAU); g.stroke();
+}
+/* tracery windows along a seen wall, n of them */
+function traceried(K, fc, c, a0, a1, z, n, hw = 0.06, h = 7, lit = false) {
+  for (let k = 0; k < n; k++) {
+    const m = a0 + (a1 - a0) * (k + 0.5) / n;
+    traceryWindow(K.g, (s, zz) => K.P(...(fc === 'y' ? [m + s, c, z + zz] : [c, m - s, z + zz])), hw, h, lit);
+  }
+}
+/* a swept roof: a gable whose eaves flick up in gold curls at the corners */
+function sweptRoof(K, x0, y0, x1, y1, zt, rh, axis) {
+  K.gable(x0, y0, x1, y1, zt, rh, axis, VERD, MOON, { ov: 0.16, tex: 'slate' });
+  const g = K.g, ov = 0.16;
+  for (const [x, y, d] of [[x0 - ov, y1 + ov, -1], [x1 + ov, y1 + ov, 1], [x1 + ov, y0 - ov, 1]]) { const [px, py] = K.P(x, y, zt); g.strokeStyle = GOLD; g.lineWidth = 1; g.beginPath(); g.moveTo(px - d * 3, py + 0.5); g.quadraticCurveTo(px, py + 0.5, px + d * 1.4, py - 3); g.stroke(); }
+  const ends = axis === 'x' ? [[x0 - ov, (y0 + y1) / 2], [x1 + ov, (y0 + y1) / 2]] : [[(x0 + x1) / 2, y0 - ov], [(x0 + x1) / 2, y1 + ov]];
+  for (const [x, y] of ends) { const [px, py] = K.P(x, y, zt + rh); finial(g, px, py, 6); }
+}
+/* an ogee roof over (x, y): swelling out, then drawing in to a point, verdigris ribbed in gold */
+function ogee(K, x, y, rx, h) {
+  const g = K.g, gr = g.createLinearGradient(x - rx, 0, x + rx, 0); gr.addColorStop(0, shade(VERD, 1.18)); gr.addColorStop(0.5, VERD); gr.addColorStop(1, shade(VERD, 0.66));
+  g.beginPath(); g.moveTo(x - rx, y); g.bezierCurveTo(x - rx * 1.15, y - h * 0.35, x - rx * 0.1, y - h * 0.6, x, y - h); g.bezierCurveTo(x + rx * 0.1, y - h * 0.6, x + rx * 1.15, y - h * 0.35, x + rx, y); g.ellipse(x, y, rx, rx * 0.5, 0, 0, Math.PI); g.closePath();
+  g.fillStyle = gr; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.7; g.stroke();
+  g.save(); g.clip(); g.strokeStyle = GOLD; g.lineWidth = 0.5; g.beginPath(); for (const f of [-0.6, -0.2, 0.2, 0.6]) { g.moveTo(x + rx * f * 1.05, y + rx * 0.3 * Math.sqrt(1 - f * f)); g.quadraticCurveTo(x + rx * f * 0.9, y - h * 0.45, x, y - h); } g.stroke(); g.restore();
+  g.strokeStyle = GOLD; g.lineWidth = 0.9; g.beginPath(); g.ellipse(x, y, rx, rx * 0.5, 0, 0.05, Math.PI - 0.05); g.stroke();
+  finial(g, x, y - h, 4);
+}
+const HIGH = [
+  { id: 'elvenpavilion', label: 'Elven pavilion', w: 1, d: 1, h: 40, draw(K, o) {
+    const z = o.z, g = K.g, c0 = o.x0 + 0.2, c1 = o.x1 - 0.2, d0 = o.y0 + 0.2, d1 = o.y1 - 0.2, zc = z + 16;
+    K.box(o.x0 + 0.08, o.y0 + 0.08, o.x1 - 0.08, o.y1 - 0.08, z, z + 1.6, MOON_D);
+    const col = (x, y) => { const c = K.cyl(x, y, 0.035, z + 1.6, zc, MOON, { lw: 0.45 }); g.fillStyle = GOLD; g.fillRect(c.x - c.rx - 0.3, c.ty - 0.8, c.rx * 2 + 0.6, 0.9); };
+    const arches = (fc, c, a0, a1, dark) => { const m = (a0 + a1) / 2, hw = (a1 - a0) / 2 - 0.03, pt = (s, zz) => K.P(...(fc === 'y' ? [m + s, c, z + zz] : [c, m - s, z + zz])); g.save(); archPath(g, pt, hw, 9, 14.4); g.strokeStyle = dark ? shade(MOON, 0.75) : MOON; g.lineWidth = 1.4; g.stroke(); g.strokeStyle = GOLD; g.lineWidth = 0.4; g.stroke(); const s0 = pt(0, 11.4), l = pt(-hw * 0.7, 13), r = pt(hw * 0.7, 13); g.strokeStyle = dark ? shade(MOON, 0.75) : MOON; g.lineWidth = 0.6; g.beginPath(); g.moveTo(l[0], l[1]); g.quadraticCurveTo(s0[0], s0[1] - 1, r[0], r[1]); g.stroke(); g.restore(); };
+    col(c0, d0); arches('y', d0, c0, c1, true); arches('x', c0, d0, d1, true); col(c1, d0); col(c0, d1);
+    const [lx, ly] = K.P((c0 + c1) / 2, (d0 + d1) / 2, z + 8); halo(g, lx, ly, 6, 0.6); g.fillStyle = GLOW; g.beginPath(); g.arc(lx, ly, 1.1, 0, TAU); g.fill();
+    col(c1, d1); arches('y', d1, c0, c1); arches('x', c1, d0, d1);
+    const [rx0, ry0] = K.P((c0 + c1) / 2, (d0 + d1) / 2, zc); ogee(K, rx0, ry0, 0.36 * 16 * 1.414, 18);
+  } },
+  { id: 'elvenrotunda', label: 'Elven rotunda', w: 2, d: 2, h: 70, draw(K, o) {
+    const [cx, cy] = mid(o), z = o.z, g = K.g;
+    K.cyl(cx, cy, 0.92, z, z + 2, MOON_D, { lw: 0.5 });
+    const d = K.cyl(cx, cy, 0.6, z + 2, z + 30, MOON, { noTop: true });
+    for (let k = -2; k <= 2; k++) { const f = k / 2.6, x = d.x + f * d.rx * 0.95, yb = d.by + Math.sqrt(1 - f * f) * d.ry - 24; traceryWindow(g, (s, zz) => [x + s * 16 * Math.sqrt(1 - f * f), yb - zz], 0.11, 16, k === 0); }
+    /* the arcade's front half: columns round the drum, pointed arches between them, a lean-to roof */
+    const ra = 0.86, [ax, ay] = K.P(cx, cy, z + 2), arx = ra * 16 * 1.414, ary = ra * 8 * 1.414, n = 9;
+    for (let k = 0; k <= n; k++) { const t = Math.PI * k / n, x = ax + Math.cos(t) * arx, y = ay + Math.sin(t) * ary; g.strokeStyle = INK; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 16); g.stroke(); g.strokeStyle = MOON; g.lineWidth = 0.7; g.stroke(); }
+    for (let k = 0; k < n; k++) { const t0 = Math.PI * k / n, t1 = Math.PI * (k + 1) / n, xa = ax + Math.cos(t0) * arx, ya = ay + Math.sin(t0) * ary - 16, xb = ax + Math.cos(t1) * arx, yb = ay + Math.sin(t1) * ary - 16; g.strokeStyle = MOON; g.lineWidth = 1; g.beginPath(); g.moveTo(xa, ya); g.quadraticCurveTo((xa + xb) / 2, (ya + yb) / 2 - 5, xb, yb); g.stroke(); g.strokeStyle = GOLD; g.lineWidth = 0.35; g.stroke(); }
+    g.beginPath(); g.ellipse(ax, ay - 17, arx + 1, ary + 0.5, 0, 0, Math.PI); g.strokeStyle = INK; g.lineWidth = 1.9; g.stroke(); g.strokeStyle = VERD; g.lineWidth = 1.2; g.stroke();
+    g.beginPath(); g.ellipse(ax, ay - 17.8, arx, ary, 0, 0, Math.PI); g.strokeStyle = GOLD; g.lineWidth = 0.45; g.stroke();
+    /* the dome, a gold band, the lantern and the finial */
+    const [dx, dy] = K.P(cx, cy, z + 30); g.fillStyle = GOLD; g.beginPath(); g.ellipse(dx, dy, d.rx + 0.8, d.ry + 0.4, 0, 0, TAU); g.fill();
+    ogee(K, dx, dy - 1, d.rx + 0.5, 26);
+    halo(g, dx, dy - 22, 4, 0.5);
+  } },
+  { id: 'elvenmanor', label: 'Elven manor', w: 2, d: 2, h: 62, draw(K, o) {
+    const ax = o.axis === 'x', z = o.z, g = K.g, [x0, y0, x1, y1] = ax ? [o.x0 + 0.14, o.y0 + 0.5, o.x1 - 0.14, o.y1 - 0.14] : [o.x0 + 0.5, o.y0 + 0.14, o.x1 - 0.14, o.y1 - 0.14], H = 22;
+    K.box(x0, y0, x1, y1, z, z + H, MOON, { noTop: true }); K.courses('y', y1, x0, x1, z, z + H, 'rgba(110,104,88,0.2)'); K.courses('x', x1, y0, y1, z, z + H, 'rgba(110,104,88,0.2)');
+    for (const zz of [10.5, H - 1]) { K.seg([x0, y1, z + zz], [x1, y1, z + zz], GOLD, 0.7); K.seg([x1, y1, z + zz], [x1, y0, z + zz], shade(GOLD, 0.8), 0.7); }
+    for (const zz of [2, 12.5]) { traceried(K, 'y', y1, x0, x1 - 0.3, z + zz, Math.round((x1 - x0 - 0.3) / 0.4), 0.06, 7, zz > 10); traceried(K, 'x', x1, y0, y1 - 0.3, z + zz, Math.round((y1 - y0 - 0.3) / 0.4), 0.06, 7); }
+    leafDoor(K, o, x0, y0, x1, y1, z, 8);
+    /* a balcony on the upper floor of the long front */
+    if (ax) { K.box(x0 + 0.3, y1, x0 + 1, y1 + 0.16, z + 10, z + 11, MOON_D, { lw: 0.5 }); for (let k = 0; k < 6; k++) { const a = x0 + 0.3 + k * 0.7 / 6, p = K.P(a, y1 + 0.16, z + 11), q = K.P(a + 0.7 / 6, y1 + 0.16, z + 11); g.strokeStyle = GOLD; g.lineWidth = 0.5; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0], p[1] - 3); g.quadraticCurveTo((p[0] + q[0]) / 2, (p[1] + q[1]) / 2 - 5, q[0], q[1] - 3); g.stroke(); } }
+    sweptRoof(K, x0, y0, x1, y1, z + H, 16, ax ? 'x' : 'y');
+    /* the turret on the front corner */
+    const c = K.cyl(x1 - 0.06, y1 - 0.06, 0.24, z, z + 32, MOON, { noTop: true });
+    traceryWindow(g, (s, zz) => [c.x - 1.5 + s * 16, c.by - 14 - zz], 0.09, 8, true);
+    g.fillStyle = GOLD; g.beginPath(); g.ellipse(c.x, c.ty, c.rx + 0.8, c.ry + 0.4, 0, 0, TAU); g.fill();
+    const tip = K.cone(x1 - 0.06, y1 - 0.06, 0.26, z + 32, 22, VERD); finial(g, tip[0], tip[1], 5);
+  } },
+  { id: 'elvenarch', label: 'Elven archway', w: 1, d: 1, h: 40, walk: true, draw(K, o) {
+    const span = o.face % 2 === 0, z = o.z, g = K.g, at = (a, zz) => K.P(...(span ? [o.x0 + a, o.y0 + 0.5, z + zz] : [o.x0 + 0.5, o.y0 + a, z + zz]));
+    for (const a of [0.2, 0.8]) { const [x, y] = span ? [o.x0 + a, o.y0 + 0.5] : [o.x0 + 0.5, o.y0 + a]; K.box(x - 0.07, y - 0.07, x + 0.07, y + 0.07, z, z + 1.5, MOON_D, { lw: 0.5 }); K.box(x - 0.05, y - 0.05, x + 0.05, y + 0.05, z + 1.5, z + 15, MOON, { lw: 0.5 }); }
+    const pt = (s, zz) => at(0.5 + s, zz);
+    g.save(); archPath(g, pt, 0.36, 15, 25); archPath(g, pt, 0.27, 15, 21.5); g.fillStyle = MOON; g.fill('evenodd'); g.strokeStyle = INK; g.lineWidth = 0.6; g.stroke();
+    archPath(g, pt, 0.36, 15, 25); g.strokeStyle = GOLD; g.lineWidth = 0.45; g.stroke(); g.restore();
+    g.strokeStyle = MOON; g.lineWidth = 0.9; g.beginPath(); const l = pt(-0.2, 19), c = pt(0, 17), r = pt(0.2, 19), top = pt(0, 21.5); g.moveTo(l[0], l[1]); g.quadraticCurveTo(c[0], c[1], r[0], r[1]); g.moveTo(c[0], c[1]); g.lineTo(top[0], top[1]); g.stroke();
+    const tp = pt(0, 25); finial(g, tp[0], tp[1], 3);
+    for (const s of [-0.18, 0.18]) { const [lx, ly] = pt(s, 13); halo(g, lx, ly, 5, 0.55); g.fillStyle = GLOW; g.beginPath(); g.arc(lx, ly, 0.9, 0, TAU); g.fill(); }
+  } }
+];
+
 const BUILDINGS = [
   { id: 'elvenhall', label: 'Elven hall', w: 2, d: 1, h: 34, draw(K, o) {
-    const x0 = o.x0 + 0.14, y0 = o.y0 + 0.14, x1 = o.x1 - 0.14, y1 = o.y1 - 0.14, z = o.z, g = K.g, hw = 13;
+    const x0 = o.x0 + 0.14, y0 = o.y0 + 0.14, x1 = o.x1 - 0.14, y1 = o.y1 - 0.14, z = o.z, hw = 13;
     K.box(x0 - 0.05, y0 - 0.05, x1 + 0.05, y1 + 0.05, z, z + 1.6, MOON_D);
     K.box(x0, y0, x1, y1, z + 1.6, z + hw, MOON, { noTop: true }); K.courses('y', y1, x0, x1, z + 1.6, z + hw, 'rgba(110,104,88,0.22)'); K.courses('x', x1, y0, y1, z + 1.6, z + hw, 'rgba(110,104,88,0.22)');
-    lancets(K, 'y', y1, x0, x1, z + 4, Math.max(1, Math.round((x1 - x0) / 0.36))); lancets(K, 'x', x1, y0, y1, z + 4, Math.max(1, Math.round((y1 - y0) / 0.36)));
+    traceried(K, 'y', y1, x0, x1, z + 3, Math.max(1, Math.round((x1 - x0) / 0.36)), 0.06, 8, true); traceried(K, 'x', x1, y0, y1, z + 3, Math.max(1, Math.round((y1 - y0) / 0.36)), 0.06, 8);
     leafDoor(K, o, x0, y0, x1, y1, z + 1.6, 8.5);
     /* a gold string course under the eaves */
     K.seg([x0, y1, z + hw - 0.8], [x1, y1, z + hw - 0.8], GOLD, 0.8); K.seg([x1, y1, z + hw - 0.8], [x1, y0, z + hw - 0.8], shade(GOLD, 0.8), 0.8);
-    K.gable(x0, y0, x1, y1, z + hw, 14, o.axis, VERD, MOON, { ov: 0.12, tex: 'slate' });
-    /* finials at the ridge's ends and the eaves' tips curling up */
-    const ax = o.axis === 'x', ends = ax ? [[x0 - 0.1, (y0 + y1) / 2], [x1 + 0.1, (y0 + y1) / 2]] : [[(x0 + x1) / 2, y0 - 0.1], [(x0 + x1) / 2, y1 + 0.1]];
-    for (const [x, y] of ends) { const [px, py] = K.P(x, y, z + hw + 14); finial(g, px, py, 6); }
-    for (const [x, y] of [[x1 + 0.12, y1 + 0.12], [ax ? x0 - 0.12 : x1 + 0.12, ax ? y1 + 0.12 : y0 - 0.12]]) { const [px, py] = K.P(x, y, z + hw); g.strokeStyle = GOLD; g.lineWidth = 0.9; g.beginPath(); g.moveTo(px, py); g.quadraticCurveTo(px + 2, py - 0.5, px + 2.4, py - 3); g.stroke(); }
+    sweptRoof(K, x0, y0, x1, y1, z + hw, 14, o.axis);
   } },
   { id: 'elvenspire', label: 'Elven spire', w: 1, d: 1, h: 60, draw(K, o) {
     const [cx, cy] = mid(o), z = o.z, g = K.g;
@@ -148,5 +232,7 @@ const PROPS = [
     g.strokeStyle = GOLD; g.lineWidth = 0.4; g.beginPath(); g.ellipse(c.x, c.by - 1.3, c.rx, c.ry, 0, 0.15, Math.PI - 0.15); g.stroke();
   } }
 ];
+
+BUILDINGS.push(...HIGH);
 
 export { BUILDINGS as ELVEN_BUILDINGS, NATURE as ELVEN_NATURE, PROPS as ELVEN_PROPS };

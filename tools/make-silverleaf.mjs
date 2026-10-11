@@ -38,12 +38,16 @@ for (let y = 15; y < 22; y++) for (let x = 15; x < 22; x++) { const d = Math.hyp
 /* the hall to the north of the court, its doors toward the well, and the spire beside it */
 put('elvenhall', 10, 5, 0.4, 0); put('elvenspire', 13, 4, 0.5, 0);
 put('moonwell', 11, 11, 0.5);
+/* the high houses: a domed rotunda east of the court, a manor in the western wood, a pavilion by the pool, and
+   archways over the paths into the court */
+put('elvenrotunda', 16, 7, 0.5, 0); put('elvenmanor', 2, 9, 0.5, 1); put('elvenpavilion', 13, 17, 0.5, 0);
+put('elvenarch', 15, 11, 0.5, 1); put('elvenarch', 11, 15, 0.5, 0);
 for (const [x, y] of [[8, 8], [14, 8], [8, 14], [14, 14]]) put('elvenlantern', x, y, 0.5, x < 11 ? 1 : 0);
 for (const [x, y] of [[16, 10], [16, 12], [10, 16], [12, 16]]) put('elvenlantern', x, y, 0.5, (x + y) % 2);
 /* flets in the great trees round the hollow */
 for (const [x, y] of [[2, 2], [19, 6], [4, 17], [20, 14]]) put('flet', x, y, rnd());
 /* the woods: mallorns, a few willows, moonflowers in the clearings, never on the paths or the court */
-const kept = new Set(['3,9', '1,12', '17,2', '22,9', '6,21']);
+const kept = new Set(['4,12', '1,13', '17,2', '22,9', '6,21']);
 for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
   const t = M.terr[y * S + x]; if (t === TI.moonstone || t === TI.moonpool || kept.has(x + ',' + y)) continue;
   const woods = x < 7 || y < 3 || x > 18 || (y > 19 && x < 15), r = rnd();
@@ -53,7 +57,7 @@ for (const [x, y] of [[15, 16], [21, 17], [16, 21], [21, 20], [14, 19]]) tryPut(
 for (const [x, y] of [[17, 15], [20, 22], [14, 17]]) tryPut('moonflowers', x, y);
 
 /* the people: the elves about the court, two dark elves creeping in from the western wood */
-for (const c of [{ sprite: 'elflady', x: 11, y: 13, face: 0 }, { sprite: 'elfsage', x: 10, y: 7, face: 0 }, { sprite: 'elfwarden', x: 12, y: 7, face: 0 }, { sprite: 'elfranger', x: 17, y: 11, face: 3 }, { sprite: 'darkelf', x: 3, y: 9, face: 1 }, { sprite: 'darkelf', x: 1, y: 12, face: 1 }]) {
+for (const c of [{ sprite: 'elflady', x: 11, y: 13, face: 0 }, { sprite: 'elfsage', x: 10, y: 7, face: 0 }, { sprite: 'elfwarden', x: 12, y: 7, face: 0 }, { sprite: 'elfranger', x: 17, y: 11, face: 3 }, { sprite: 'darkelf', x: 4, y: 12, face: 1 }, { sprite: 'darkelf', x: 1, y: 13, face: 1 }]) {
   const r = placeChar(M, c); if (!r.ok) fail.push(`${c.sprite}: ${r.reason}`);
 }
 if (fail.length) { console.error(fail.join('\n')); process.exit(1); }

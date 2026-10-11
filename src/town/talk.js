@@ -39,7 +39,9 @@ const SIGHTS = {
   throne: 'An empty throne, waiting.', altar: 'Candles flicker on the altar.', lamppost: 'An iron lamp on a post.', obelisk: 'Strange marks run up the obelisk.',
   moonwell: 'The water holds the moon, even at noon.', elvenlantern: 'A pale lantern on a silver crook. It gives no heat at all.', mallorn: 'A mallorn. Its leaves are gold, and its bark is silver.',
   willow: 'A silver willow, its strands brushing the ground.', moonflowers: 'Moonflowers, glowing faintly.', flet: 'A round house high in the tree. A rope ladder has been drawn up.',
-  elvenhall: 'The hall\'s doors are carved with leaves. They are shut.', elvenspire: 'A white spire. Someone is singing at the top.'
+  elvenhall: 'The hall\'s doors are carved with leaves. They are shut.', elvenspire: 'A white spire. Someone is singing at the top.',
+  elvenpavilion: 'An open pavilion. A lantern turns slowly under its roof.', elvenrotunda: 'Light falls through the tracery in long gold bars. Inside, someone is reading aloud.',
+  elvenmanor: 'Every window is filled with stone lace. A song drifts down from the balcony.', elvenarch: 'An archway of moonstone, carved as fine as frost.'
 };
 function sightFor(asset, terrain, place) {
   if (asset) return (SIGHTS[asset.id] || (asset.group === 'Buildings' ? `The ${asset.label.toLowerCase()} is shut tight.` : asset.group === 'Nature' ? `${asset.label}.` : `A ${asset.label.toLowerCase()}.`)).replace('{place}', place || 'this town');

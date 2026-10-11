@@ -604,4 +604,4 @@ DESIGNS.cathedral = { top: 230, draw(F, o) {
   });
 } };
 
-export { C, DESIGNS, MAT, ROOF, WALL_T, chimney, cone, flag, flat, gable, hip, house, puff, stoneSh, tower, wall, walls };
+export { C, DESIGNS, MAT, ROOF, WALL_T, chimney, cone, flag, flat, gable, hip, house, planeTone, puff, stoneSh, tower, wall, walls };
