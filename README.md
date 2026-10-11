@@ -26,7 +26,7 @@ the editor instead. Opening a scene replaces the editor's map; **Undo** brings t
 ## Tile editor
 
 The **Map editor** in the rail opens an isometric workbench built on the same tile set as the city
-districts. Paint 34 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
+districts. Paint 46 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
 turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
 builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
 fenland, ashlands). The land is kept calm: the main ground covers most of it with the others in a few broad patches,
@@ -36,6 +36,43 @@ generated from the atlas: its biome blended into its neighbours', coast or lake 
 water, rivers and roads crossing the same sides as on the map, farmland, and the village, town, keep, ruin or
 other feature that stands there (a city or abbey hex brings its whole city plan). Inside a city, **Enter
 district** opens just the selected district. The map is autosaved in the browser.
+
+### The elven wood
+
+An elven tile set sits alongside the rest: its grounds under their own **Elven** heading in the Terrain tab, and its
+pieces at the end of the Buildings, Props and Nature tabs. Everything is drawn for every view (the editor's map, the
+tactical view's pixel art and the town view's front-on pieces), after one palette: white moonstone, verdigris copper,
+silver bark, gold leaf, and a cool pale light where the town's lamps are warm.
+
+- **Grounds:** elven moss starred with pale flowers, fallen gold leaves, moonstone paving laid in fish-scale courses
+  with a gold leaf inlaid here and there, an ash floor inlaid with a gold vine, and a moonlit pool (water, rippling,
+  with lily pads and motes of light).
+- **Buildings,** in the high elven manner of Rivendell: tall pointed windows filled with stone tracery (a mullion
+  branching in a Y under an oculus, a transom in the tallest, a gold hood-mould over each), roofs of verdigris that
+  sweep down in a concave curve and flick up at the eaves under gold barge boards and leaf finials, slender columns
+  and open arcades with tracery hung in their heads.
+  - the **elven hall** (2×1): coursed moonstone, a pointed door under a tracery fanlight, a lit tracery window in
+    its gable;
+  - the **elven manor** (2×2): two storeys of tracery windows, a balcony with a balustrade of little arches across
+    the upper floor, and a round turret on the corner under a needle of verdigris;
+  - the **elven rotunda** (2×2): an arcade of pointed arches round a drum whose clerestory is ringed with tall
+    tracery windows, under a ribbed dome, a lantern and a finial;
+  - the **elven pavilion**: an open arcade on four slender columns, a lantern hung inside, an ogee roof;
+  - the **elven archway**: two pillars and a pointed arch of moonstone with tracery in its head and lanterns hung
+    from it, which characters walk through;
+  - the **elven spire** (a slender white tower with a balcony ring and a needle of verdigris) and the **tree flet**
+    (a round house on a railed platform high in a silver-barked tree, under its gold crown).
+- **Nature:** the **mallorn** (silver bark, a gold crown), the **silver willow** (a dome of leaves with strands hanging
+  nearly to the ground), and **moonflowers**.
+- **Props:** the **elven lantern** (a teardrop of pale light hung from a silver crook) and the **moonwell** (a moonstone
+  rim round glowing water under a carved arch).
+
+The elves who live there are in the roster (see [Characters](#characters)). The editor's drawings are in
+`src/tiles/elven.js`, the tactical view's in `src/tactical/elven.js`, the town view's in `src/town/pieces.js`, and the
+grounds beside the others in each. `scenes/town/silverleaf-hollow.html` is an elven hollow built to show it all (see
+[Test scenes](#test-scenes)).
+
+![Silverleaf Hollow in the tactical view](docs/images/silverleaf-hollow.png)
 
 ### Interiors
 
@@ -79,13 +116,17 @@ and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `ge
 
 ### Characters
 
-The **Characters** tab lists the roster: twenty-two pixel-art figures, 32×48 and big-headed, in the manner of
+The **Characters** tab lists the roster: twenty-seven pixel-art figures, 32×48 and big-headed, in the manner of
 Final Fantasy Tactics and Tactics Ogre.
 
 - **Townsfolk:** a villager in an open vest over a laced shirt, a farmer in rolled sleeves and overalls, a guard with a kettle helm, cape and
   spear, a bearded merchant in a long gold-faced coat with a sash and a satchel, a hooded monk with a rope belt, a healer with a satchel marked with a
   cross, and a red-haired noble lady in a green gown and gold circlet.
 - **Jobs:** squire, knight, archer, thief, dragoon, valkyrie, black mage, white mage and summoner.
+- **Elves:** long pointed ears swept back out of long straight hair. A ranger with a grey-green cloak, a gold-fletched
+  quiver and a longbow of pale wood; a warden in verdigris plate with a leaf-bladed glaive; a sage in a white robe
+  hemmed in gold with a crystal staff whose spells are moonlight; an elf lady in a pale blue gown and circlet; and,
+  among the enemies, a dark elf with ash-violet skin, white hair, ember eyes and a dagger in each hand.
 - **Enemies:** a big-eared goblin with a nail-studded club, a hooded and masked bandit, a tusked orc with war paint
   and a great axe, a skeleton with a rusted sword, a grey wolf that trots on four legs, and a round slime that heaves.
 
@@ -104,7 +145,7 @@ walk behind and in front of buildings correctly, and are on the same undo stack 
 **New character…** opens the **character maker**. A character is built from choices:
 
 - **Body:** build, clothes, sleeves.
-- **Head:** hair, hat, beard.
+- **Head:** hair (flowing elven hair among the cuts), ears (round or pointed), hat, beard.
 - **Gear:** what they hold, a shield, a cape, a satchel.
 
 Each material gets a colour from the tile set's swatches or any colour. The preview shows the character in all four
@@ -394,6 +435,10 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   harbour town to walk about in. `scenes/town/greenwood-glade.html` shows off the trees and plants: an oak grove with
   copper beeches, a birch copse on the heath, a poplar avenue, pines climbing a hill to snowy firs, and a reed-fringed
   pond fed by a stream, round a woodcutter's cottage. Its map is built by `node tools/make-greenwood.mjs`.
+  `scenes/town/silverleaf-hollow.html` is the elven wood: a moonstone court round a moonwell, the elven hall and spire,
+  a domed rotunda, archways over the paths in, a manor in the western wood, a pavilion by the pool, flets in the great
+  trees, mallorns on fallen gold leaves and silver willows over a moonlit pool, with the four elves
+  about the court and two dark elves creeping in from the west. Its map is built by `node tools/make-silverleaf.mjs`.
   `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
   villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
   clothes show, with the dragoon and the black mage beside them as the benchmark.

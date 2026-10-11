@@ -16,8 +16,8 @@ import { TOWNSFOLK } from './townsfolk.js';
    facings on grass, standing, walking or attacking (winding up and striking with whatever it holds, over and over),
    exactly as the map draws it. Every change saves to the character library (library.js) at once, with its own undo. */
 const root = $('charMaker'), cv = $('cmPreview'), g = cv.getContext('2d'), panel = $('cmChoices'), statusEl = $('cmStatus');
-const GROUPS = [['Body', ['build', 'clothes', 'sleeves', 'cut', 'neckline', 'rope']], ['Head', ['hair', 'hat', 'beard']], ['Gear', ['held', 'shield', 'cape', 'satchel']]];
-const LABEL = { build: 'build', clothes: 'clothes', sleeves: 'sleeves', cut: 'sleeve cut', neckline: 'neckline', rope: 'belt', hair: 'hair', hat: 'hat', beard: 'beard', held: 'in hand', shield: 'shield', cape: 'cape', satchel: 'satchel' };
+const GROUPS = [['Body', ['build', 'clothes', 'sleeves', 'cut', 'neckline', 'rope']], ['Head', ['hair', 'ears', 'hat', 'beard']], ['Gear', ['held', 'shield', 'cape', 'satchel']]];
+const LABEL = { build: 'build', clothes: 'clothes', sleeves: 'sleeves', cut: 'sleeve cut', neckline: 'neckline', rope: 'belt', hair: 'hair', ears: 'ears', hat: 'hat', beard: 'beard', held: 'in hand', shield: 'shield', cape: 'cape', satchel: 'satchel' };
 const FACINGS = [['front', false], ['front', true], ['back', false], ['back', true]];
 /* each animation: its poses in order and how long each is held, in milliseconds (the attack's as on the sheet) */
 const ANIMS = { stand: { beats: [0], ms: 0 }, walk: { beats: WALK, ms: 170 }, attack: { beats: ATTACK_BEATS, ms: 120 } };

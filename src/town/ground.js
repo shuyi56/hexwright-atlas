@@ -48,16 +48,19 @@ const rampRgb = hex => ramp(hex).map(rgb);
 const FAMILY = {
   grass: 'green', meadow: 'green', tallgrass: 'green', pasture: 'green', heath: 'green', moor: 'green', garden: 'green',
   dirt: 'earth', road: 'earth', mud: 'earth', scrub: 'earth', sand: 'sand', dunes: 'sand', shingle: 'sand', rock: 'rock', scree: 'rock',
-  snow: 'snow', tundra: 'snow', ice: 'snow', ash: 'ash', lava: 'lava', shallows: 'water', water: 'water', deep: 'water', marsh: 'wet', swamp: 'wet'
+  snow: 'snow', tundra: 'snow', ice: 'snow', ash: 'ash', lava: 'lava', shallows: 'water', water: 'water', deep: 'water', marsh: 'wet', swamp: 'wet',
+  elvenmoss: 'green', goldleaf: 'earth', moonpool: 'water'
 };
+/* the elven wood's laid grounds keep straight edges as the town's paving and floors do */
+const LAID = { moonstone: 'stone', elvenfloor: 'wood' };
 /* which ground overhangs which where they meet: green over everything, built ground over bare, bare over water */
 const RANK = { green: 4, earth: 2, sand: 2, rock: 2, snow: 2, ash: 2, wet: 1, water: 0, lava: 0 };
 const INFO = TERRAIN.map(t => {
-  const crisp = (t.group === 'Paved' && t.id !== 'road') || t.group === 'Floors' || t.group === 'Farm';
+  const crisp = (t.group === 'Paved' && t.id !== 'road') || t.group === 'Floors' || t.group === 'Farm' || !!LAID[t.id];
   const fam = FAMILY[t.id] || t.id;
   return {
     id: t.id, R: rampRgb(t.top), S: rampRgb(t.side[0]), fam, crisp, road: t.id === 'road', rank: RANK[fam] ?? 3, water: !!t.water, anim: !!t.water || !!t.glow,
-    face: t.water ? 'water' : t.glow ? 'lava' : fam === 'snow' ? 'snow' : t.group === 'Floors' || t.id === 'planks' ? 'wood' : crisp && t.group !== 'Farm' ? 'stone' : fam === 'rock' || fam === 'sand' ? 'rock' : 'earth',
+    face: t.water ? 'water' : t.glow ? 'lava' : fam === 'snow' ? 'snow' : LAID[t.id] ? LAID[t.id] : t.group === 'Floors' || t.id === 'planks' ? 'wood' : crisp && t.group !== 'Farm' ? 'stone' : fam === 'rock' || fam === 'sand' ? 'rock' : 'earth',
     lip: fam === 'green' || fam === 'wet' || t.group === 'Farm' ? rampRgb(t.top) : fam === 'snow' ? rampRgb('#eceeea') : null
   };
 });
@@ -68,6 +71,7 @@ const FLOWERS = ['#f4ecd8', '#e2bf4e', '#c4503e', '#9a7fc0'].map(rampRgb);
 const C = hex => rampRgb(hex);
 const LEAF = C('#6f8a40'), GRAIN = C('#e8d18a'), STALK = C('#b89443'), VINE = C('#5c773f'), GRAPE = C('#6a3d5c'), BUSH = C('#8f9a5a'), POOL = C('#8eb0ab'), LILY = C('#9ab06a');
 const TERRA = C('#c98a72'), PEBBLE = C('#bdb39d'), SNOWY = C('#eef0ec'), SHOAL = C('#c8bea0'), SWAMPW = C('#6c8278');
+const MOSS = C('#a9c38c'), STAR = C('#eef2f4'), STARHEART = C('#7f9cc4'), LEAVES = ['#e0bf52', '#c98a3a', '#d9b44a', '#a8b062'].map(C), INLAY = C('#c9a24f'), LILYPAD = C('#86a868');
 const GOLDC = C('#e8ce8c'), CARPET_MARK = { carpet: C('#5a281e'), carpetblue: C('#283446') }, GLOW = C('#f4c25a'), CRUST = C('#5a4a42'), FOAM = rgb('#eef2ea'), STRAW = C('#b8a266');
 
 /* ---------- the surface ---------- */
@@ -298,7 +302,31 @@ const TEX = {
   checker: (R, x, y) => { const t = blocks(x, y, 16, 16, false, 4), dark = (Math.floor(x / 16) + Math.floor(y / 16)) % 2; return dark && t !== 4 ? dim(R[t], 0.62) : R[t]; },
   carpet: (R, x, y, f, G, k) => carpetTone(R, x, y, G, k, CARPET_MARK.carpet),
   carpetblue: (R, x, y, f, G, k) => carpetTone(R, x, y, G, k, CARPET_MARK.carpetblue),
-  rushes: (R, x, y) => { const q = spot(x, y, 4, 0.8, 351, 1); if (q && q[1] === 0 && Math.abs(q[0]) <= 1) return STRAW[q[0] ? 3 : 1]; return base(R, x, y, 0.14); }
+  rushes: (R, x, y) => { const q = spot(x, y, 4, 0.8, 351, 1); if (q && q[1] === 0 && Math.abs(q[0]) <= 1) return STRAW[q[0] ? 3 : 1]; return base(R, x, y, 0.14); },
+  /* the elven wood */
+  elvenmoss: (R, x, y) => {
+    const s = spot(x, y, 13, 0.18, 361); if (s && Math.abs(s[0]) + Math.abs(s[1]) <= 1) return s[0] === 0 && s[1] === 0 ? STARHEART[2] : STAR[s[1] < 0 ? 0 : s[1] > 0 ? 2 : 1];
+    const m = fbm(x, y, 362); if (m > 0.68) return MOSS[fbm(x, y - 1, 362) <= 0.68 ? 0 : fbm(x, y + 2, 362) <= 0.68 ? 3 : 2];
+    return tuft(R, x, y, 11, 0.25, 363) || base(R, x, y, 0.14);
+  },
+  goldleaf: (R, x, y) => {
+    const q = spot(x, y, 6, 0.62, 371, 2); if (q) { const L = LEAVES[Math.floor(q[2] * LEAVES.length)], [dx, dy] = q, up = q[2] * 8 % 2 < 1; if (dy === 0 && dx >= -1 && dx <= 1) return L[dx < 0 ? 1 : 2]; if (dy === (up ? -1 : 1) && dx === (up ? 1 : -1)) return L[up ? 1 : 3]; if (dy === 1 && dx === 0) return L[4]; }
+    return pebble(R, x, y, 11, 0.12, 372) || base(R, x, y, 0.22);
+  },
+  /* fish-scale moonstone: arcs of stone laid round each 32-pixel cell's top corner, a gold leaf in one cell in nine */
+  moonstone: (R, x, y) => {
+    const n = 32, cx = Math.floor(x / n), cy = Math.floor(y / n), lx = x - cx * n, ly = y - cy * n, d = Math.hypot(lx + 0.5, ly + 0.5) / n, ring = Math.floor(d * 3), f = d * 3 - ring;
+    if (((cx % 3) + 3) % 3 === 0 && ((cy % 3) + 3) % 3 === 0 && Math.abs(lx - 21) + Math.abs(ly - 21) < 3) return INLAY[Math.abs(lx - 21) + Math.abs(ly - 21) < 1.5 ? 0 : 2];
+    const a = Math.atan2(ly + 0.5, lx + 0.5) / (Math.PI / 2), seam = ring > 0 && ring < 3 && Math.abs(((a * (ring + 2) + (ring % 2) * 0.5) % 1)) < 0.04 * (ring + 1);
+    if (f < 0.05 || seam) return R[3]; if (f < 0.12) return R[1]; if (f > 0.9) return R[3];
+    return base(R, x, y, 0.03);
+  },
+  elvenfloor: (R, x, y) => {
+    const c = 4 + Math.round(2.5 * Math.sin(x / 9)), row = ((y % 12) + 12) % 12;
+    if (row === c || (row === c - 2 && ((x % 18) + 18) % 18 < 3) || (row === c + 2 && ((x + 9) % 18 + 18) % 18 < 3)) return INLAY[row === c ? 1 : 2];
+    return R[boardsTone(x, y, 6, 5)];
+  },
+  moonpool: (R, x, y, f) => { const q = spot(x, y, 19, 0.2, 381, 4); if (q) { const [dx, dy] = q; if (dx * dx / 9 + dy * dy / 4 <= 1) return dx === 0 && dy === -1 ? STAR[0] : (dx === -1 || dx === 1) && dy === -1 ? STAR[1] : LILYPAD[dy < 0 ? 1 : dy > 0 ? 3 : 2]; } if (h2(x, y, 382 + (f >> 1)) < 0.006) return STAR[0]; return waterTone(R, x, y, f, mix(R[0], FOAM, 0.75)); }
 };
 function carpetTone(R, x, y, G, k, M) {
   const d = edgeDist(G, x, y, k);

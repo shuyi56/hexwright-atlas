@@ -11,7 +11,7 @@ import { MID, SMALL, TREES, treeOffset } from './pieces.js';
 const T = TILE;
 const circle = (x, y, r) => ({ x, y, r });
 const rect = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
-const OPEN = new Set(['flowers', 'mushrooms', 'reeds', 'rowboat', 'idoor', 'stairs']);
+const OPEN = new Set(['flowers', 'mushrooms', 'reeds', 'rowboat', 'idoor', 'stairs', 'moonflowers']);
 const ROUND_FURNITURE = { chair: 6, stool: 5, candelabra: 4, plantpot: 6, cauldron: 10, spinwheel: 9 };
 
 /* the shapes of piece o in its own drawing's coordinates (kit pixels, the footprint FW × FD from (0, 0)) */
@@ -31,7 +31,11 @@ function local(o, FW, FD) {
     case 'crates': return [rect(4, FD - 16, 28, FD - 4)];
     case 'cart': return [rect(4, 8, FW - 4, FD - 5)];
     case 'well': return [circle(FW / 2, FD - 9, 11)];
-    case 'scarecrow': case 'lamppost': case 'signpost': return [circle(FW / 2, FD - 6, 3)];
+    case 'scarecrow': case 'lamppost': case 'signpost': case 'elvenlantern': return [circle(FW / 2, FD - 6, 3)];
+    case 'moonwell': return [circle(FW / 2, FD - 9, 12)];
+    case 'flet': return [circle(FW / 2, FD - 9, 12)];
+    case 'elvenpavilion': return [circle(15, FD - 12, 5), circle(FW - 15, FD - 12, 5), circle(25, FD - 40, 4), circle(FW - 25, FD - 40, 4)];
+    case 'elvenarch': return (o.face || 0) % 2 ? [circle(FW / 2, 14, 6), circle(FW / 2, FD - 14, 6)] : [circle(18, FD / 2 + 8, 7), circle(FW - 18, FD / 2 + 8, 7)];
     case 'stones': return Array.from({ length: 7 }, (_, k) => { const a = k / 7 * Math.PI * 2; return circle(FW / 2 + Math.cos(a) * FW * 0.34, FD / 2 + Math.sin(a) * FD * 0.3, 4); });
     case 'stall': return [rect(3, FD - 14, FW - 3, FD - 4)];
     case 'beehives': return [rect(3, FD - 11, FW - 3, FD - 5)];

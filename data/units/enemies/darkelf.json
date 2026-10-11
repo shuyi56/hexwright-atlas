@@ -1,0 +1,14 @@
+{
+  "id": "darkelf",
+  "name": "Dark Elf",
+  "stats": {
+    "hp": 34,
+    "attack": 12,
+    "range": 1,
+    "pattern": "melee"
+  },
+  "movement": {
+    "move": 6,
+    "jump": 3
+  }
+}

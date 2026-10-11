@@ -6,7 +6,7 @@ const ROOFS = [['#a6533b', '#7c3a2a'], ['#66727e', '#48525c'], ['#bf9850', '#947
 const SHADOW = 'rgba(74,52,26,0.2)';
 const MT = { temperate: ['#ecdfc1', '#ad9572'], cold: ['#e6e2d8', '#9b968d'], arid: ['#efd6b0', '#b7865e'], dark: ['#8d8378', '#564c45'] };
 const HILLP = { temperate: ['#e2cf98', '#c1a96f'], cold: ['#dddccb', '#afae9b'], arid: ['#ebd29c', '#c9a067'] };
-const TREE = { oak: ['#87a05a', '#637d43'], deep: ['#6c8549', '#4c6435'], pine: ['#76a356', '#55803f'], spruce: ['#6b9c5c', '#4b7a46'], poplar: ['#7f9a52', '#5c773f'], birch: ['#a6ba6c', '#7f9650'], bush: ['#93a862', '#6c8447'], autumn1: ['#cf9f48', '#9b7232'], autumn2: ['#bf7240', '#8d4f2b'] };
+const TREE = { oak: ['#87a05a', '#637d43'], deep: ['#6c8549', '#4c6435'], pine: ['#76a356', '#55803f'], spruce: ['#6b9c5c', '#4b7a46'], poplar: ['#7f9a52', '#5c773f'], birch: ['#a6ba6c', '#7f9650'], bush: ['#93a862', '#6c8447'], autumn1: ['#cf9f48', '#9b7232'], autumn2: ['#bf7240', '#8d4f2b'], mallorn: ['#e2c45a', '#ad8a34'], willow: ['#aac08a', '#76905e'] };
 const STONE = ['#ddd1b0', '#b5a683'];
 const lerp = (a, b, t) => a + (b - a) * t;
 const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];

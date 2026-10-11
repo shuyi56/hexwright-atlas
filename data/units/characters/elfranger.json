@@ -1,0 +1,14 @@
+{
+  "id": "elfranger",
+  "name": "Elf Ranger",
+  "stats": {
+    "hp": 38,
+    "attack": 12,
+    "range": 5,
+    "pattern": "ranged"
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  }
+}

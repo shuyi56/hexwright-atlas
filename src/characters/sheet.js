@@ -2,6 +2,7 @@ import { ADVANCE, GLYPH_H, glyph, textWidth } from './font.js';
 import { H, OUTLINE, W, hexRgb, mixHex } from './pixels.js';
 import { BASE, BODY_TYPES } from './body.js';
 import { ATTACK, BODIES, POSES, ROSTER, WALK, attackOf, render } from './roster.js';
+import { ELVES } from './elves.js';
 import { ENEMIES } from './enemies.js';
 import { TOWNSFOLK } from './townsfolk.js';
 import { TERRAIN_BY_ID } from '../tiles/terrain.js';
@@ -63,11 +64,11 @@ function groundTile(cv, x, y, k) {
   }
 }
 
-/* the roster in blocks for rows of figures: the townsfolk, the jobs and the enemies apart, each split evenly into
+/* the roster in blocks for rows of figures: the townsfolk, the jobs, the elves and the enemies apart, each split evenly into
    rows of at most nine so a row stays readable. Each block is { name, list }. */
 function blocks(roster) {
-  const out = [], kind = c => (TOWNSFOLK.includes(c) ? 'TOWNSFOLK' : ENEMIES.includes(c) ? 'ENEMIES' : 'JOBS');
-  for (const name of ['TOWNSFOLK', 'JOBS', 'ENEMIES']) {
+  const out = [], kind = c => (TOWNSFOLK.includes(c) ? 'TOWNSFOLK' : ENEMIES.includes(c) ? 'ENEMIES' : ELVES.includes(c) ? 'ELVES' : 'JOBS');
+  for (const name of ['TOWNSFOLK', 'JOBS', 'ELVES', 'ENEMIES']) {
     const list = roster.filter(c => kind(c) === name); if (!list.length) continue;
     const n = Math.ceil(list.length / 9), size = Math.ceil(list.length / n);
     for (let b = 0; b < n; b++) out.push({ name, list: list.slice(b * size, (b + 1) * size) });

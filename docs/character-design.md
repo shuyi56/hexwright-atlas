@@ -5,8 +5,8 @@ Final Fantasy Tactics and Tactics Ogre: chunky, big-headed figures that read by 
 painted in the tile set's own soft, chalky palette with gently hue-shifted ramps and an outline in the tiles' umber
 ink, so they belong on the editor's ground. The code lives in `src/characters/`.
 
-The roster is twenty-two characters: seven townsfolk, the people of the map's towns and villages, nine jobs, and
-six enemies.
+The roster is twenty-seven characters: seven townsfolk, the people of the map's towns and villages, nine jobs, five
+elves (four of the elven wood and a dark elf among the enemies) and six enemies.
 The character maker makes more from the same choices the townsfolk are built from.
 
 ![Every character in all four facings, standing and in both strides, each on the editor's grass tile, then everyone in every build](images/character-sprite-sheet.png)
@@ -38,6 +38,14 @@ Each character has a default build (in brackets below); anyone can be drawn in a
 | Black Mage (stocky) | A wide-brimmed pointed hat with a flopped tip, a face of pure shadow with two glowing eyes over a high collar, a floor-length blue robe flaring to a gold hem with only his toes beneath, wide bell sleeves, a crooked staff. |
 | White Mage (slim) | A white cowl whose peak droops back like a nightcap, a red band framing her face, a mantle and robe hemmed in red teeth, a staff with a red orb in a gold cup. |
 | Summoner (standard) | A moss-green cowl banded in gold with a jewel at the brow, ram's horns curling from its temples, gold-edged lappets down her chest and a long tail down her back; a rod with a blue crystal in bone claws. |
+
+| Elf | Read at a glance by |
+| --- | --- |
+| Elf Ranger (slim) | Long pointed ears, pale gold hair falling straight down her back, a leaf-green tunic, a grey-green cloak, a gold-fletched quiver and a longbow of pale wood. |
+| Elf Warden (tall) | Verdigris plate over a sea-green tunic and skirt, gold-cuffed steel sleeves, a long sea-green cloak, a circlet over dark hair, a glaive whose blade curves like a leaf. |
+| Elf Sage (tall) | Silver hair under a gold circlet, a white gown to the floor hemmed in gold with bell sleeves, a staff whose two pale branches cradle a crystal; his spells are moonlight. |
+| Elf Lady (slim) | Raven hair to the waist, a circlet with a sea-green stone, a pale sky-blue gown with a square neckline and paler sleeves. |
+| Dark Elf (slim, enemy) | Ash-violet skin, white hair, ember-red eyes, black leather and a vest, a dagged black cape, a dagger in each hand. |
 
 | Enemy | Read at a glance by |
 | --- | --- |
@@ -182,6 +190,19 @@ in `body.js`, so they fit any build and pose. The rest are hand-drawn in `roster
 - **Colours.** Crimson-lacquered plate (`S`, close to the tiles' roof terracotta) with lighter greaves (`O`),
   over grey mail (`A`, `P`). The crest, gauntlets and cape are black iron (`D`, `V`), with brass trim, bone horns
   and fangs (`F`), an amber eye (`J`) and a gold tuft on the lance (`R`).
+
+## Elves
+
+The elves (`elves.js`) are drawn like the jobs. Two parts make them elves, and the character maker offers both:
+
+- **Ears** (`ELF_EARS`, the maker's *Ears: Pointed*). Long ears swept back and up to a point, the inner ear in the
+  skin's shadow. They hang on the head in the hat slot, so they lie over the hair: in front the near ear rises behind
+  the cheek and out past the hair; from behind both stand out from the sides of the head.
+- **Hair** (`ELF_HAIR`, the maker's *Flowing* hair). The long cut in front; from behind every lock falls straight down
+  past the shoulder blades and ends in points.
+
+The sage's staff is held at his side rather than forward, so from behind his flowing hair covers it instead of the
+shaft crossing it; he still casts with it. The dark elf is filed with the enemies in the unit data.
 
 ## Enemies
 

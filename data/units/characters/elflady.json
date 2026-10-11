@@ -1,0 +1,14 @@
+{
+  "id": "elflady",
+  "name": "Elf Lady",
+  "stats": {
+    "hp": 28,
+    "attack": 6,
+    "range": 1,
+    "pattern": "melee"
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  }
+}

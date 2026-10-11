@@ -1,0 +1,7 @@
+{
+  "title": "Silverleaf Hollow: the elven wood",
+  "about": "An elven hollow laid out to show the elven tile set and its people: a moonstone court round a moonwell with lanterns at its corners, the elven hall and a white spire to the north, a domed rotunda ringed with tracery to the east, archways of moonstone over the paths in, a manor with a balcony and a turret in the western wood, an open pavilion by the pool, flets high in the great trees, mallorns on drifts of fallen gold leaves, silver willows over a moonlit pool, and moss starred with moonflowers. The elf lady, the sage, the warden and the ranger keep the court; two dark elves creep in from the western wood. Walk the elf lady about with the arrow keys or by clicking; Space talks to whoever is in front.",
+  "view": "town",
+  "town": { "zoom": 2, "hero": 0 },
+  "checks": []
+}
