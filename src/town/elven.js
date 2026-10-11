@@ -27,7 +27,7 @@
    elvenTown(H) is handed the raster helpers it needs from town/pieces.js and returns the drawings by asset id. */
 function elvenTown(H) {
   const { R, mix, INK, h2, hexRgb, crown, foliageRamp, leafRamp, leafClump, trunk, broadleaf, wallTone, ROOF } = H;
-  const ELF = { moon: '#ece9df', moonD: '#d6d2c4', verd: ROOF.copper, glass: '#5f8f8c', door: '#4f6e5c', bark: '#d6d1c2', gold: '#c9a24f', mallorn: '#d8b84a', willow: '#a9bf8a', glow: '#e4f6ea', ivy: '#5f7f4a', dark: '#2a3a36', lit: '#f2e2a0' };
+  const ELF = { moon: '#ece9df', moonD: '#d6d2c4', verd: ROOF.copper, glass: '#5f8f8c', door: '#4f6e5c', bark: '#d6d1c2', gold: '#c9a24f', mallorn: '#e2c45a', willow: '#aac08a', glow: '#e4f6ea', ivy: '#5f7f4a', dark: '#2a3a36', lit: '#f2e2a0' };
   const M = R(ELF.moon), MD = R(ELF.moonD), G = R(ELF.gold), V = R(ELF.verd), Gl = R(ELF.glass), D = R(ELF.door), L = R(ELF.lit), GLOW = R(ELF.glow), IVY = leafRamp(ELF.ivy), DK = R(ELF.dark);
 
   /* ---------- light and stone ---------- */
@@ -476,7 +476,7 @@ function elvenTown(H) {
      behind the trunk; the front one parts round the trunk and here and there elsewhere, so the shade within and the
      trunk show through. */
   function weeping(K, cx, base, seed) {
-    const P = foliageRamp('#86a476'), s = Math.floor(seed * 61) + 5, W = 44, crownTop = base - 88, dome = 30;
+    const P = foliageRamp('#9cb682'), s = Math.floor(seed * 61) + 5, W = 44, crownTop = base - 88, dome = 30;
     /* the crown's top: a dome scalloped into rounded bulges of leaves */
     const top = x => crownTop + Math.round(dome * (1 - Math.sqrt(Math.max(0, 1 - ((x + 0.5 - cx) / W) ** 2))) + 1.6 * Math.abs(Math.sin((x - cx) / 3.4 + s)));
     const hem = (x, id) => base - 4 - Math.round(16 * ((x + 0.5 - cx) / W) ** 4) - Math.round(h2(id, 7, s) * 10);

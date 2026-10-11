@@ -402,7 +402,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   covers the fronts of the row behind it; only towers, keeps and spires stand up over the tiles to their north. Round
   towers carry cones or battlements, broadleaf trees are a few big lobes of leaves, each lit on its upper left as a rounded volume and textured in small
   clumps of leaves (a lit leaf over a darker crease), the lower lobes standing in front and the ones tucked behind them
-  in shade, so they part without ink; the tones run warm in the light and cool in the shade, the edges are scalloped
+  in shade, so they part without ink; the colours are the tiles' own tree colours on the tiles' gentle ramp, the edges are scalloped
   and soft (the rim a little translucent, a faint halo outside it) rather than cut out, and the trunks are shaded as
   cylinders, their bark broken into plates, flaring into roots, with limbs reaching up into the crown; trees stand a
   little off the grid so a wood never grows in rows; the willow is one bell of hanging strands lit over its crown, a

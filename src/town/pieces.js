@@ -1,5 +1,6 @@
-import { OUTLINE, hexRgb, ramp } from '../characters/pixels.js';
+import { OUTLINE, hexRgb, mixHex, ramp } from '../characters/pixels.js';
 import { ASSET_BY_ID, footprint } from '../tiles/index.js';
+import { TREE } from '../render/palette.js';
 import { elvenTown } from './elven.js';
 import { TILE } from './ground.js';
 
@@ -492,10 +493,13 @@ function leafRamp(hex) {
    the light and cool in the shade, dithered where they meet instead of banded, broken up by leaf dabs (a lighter leaf
    in the light, a darker one in the shade). A last pass smooths any lone pixel that stands two tones off all its
    neighbours, so no specks or holes are left in the leaves. */
+/* The leaves take the tiles' own palette: the tree colours the map and the editor use (render/palette.js TREE) on the
+   tiles' gentle ramp (characters/pixels.js), with one step put in between its base and its shade so a crown can turn
+   from light to shade without a jump. Six tones, lightest first; nothing near black. */
 const foliageRamps = new Map();
 function foliageRamp(hex) {
   let F = foliageRamps.get(hex);
-  if (!F) { const c = hexRgb(hex), warm = [228, 220, 146], cool = [40, 64, 62]; F = [mix(c, warm, 0.32), mix(c, warm, 0.16), c, mix(c, cool, 0.2), mix(c, cool, 0.38), mix(c, cool, 0.56)]; foliageRamps.set(hex, F); }
+  if (!F) { const r = ramp(hex); F = [r[0], r[1], r[2], mixHex(r[2], r[3], 0.5), r[3], r[4]].map(hexRgb); foliageRamps.set(hex, F); }
   return F;
 }
 const BAYER = [[0, 0.5, 0.125, 0.625], [0.75, 0.25, 0.875, 0.375], [0.1875, 0.6875, 0.0625, 0.5625], [0.9375, 0.4375, 0.8125, 0.3125]];
@@ -548,10 +552,10 @@ function crown(K, col, cx, cy, rx, ry, seed, opts = {}) {
     const mass = -0.4 * gx - 0.75 * gy, z = Math.sqrt(Math.max(0, 1 - o.d * o.d)), lobe = -0.5 * o.dx - 0.85 * o.dy + 0.35 * z - 0.15;
     const lc = leafClump(x, y, s, opts.column || opts.airy ? 5 : 6, opts.column || opts.airy ? 4 : 5);
     /* tucked behind a lobe in front of it: in that lobe's shade */
-    let tuck = 0; for (let m = o.j + 1; m < lobes.length; m++) { const c = lobes[m], d = Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y) / c.r; if (d < 1.22) { tuck = d < 1.1 ? 0.5 : 0.28; break; } }
-    const ao = Math.max(0, gy + 0.25) * 0.45 + Math.max(0, gx - 0.35) * 0.3;
+    let tuck = 0; for (let m = o.j + 1; m < lobes.length; m++) { const c = lobes[m], d = Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y) / c.r; if (d < 1.2) { tuck = d < 1.1 ? 0.32 : 0.16; break; } }
+    const ao = Math.max(0, gy + 0.35) * 0.22 + Math.max(0, gx - 0.4) * 0.15;
     const v = 0.4 * mass + 0.55 * lobe + 0.3 * lc.lit - ao - tuck;
-    let t = Math.round((0.42 - v) * 2.6 + (o.d > 0.85 ? 0 : (BAYER[((y % 4) + 4) % 4][((x % 4) + 4) % 4] - 0.5) * 0.6));
+    let t = Math.round(2 - v * 2.1 + (o.d > 0.85 ? 0 : (BAYER[((y % 4) + 4) % 4][((x % 4) + 4) % 4] - 0.5) * 0.6));
     if (lc.crease) t += 1;
     tone.set(k, Math.max(0, Math.min(4, t)));
   }
@@ -571,7 +575,7 @@ function crown(K, col, cx, cy, rx, ry, seed, opts = {}) {
    flares into roots that spread over the ground, each a small rounded lobe lit on top. Limbs fork from its top into
    the crown. */
 function trunk(K, cx, base, top, col, birch = false, w = 3.4, limbs = 3) {
-  const B0 = R(col), B = [mix(B0[0], [255, 246, 220], 0.15), B0[1], B0[2], B0[3], B0[4], mix(B0[4], INK, 0.45)], W = R('#eeeae0'), H = base - top;
+  const B0 = R(col), B = [B0[0], B0[0], B0[1], B0[2], B0[3], B0[4]], W = R('#eeeae0'), H = base - top;
   const half = y => { const f = (y - top) / H; return w * (0.6 + 0.4 * f) + (y > base - 8 ? (y - base + 8) ** 1.7 * 0.32 : 0); };
   const tone = (u, t) => (t ? [W[0], W[1], W[2], W[3], R('#b9b2a2')[3], R('#8a8274')[3]] : B)[Math.max(0, Math.min(5, u))];
   /* the limbs first, so the trunk's top covers where they spring from */
@@ -629,10 +633,10 @@ function conifer(K, P, cx, base, h, w, snow = false) {
   }
 }
 const NATURE = {
-  oak: (K, o) => broadleaf(K, o.v > 0.86 ? '#c99a3e' : '#7f9a4a', K.FW / 2, K.FD - 8, 50, 80, '#6e5236', o.v * 6),
-  beech: (K, o) => broadleaf(K, '#b8683a', K.FW / 2, K.FD - 8, 50, 80, '#7a6a5a', o.v * 6),
-  birch: (K, o) => broadleaf(K, '#9fb862', K.FW / 2, K.FD - 8, 56, 62, '#eeeae0', o.v * 6, { birch: true, airy: true }),
-  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8; trunk(K, cx, b, b - 40, '#6e5236', false, 2.8, 0); crown(K, '#76924a', cx, b - 64, 17, 44, o.v * 5, { column: true }); },
+  oak: (K, o) => broadleaf(K, o.v > 0.86 ? TREE.autumn1[0] : TREE.oak[0], K.FW / 2, K.FD - 8, 50, 80, '#6e5236', o.v * 6),
+  beech: (K, o) => broadleaf(K, TREE.autumn2[0], K.FW / 2, K.FD - 8, 50, 80, '#7a6a5a', o.v * 6),
+  birch: (K, o) => broadleaf(K, TREE.birch[0], K.FW / 2, K.FD - 8, 56, 62, '#eeeae0', o.v * 6, { birch: true, airy: true }),
+  poplar: (K, o) => { const cx = K.FW / 2, b = K.FD - 8; trunk(K, cx, b, b - 40, '#6e5236', false, 2.8, 0); crown(K, TREE.poplar[0], cx, b - 64, 17, 44, o.v * 5, { column: true }); },
   pine: (K, o) => conifer(K, leafRamp('#4f7a3c'), K.FW / 2, K.FD - 6, 100, 66),
   snowpine: (K, o) => conifer(K, leafRamp('#456f42'), K.FW / 2, K.FD - 6, 100, 66, true),
   palm: (K, o) => {
@@ -643,7 +647,7 @@ const NATURE = {
     K.oval(tx, ty + 1, 2, 2, R('#6e5236')[2]);
   },
   deadtree: (K, o) => { const cx = K.FW / 2, b = K.FD - 8, B = R('#7a6a58'); K.rect(cx - 2, b - 22, cx + 1, b, (x) => B[x < cx - 1 ? 1 : 3]); for (const [dx, dy, l] of [[-1, -1, 9], [1, -1, 10], [-1, -0.4, 7], [1, -0.5, 6]]) { const y0 = b - 14 - l * 0.6; for (let i = 0; i < l; i++) K.set(cx + dx * i, y0 + dy * i * 0.7, B[2]); } },
-  bush: (K, o) => { const cx = K.FW / 2, b = K.FD - 6; crown(K, '#86a058', cx, b - 9, 15, 9, o.v * 4 + 1, { fruit: o.v > 0.5 ? '#c4503e' : null }); },
+  bush: (K, o) => { const cx = K.FW / 2, b = K.FD - 6; crown(K, TREE.bush[0], cx, b - 9, 15, 9, o.v * 4 + 1, { fruit: o.v > 0.5 ? '#c4503e' : null }); },
   cactus: (K, o) => { const P = R('#7f9a5a'), cx = K.FW / 2, b = K.FD - 6, arm = (x0, y0, x1, y1) => K.rect(x0, y0, x1, y1, (x) => P[x === x0 ? 1 : x === x1 - 1 ? 3 : 2]); arm(cx - 3, b - 26, cx + 3, b); arm(cx - 10, b - 18, cx - 6, b - 10); arm(cx - 10, b - 12, cx - 3, b - 8); arm(cx + 6, b - 22, cx + 10, b - 14); arm(cx + 3, b - 16, cx + 10, b - 12); },
   reeds: (K, o) => { const P = R('#8a9a50'); for (let k = 0; k < 9; k++) { const x = 6 + h2(k, 1) * (K.FW - 12), h = 8 + h2(k, 2) * 10, b = K.FD - 6 - h2(k, 3) * 8; K.line(x, b, x + (h2(k, 4) - 0.5) * 3, b - h, P[k % 2 ? 2 : 3]); if (k % 3 === 0) K.rect(x, b - h - 3, x + 2, b - h + 1, R('#7a5a3a')[2]); } },
   mushrooms: (K, o) => { for (let k = 0; k < 3; k++) { const x = 8 + k * 7, b = K.FD - 8 - (k % 2) * 4, C = R('#c4503e'); K.rect(x, b - 3, x + 2, b, R('#eeeae0')[2]); K.oval(x + 1, b - 4, 3.5, 2.2, (px, py, dx, dy) => (h2(px, py, 1) < 0.15 ? R('#f4ecd8')[0] : C[dy < 0 ? 1 : 3])); } },
