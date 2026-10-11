@@ -176,11 +176,51 @@ const TOPS = {
   checker: P => { base(P, 0, true); const dark = mixHex(P.R[2], '#463a2c', 0.42); P.each((x, y, u, v) => { if ((Math.floor(u / 8) + Math.floor(v / 8)) % 2 === 0) P.set(x, y, inDiamond(x, y - 1) ? dark : mixHex(dark, P.R[1], 0.3)); }); },
   carpet: P => { base(P, 0.06, false); carpet(P, '#e8ce8c', '#5a281e'); },
   carpetblue: P => { base(P, 0.06, false); carpet(P, '#e8ce8c', '#283446'); },
-  rushes: P => { base(P, 0.14); for (let k = 0; k < 7; k++) { const [x, y] = P.spot(3), d = k % 2 ? 1 : -1; P.set(x, y, '#9c8650'); P.set(x + d, y, '#b8a266'); P.set(x + 2 * d, y + (k % 3 ? 0 : 1), '#9c8650'); } }
+  rushes: P => { base(P, 0.14); for (let k = 0; k < 7; k++) { const [x, y] = P.spot(3), d = k % 2 ? 1 : -1; P.set(x, y, '#9c8650'); P.set(x + d, y, '#b8a266'); P.set(x + 2 * d, y + (k % 3 ? 0 : 1), '#9c8650'); } },
+  /* the elven wood */
+  elvenmoss: P => {
+    base(P, 0.12);
+    for (let k = 0; k < 3; k++) { const [x, y] = P.spot(4), M = rampOf('#a9c38c'); P.blob(x, y, 2, 1, '#7f9c68', false); P.set(x - 1, y - 1, M[1]); P.set(x, y - 1, M[0]); P.set(x + 1, y - 1, M[1]); }
+    tufts(P, 1, '#5e7d4c');
+    for (let k = 0; k < (P.v % 2 ? 1 : 2); k++) { const [x, y] = P.spot(3), S = rampOf('#eef2f4'); P.set(x, y - 1, S[0]); P.set(x - 1, y, S[1]); P.set(x + 1, y, S[1]); P.set(x, y + 1, S[2]); P.set(x, y, '#7f9cc4'); }
+  },
+  goldleaf: P => {
+    base(P, 0.22); specks(P, 3, 4);
+    const cols = ['#e0bf52', '#c98a3a', '#d9b44a', '#a8b062', '#e6c86a'];
+    for (let k = 0; k < 10; k++) {
+      const [x, y] = P.spot(2), D = rampOf(cols[(k + P.v) % cols.length]);
+      if (k % 2) { P.set(x, y, D[1]); P.set(x + 1, y, D[2]); P.set(x + 1, y + 1, D[3]); P.set(x + 2, y + 1, ink(D[3], 0.3)); }
+      else { P.set(x, y, D[2]); P.set(x + 1, y - 1, D[1]); P.set(x + 2, y - 1, D[1]); P.set(x + 1, y, ink(D[3], 0.35)); }
+    }
+  },
+  /* fish-scale courses: arcs swept round the tile's top corner, joints between the stones, a gold leaf inlaid */
+  moonstone: P => {
+    base(P, 0.06);
+    P.each((x, y, u, v) => {
+      const d = Math.hypot(u, v), ring = Math.floor(d / 5.4), f = d - ring * 5.4, a = Math.atan2(v, u) / (Math.PI / 2);
+      const n = ring + 2, seam = Math.abs(((a * n + (ring % 2) * 0.5) % 1) - 0) < 0.06 * (ring + 1) && ring > 0;
+      if (f < 0.75 || seam) P.set(x, y, ink(P.R[3], 0.28));
+      else if (f < 1.8) P.tone(x, y, 1);
+      else if (f > 4.6) P.tone(x, y, 3);
+    });
+    if (P.v % 2 === 0) P.each((x, y, u, v) => { const m = Math.abs(u - 11.5) * 1.6 + Math.abs(v - 11.5) * 0.7; if (m < 2.2) P.set(x, y, m < 1.1 ? '#e2c262' : '#c9a24f'); });
+  },
+  elvenfloor: P => {
+    boards(P, 4, 0.28);
+    const G = rampOf('#c9a24f');
+    P.each((x, y, u, v) => { const [a, b] = P.ab(u, v), c = 8 + 1.6 * Math.sin((b / 16) * Math.PI * 2); if (Math.abs(a - c) < 0.55) P.set(x, y, G[1]); else if (Math.abs(a - c - (b % 8 < 4 ? 1.6 : -1.6)) < 0.6 && b % 8 > 1 && b % 8 < 3) P.set(x, y, G[2]); });
+  },
+  moonpool: P => {
+    water(P, '#eef8f2', '#6f948f', 5);
+    /* motes of moonlight on the surface, winking in turn over the frames */
+    const r = mulberry32(P.v * 41 + 3);
+    for (let k = 0; k < 3; k++) { const x = 4 + Math.floor(r() * 24), y = 2 + Math.floor(r() * 12); if (inDiamond(x, y) && (k + P.f) % 3) P.set(x, y, '#f2fbf6'); }
+    if (P.v % 2) { const [x, y] = P.spot(5); P.blob(x, y, 2, 1, '#86a868', false); P.set(x + 2, y, P.R[2]); P.set(x, y - 1, '#f4f6f0'); P.set(x - 1, y - 1, '#e2e6dc'); P.set(x, y - 2, '#f8faf4'); }
+  }
 };
 /* grounds whose marks run along one tile edge: the renderer swaps their axis when the view turns a quarter */
-const DIRECTIONAL = new Set(['dunes', 'field', 'wheat', 'crops', 'vineyard', 'road', 'planks', 'floorboards', 'oakfloor']);
-const ANIMATED = new Set(['shallows', 'water', 'deep', 'lava']);
+const DIRECTIONAL = new Set(['dunes', 'field', 'wheat', 'crops', 'vineyard', 'road', 'planks', 'floorboards', 'oakfloor', 'elvenfloor']);
+const ANIMATED = new Set(['shallows', 'water', 'deep', 'lava', 'moonpool']);
 
 /* one ground's top: TW × (TH + PAD) with the diamond's top point at (16, PAD) */
 function topTile(id, variant = 0, frame = 0) {
@@ -197,11 +237,11 @@ function topTile(id, variant = 0, frame = 0) {
 const STYLE = {};
 for (const T of TERRAIN) {
   STYLE[T.id] = T.water ? 'water' : T.glow ? 'lava' : ['snow', 'ice'].includes(T.id) ? 'snow'
-    : ['cobble', 'flagstone', 'plaza', 'stonefloor', 'checker', 'rock', 'scree', 'shingle', 'tundra'].includes(T.id) ? 'stone'
-    : ['planks', 'floorboards', 'oakfloor', 'carpet', 'carpetblue'].includes(T.id) ? 'wood'
+    : ['cobble', 'flagstone', 'plaza', 'stonefloor', 'checker', 'rock', 'scree', 'shingle', 'tundra', 'moonstone'].includes(T.id) ? 'stone'
+    : ['planks', 'floorboards', 'oakfloor', 'carpet', 'carpetblue', 'elvenfloor'].includes(T.id) ? 'wood'
     : ['sand', 'dunes', 'scrub'].includes(T.id) ? 'sand' : 'soil';
 }
-const LIPPED = new Set(['grass', 'meadow', 'tallgrass', 'pasture', 'heath', 'moor', 'garden', 'crops', 'vineyard', 'wheat', 'marsh', 'swamp', 'tundra', 'snow']);
+const LIPPED = new Set(['grass', 'meadow', 'tallgrass', 'pasture', 'heath', 'moor', 'garden', 'crops', 'vineyard', 'wheat', 'marsh', 'swamp', 'tundra', 'snow', 'elvenmoss']);
 function sideFace(id, side, h, zTop = 0) {
   const T = TERRAIN_BY_ID[id] || TERRAIN[0], style = STYLE[T.id], R = rampOf(T.side[side]), Top = rampOf(T.top);
   const im = image(16, h + 8), lit = side === 0, earthy = style === 'soil' || style === 'sand', z0 = ((Math.round(zTop) % STEP) + STEP) % STEP;

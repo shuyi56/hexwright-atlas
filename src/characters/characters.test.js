@@ -7,7 +7,7 @@ import { BASE, BODY_TYPES, SHIFT, STRIKE, WINDUP, measure, profile } from './bod
 import { GLYPH_H, GLYPH_W, glyph } from './font.js';
 import * as parts from './parts.js';
 import { H, OUTLINE, PAPER, W, finish, frameBuf, hexRgb, ramp, rgbLch, stamp, wash } from './pixels.js';
-import { ATTACK, BODIES, ENEMIES, FRAMES, JOBS, POSES, ROSTER, VIEWS, WALK, attackOf, byId, frame, palette, render } from './roster.js';
+import { ATTACK, BODIES, ELVES, ENEMIES, FRAMES, JOBS, POSES, ROSTER, VIEWS, WALK, attackOf, byId, frame, palette, render } from './roster.js';
 import { APPLIES, CHOICES, COLOURS, cleanSpec, fromSpec } from './custom.js';
 import * as hats from './hats.js';
 import { TOWNSFOLK } from './townsfolk.js';
@@ -24,7 +24,7 @@ test('every shared part is a rectangle of rows', () => {
   for (const [name, v] of Object.entries({ ...parts, ...hats })) if (typeof v !== 'function') each(v, name);
 });
 test('every job in every build draws all its frames inside the frame, in colours it defines', () => {
-  assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 7); assert.equal(ENEMIES.length, 6); assert.equal(ROSTER.length, 22);
+  assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 7); assert.equal(ENEMIES.length, 6); assert.equal(ELVES.length, 5); assert.equal(ROSTER.length, 27);
   assert.equal(new Set(ROSTER.map(j => j.id)).size, ROSTER.length); for (const j of ROSTER) assert.equal(byId(j.id), j);
   for (const job of ROSTER) {
     const pal = palette(job); assert.ok(BODY_TYPES[job.body], `${job.id} has a build`);
@@ -438,4 +438,14 @@ test('a sword has a fuller, a crossguard and a pommel above the fist; a dagger a
   }
   for (const sh of [parts.KITE, parts.BUCKLER]) { assert.ok(sh.front.rows.join('').includes('S'), 'a steel boss or rivets'); assert.ok(sh.back.rows.join('').includes('S'), 'a buckled strap'); }
   assert.equal(parts.KITE.front.rows.filter(r => r.includes('C')).length, 8, 'a cross from rim to point');
+});
+test('elves wear pointed ears that stand out past their hair on every build, and the maker offers them', () => {
+  const skin = m => m.filter(c => c === 'K').length, bare = j => ({ ...j, parts: { front: { ...j.parts.front, hat: null }, back: { ...j.parts.back, hat: null } } });
+  for (const elf of ELVES) for (const b of BODIES) for (const v of VIEWS) for (let k = 0; k < FRAMES; k++) {
+    const shown = skin(frame(elf, v, k, b).mat) - skin(frame(bare(elf), v, k, b).mat);
+    assert.ok(shown >= (v === 'front' ? 6 : 10), `${elf.id} ${b} ${v} ${k}: only ${shown} pixels of ear show`);
+  }
+  const plain = { name: 'Elf', hair: 'flowing' }, a = fromSpec({ ...plain, ears: 'round' }), e = fromSpec({ ...plain, ears: 'pointed' });
+  for (const v of VIEWS) assert.ok(skin(frame(e, v, 0).mat) > skin(frame(a, v, 0).mat) + 5, `${v}: the maker's pointed ears show`);
+  assert.match(e.blurb, /pointed ears/);
 });

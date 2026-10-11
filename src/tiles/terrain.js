@@ -14,6 +14,29 @@ const pebble = (g, p, rx, col) => { g.beginPath(); g.ellipse(p[0], p[1], rx, rx 
 const ripple = (g, p, w, col = 'rgba(245,245,232,0.6)') => { g.strokeStyle = col; g.lineWidth = 0.7; g.beginPath(); g.moveTo(p[0] - w, p[1]); g.quadraticCurveTo(p[0] - w / 2, p[1] - 1.6, p[0], p[1]); g.quadraticCurveTo(p[0] + w / 2, p[1] - 1.6, p[0] + w, p[1]); g.stroke(); };
 /* a carpet's border and medallion, so a run of carpet tiles reads as one woven floor */
 const carpet = (g, at, edge, mark) => { const q = (k, col, lw) => { const a = at(k, k), b = at(1 - k, k), c = at(1 - k, 1 - k), d = at(k, 1 - k); g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.stroke(); }; q(0.1, edge, 0.8); q(0.17, mark, 0.4); const m = at(0.5, 0.5); g.fillStyle = edge; g.beginPath(); g.ellipse(m[0], m[1], 3, 1.5, 0, 0, TAU); g.fill(); g.fillStyle = mark; g.beginPath(); g.ellipse(m[0], m[1], 1.3, 0.65, 0, 0, TAU); g.fill(); };
+/* a fallen leaf: a pointed oval along angle a with its midrib */
+const leaf = (g, p, a, col) => { const c = Math.cos(a), s = Math.sin(a) * 0.5; g.beginPath(); g.moveTo(p[0] - c * 1.8, p[1] - s * 1.8); g.quadraticCurveTo(p[0] - s * 1.6, p[1] + c * 0.8, p[0] + c * 1.8, p[1] + s * 1.8); g.quadraticCurveTo(p[0] + s * 1.6, p[1] - c * 0.8, p[0] - c * 1.8, p[1] - s * 1.8); g.fillStyle = col; g.fill(); g.strokeStyle = 'rgba(90,60,25,0.45)'; g.lineWidth = 0.35; g.beginPath(); g.moveTo(p[0] - c * 1.6, p[1] - s * 1.6); g.lineTo(p[0] + c * 1.6, p[1] + s * 1.6); g.stroke(); };
+/* cushions of moss, lit on top, and a few pale star-flowers with a blue heart */
+const elvenMoss = (g, at, h, r) => {
+  for (let k = 0; k < 3; k++) { const p = at(0.2 + r() * 0.6, 0.2 + r() * 0.6); g.beginPath(); g.ellipse(p[0], p[1], 2.4, 1.2, 0, 0, TAU); g.fillStyle = 'rgba(70,104,58,0.45)'; g.fill(); g.beginPath(); g.ellipse(p[0] - 0.4, p[1] - 0.4, 1.6, 0.7, 0, 0, TAU); g.fillStyle = 'rgba(190,214,150,0.55)'; g.fill(); }
+  for (let k = 0; k < (h < 0.5 ? 3 : 1); k++) { const p = at(0.15 + r() * 0.7, 0.15 + r() * 0.7); g.fillStyle = '#eef2f4'; g.fillRect(p[0] - 1.1, p[1] - 0.4, 2.2, 0.8); g.fillRect(p[0] - 0.4, p[1] - 1.1, 0.8, 2.2); g.fillStyle = '#8fa8cc'; g.fillRect(p[0] - 0.4, p[1] - 0.4, 0.8, 0.8); }
+};
+/* moonstone laid in courses that sweep round in arcs, a leaf of gold inlaid at every other tile's heart */
+const moonstone = (g, at, h) => {
+  g.strokeStyle = 'rgba(120,118,104,0.42)'; g.lineWidth = 0.45; g.beginPath();
+  for (const k of [0.34, 0.67, 1]) { for (let s = 0; s <= 12; s++) { const t = s / 12, a = at(k * Math.cos(t * Math.PI / 2), k * Math.sin(t * Math.PI / 2)); if (s) g.lineTo(a[0], a[1]); else g.moveTo(a[0], a[1]); } }
+  for (const t of [0.25, 0.5, 0.75]) { const a = at(0.34 * Math.cos(t * Math.PI / 2), 0.34 * Math.sin(t * Math.PI / 2)), b = at(Math.min(0.98, Math.cos(t * Math.PI / 2)), Math.min(0.98, Math.sin(t * Math.PI / 2))); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); }
+  g.stroke();
+  if (h < 0.5) leaf(g, at(0.72, 0.72), 0.6, 'rgba(201,162,79,0.85)');
+};
+/* a gold vine inlaid along the boards, curling either side of its stem */
+const vine = (g, at, alongX) => {
+  const pt = (s, w) => (alongX ? at(s, 0.5 + w) : at(0.5 + w, s));
+  g.strokeStyle = 'rgba(190,150,70,0.8)'; g.lineWidth = 0.55; g.beginPath();
+  for (let s = 0; s <= 20; s++) { const t = s / 20, p = pt(0.05 + t * 0.9, Math.sin(t * TAU) * 0.08); if (s) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }
+  g.stroke();
+  for (const t of [0.25, 0.75]) { const p = pt(0.05 + t * 0.9, Math.sin(t * TAU) * 0.18); g.fillStyle = 'rgba(201,162,79,0.85)'; g.beginPath(); g.ellipse(p[0], p[1], 1.4, 0.7, 0, 0, TAU); g.fill(); }
+};
 const grid = (g, at, n, col, jit) => { g.strokeStyle = col; g.lineWidth = 0.45; g.beginPath(); for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const o = jit && j % 2 ? 0.5 / n : 0, x0 = Math.max(0.03, i / n + o), x1 = Math.min(0.97, (i + 1) / n + o), y0 = j / n + 0.03, y1 = (j + 1) / n - 0.03; if (x1 - x0 < 0.06) continue; const a = at(x0, y0), b = at(x1, y0), c = at(x1, y1), d = at(x0, y1); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); } g.stroke(); };
 
 const TERRAIN = [
@@ -62,7 +85,14 @@ const TERRAIN = [
   { id: 'checker', label: 'Chequered floor', group: 'Floors', top: '#e8dfc8', side: ['#b3a98f', '#988f77'], deco: (g, at) => { g.fillStyle = 'rgba(70,58,44,0.42)'; for (const [i, j] of [[0, 0], [1, 1]]) { const a = at(i / 2, j / 2), b = at((i + 1) / 2, j / 2), c = at((i + 1) / 2, (j + 1) / 2), d = at(i / 2, (j + 1) / 2); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill(); } } },
   { id: 'carpet', label: 'Red carpet', group: 'Floors', top: '#b0614a', side: ['#a07a4c', '#86613a'], deco: (g, at) => carpet(g, at, 'rgba(232,206,140,0.75)', 'rgba(90,40,30,0.5)') },
   { id: 'carpetblue', label: 'Blue carpet', group: 'Floors', top: '#6f8faa', side: ['#a07a4c', '#86613a'], deco: (g, at) => carpet(g, at, 'rgba(232,206,140,0.7)', 'rgba(40,52,70,0.5)') },
-  { id: 'rushes', label: 'Strewn rushes', group: 'Floors', top: '#cdb985', side: SOIL, deco: (g, at, h, r) => tufts(g, at, r, 4, 'rgba(120,100,50,0.5)', 1.6) }
+  { id: 'rushes', label: 'Strewn rushes', group: 'Floors', top: '#cdb985', side: SOIL, deco: (g, at, h, r) => tufts(g, at, r, 4, 'rgba(120,100,50,0.5)', 1.6) },
+  /* the elven wood: deep moss starred with pale flowers, a litter of fallen gold leaves, moonstone laid in sweeping
+     courses, ash boards inlaid with a gold vine, and a still pool that holds the moonlight */
+  { id: 'elvenmoss', label: 'Elven moss', group: 'Elven', top: '#93ad7a', side: SOIL, deco: (g, at, h, r) => elvenMoss(g, at, h, r) },
+  { id: 'goldleaf', label: 'Fallen gold leaves', group: 'Elven', top: '#bca469', side: SOIL, deco: (g, at, h, r) => { for (let k = 0; k < 7; k++) leaf(g, at(0.12 + r() * 0.76, 0.12 + r() * 0.76), r() * TAU, ['#e0bf52', '#c98a3a', '#d9b44a', '#a8b062'][k % 4]); } },
+  { id: 'moonstone', label: 'Moonstone paving', group: 'Elven', top: '#e6e4da', side: ['#c9c6b8', '#aaa697'], deco: (g, at, h) => moonstone(g, at, h) },
+  { id: 'elvenfloor', label: 'Inlaid ash floor', group: 'Elven', top: '#dccaa0', side: ['#b39a6c', '#957f56'], deco: (g, at, h) => { rows(g, at, 'rgba(120,90,50,0.32)', 5, h < 0.5, 0.45); vine(g, at, h < 0.5); } },
+  { id: 'moonpool', label: 'Moonlit pool', group: 'Elven', top: '#8fb8b4', side: ['#6f948f', '#5c7f7a'], water: true, sink: 3, deco: (g, at, h) => { ripple(g, at(0.35 + h * 0.3, 0.45), 3.5, 'rgba(236,248,242,0.75)'); g.fillStyle = 'rgba(236,250,244,0.85)'; for (const [fx, fy] of [[0.25, 0.7], [0.7, 0.3], [0.6, 0.75]]) { const p = at(fx, fy); g.fillRect(p[0] - 0.5, p[1] - 0.5, 1, 1); } if (h > 0.55) { const p = at(0.65, 0.6); g.beginPath(); g.ellipse(p[0], p[1], 2.2, 1.1, 0, 0.3, TAU - 0.3); g.lineTo(p[0], p[1]); g.closePath(); g.fillStyle = '#86a868'; g.fill(); g.strokeStyle = 'rgba(43,33,22,0.4)'; g.lineWidth = 0.4; g.stroke(); g.fillStyle = '#f4f6f0'; g.fillRect(p[0] - 0.6, p[1] - 1.2, 1.2, 1); } } }
 ];
 const TERRAIN_BY_ID = Object.fromEntries(TERRAIN.map(t => [t.id, t]));
 

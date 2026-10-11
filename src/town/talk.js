@@ -15,7 +15,12 @@ const SAYS = {
   orc: ['RAAAGH!', 'Puny. Very puny.'],
   skeleton: ['...', '*rattle*'],
   wolf: ['Grrrr...', '*sniff sniff*'],
-  slime: ['*blorp*', '*squelch*']
+  slime: ['*blorp*', '*squelch*'],
+  elfranger: ['The trees spoke of your coming. They did not say you would be so loud.', 'Walk softly here. The wood is listening.', 'I have watched this road for three hundred winters.'],
+  elfwarden: ['None pass the moonwell armed. Save you, it seems.', 'The deep wood stirs. Keep to the paths.', 'Our blades are old, but they remember.'],
+  elfsage: ['The moon rises full tonight. Come to the well and see.', 'Every leaf that falls is written down, somewhere.', 'Patience. Even the mallorn was once a seed.'],
+  elflady: ['Welcome to {place}, traveller. Rest beneath the gold.', 'Have you heard the singing in the high flets at dusk?', 'The lanterns here never go out. We forgot how to make them stop.'],
+  darkelf: ['The light here burns my eyes. You will do instead.', 'Your kin cast us out. I have come to return the favour.']
 };
 const GROUP = {
   characters: ['Fine day for a walk around {place}.', 'Have you seen the market? Busy as ever.', 'Stay out of trouble, now.'],
@@ -31,7 +36,10 @@ const SIGHTS = {
   graves: 'Old gravestones. The names are worn away.', campfire: 'The fire crackles warmly.', stall: 'A market stall, piled with goods.',
   bookshelf: 'Rows of dusty books. Nothing you can read in a hurry.', chest: 'A sturdy chest. It is locked.', bed: 'A soft bed. Not now.',
   hearth: 'A fire burns low in the hearth.', wardrobe: 'Clothes, mothballs, and one odd boot.', cauldron: 'Something bubbles in the pot. It smells of onions.',
-  throne: 'An empty throne, waiting.', altar: 'Candles flicker on the altar.', lamppost: 'An iron lamp on a post.', obelisk: 'Strange marks run up the obelisk.'
+  throne: 'An empty throne, waiting.', altar: 'Candles flicker on the altar.', lamppost: 'An iron lamp on a post.', obelisk: 'Strange marks run up the obelisk.',
+  moonwell: 'The water holds the moon, even at noon.', elvenlantern: 'A pale lantern on a silver crook. It gives no heat at all.', mallorn: 'A mallorn. Its leaves are gold, and its bark is silver.',
+  willow: 'A silver willow, its strands brushing the ground.', moonflowers: 'Moonflowers, glowing faintly.', flet: 'A round house high in the tree. A rope ladder has been drawn up.',
+  elvenhall: 'The hall\'s doors are carved with leaves. They are shut.', elvenspire: 'A white spire. Someone is singing at the top.'
 };
 function sightFor(asset, terrain, place) {
   if (asset) return (SIGHTS[asset.id] || (asset.group === 'Buildings' ? `The ${asset.label.toLowerCase()} is shut tight.` : asset.group === 'Nature' ? `${asset.label}.` : `A ${asset.label.toLowerCase()}.`)).replace('{place}', place || 'this town');

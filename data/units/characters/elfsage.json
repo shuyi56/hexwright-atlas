@@ -1,0 +1,14 @@
+{
+  "id": "elfsage",
+  "name": "Elf Sage",
+  "stats": {
+    "hp": 32,
+    "attack": 5,
+    "range": 3,
+    "pattern": "ranged"
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

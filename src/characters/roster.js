@@ -4,6 +4,7 @@ import { BANDANA, FEATHER_CAP, WIZARD_HAT } from './hats.js';
 import { finish, frameBuf, mixHex, ramp, shrink, stamp } from './pixels.js';
 import { TOWNSFOLK } from './townsfolk.js';
 import { ENEMIES } from './enemies.js';
+import { ELVES } from './elves.js';
 
 /* ================= character sprites: the roster =================
    Each job is a build, an outfit, a palette and a stack of hand-drawn parts. The body (torso, arms, legs, a
@@ -461,9 +462,9 @@ const SUMMONER = {
 };
 
 const JOBS = [SQUIRE, KNIGHT, ARCHER, THIEF, DRAGOON, VALKYRIE, BLACK_MAGE, WHITE_MAGE, SUMMONER];
-/* everyone who can be drawn: the townsfolk (townsfolk.js), the jobs, then the enemies (enemies.js) */
-const ROSTER = [...TOWNSFOLK, ...JOBS, ...ENEMIES];
+/* everyone who can be drawn: the townsfolk (townsfolk.js), the jobs, the elves (elves.js), then the enemies (enemies.js) */
+const ROSTER = [...TOWNSFOLK, ...JOBS, ...ELVES, ...ENEMIES];
 const BY_ID = new Map(ROSTER.map(c => [c.id, c]));
 const byId = id => BY_ID.get(id) || null;
 
-export { ATTACK, BODIES, ENEMIES, FRAMES, JOBS, POSES, ROSTER, SHIFT, VIEWS, WALK, attackOf, byId, frame, palette, render, renderScaled };
+export { ATTACK, BODIES, ELVES, ENEMIES, FRAMES, JOBS, POSES, ROSTER, SHIFT, VIEWS, WALK, attackOf, byId, frame, palette, render, renderScaled };

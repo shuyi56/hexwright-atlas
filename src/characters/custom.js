@@ -1,4 +1,5 @@
 import { BANDANA, BEARD, CAPELET, CIRCLET, COWL, COWL_POINT, FEATHER_CAP, KETTLE_HELM, STRAW_HAT, WIZARD_HAT } from './hats.js';
+import { ELF_EARS, ELF_HAIR } from './elves.js';
 import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, KITE, SKIN, SWORD, recolor, staff } from './parts.js';
 
 /* ================= character sprites: characters made from choices =================
@@ -16,7 +17,8 @@ const CHOICES = {
   cut: [['plain', 'Plain'], ['bell', 'Bell']],
   neckline: [['high', 'High'], ['square', 'Square']],
   rope: [['none', 'None'], ['rope', 'Rope belt']],
-  hair: [['short', 'Short'], ['tousled', 'Tousled'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['bun', 'Low bun'], ['braid', 'Braid']],
+  hair: [['short', 'Short'], ['tousled', 'Tousled'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['bun', 'Low bun'], ['braid', 'Braid'], ['flowing', 'Flowing (elven)']],
+  ears: [['round', 'Round'], ['pointed', 'Pointed (elven)']],
   hat: [['none', 'None'], ['straw', 'Straw hat'], ['kettle', 'Kettle helm'], ['circlet', 'Circlet'], ['cowl', 'Cowl'], ['cap', 'Feathered cap'], ['bandana', 'Bandana'], ['wizard', 'Wizard hat']],
   beard: [['none', 'None'], ['full', 'Full beard']],
   cape: [['none', 'None'], ['cape', 'Cape'], ['dagged', 'Dagged cape']],
@@ -47,7 +49,7 @@ const SWATCHES = [
   '#a6533b', '#b8483a', '#a84a3c', '#c27458', '#b0614a', '#8fa462', '#6c8549', '#356a52', '#a6b878',
   '#7f9cb4', '#6f8faa', '#8297b0', '#56688f', '#66727e', '#a898b8', '#8a7a9a', '#c4c8c6', '#3f3a3d'];
 
-const HAIRS = { short: HAIR_SHORT, tousled: HAIR_TOUSLED, long: HAIR_LONG, ponytail: HAIR_PONYTAIL, bun: HAIR_BUN, braid: HAIR_BRAID };
+const HAIRS = { short: HAIR_SHORT, tousled: HAIR_TOUSLED, long: HAIR_LONG, ponytail: HAIR_PONYTAIL, bun: HAIR_BUN, braid: HAIR_BRAID, flowing: ELF_HAIR };
 /* a hat for each view; the cowl brings its capelet, and from behind its point */
 const HATS = {
   straw: { front: { hat: STRAW_HAT }, back: { hat: STRAW_HAT } },
@@ -79,7 +81,8 @@ function cleanSpec(J) {
 const label = (k, v) => (CHOICES[k].find(o => o[0] === v) || [v, v])[1];
 /* a line about a spec, from its choices */
 function describe(s) {
-  const bits = [`${label('build', s.build).toLowerCase()} build`, label('clothes', s.clothes).toLowerCase(), `${label('hair', s.hair).toLowerCase()} hair`];
+  const bits = [`${label('build', s.build).toLowerCase()} build`, label('clothes', s.clothes).toLowerCase(), `${label('hair', s.hair).toLowerCase().replace(' (elven)', '')} hair`];
+  if (s.ears === 'pointed') bits.push('pointed ears');
   for (const k of ['hat', 'beard', 'cape', 'satchel', 'held']) if (s[k] !== 'none' && (!APPLIES[k] || APPLIES[k](s))) bits.push(label(k, s[k]).toLowerCase());
   if (s.shield !== 'none' && APPLIES.shield(s)) bits.push(label('shield', s.shield).toLowerCase());
   const t = bits.join(', ');
@@ -112,6 +115,8 @@ function fromSpec(spec, extra = {}) {
   const hat = HATS[s.hat];
   if (hat) { Object.assign(front, hat.front); Object.assign(back, hat.back); }
   if (s.beard === 'full') front.hair = BEARD;
+  /* pointed ears lie over the hair and under nothing but a hat's brim (elves.js) */
+  if (s.ears === 'pointed') { front.hat = [].concat(front.hat || [], ELF_EARS.front); back.hat = [].concat(back.hat || [], ELF_EARS.back); }
   for (const [key, letter] of COLOURS) pal[letter] = s.colours[key];
   if (s.clothes === 'overalls') pal.P = s.colours.second;                       /* the overalls run down the legs */
   return { id: s.id, name: s.name, blurb: describe(s), body: s.build, outfit: o, hair: HAIRS[s.hair], weapon, shield, pal, parts: { front, back }, spec: s, look: JSON.stringify(s), ...extra };

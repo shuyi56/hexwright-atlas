@@ -1,7 +1,7 @@
 import { FACES, FIGURE, drawFigure, figureBox, figureThumb, footShadow, lookOf } from '../characters/draw.js';
 import { characterById, list as customList, onChange as onLibraryChange } from '../characters/library.js';
 import { makerOpen, openMaker } from '../characters/maker.js';
-import { ENEMIES, JOBS, ROSTER, WALK } from '../characters/roster.js';
+import { ELVES, ENEMIES, JOBS, ROSTER, WALK } from '../characters/roster.js';
 import { TOWNSFOLK } from '../characters/townsfolk.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
@@ -414,7 +414,7 @@ function buildCharacters(box) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = text; b.title = tip; b.disabled = !ok; b.addEventListener('click', fn); row.appendChild(b);
   }
   const mine = customList();
-  for (const [gn, list] of [['Townsfolk', TOWNSFOLK], ['Jobs', JOBS], ['Enemies', ENEMIES], ...(mine.length ? [['Made here', mine]] : [])]) {
+  for (const [gn, list] of [['Townsfolk', TOWNSFOLK], ['Jobs', JOBS], ['Elves', ELVES], ['Enemies', ENEMIES], ...(mine.length ? [['Made here', mine]] : [])]) {
     const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h);
     const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
     for (const s of list) {

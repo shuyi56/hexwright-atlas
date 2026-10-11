@@ -186,4 +186,4 @@ const DESIGNS = {
   } }
 };
 
-export { DESIGNS, broadleaf, mass, pine };
+export { DESIGNS, broadleaf, mass, pine, trunk };

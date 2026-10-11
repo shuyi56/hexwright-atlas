@@ -8,6 +8,7 @@ import { TI, blankModel } from '../editor/model.js';
 import { ASSET_BY_ID } from '../tiles/index.js';
 import { DESIGNS as BUILT } from './buildings.js';
 import { DESIGNS as GROWN } from './foliage.js';
+import { DESIGNS as ELVEN } from './elven.js';
 import { pieceImage } from './pieces.js';
 import { FIGURE_SCALE, P, buildScene, withFigures } from './scene.js';
 import { ANIMATED, FRAMES, PAD, VARIANTS, arrow, cursor, foam, marker, sideFace, topTile, unitShadow } from './tiles.js';
@@ -142,7 +143,7 @@ function buildSheet(k = 3) {
   return { width: w, height: h, rgba: cv.px };
 }
 /* the pieces with tactical designs, as the editor's palette groups them */
-const PIECE_GROUPS = [['BUILDINGS', Object.keys(BUILT)], ['TREES AND PLANTS', Object.keys(GROWN)]];
+const PIECE_GROUPS = [['BUILDINGS', Object.keys(BUILT)], ['TREES AND PLANTS', Object.keys(GROWN)], ['THE ELVEN WOOD', Object.keys(ELVEN)]];
 function flow(ids, width, k) {
   const items = []; let x = 0, y = 0, rowH = 0;
   for (const id of ids) {

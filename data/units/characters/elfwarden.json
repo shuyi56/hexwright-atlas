@@ -1,0 +1,14 @@
+{
+  "id": "elfwarden",
+  "name": "Elf Warden",
+  "stats": {
+    "hp": 50,
+    "attack": 13,
+    "range": 2,
+    "pattern": "line"
+  },
+  "movement": {
+    "move": 4,
+    "jump": 2
+  }
+}

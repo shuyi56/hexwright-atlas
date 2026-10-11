@@ -1,14 +1,15 @@
 import { ASSET_BY_ID, footprint } from '../tiles/index.js';
 import { DESIGNS as BUILT } from './buildings.js';
+import { DESIGNS as ELVEN } from './elven.js';
 import { forge } from './forge.js';
 import { DESIGNS as GROWN } from './foliage.js';
 
 /* ================= tactical view: pieces drawn for the close camera =================
    The buildings (tactical/buildings.js) and the trees and plants (tactical/foliage.js) designed as pixel art for
-   the tactical view, by asset id. pieceImage draws one placed piece (as the scene holds it: turned with the view,
+   the tactical view, by asset id, with the elven wood's (tactical/elven.js). pieceImage draws one placed piece (as the scene holds it: turned with the view,
    walls linked) into { w, h, px, ox, oy }, with (ox, oy) its footprint's top corner. Pieces with no design here
    (the smaller props and the furniture) are drawn by tactical/render.js from the tile set's own drawings. */
-const DESIGNS = Object.assign({}, BUILT, GROWN);
+const DESIGNS = Object.assign({}, BUILT, GROWN, ELVEN);
 const hasDesign = id => !!DESIGNS[id];
 /* how far above its footprint a designed piece can reach, in art pixels (for culling and the camera's limits) */
 const designTop = id => (DESIGNS[id] ? DESIGNS[id].top + 30 : 0);
