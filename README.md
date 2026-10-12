@@ -450,7 +450,11 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   embers from a tripod; a coopered wash tub; a candle stand glowing; a potted fern; a gilt and velvet throne on its
   dais; an altar under a cloth; pews with carved ends; a weapon rack of spears, swords and a shield; and a spinning
   wheel. Each is drawn facing south and turned to its facing, so a turned piece shows its side (a plain face there
-  is a framed, sunken panel) and from behind its back. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
+  is a framed, sunken panel) and from behind its back. Shadows fall to the east. City and room walls join their neighbours. A room wall running across the view shows its face (a timber beam along
+  its top, lime plaster, a skirting board) under its capping beam; one running up the view shows its capping beam and
+  its east face in shade, so it reads as a wall rather than a crack; where walls join there is no seam. A doorway is an
+  opening in its wall, the wall going on either side, with timber jambs, a lintel carrying the capping beam over it and
+  a sill underfoot; only the opening can be walked through. A piece standing in
   front of the hero fades so they are never lost behind it.
 - **Walking:** the hero walks freely, not tile by tile: the arrow keys or `WASD` (diagonals too, `Shift` runs) move
   them at a figure's pace, about three of their own heights a second, with a stride every few pixels so the feet plant

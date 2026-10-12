@@ -8,7 +8,7 @@
      candle stand at the hearth and a long table between two benches; east of it the bar (a counter facing the room,
      a dresser of crockery behind it, a stool before it); a weapon rack and barrels by the door, stairs in the
      south-east corner.
-   - Upstairs (floor 1): a passage along the south with a bench and a candle stand, the open stairwell at its east
+   - Upstairs (floor 1), walled and windowed like the room below: a passage along the south with a bench and a candle stand, the open stairwell at its east
      end, and two bedrooms through doorways in a timber partition: the west on a red carpet with a bed and a dresser,
      the east on a blue one with a bed and a wardrobe.
    - The people: the innkeeper behind the bar, a healer at it, a monk warming himself at the fire, a farmer by the long
@@ -42,9 +42,11 @@ put(I, 'weaponrack', 1, 5, 1); put(I, 'barrels', 2, 5);
 /* the stairs climbing north to the landing at 5,4 on floor 1, stepped onto from the bar's side or the aisle */
 put(I, 'stairs', 5, 5, 0);
 
-/* upstairs: floor over the whole room inside the walls but the stairwell over the flight */
-paintTiles(I, rectTiles(I, 1, 1, 5, 5), 'floorboards', 1);
+/* upstairs: floor out to the walls but the stairwell over the flight, and the outer walls again with their windows */
+paintTiles(I, rectTiles(I, 0, 0, S, S), 'floorboards', 1);
 removeFloor(I, [[5, 5]], 1);
+const upper = { '2,0': 'iwindow', '4,0': 'iwindow', '0,2': 'iwindow', '0,4': 'iwindow', '6,2': 'iwindow', '6,4': 'iwindow', '1,6': 'iwindow', '5,6': 'iwindow' };
+for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (!x || !y || x === S - 1 || y === S - 1) put(I, upper[x + ',' + y] || 'iwall', x, y, 0, 1);
 /* a timber partition: two bedrooms to the north, a doorway into each, the passage along the south */
 for (let x = 1; x <= 5; x++) put(I, x === 2 || x === 4 ? 'idoor' : 'iwall', x, 3, 0, 1);
 for (let y = 1; y <= 2; y++) put(I, 'iwall', 3, y, 0, 1);
@@ -53,8 +55,8 @@ for (let y = 1; y <= 2; y++) put(I, 'iwall', 3, y, 0, 1);
 paintTiles(I, rectTiles(I, 1, 1, 2, 2), 'carpet', 1); paintTiles(I, rectTiles(I, 4, 1, 2, 2), 'carpetblue', 1);
 put(I, 'bed', 1, 1, 0, 1); put(I, 'dresser', 2, 1, 0, 1);
 put(I, 'bed', 5, 1, 0, 1); put(I, 'wardrobe', 4, 1, 0, 1);
-/* the passage: a bench under the window and a candle stand */
-put(I, 'bench', 1, 5, 2, 1); put(I, 'candelabra', 3, 5, 0, 1);
+/* the passage, two tiles wide all along: a bench under the window and a candle stand at its west end */
+put(I, 'bench', 1, 5, 2, 1); put(I, 'candelabra', 1, 4, 0, 1);
 
 /* the people inside */
 stand(I, 'merchant', 4, 1, 0);   /* the innkeeper behind the bar */

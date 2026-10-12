@@ -78,9 +78,10 @@ function kit(FW, FD, up, side = 16) {
       for (const [j, [r, g, b, lo]] of halo) { const k = lo ? 0.35 : 0.15; px[j] = r + (INK[0] - r) * k; px[j + 1] = g + (INK[1] - g) * k; px[j + 2] = b + (INK[2] - b) * k; px[j + 3] = glow; }
     },
     /* ink every opaque pixel that touches a clear one */
-    outline(k = 0.75) {
+    /* skip(x, y), in drawing coordinates, spares the pixels it is true for (the ends of a wall where it joins the next) */
+    outline(k = 0.75, skip = null) {
       const on = (x, y) => x >= 0 && y >= 0 && x < w && y < h && px[(y * w + x) * 4 + 3] === 255, edge = [];
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (on(x, y) && (!on(x - 1, y) || !on(x + 1, y) || !on(x, y - 1) || !on(x, y + 1))) edge.push((y * w + x) * 4);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (on(x, y) && (!on(x - 1, y) || !on(x + 1, y) || !on(x, y - 1) || !on(x, y + 1)) && !(skip && skip(x - ox, y - oy))) edge.push((y * w + x) * 4);
       for (const i of edge) { px[i] += (INK[0] - px[i]) * k; px[i + 1] += (INK[1] - px[i + 1]) * k; px[i + 2] += (INK[2] - px[i + 2]) * k; }
     },
     /* the shadow on the ground: east of the rows [y0, y1), reaching len pixels past x1, under nothing drawn */
@@ -682,12 +683,77 @@ const PROPS = {
 };
 
 /* ---------- interiors ---------- */
-const ROOMW = 34;
-function roomWall(K, o, front) {
-  const { FW, FD } = K, L = o.links || [0, 0, 0, 0], t = 5, c0 = FW / 2 - t, c1 = FW / 2 + t, P = R(WALL.plaster), Tp = R('#7a5a3a');
-  const x0 = L[2] ? 0 : c0, x1 = L[0] ? FW : c1, y0 = L[3] ? 0 : c0, y1 = L[1] ? FD : c1;
-  const seg = (a0, b0, a1, b1, f) => { K.rect(a0, b1 - ROOMW, a1, b1, (x, y) => (f ? f(x, y, b1) : null) || (y === b1 - 1 ? P[3] : y < b1 - ROOMW + 3 ? P[1] : P[2])); K.rect(a0, b0 - ROOMW, a1, b1 - ROOMW, (x, y) => Tp[(x + y) % 5 === 0 ? 3 : 2]); };
-  seg(x0, c0, x1, c1, front); seg(c0, y0, c1, y1, null);
+/* ---------- room walls ----------
+   Interior walls are a band through the middle of their tile, ROOMW high, 2·RT thick, with an arm out to each side
+   it joins (links: [+x, +y, -x, -y], tiles/index.js). A run across the view (east-west) shows its face: a timber
+   beam along its top, lime plaster mottled a little, a skirting board at its foot, and its capping beam on top. A run
+   up the view (north-south) shows its capping beam and, beside it, its east face in shade, so it reads as a wall and
+   not a crack in the floor. A free end shows its end in shade too. Where a wall joins the next there is no ink, so a
+   room's walls run on as one (pieceSprite). A doorway is an opening in a wall: the wall on either side, timber
+   jambs, a lintel carrying the capping beam over it, and a sill on the floor between. */
+const ROOMW = 34, RT = 5, RSIDE = 4, DOOR_HALF = 21;
+const WALLS_JOINED = new Set(['iwall', 'iwindow', 'idoor']);
+function wallKit(K) {
+  const { FW } = K, c0 = FW / 2 - RT, c1 = FW / 2 + RT, P = R(WALL.plaster), Tp = R('#7a5a3a'), H = ROOMW;
+  /* the face of a run across the view at rows (b - H .. b), r counted from its top */
+  const face = (x, y, b) => {
+    const r = y - (b - H);
+    if (r < 3) return Tp[r === 0 ? 1 : 2];
+    if (r >= H - 5) return Tp[r === H - 5 ? 0 : r === H - 1 ? 4 : 3];
+    const n = h2(x >> 1, (y >> 1) + 3, 11); return P[n < 0.07 ? 3 : n > 0.93 ? 1 : 2];
+  };
+  const cap = (x, y) => Tp[h2(x >> 2, y, 12) < 0.12 ? 3 : (x + 2 * y) % 9 === 0 ? 2 : 1];
+  const side = (x, y, foot) => (y >= foot - 5 ? Tp[4] : P[(x - c1) === 0 ? 3 : 4]);
+  const W = {
+    c0, c1, P, Tp, H,
+    /* a run across the view from a0 to a1, its face shown, and its east end if free */
+    across(a0, a1, eastEnd, window = false) {
+      K.rect(a0, c0 - H, a1, c1 - H, cap);
+      K.rect(a0, c1 - H, a1, c1, (x, y) => {
+        if (window) { const m = (a0 + a1) / 2, dx = Math.abs(x + 0.5 - m), r = y - (c1 - H); if (dx < 8 && r >= 7 && r < 22) return dx > 6.5 || r === 7 || r === 21 ? Tp[2] : Math.abs(x + 0.5 - m) < 0.8 || r === 14 ? Tp[3] : R('#9cc0d0')[r < 11 ? 0 : r < 16 ? 1 : 2]; if (dx < 9 && r === 22) return Tp[1]; }
+        return face(x, y, c1);
+      });
+      if (eastEnd) K.rect(a1, c0 - H + 1, a1 + RSIDE, c1, (x, y) => side(x, y, c1));
+    },
+    /* a run up the view from a0 (north) to a1 (south): its capping beam, its east face, and its south end if free */
+    upDown(a0, a1, southEnd) {
+      K.rect(c1, a0 - H + 1, c1 + RSIDE, a1, (x, y) => side(x, y, a1));
+      K.rect(c0, a0 - H, c1, a1 - H, cap);
+      if (southEnd) K.rect(c0, a1 - H, c1, a1, (x, y) => face(x, y, a1));
+    }
+  };
+  return W;
+}
+function roomWall(K, o, window = false) {
+  const { FW, FD } = K, L = o.links || [0, 0, 0, 0], W = wallKit(K), { c0, c1 } = W;
+  const across = L[0] || L[2] || !(L[1] || L[3]);
+  /* the arm to the north behind, the run across, then the arm to the south in front */
+  if (L[3]) W.upDown(0, c1, false);
+  if (across) W.across(L[2] ? 0 : c0, L[0] ? FW : c1, !L[0], window && across);
+  else W.upDown(c0, c1, !L[1]);
+  if (L[1]) W.upDown(across ? c1 : c0, FD, false);
+  /* a window in a run up the view: a slit of glass in its east face */
+  if (window && !across) K.rect(c1, FD / 2 - 12 - ROOMW / 2, c1 + RSIDE, FD / 2 + 12 - ROOMW / 2, (x, y) => (y % 12 === 0 ? W.Tp[2] : R('#9cc0d0')[x === c1 ? 1 : 2]));
+}
+/* a doorway: an opening DOOR_HALF either side of the middle of the tile, the wall on either side of it */
+function roomDoor(K, o) {
+  const { FW, FD } = K, L = o.links || [0, 0, 0, 0], W = wallKit(K), { c0, c1, Tp, H } = W, m = FW / 2, d0 = m - DOOR_HALF, d1 = m + DOOR_HALF;
+  const across = L[0] || L[2] || !(L[1] || L[3]), sill = R('#8e6a44');
+  if (across) {
+    /* the sill on the floor, the wall either side, the lintel and capping beam over the opening, the jambs */
+    K.rect(d0, c0, d1, c1, (x, y) => sill[y === c0 ? 3 : x % 6 === 0 ? 2 : 1]);
+    W.across(L[2] ? 0 : d0 - 6, d0, false); W.across(d1, L[0] ? FW : d1 + 6, !L[0]);
+    K.rect(d0, c0 - H, d1, c1 - H, (x, y) => Tp[h2(x >> 2, y, 12) < 0.12 ? 3 : 1]);
+    K.rect(d0, c1 - H, d1, c1 - H + 5, (x, y) => Tp[y === c1 - H + 4 ? 4 : y === c1 - H ? 1 : 2]);
+    for (const [a, b, lit] of [[d0, d0 + 3, true], [d1 - 3, d1, false]]) K.rect(a, c1 - H + 5, b, c1, (x) => Tp[lit ? (x === a ? 1 : 2) : (x === b - 1 ? 4 : 3)]);
+  } else {
+    const e0 = FD / 2 - DOOR_HALF, e1 = FD / 2 + DOOR_HALF;
+    K.rect(c0, e0, c1, e1, (x, y) => sill[x === c0 ? 3 : y % 6 === 0 ? 2 : 1]);
+    W.upDown(L[3] ? 0 : e0 - 6, e0, true); K.rect(c0, e0 - H, c1, e1 - H, (x, y) => Tp[h2(x, y >> 2, 12) < 0.12 ? 3 : 1]);
+    /* the jambs at either end of the opening, then the wall to the south in front */
+    for (const y of [e0, e1]) K.rect(c0 - 1, y - H, c1 + 1, y, (x, yy) => Tp[yy < y - H + 2 ? 1 : x === c0 - 1 ? 2 : 3]);
+    W.upDown(e1, L[1] ? FD : e1 + 6, !L[1]);
+  }
 }
 const facing = o => (o.face || 0);
 
@@ -1068,8 +1134,8 @@ const FURNITURE = {
 
 const INTERIOR = {
   iwall: (K, o) => roomWall(K, o),
-  iwindow: (K, o) => roomWall(K, o, (x, y, b) => (Math.abs(x - K.FW / 2) < 5 && y > b - ROOMW + 6 && y < b - 9 ? (Math.abs(x - K.FW / 2) < 4 && y > b - ROOMW + 7 && y < b - 10 ? R('#9cc0d0')[y < b - 16 ? 0 : 2] : R('#7a5a3a')[2]) : null)),
-  idoor: (K, o) => { const L = o.links || [0, 0, 0, 0], P = R('#7a5a3a'), along = L[0] || L[2] || !(L[1] || L[3]); if (along) { K.rect(0, K.FD / 2 - ROOMW + 2, K.FW, K.FD / 2 - ROOMW + 6, P[2]); for (const x of [0, K.FW - 4]) K.rect(x, K.FD / 2 - ROOMW + 2, x + 4, K.FD / 2 + 4, P[x ? 3 : 1]); } else { K.rect(K.FW / 2 - 4, -ROOMW + 2, K.FW / 2 + 4, 4, P[2]); K.rect(K.FW / 2 - 4, K.FD - 4 - ROOMW, K.FW / 2 + 4, K.FD - 2, P[3]); } },
+  iwindow: (K, o) => roomWall(K, o, true),
+  idoor: (K, o) => roomDoor(K, o),
   post: (K) => { const P = R('#7a5a3a'), cx = K.FW / 2, cy = K.FD / 2; K.rect(cx - 3, cy - ROOMW, cx + 3, cy + 3, (x) => P[x < cx - 1 ? 1 : 3]); },
   hearth: (K, o) => { const S = R('#b3aa96'), { FW, FD } = K; K.box(2, 4, FW - 2, FD - 6, 28, (x, y) => S[2], (x, y) => wallTone('stone', S, x, y)); K.rect(FW / 2 - 8, FD - 20, FW / 2 + 8, FD - 6, R('#2a2018')[3]); K.poly([[FW / 2 - 6, FD - 6], [FW / 2 - 2, FD - 16], [FW / 2, FD - 11], [FW / 2 + 3, FD - 17], [FW / 2 + 6, FD - 6]], R('#f4a03a')[1]); K.rect(0, FD - 30, FW, FD - 27, R('#8e6a44')[1]); },
   stairs: (K, o) => stairsSprite(K, o),
@@ -1185,7 +1251,10 @@ function pieceSprite(o) {
   const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null };
   if (draw) draw(K, inst);
   else K.box(4, 4, FW - 4, FD - 4, Math.min(30, (a ? a.h : 8) * 1.4), R('#c4b99f')[1], R('#c4b99f')[3]);
-  if (SOFT.has(o.id)) K.softEdge(); else K.outline(a && a.group === 'Interior' ? 0.6 : TREES.has(o.id) ? 0.5 : 0.75);
+  if (SOFT.has(o.id)) K.softEdge();
+  /* room walls join the next seamlessly: no ink where they meet it */
+  else if (WALLS_JOINED.has(o.id)) { const L = o.links || [0, 0, 0, 0]; K.outline(0.6, (x, y) => (L[2] && x <= 0) || (L[0] && x >= FW - 1) || (L[3] && y <= -ROOMW + 1) || (L[1] && y >= FD - 1)); }
+  else K.outline(a && a.group === 'Interior' ? 0.6 : TREES.has(o.id) ? 0.5 : 0.75);
   /* the shadow falls on the ground to the east, and under trees and props as a pool round their foot */
   const len = a ? shadowOf(a) : 6;
   if (a && (a.group === 'Nature' || a.group === 'Props')) { if (!FLAT.has(o.id)) K.ovalShadow(FW / 2 + 3, FD - 7, FW * 0.4, Math.min(8, FD * 0.18)); }

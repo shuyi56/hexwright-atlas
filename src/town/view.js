@@ -499,8 +499,12 @@ function stroll(dt) {
     beginStep(k, to);
   });
 }
-/* a doorway, a flight of stairs or anything else made to walk through: [x, y, L] */
-const inTheWay = ([x, y, L]) => { const k = objAt(TW.M, x, y, L); return k >= 0 && !!ASSET_BY_ID[TW.M.objs[k].id].walk; };
+/* a doorway, a flight of stairs or anything else made to walk through, or (in a room) the tile just inside a way
+   out: [x, y, L] */
+const inTheWay = ([x, y, L]) => {
+  const k = objAt(TW.M, x, y, L); if (k >= 0 && ASSET_BY_ID[TW.M.objs[k].id].walk) return true;
+  return !L && TW.stack.length > 0 && doorways(TW.M).some(([dx, dy, side]) => dx - FACE_DELTA[side][0] === x && dy - FACE_DELTA[side][1] === y);
+};
 /* someone standing on the hero's way (where they stand or the next point of their route) steps off it, onto a free
    tile beside them that is not on the route, the hero's, or in the way; true if someone did */
 function makeWay() {
@@ -512,7 +516,10 @@ function makeWay() {
     const q = charPos(k); if (q.L !== m.L) continue;
     const near = Math.hypot(q.fx - m.x, q.gy - m.y) < FOOT_R * 2 + 18 || Math.hypot(q.fx - next[0], q.gy - next[1]) < FOOT_R * 2 + 18;
     if (!near) continue;
-    const c = M.chars[k], away = [0, 1, 2, 3].map(d => stepToward(k, d)).filter(to => to && to[2] === levelOf(c) && !on.has(to[0] + ',' + to[1]) && !inTheWay(to));
+    const c = M.chars[k], steps = [0, 1, 2, 3].map(d => stepToward(k, d)).filter(to => to && to[2] === levelOf(c));
+    let away = steps.filter(to => !on.has(to[0] + ',' + to[1]) && !inTheWay(to));
+    /* hemmed in (a narrow passage): on along the route, away from the hero, to where there is room to stand aside */
+    if (!away.length) { const idx = to => TW.path.findIndex(([x, y]) => Math.floor(x / T) === to[0] && Math.floor(y / T) === to[1]), here = idx([c.x, c.y]); away = steps.filter(to => idx(to) > here && idx(to) > 0); }
     if (!away.length) continue;
     beginStep(k, away[Math.floor(Math.random() * away.length)]); TW.homes[k] = [c.x, c.y]; return true;
   }
