@@ -697,25 +697,7 @@ const INTERIOR = {
   idoor: (K, o) => { const L = o.links || [0, 0, 0, 0], P = R('#7a5a3a'), along = L[0] || L[2] || !(L[1] || L[3]); if (along) { K.rect(0, K.FD / 2 - ROOMW + 2, K.FW, K.FD / 2 - ROOMW + 6, P[2]); for (const x of [0, K.FW - 4]) K.rect(x, K.FD / 2 - ROOMW + 2, x + 4, K.FD / 2 + 4, P[x ? 3 : 1]); } else { K.rect(K.FW / 2 - 4, -ROOMW + 2, K.FW / 2 + 4, 4, P[2]); K.rect(K.FW / 2 - 4, K.FD - 4 - ROOMW, K.FW / 2 + 4, K.FD - 2, P[3]); } },
   post: (K) => { const P = R('#7a5a3a'), cx = K.FW / 2, cy = K.FD / 2; K.rect(cx - 3, cy - ROOMW, cx + 3, cy + 3, (x) => P[x < cx - 1 ? 1 : 3]); },
   hearth: (K, o) => { const S = R('#b3aa96'), { FW, FD } = K; K.box(2, 4, FW - 2, FD - 6, 28, (x, y) => S[2], (x, y) => wallTone('stone', S, x, y)); K.rect(FW / 2 - 8, FD - 20, FW / 2 + 8, FD - 6, R('#2a2018')[3]); K.poly([[FW / 2 - 6, FD - 6], [FW / 2 - 2, FD - 16], [FW / 2, FD - 11], [FW / 2 + 3, FD - 17], [FW / 2 + 6, FD - 6]], R('#f4a03a')[1]); K.rect(0, FD - 30, FW, FD - 27, R('#8e6a44')[1]); },
-  stairs: (K, o) => {
-    /* a flight at the figures' scale in the middle of its tile (FLIGHT): a little wider than a person, eight treads a
-       stride deep rising toward the back (face 0: north), each lighter than the one below, between dark stringers.
-       Stairs lead to another floor (the town view opens it as the editor does), so the flight lies flat. Seen from
-       the south, a flight climbing north shows its risers under each nosing; others show only the seams. */
-    const P = R('#a07a4c'), D = R('#6b4c32'), f = facing(o), n = 8, [x0, y0, x1, y1] = flightBox(f), ns = f % 2 === 0, len = ns ? y1 - y0 : x1 - x0, sw = 3;
-    /* the box of the band from p0 to p1 along the flight (0 at its foot), across from a to b (0 at its west or north side) */
-    const band = (p0, p1, a, b) => (f === 0 ? [x0 + a, y1 - p1, x0 + b, y1 - p0] : f === 2 ? [x0 + a, y0 + p0, x0 + b, y0 + p1] : f === 1 ? [x0 + p0, y0 + a, x0 + p1, y0 + b] : [x1 - p1, y0 + a, x1 - p0, y0 + b]);
-    const across = ns ? x1 - x0 : y1 - y0;
-    K.rect(...band(-2, len + 2, -2, across + 2), R('#2b2116')[2]);
-    for (let i = 0; i < n; i++) {
-      const p0 = Math.round(i * len / n), p1 = Math.round((i + 1) * len / n), tone = P[1 + Math.floor((n - 1 - i) * 3 / n)];
-      K.rect(...band(p0, p1, sw, across - sw), tone);
-      if (!i) continue;
-      if (f === 0) { K.rect(...band(p0, p0 + 2, sw, across - sw), P[4]); K.rect(...band(p0 + 2, p0 + 3, sw, across - sw), P[0]); }
-      else K.rect(...band(p0, p0 + 1, sw, across - sw), P[4]);
-    }
-    for (const [a, b] of [[0, sw], [across - sw, across]]) K.rect(...band(0, len, a, b), (x, y) => D[(ns ? x - x0 : y - y0) === a ? 1 : 2]);
-  },
+  stairs: (K, o) => stairsSprite(K, o),
   bed: (K, o) => { const { FW, FD } = K, f = facing(o), F = furnBox(K, 3, 3, FW - 3, FD - 3, 7, '#8e6a44'), B = R('#c4503e'), W = R('#f4efe2'); const pil = f === 0 ? [3, 3, FW - 3, 13] : f === 2 ? [3, FD - 13, FW - 3, FD - 3] : f === 1 ? [3, 3, 13, FD - 3] : [FW - 13, 3, FW - 3, FD - 3]; K.rect(4, 4 - 7, FW - 4, FD - 4 - 7, (x, y) => B[(x + y) % 6 === 0 ? 2 : 1]); K.rect(pil[0] + 1, pil[1] - 7 + 1, pil[2] - 1, pil[3] - 7 - 1, W[1]); void F; },
   cot: (K) => { const P = R('#d8b968'); K.box(4, 4, K.FW - 4, K.FD - 4, 3, (x, y) => P[h2(x, y) < 0.3 ? 1 : 0], P[3]); },
   table: (K) => { const P = R('#9a7650'); K.rect(6, K.FD - 14, 9, K.FD - 5, P[3]); K.rect(K.FW - 9, K.FD - 14, K.FW - 6, K.FD - 5, P[3]); K.box(3, 6, K.FW - 3, K.FD - 12, 10, (x, y) => P[((y % 5) + 5) % 5 === 0 ? 2 : 1], P[3]); },
@@ -772,6 +754,66 @@ const OPEN_SHADOW = {
   flet: K => K.ovalShadow(K.FW / 2 + 4, K.FD - 8, 20, 6),
   elvenarch: (K, o) => { if ((o.face || 0) % 2) for (const y of [14, K.FD - 14]) K.ovalShadow(K.FW / 2 + 4, y, 8, 4); else for (const x of [18, K.FW - 18]) K.ovalShadow(x + 4, K.FD / 2 + 14, 10, 4); }
 };
+/* A flight of stairs at the figures' scale in the middle of its tile (flightBox): eight steps a stride deep climbing
+   toward the back (face 0: north) between stringers, a banister along each side on newel posts, and on some flights (by
+   o.v) a red runner held by brass rods. It is drawn as it would be seen from the south with the light from the upper
+   left: climbing north, every riser faces the viewer, darkest under its lit nosing; climbing south, each nosing throws
+   a shadow on the step below; climbing east or west, the flight is seen side on, its treads stepping up toward the
+   top over a stepped stringer, the risers catching the light (east) or turned from it (west). A soft shadow lies east
+   of it. Treads carry a grain and lighten toward the top. */
+function stairsSprite(K, o) {
+  const f = facing(o), [x0, y0, x1, y1] = flightBox(f), ns = f % 2 === 0, len = ns ? y1 - y0 : x1 - x0, W = ns ? x1 - x0 : y1 - y0;
+  const P = R('#a8814f'), D = R('#6b4c32'), RUN = R('#a8432f'), BRASS = R('#c9a24f'), n = 8, sw = 3, runner = (o.v ?? 0.5) >= 0.5;
+  /* side on, the flight rises RISE pixels from foot to top, a step at a time */
+  const RISE = ns ? 0 : 12, stepOf = p => Math.min(n - 1, Math.floor(p * n / len)), rise = p => (RISE ? Math.round((stepOf(p) + 1) * RISE / n) : 0);
+  /* the pixel at p along the flight (0 at its foot) and a across it (0 on its west or north side), raised by the rise */
+  const at = (p, a, up = rise(p)) => (f === 0 ? [x0 + a, y1 - 1 - p] : f === 2 ? [x0 + a, y0 + p] : f === 1 ? [x0 + p, y0 + a - up] : [x1 - 1 - p, y0 + a - up]);
+  const put = (p, a, c, up) => { const [x, y] = at(p, a, up); K.set(x, y, c); };
+  const r0 = Math.round(W * 0.3), r1 = W - r0, RH = 9;
+  /* the shadow east of the flight, on the floor */
+  for (let y = y0 - (ns ? 0 : RISE); y < y1; y++) for (let x = x1; x < x1 + 4; x++) if (!K.get(x, y)) K.set(x, y, SHADOW, Math.round(SHADOW[3] * (1 - (x - x1) / 4)));
+  /* side on: the south face of the flight under its treads, stepped along its top, darker toward the ground */
+  if (RISE) for (let p = 0; p < len; p++) { const e = rise(p), [x, yb] = at(p, W - 1, 0); for (let k = 0; k <= e; k++) K.set(x, yb - k, k === e ? D[1] : D[k < 2 ? 4 : 3]); }
+  /* the north banister stands behind the treads */
+  const banister = (side, front) => {
+    const a = side ? W - 2 : 1;
+    for (let p = 0; p < len; p++) {
+      const up = RISE * p / len, [x, y] = at(p, a, Math.round(up));
+      if (ns) { K.set(x - 1, y - RH, D[0]); K.set(x, y - RH, D[2]); } else { K.set(x, y - RH - 1, D[0]); K.set(x, y - RH, D[2]); }
+      /* balusters where the rail runs across the view: sparse in front so the steps show through */
+      if (!ns && p > 2 && p < len - 2 && p % (front ? 7 : 5) === 3) for (let k = 1; k < RH; k++) K.set(x, y - k, D[k < 3 ? 3 : 2]);
+    }
+    for (const [p, big] of [[1, true], [len - 2, false]]) {
+      const [x, y] = at(p, a), w = big ? 4 : 3, top = y - RH - (big ? 3 : 1);
+      K.rect(x - 1, top, x - 1 + w, y + 1, (px) => D[px === x - 1 ? 1 : px === x - 2 + w ? 3 : 2]);
+      K.rect(x - 2, top - 1, x + w, top + 1, (px) => D[px <= x - 1 ? 0 : 1]);
+      if (big) K.set(x, top - 2, BRASS[1]);
+    }
+  };
+  if (!ns) banister(0, false);
+  for (let i = 0; i < n; i++) {
+    const p0 = Math.round(i * len / n), p1 = Math.round((i + 1) * len / n), tone = i > 4 ? 1 : 2;
+    for (let p = p0; p < p1; p++) for (let a = sw; a < W - sw; a++) {
+      const q = p - p0, on = runner && a >= r0 && a < r1, T0 = on ? RUN : P; let c = T0[tone];
+      if (f === 0 && q < 3) c = T0[q === 2 ? 4 : 3];               /* the riser, darkest under the nosing */
+      else if (f === 0 && q === 3) c = T0[0];                       /* the nosing */
+      else if (f === 2 && q === 0 && i) c = T0[0];                  /* the nosing, toward the viewer */
+      else if (f === 2 && q === p1 - p0 - 1 && i < n - 1) c = T0[4]; /* the shadow it throws on the step below */
+      else if (f === 2 && q === p1 - p0 - 2 && i < n - 1) c = T0[3];
+      else if (f === 1 && q === 0) c = T0[0];                       /* risers facing the light */
+      else if (f === 3 && q === 0) c = T0[4];                       /* risers turned from it */
+      else if (f % 2 && q === 1) c = T0[f === 1 ? 1 : 3];
+      else if (!on && h2(...at(p, a, 0), 91) < 0.14 && (ns ? a : p) % 5 !== 0) c = P[tone + 1];
+      if (on && (a === r0 || a === r1 - 1) && !(f === 0 && q < 4)) c = RUN[4];
+      put(p, a, c);
+    }
+    /* a brass rod across the runner where each tread meets the riser above */
+    if (runner && i) { const q = f === 0 ? 3 : f === 2 ? p1 - p0 - 1 : 1; for (let a = r0 - 1; a <= r1; a++) put(p0 + q, a, BRASS[a === r0 - 1 || a === r1 ? 2 : 0]); }
+  }
+  /* the stringers, their tops lit on the side toward the light */
+  for (let p = 0; p < len; p++) for (const side of [0, 1]) for (let k = 0; k < sw; k++) { const a = side ? W - sw + k : k; put(p, a, D[k === 0 ? 1 : k === sw - 1 ? 3 : 2]); }
+  if (ns) { banister(0, false); banister(1, false); } else banister(1, true);
+}
 /* where a flight of stairs lies in its tile, in tile pixels [x0, y0, x1, y1]: at the figures' scale (about a person
    and a half wide, a few strides long) in the middle, its long side running the way it climbs. The town view walks
    the hero up it (or down the stairwell over it) when their feet reach this box. */

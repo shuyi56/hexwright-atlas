@@ -533,7 +533,7 @@ function wellsOf(M, L) {
   return out;
 }
 /* The way down from the floor shown: over each flight below, a well the flight's own size cut in the floor, its
-   steps dropping away from the landing into the dark, edged in timber. Each keeps its box on screen for a click. */
+   steps dropping away from the landing, each a shade deeper in the wood's own browns, edged in timber. Each keeps its box on screen for a click. */
 function stairwells(vx0, vy0, vx1, vy1) {
   const M = TW.M, L = TW.top;
   for (const w of TW.wells || []) {
@@ -542,19 +542,31 @@ function stairwells(vx0, vy0, vx1, vy1) {
     if (X > vx1 || Y > vy1 || X + BW < vx0 || Y + BH < vy0) continue;
     /* steps run from the landing's edge (lit, near the floor's colour) down into shadow */
     const ux = w.up[0] - w.x, uy = w.up[1] - w.y, n = 8, along = uy ? BH : BW;
-    g.fillStyle = '#0d1112'; g.fillRect(X - 2, Y - 2, BW + 4, BH + 4);
+    g.fillStyle = '#4e3622'; g.fillRect(X - 2, Y - 2, BW + 4, BH + 4);
     for (let k = 0; k < n; k++) {
-      const t = 1 - k / (n - 1), shade = `rgb(${Math.round(40 + 120 * t)},${Math.round(30 + 88 * t)},${Math.round(20 + 56 * t)})`;
+      /* from near the floor's own wood at the top step to a mid brown at the foot: lower, not lost in the dark */
+      const t = 1 - k / (n - 1), shade = `rgb(${Math.round(112 + 64 * t)},${Math.round(82 + 52 * t)},${Math.round(52 + 36 * t)})`;
       const lo = Math.round(along * k / n), hi = Math.round(along * (k + 1) / n);
       /* k counts from the landing side */
       const [x0, y0, x1, y1] = uy < 0 ? [3, lo, BW - 3, hi] : uy > 0 ? [3, BH - hi, BW - 3, BH - lo] : ux < 0 ? [lo, 3, hi, BH - 3] : [BW - hi, 3, BW - lo, BH - 3];
       g.fillStyle = shade; g.fillRect(X + x0, Y + y0, x1 - x0, y1 - y0);
-      g.fillStyle = 'rgba(0,0,0,0.35)'; if (uy) g.fillRect(X + x0, Y + (uy < 0 ? y1 - 1 : y0), x1 - x0, 1); else g.fillRect(X + (ux < 0 ? x1 - 1 : x0), Y + y0, 1, y1 - y0);
+      g.fillStyle = 'rgba(43,33,22,0.42)'; if (uy) g.fillRect(X + x0, Y + (uy < 0 ? y1 - 1 : y0), x1 - x0, 1); else g.fillRect(X + (ux < 0 ? x1 - 1 : x0), Y + y0, 1, y1 - y0);
     }
     /* a timber rim round the well, open on the landing's side */
     g.fillStyle = '#5a3f28';
     if (uy >= 0) g.fillRect(X - 2, Y - 2, BW + 4, 3); if (uy <= 0) g.fillRect(X - 2, Y + BH - 1, BW + 4, 3);
     if (ux >= 0) g.fillRect(X - 2, Y - 2, 3, BH + 4); if (ux <= 0) g.fillRect(X + BW - 1, Y - 2, 3, BH + 4);
+    /* and a banister round it on the sides away from the landing, as the flight below has: a rail standing RH above the
+       rim on balusters, newel posts at its corners, a soft shadow east of it */
+    const RH = 9, posts = [], rails = [];
+    if (uy) { rails.push([X - 1, Y - 1, X - 1, Y + BH], [X + BW, Y - 1, X + BW, Y + BH]); const far = uy < 0 ? Y + BH : Y - 1; rails.push([X - 1, far, X + BW, far]); posts.push([X - 1, far], [X + BW, far], [X - 1, uy < 0 ? Y - 1 : Y + BH], [X + BW, uy < 0 ? Y - 1 : Y + BH]); }
+    else { rails.push([X - 1, Y - 1, X + BW, Y - 1], [X - 1, Y + BH, X + BW, Y + BH]); const far = ux < 0 ? X + BW : X - 1; rails.push([far, Y - 1, far, Y + BH]); posts.push([far, Y - 1], [far, Y + BH], [ux < 0 ? X - 1 : X + BW, Y - 1], [ux < 0 ? X - 1 : X + BW, Y + BH]); }
+    g.fillStyle = 'rgba(43,33,22,0.25)'; g.fillRect(X + BW + 2, Y - 2, 3, BH + 5);
+    for (const [ax, ay, bx, by] of rails) {
+      if (ay === by) { g.fillStyle = '#4e3622'; for (let x = ax + 2; x < bx - 1; x += 5) g.fillRect(x, ay - RH + 1, 1, RH - 1); g.fillStyle = '#c4a072'; g.fillRect(ax, ay - RH - 1, bx - ax + 1, 1); g.fillStyle = '#6b4c32'; g.fillRect(ax, ay - RH, bx - ax + 1, 1); }
+      else { g.fillStyle = '#c4a072'; g.fillRect(ax - 1, ay - RH, 1, by - ay + 1); g.fillStyle = '#6b4c32'; g.fillRect(ax, ay - RH, 1, by - ay + 1); }
+    }
+    for (const [px, py] of posts) { g.fillStyle = '#6b4c32'; g.fillRect(px - 1, py - RH - 2, 3, RH + 3); g.fillStyle = '#c4a072'; g.fillRect(px - 1, py - RH - 3, 3, 1); g.fillStyle = '#4e3622'; g.fillRect(px + 1, py - RH - 2, 1, RH + 3); }
   }
 }
 /* the water's ripples: short lit dashes drifting to and fro, wherever the water is in sight */

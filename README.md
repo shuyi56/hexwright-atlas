@@ -410,8 +410,8 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   the top. A flight is drawn at the figures' scale, as the furniture is: flat in the middle of its tile, about a person
   and a half wide and a few strides long, eight treads lighter toward the top between dark stringers. The floor changes
   when the hero's feet reach the steps, so walking past beside a flight on its tile does not climb it. Up there the way
-  down shows as a stairwell the flight's own size, cut in the floor (which runs on round it) with its steps falling away
-  into the dark; walking into it (or clicking it) fades back down to the foot of the flight. Clicking a flight goes up
+  down shows as a stairwell the flight's own size, cut in the floor (which runs on round it) behind a banister, its steps
+  going down a shade deeper each, in the wood's own browns; walking into it (or clicking it) fades back down to the foot of the flight. Clicking a flight goes up
   it, and a route to a tile on another floor goes by the stairs.
 - **Camera:** it follows the hero's place on the ground and, through a gentle smoothing, their height, so climbing a
   ramp or slope never shakes the view.
