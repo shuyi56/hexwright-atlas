@@ -446,7 +446,8 @@ than a person, a cottage about twice their height, two-storey houses towering ov
 - **Walking:** the hero walks freely, not tile by tile: the arrow keys or `WASD` (diagonals too, `Shift` runs) move
   them at a figure's pace, about three of their own heights a second, with a stride every few pixels so the feet plant
   instead of gliding. Clicking a tile walks them there along the editor's walking route, up and down stairs. `Tab` (or **Next hero**)
-  walks as the next character. Everyone else strolls about near where they were put; enemies hold their ground.
+  walks as the next character. Everyone else strolls about near where they were put, keeping out of doorways and off stairs; enemies hold their
+  ground. Whoever stands in the way of the hero's route steps aside, so routes are planned through people.
 - **Collision:** each piece blocks only the ground it is drawn standing on: a tree its trunk, a bush, well or
   haystack its round base, a house its walls (the doorstep stays open), a fence a strip along its rails, an interior
   wall its band, joined to its neighbours. Flowers, toadstools, reeds, doorways and stairs block nothing. Water stops
@@ -513,6 +514,13 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   a domed rotunda, archways over the paths in, a manor in the western wood, a pavilion by the pool, flets in the great
   trees, mallorns on fallen gold leaves and silver willows over a moonlit pool, with the four elves
   about the court and two dark elves creeping in from the west. Its map is built by `node tools/make-silverleaf.mjs`.
+  `scenes/town/wayfarers-rest.html` is a fully furnished interior: a village inn that the scene opens inside
+  (`town: { inside: { x, y } }` in its `.scene.json` starts the walk in the building on that tile). Downstairs the
+  common room: an aisle from the door to the fire, a red rug and a candle stand at the hearth, a long table between two
+  benches, the bar with its counter, a dresser of crockery and a stool, a weapon rack and barrels by the door, stairs in
+  the corner. Upstairs a passage with a bench and a candle stand, and two bedrooms through doorways in a timber
+  partition, each with a bed on its own carpet. The innkeeper, a healer, a monk, a farmer, a guard and a noble guest
+  are about, and the door leads out to a cobbled lane. Its map is built by `node tools/make-wayfarers-rest.mjs`.
   `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
   villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
   clothes show, with the dragoon and the black mage beside them as the benchmark.

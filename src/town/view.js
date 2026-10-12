@@ -6,8 +6,8 @@ import { WALK, renderScaled } from '../characters/roster.js';
 import { unitFor } from '../data/units.js';
 import { ED, rootModel } from '../editor/editor.js';
 import { arrival, doorAcross, doorways } from '../editor/interiors.js';
-import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf } from '../editor/model.js';
-import { FACE_DELTA, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
+import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf, objAt } from '../editor/model.js';
+import { FACE_DELTA, blockedBy, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
@@ -279,7 +279,8 @@ function heroTick(dt) {
     m.face = FACE_OF(vx, vy);
     const gone = moveHero(vx / len * sp, vy / len * sp);
     m.dist += gone; m.moving = gone > 0.05;
-    if (!m.moving && TW.path.length) { TW.stuck = (TW.stuck || 0) + dt; if (TW.stuck > 0.4) TW.path = []; }
+    /* held up on a route: whoever stands in the way steps aside; with no one to blame, the route is given up */
+    if (!m.moving && TW.path.length) { TW.stuck = (TW.stuck || 0) + dt; if (TW.stuck > 0.4) { if (makeWay()) TW.stuck = 0; else TW.path = []; } }
     TW.dirty = true;
     /* walking into a door goes through it */
     if (!TW.say && throughDoor(m.face)) return;
@@ -331,13 +332,16 @@ function stairsAhead(face) {
   const w = (TW.wells || []).find(q => q.x === tx && q.y === ty); if (!w || !inFlight(m.x, m.y, tx, ty, w.face)) return false;
   /* heading down it: away from the landing */
   const [dx, dy] = FACE_DELTA[face]; if (dx !== tx - w.up[0] || dy !== ty - w.up[1]) return false;
+  /* onto the tile at the flight's foot, or where that is blocked (a flight rising from a wall), onto the foot of the
+     flight itself, facing off it */
   const [fx, fy] = FACE_DELTA[w.face];
-  return changeFloor(m.L - 1, tx + fx, ty + fy, w.face, [tx, ty]);
+  if (!blockedBy(M, tx + fx, ty + fy, TW.hero, m.L - 1)) return changeFloor(m.L - 1, tx + fx, ty + fy, w.face, [tx, ty]);
+  return changeFloor(m.L - 1, tx, ty, w.face, [tx, ty], [tx * T + T / 2 + fx * 36, ty * T + T / 2 + fy * 36]);
 }
-/* the hero onto storey L at tile (x, y), facing `face`, having come by the flight at tile `via`: behind the veil
-   (transition), and a route being followed goes on from the far end of the flight */
-function changeFloor(L, x, y, face, via) {
-  const m = TW.me, cx = x * T + T / 2, cy = y * T + FOOT, at = standSpot(cx, cy, L, via);
+/* the hero onto storey L at tile (x, y) (or the exact spot given), facing `face`, having come by the flight at tile
+   `via`: behind the veil (transition), and a route being followed goes on from the far end of the flight */
+function changeFloor(L, x, y, face, via, spot = null) {
+  const m = TW.me, cx = x * T + T / 2, cy = y * T + FOOT, at = spot && standable(L, spot[0], spot[1], heightOn(L, spot[0], spot[1]) ?? 0) ? spot : standSpot(cx, cy, L, via);
   if (!at) return false;
   return transition(() => {
     m.x = at[0]; m.y = at[1]; m.L = L; m.face = face; m.z = null; m.moving = false;
@@ -477,7 +481,8 @@ function syncInside() {
 /* a route for the hero to (x, y) in map pixels on storey L: through the middles of the tiles on the editor's
    walking route, then to the point itself; or straight there if there is no route */
 function routeTo(x, y, L) {
-  const M = TW.M, k = TW.hero, tx = Math.floor(x / T), ty = Math.floor(y / T), tiles = findPath(M, k, tx, ty, L);
+  /* the others are left out of the reckoning: whoever stands on the way steps aside when the hero comes (makeWay) */
+  const M = TW.M, k = TW.hero, tx = Math.floor(x / T), ty = Math.floor(y / T), tiles = findPath(Object.assign({}, M, { chars: [M.chars[k]] }), 0, tx, ty, L);
   const pts = (tiles || []).slice(0, -1).map(([a, b, l]) => [a * T + T / 2, b * T + FOOT, l || 0]);
   pts.push([x, y, L || 0]); return pts;
 }
@@ -489,9 +494,29 @@ function stroll(dt) {
     TW.rest[k] = (TW.rest[k] ?? 1 + Math.random() * 3) - dt; if (TW.rest[k] > 0) return;
     TW.rest[k] = 1.5 + Math.random() * 4;
     const home = TW.homes[k], dir = Math.floor(Math.random() * 4), to = stepToward(k, dir);
-    if (Math.random() < 0.35 || !to || to[2] !== levelOf(c) || Math.abs(to[0] - home[0]) + Math.abs(to[1] - home[1]) > 2) { c.face = dir; TW.dirty = true; return; }
+    /* they keep near home, on their own storey, and out of doorways and off stairs, where they would stand in the way */
+    if (Math.random() < 0.35 || !to || to[2] !== levelOf(c) || Math.abs(to[0] - home[0]) + Math.abs(to[1] - home[1]) > 2 || inTheWay(to)) { c.face = dir; TW.dirty = true; return; }
     beginStep(k, to);
   });
+}
+/* a doorway, a flight of stairs or anything else made to walk through: [x, y, L] */
+const inTheWay = ([x, y, L]) => { const k = objAt(TW.M, x, y, L); return k >= 0 && !!ASSET_BY_ID[TW.M.objs[k].id].walk; };
+/* someone standing on the hero's way (where they stand or the next point of their route) steps off it, onto a free
+   tile beside them that is not on the route, the hero's, or in the way; true if someone did */
+function makeWay() {
+  const m = TW.me, M = TW.M, next = TW.path[0]; if (!next) return false;
+  const on = new Set(TW.path.map(([x, y]) => Math.floor(x / T) + ',' + Math.floor(y / T)));
+  on.add(Math.floor(m.x / T) + ',' + Math.floor(m.y / T));
+  for (let k = 0; k < M.chars.length; k++) {
+    if (k === TW.hero || TW.steps.has(k)) continue;
+    const q = charPos(k); if (q.L !== m.L) continue;
+    const near = Math.hypot(q.fx - m.x, q.gy - m.y) < FOOT_R * 2 + 18 || Math.hypot(q.fx - next[0], q.gy - next[1]) < FOOT_R * 2 + 18;
+    if (!near) continue;
+    const c = M.chars[k], away = [0, 1, 2, 3].map(d => stepToward(k, d)).filter(to => to && to[2] === levelOf(c) && !on.has(to[0] + ',' + to[1]) && !inTheWay(to));
+    if (!away.length) continue;
+    beginStep(k, away[Math.floor(Math.random() * away.length)]); TW.homes[k] = [c.x, c.y]; return true;
+  }
+  return false;
 }
 
 /* ---------- talking and looking ---------- */
@@ -852,7 +877,8 @@ function takeHero() {
 }
 
 /* ---------- open and close ---------- */
-/* opts: hero, the index of the character to walk as (default the one picked in the editor, else the first); zoom */
+/* opts: hero, the index of the character to walk as (default the one picked in the editor, else the first); zoom;
+   inside: { x, y }, a tile of a building with an interior to start in, the hero having just come in at its door */
 /* The whole map is walked, with its interiors; the editor inside a building starts the walk in there, as whoever is
    picked in the room, else the map's hero walking in at the door. */
 function openTown(opts = {}) {
@@ -862,6 +888,8 @@ function openTown(opts = {}) {
   startPainters();
   useMap(M, opts.hero ?? (!room && ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0));
   if (room) { const o = M.objs[room.M.objs.indexOf(room.piece)]; if (o && o.interior) enter(o, ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : M.chars.length ? -1 : 0); }
+  /* a scene can start inside a building: opts.inside is any tile it covers */
+  else if (opts.inside) { const { x, y } = opts.inside, o = M.objs.find(p => p.interior && !levelOf(p) && x >= p.x && y >= p.y && x < p.x + footprint(p)[0] && y < p.y + footprint(p)[1]); if (o) enter(o); }
   size();
   setZoom(opts.zoom || Math.max(2, Math.min(5, Math.round(TW.cw / (15 * T)))));
   closeSay(); syncInside(); place();

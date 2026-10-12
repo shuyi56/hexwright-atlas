@@ -68,3 +68,14 @@ test('the doorstep of a house stays open, so the hero can walk up to the door an
   assert.ok(!hits(sh, x, front + 6, 5), 'the doorstep');
   assert.ok(hits(sh, x, front - 4, 5), 'the wall behind it');
 });
+
+test('the Wayfarer\'s Rest scene: a furnished inn on two floors, every room reachable from its door', async () => {
+  const { readFileSync } = await import('node:fs');
+  const J = JSON.parse(readFileSync(new URL('../../scenes/town/wayfarers-rest.json', import.meta.url), 'utf8')), meta = JSON.parse(readFileSync(new URL('../../scenes/town/wayfarers-rest.scene.json', import.meta.url), 'utf8'));
+  const M = fromJSON(J), { x, y } = meta.town.inside, b = buildingAt(M, x, y), I = b && b.o.interior;
+  assert.ok(I, 'the scene starts inside a building with an interior');
+  assert.ok(I.objs.filter(o => !['iwall', 'iwindow', 'idoor', 'hearth'].includes(o.id)).length >= 15, 'furnished');
+  assert.ok(I.objs.some(o => o.level === 1) && I.objs.some(o => o.id === 'stairs'), 'with an upstairs reached by stairs');
+  const [ax, ay] = arrival(I), solo = { ...I, chars: [{ sprite: 'villager', x: ax, y: ay, face: 2 }] };
+  for (const [tx, ty, L] of [[3, 1, 0], [5, 4, 0], [5, 4, 1], [2, 2, 1], [4, 2, 1], [1, 4, 1]]) assert.ok(findPath(solo, 0, tx, ty, L), `${tx},${ty} on floor ${L}`);
+});
