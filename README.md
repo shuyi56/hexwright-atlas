@@ -403,7 +403,14 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   where it faces the upper left and shaded where it turns away. Only a jump of two levels or more (where no one can
   walk) breaks into a cliff, its edge wandering like any other border: earth or rock under a ragged grass lip,
   coursed blocks under paving, beams under floors, falling water. Cliffs throw a shadow east and darken the ground at
-  their foot. Upper floors that are shown join the surface a storey up.
+  their foot.
+- **Floors and stairs:** one storey is shown at a time, as in the editor: the ground, or an upper floor on its own
+  over the dark, its edge showing as a thin slab. Stairs open the next floor rather than being climbed: step onto a
+  flight going up it and the view fades to the floor above, with "Floor 1" in a banner and the hero on the landing at
+  the top. Up there the way down shows as a stairwell, a single tile of steps falling away into the dark, and walking
+  into it (or clicking it) fades back down to the foot of the flight. A flight is drawn flat inside its own tile, its
+  treads lighter toward the top between dark stringers. Clicking a flight goes up it, and a route to a tile on another
+  floor goes by the stairs.
 - **Camera:** it follows the hero's place on the ground and, through a gentle smoothing, their height, so climbing a
   ramp or slope never shakes the view.
 - **Depth:** every screen pixel of ground remembers which row of the map it shows. A piece or figure is cut away
@@ -436,8 +443,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   front of the hero fades so they are never lost behind it.
 - **Walking:** the hero walks freely, not tile by tile: the arrow keys or `WASD` (diagonals too, `Shift` runs) move
   them at a figure's pace, about three of their own heights a second, with a stride every few pixels so the feet plant
-  instead of gliding. Clicking a tile walks them there along the editor's walking route, up and down stairs. Only the
-  storeys up to the hero's own are shown, so stepping indoors upstairs takes the roof off. `Tab` (or **Next hero**)
+  instead of gliding. Clicking a tile walks them there along the editor's walking route, up and down stairs. `Tab` (or **Next hero**)
   walks as the next character. Everyone else strolls about near where they were put; enemies hold their ground.
 - **Collision:** each piece blocks only the ground it is drawn standing on: a tree its trunk, a bush, well or
   haystack its round base, a house its walls (the doorstep stays open), a fence a strip along its rails, an interior

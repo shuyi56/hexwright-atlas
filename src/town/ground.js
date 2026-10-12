@@ -76,12 +76,15 @@ const GOLDC = C('#e8ce8c'), CARPET_MARK = { carpet: C('#5a281e'), carpetblue: C(
 
 /* ---------- the surface ---------- */
 /* the surface of map M seen with the storeys up to `top` shown: each tile's ground (or the highest floor laid over
-   it up to top), the storey that is and its height in levels */
-function fieldOf(M, top = 0) {
+   it up to top), the storey that is and its height in levels. only: storey `top` alone, as the town view shows an
+   upper floor, everywhere it has no floor left empty (terrain -1, the void, at the floor's height so no cliff edges
+   it) */
+function fieldOf(M, top = 0, only = false) {
   const S = M.S, NN = S * S, terr = new Int16Array(NN), hgt = new Float32Array(NN), lev = new Uint8Array(NN); let maxH = 0;
   for (let u = 0; u < NN; u++) {
     let L = 0, t = M.terr[u];
     for (let l = 1; l <= top; l++) { const v = M.floors && M.floors[l - 1] ? M.floors[l - 1][u] : 0; if (v) { L = l; t = v - 1; } }
+    if (only && top && L !== top) { L = top; t = -1; }
     terr[u] = t; lev[u] = L; hgt[u] = M.elev[u] + STOREY * L; if (hgt[u] > maxH) maxH = hgt[u];
   }
   /* tiles with a slope round them (a neighbour one level off), where the ground is shaded by how it faces */
@@ -392,6 +395,8 @@ function faceColour(F, gx, gy, k, u, h, r, run, f) {
    pixel 1 + the row of ground it shows (0 for none). A screen pixel (X, Y) shows ground (X, gy) standing at
    Y = gy - height × LIFT; each column is walked from the south, and wherever a point stands above everything in
    front of it, the rows down to the next point are its cliff face. */
+/* how deep a floor's edge shows over the void, in art pixels */
+const SLAB = 5;
 function renderChunk(F, X0, Y0, f = 0) {
   const W = CHUNK, px = new Uint8ClampedArray(W * W * 4), depth = new Uint16Array(W * W), S = F.S, end = S * TILE, maxL = F.maxH * LIFT, Y1 = Y0 + W;
   for (let i = 0; i < W; i++) {
@@ -400,7 +405,10 @@ function renderChunk(F, X0, Y0, f = 0) {
     /* the map's south edge stands on a face down to height 0 */
     let ymin = g0 === end - 1 ? end : Infinity;
     for (let gy = g0; gy >= g1; gy--) {
-      const k = cellAt(F, gx, gy), u = cellU; if (k < 0) continue;
+      const k = cellAt(F, gx, gy), u = cellU;
+      /* the void beside a floor shown on its own: the floor's edge shows only a thin slab, never a face falling
+         through the dark to the map's edge */
+      if (k < 0) { const t = Math.floor(gy / TILE) * S + Math.floor(gx / TILE); if (F.terr[t] < 0) ymin = Math.round(gy - F.hgt[t] * LIFT) + SLAB; continue; }
       const h = heightAt(F, gx, gy, u), sy = Math.round(gy - h * LIFT);
       if (sy >= ymin) continue;
       const run = ymin === Infinity ? 1 : ymin - sy, a = Math.max(sy, Y0), b = Math.min(ymin, Y1);

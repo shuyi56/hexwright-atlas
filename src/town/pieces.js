@@ -698,13 +698,24 @@ const INTERIOR = {
   post: (K) => { const P = R('#7a5a3a'), cx = K.FW / 2, cy = K.FD / 2; K.rect(cx - 3, cy - ROOMW, cx + 3, cy + 3, (x) => P[x < cx - 1 ? 1 : 3]); },
   hearth: (K, o) => { const S = R('#b3aa96'), { FW, FD } = K; K.box(2, 4, FW - 2, FD - 6, 28, (x, y) => S[2], (x, y) => wallTone('stone', S, x, y)); K.rect(FW / 2 - 8, FD - 20, FW / 2 + 8, FD - 6, R('#2a2018')[3]); K.poly([[FW / 2 - 6, FD - 6], [FW / 2 - 2, FD - 16], [FW / 2, FD - 11], [FW / 2 + 3, FD - 17], [FW / 2 + 6, FD - 6]], R('#f4a03a')[1]); K.rect(0, FD - 30, FW, FD - 27, R('#8e6a44')[1]); },
   stairs: (K, o) => {
-    /* steps climb toward the back (face 0: north), drawn from the highest so each lower one stands in front */
-    const P = R('#a07a4c'), f = facing(o), n = 6, { FW, FD } = K, rise = 30 / n;
-    for (let i = n - 1; i >= 0; i--) {
-      const h = Math.round((i + 1) * rise);
-      if (f % 2 === 0) { const y0 = f === 0 ? FD - 2 - (i + 1) * (FD - 4) / n : 2 + i * (FD - 4) / n; K.box(2, y0, FW - 2, y0 + (FD - 4) / n, h, P[1], (x, y) => P[y % 3 === 0 ? 3 : 2]); }
-      else { const x0 = f === 1 ? 2 + i * (FW - 4) / n : FW - 2 - (i + 1) * (FW - 4) / n; K.box(x0, 2, x0 + (FW - 4) / n, FD - 2, h, P[1], (x) => P[x === Math.ceil(x0) ? 2 : 3]); }
+    /* a flight inside its own tile, seen from above as the floors are: six treads rising toward the back (face 0:
+       north), each lighter than the one below, between two dark stringers. Stairs lead to another floor (the town
+       view opens it as the editor does), so the flight never stands up out of its tile. Seen from the south, a
+       flight climbing north shows its risers under each nosing; others show only the seams between treads. */
+    const P = R('#a07a4c'), D = R('#6b4c32'), f = facing(o), n = 6, { FW, FD } = K, m = 4, sw = 5;
+    const along = f % 2 === 0 ? FD - 2 * m : FW - 2 * m, step = along / n;
+    /* the box of the band from p0 to p1 along the flight (0 at its foot), across between a and b */
+    const band = (p0, p1, a, b) => (f === 0 ? [a, FD - m - p1, b, FD - m - p0] : f === 2 ? [a, m + p0, b, m + p1] : f === 1 ? [m + p0, a, m + p1, b] : [FW - m - p1, a, FW - m - p0, b]);
+    const across = f % 2 === 0 ? FW : FD, in0 = m + sw, in1 = across - m - sw;
+    for (let i = 0; i < n; i++) {
+      const p0 = Math.round(i * step), p1 = Math.round((i + 1) * step), tone = P[1 + Math.floor((n - 1 - i) * 3 / n)];
+      K.rect(...band(p0, p1, in0, in1), tone);
+      if (!i) continue;
+      /* the seam with the tread below: a riser in shadow and a lit nosing where it shows, else a dark line */
+      if (f === 0) { K.rect(...band(p0, p0 + 2, in0, in1), P[4]); K.rect(...band(p0 + 2, p0 + 3, in0, in1), P[0]); }
+      else K.rect(...band(p0, p0 + 1, in0, in1), P[4]);
     }
+    for (const [a, b] of [[m, m + sw], [across - m - sw, across - m]]) K.rect(...band(0, along, a, b), (x, y) => D[(f % 2 === 0 ? x : y) === a ? 1 : 2]);
   },
   bed: (K, o) => { const { FW, FD } = K, f = facing(o), F = furnBox(K, 3, 3, FW - 3, FD - 3, 7, '#8e6a44'), B = R('#c4503e'), W = R('#f4efe2'); const pil = f === 0 ? [3, 3, FW - 3, 13] : f === 2 ? [3, FD - 13, FW - 3, FD - 3] : f === 1 ? [3, 3, 13, FD - 3] : [FW - 13, 3, FW - 3, FD - 3]; K.rect(4, 4 - 7, FW - 4, FD - 4 - 7, (x, y) => B[(x + y) % 6 === 0 ? 2 : 1]); K.rect(pil[0] + 1, pil[1] - 7 + 1, pil[2] - 1, pil[3] - 7 - 1, W[1]); void F; },
   cot: (K) => { const P = R('#d8b968'); K.box(4, 4, K.FW - 4, K.FD - 4, 3, (x, y) => P[h2(x, y) < 0.3 ? 1 : 0], P[3]); },
