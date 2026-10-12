@@ -6,12 +6,12 @@ import { MID, SMALL, TREES, treeOffset } from './pieces.js';
    The hero walks freely in map pixels, not tile by tile, so each piece blocks only the ground it is drawn
    standing on: a tree its trunk, a bush or a well its round base, a house its walls (the step in front of the door
    stays open), a fence a strip along its rails, an interior wall the band it is drawn as, joined to the walls
-   beside it. Flowers, toadstools, reeds, doorways and stairs block nothing. Shapes are circles { x, y, r } and
+   beside it, a doorway the wall either side of its opening. Flowers, toadstools, reeds and stairs block nothing. Shapes are circles { x, y, r } and
    rectangles { x0, y0, x1, y1 } in map pixels, grouped by storey. No DOM. */
 const T = TILE;
 const circle = (x, y, r) => ({ x, y, r });
 const rect = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
-const OPEN = new Set(['flowers', 'mushrooms', 'reeds', 'rowboat', 'idoor', 'stairs', 'moonflowers']);
+const OPEN = new Set(['flowers', 'mushrooms', 'reeds', 'rowboat', 'stairs', 'moonflowers']);
 const ROUND_FURNITURE = { chair: 6, stool: 5, candelabra: 4, plantpot: 6, cauldron: 10, spinwheel: 9 };
 
 /* the shapes of piece o in its own drawing's coordinates (kit pixels, the footprint FW × FD from (0, 0)) */
@@ -46,6 +46,11 @@ function local(o, FW, FD) {
     case 'fence': return (o.face || 0) % 2 ? [rect(FW / 2 - 3, 0, FW / 2 + 3, FD)] : [rect(0, FD - 15, FW, FD - 8)];
     case 'post': return [circle(FW / 2, FD / 2, 4)];
     case 'hearth': return [rect(2, 4, FW - 2, FD - 6)];
+    case 'idoor': {
+      /* the wall either side of the opening (DOOR_HALF either side of the middle, town/pieces.js) */
+      const L = o.links || [0, 0, 0, 0], across = L[0] || L[2] || !(L[1] || L[3]), c0 = FW / 2 - 5, c1 = FW / 2 + 5, h = 21;
+      return across ? [rect(0, c0, FW / 2 - h, c1), rect(FW / 2 + h, c0, FW, c1)] : [rect(c0, 0, c1, FD / 2 - h), rect(c0, FD / 2 + h, c1, FD)];
+    }
     case 'iwall': case 'iwindow': case 'wall': case 'walltower': {
       /* a band through the middle, with an arm to each side it joins */
       const L = o.links || [0, 0, 0, 0], t = id === 'wall' || id === 'walltower' ? FW / 2 - 12 : 5, c0 = FW / 2 - t, c1 = FW / 2 + t;

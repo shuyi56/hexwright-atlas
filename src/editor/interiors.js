@@ -27,11 +27,11 @@ const FLOOR_OF = Object.fromEntries(Object.entries(FLOORS).flatMap(([t, ids]) =>
 /* the homes and halls that get a fireplace */
 const HEARTH = new Set(['cottage', 'townhouse', 'longhouse', 'tavern', 'slatehouse', 'stonehouse', 'mansion', 'smithy', 'keep', 'elvenhall', 'elvenmanor']);
 
-/* the side of a square interior: 8 tiles for a one-tile cottage, 12 for a two-tile hall, then 2 more a tile of
-   footprint, up to 24 */
+/* the side of a square interior, at the figures' scale: 5 tiles for a one-tile cottage (a room three tiles across
+   inside its walls), 2 more for each tile more of footprint, up to 12 */
 function interiorSize(o) {
   const [w, d] = footprint(o), m = Math.max(w, d);
-  return Math.min(24, m <= 2 ? 4 + 4 * m : 12 + 2 * (m - 2));
+  return Math.min(12, 3 + 2 * m);
 }
 /* A fresh interior for building o: a walled room with its doorway in the middle of the south wall. size picks the
    side (4-96); clim the climate (the room's ground is all floor, so it only matters to whatever is placed later). */

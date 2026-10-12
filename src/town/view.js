@@ -6,8 +6,8 @@ import { WALK, renderScaled } from '../characters/roster.js';
 import { unitFor } from '../data/units.js';
 import { ED, rootModel } from '../editor/editor.js';
 import { arrival, doorAcross, doorways } from '../editor/interiors.js';
-import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf } from '../editor/model.js';
-import { FACE_DELTA, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
+import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf, objAt } from '../editor/model.js';
+import { FACE_DELTA, blockedBy, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
@@ -89,15 +89,23 @@ function chunk(cx, cy) {
    pixels are looked up one after another */
 let lastKey = NaN, lastChunk = null;
 function depthAt(X, Y) {
-  X = Math.floor(X); Y = Math.floor(Y); if (X < 0 || X >= S() * T) return 0;
+  X = Math.floor(X); Y = Math.floor(Y); if (X < 0 || X >= S() * T || noGround(Y)) return 0;
   const cx = Math.floor(X / CHUNK), cy = Math.floor(Y / CHUNK), key = keyOf(cx, cy);
   if (key !== lastKey) { lastChunk = chunk(cx, cy); lastKey = key; }
   return lastChunk.depth[(Y - cy * CHUNK) * CHUNK + X - cx * CHUNK];
 }
+/* rows no ground reaches: above the highest ground raised to its height, or below the map */
+const noGround = Y => Y < -Math.ceil(TW.F.maxH * LIFT) || Y >= S() * T;
+/* are the chunks under the box of art pixels (X, Y, w, h) painted (those that can hold ground)? */
+function groundReady(X, Y, w, h) {
+  const n = Math.ceil(S() * T / CHUNK), cy0 = Math.floor(-TW.F.maxH * LIFT / CHUNK);
+  for (let cy = Math.max(cy0, Math.floor(Y / CHUNK)); cy * CHUNK < Y + h && cy < n; cy++) for (let cx = Math.max(0, Math.floor(X / CHUNK)); cx * CHUNK < X + w && cx < n; cx++) if (!TW.chunks.has(keyOf(cx, cy))) return false;
+  return true;
+}
 /* is any ground shown in the box of whole art pixels (X, Y, w, h) further south than row base? */
 function hidden(X, Y, w, h, base) {
   const lim = base + 1, n = S() * T;
-  for (let cy = Math.floor(Y / CHUNK); cy * CHUNK < Y + h; cy++) for (let cx = Math.floor(Math.max(0, X) / CHUNK); cx * CHUNK < Math.min(X + w, n); cx++) {
+  for (let cy = Math.floor(Math.max(Y, -Math.ceil(TW.F.maxH * LIFT)) / CHUNK); cy * CHUNK < Math.min(Y + h, n); cy++) for (let cx = Math.floor(Math.max(0, X) / CHUNK); cx * CHUNK < Math.min(X + w, n); cx++) {
     const d = chunk(cx, cy).depth, x0 = Math.max(X, cx * CHUNK), x1 = Math.min(X + w, (cx + 1) * CHUNK, n), y0 = Math.max(Y, cy * CHUNK), y1 = Math.min(Y + h, (cy + 1) * CHUNK);
     for (let y = y0; y < y1; y++) { const o = (y - cy * CHUNK) * CHUNK - cx * CHUNK; for (let x = x0; x < x1; x++) if (d[o + x] > lim) return true; }
   }
@@ -271,7 +279,8 @@ function heroTick(dt) {
     m.face = FACE_OF(vx, vy);
     const gone = moveHero(vx / len * sp, vy / len * sp);
     m.dist += gone; m.moving = gone > 0.05;
-    if (!m.moving && TW.path.length) { TW.stuck = (TW.stuck || 0) + dt; if (TW.stuck > 0.4) TW.path = []; }
+    /* held up on a route: whoever stands in the way steps aside; with no one to blame, the route is given up */
+    if (!m.moving && TW.path.length) { TW.stuck = (TW.stuck || 0) + dt; if (TW.stuck > 0.4) { if (makeWay()) TW.stuck = 0; else TW.path = []; } }
     TW.dirty = true;
     /* walking into a door goes through it */
     if (!TW.say && throughDoor(m.face)) return;
@@ -323,22 +332,24 @@ function stairsAhead(face) {
   const w = (TW.wells || []).find(q => q.x === tx && q.y === ty); if (!w || !inFlight(m.x, m.y, tx, ty, w.face)) return false;
   /* heading down it: away from the landing */
   const [dx, dy] = FACE_DELTA[face]; if (dx !== tx - w.up[0] || dy !== ty - w.up[1]) return false;
+  /* onto the tile at the flight's foot, or where that is blocked (a flight rising from a wall), onto the foot of the
+     flight itself, facing off it */
   const [fx, fy] = FACE_DELTA[w.face];
-  return changeFloor(m.L - 1, tx + fx, ty + fy, w.face, [tx, ty]);
+  if (!blockedBy(M, tx + fx, ty + fy, TW.hero, m.L - 1)) return changeFloor(m.L - 1, tx + fx, ty + fy, w.face, [tx, ty]);
+  return changeFloor(m.L - 1, tx, ty, w.face, [tx, ty], [tx * T + T / 2 + fx * 36, ty * T + T / 2 + fy * 36]);
 }
-/* the hero onto storey L at tile (x, y), facing `face`, having come by the flight at tile `via`: the storey shown
-   changes at once, with a moment's fade, and a route being followed goes on from the far end of the flight */
-function changeFloor(L, x, y, face, via) {
-  const m = TW.me, cx = x * T + T / 2, cy = y * T + FOOT, at = standSpot(cx, cy, L, via);
+/* the hero onto storey L at tile (x, y) (or the exact spot given), facing `face`, having come by the flight at tile
+   `via`: behind the veil (transition), and a route being followed goes on from the far end of the flight */
+function changeFloor(L, x, y, face, via, spot = null) {
+  const m = TW.me, cx = x * T + T / 2, cy = y * T + FOOT, at = spot && standable(L, spot[0], spot[1], heightOn(L, spot[0], spot[1]) ?? 0) ? spot : standSpot(cx, cy, L, via);
   if (!at) return false;
-  m.x = at[0]; m.y = at[1]; m.L = L; m.face = face; m.z = null; m.moving = false;
-  const c = TW.M.chars[TW.hero]; c.x = Math.floor(m.x / T); c.y = Math.floor(m.y / T); c.face = face; if (L) c.level = L; else delete c.level;
-  while (TW.path.length && (TW.path[0][2] != null && TW.path[0][2] !== L || (Math.floor(TW.path[0][0] / T) === via[0] && Math.floor(TW.path[0][1] / T) === via[1]))) TW.path.shift();
-  if (TW.say) closeSay();
-  setTop(L); settle(0);
-  cv.classList.remove('tw-fade'); void cv.offsetWidth; cv.classList.add('tw-fade');
-  banner(L ? `Floor ${L}` : 'Ground floor'); TW.dirty = true;
-  return true;
+  return transition(() => {
+    m.x = at[0]; m.y = at[1]; m.L = L; m.face = face; m.z = null; m.moving = false;
+    const c = TW.M.chars[TW.hero]; c.x = Math.floor(m.x / T); c.y = Math.floor(m.y / T); c.face = face; if (L) c.level = L; else delete c.level;
+    while (TW.path.length && (TW.path[0][2] != null && TW.path[0][2] !== L || (Math.floor(TW.path[0][0] / T) === via[0] && Math.floor(TW.path[0][1] / T) === via[1]))) TW.path.shift();
+    if (TW.say) closeSay();
+    setTop(L); settle(0);
+  }, { name: L ? `Floor ${L}` : 'Ground floor', view: L > m.L ? 'back' : 'front' });
 }
 /* walk map M as character `hero`: everything the view keeps about the map made afresh for it */
 function useMap(M, hero, homes = null) {
@@ -348,8 +359,13 @@ function useMap(M, hero, homes = null) {
   TW.hero = hero; TW.G0 = fieldOf(M, 0); TW.shapes = shapesOf(M.objs, TW.links); takeHero();
   TW.top = TW.me ? TW.me.L : 0; buildField();
 }
-/* into building o's interior. from: the index of someone already inside to walk as, else the hero goes in */
+/* into building o's interior, behind the veil. from: the index of someone already inside to walk as, else the hero
+   goes in */
 function goIn(o, from = -1) {
+  if (from < 0 && !TW.M.chars[TW.hero]) return false;
+  return transition(() => enter(o, from), { name: (TW.inside.get(o) || o.interior).name, view: 'back' });
+}
+function enter(o, from = -1) {
   let I = TW.inside.get(o);
   if (!I) { I = cloneModel(o.interior); I.chars = I.chars || []; TW.inside.set(o, I); }
   const ctx = { M: TW.M, hero: TW.hero, homes: TW.homes, piece: o }; let k = from;
@@ -360,8 +376,12 @@ function goIn(o, from = -1) {
   if (TW.say) closeSay();
   TW.stack.push(ctx); useMap(I, k); arrived(); return true;
 }
-/* back out onto the doorstep of the building the hero is in */
+/* back out onto the doorstep of the building the hero is in, behind the veil */
 function goOut() {
+  if (!TW.stack.length) return false;
+  return transition(exit, { name: TW.stack[TW.stack.length - 1].M.name, view: 'front' });
+}
+function exit() {
   const ctx = TW.stack.pop(); if (!ctx) return false;
   const I = TW.M, c = I.chars[TW.hero], O = ctx.M, o = ctx.piece, [w, d] = footprint(o);
   if (c) I.chars.splice(TW.hero, 1);
@@ -388,10 +408,68 @@ function standSpot(x, y, L = 0, not = null) {
   }
   return null;
 }
-/* a moment's fade, the place's name shown, the top bar and the panel brought up to date */
-function arrived() {
-  cv.classList.remove('tw-fade'); void cv.offsetWidth; cv.classList.add('tw-fade');
-  banner(TW.M.name); syncInside(); place(); TW.dirty = true;
+/* the top bar and the panel brought up to date for the place just come into */
+function arrived() { syncInside(); place(); TW.dirty = true; }
+
+/* ---------- transitions ----------
+   Going through a door, taking the stairs, or opening the view: the screen fades to dark, the new place is swapped
+   in behind it, and it fades back up only once the ground in sight is painted. The workers paint it a piece at a time
+   while the frames keep coming, so nothing stalls and the place being left never shows through (painting it all at
+   once held the page for a third of a second, while the fade ran on over the old picture). Meanwhile the hero walks
+   in place over the name of where they are going: from behind going in or up, from the front coming out or down. */
+const veil = $('twVeil'), loadFig = $('twLoadFig'), lfg = loadFig.getContext('2d');
+/* the fade out (ms), the shortest time the veil is up (so it reads as a step, not a blink), and how long to wait on
+   the painters before painting what is left here and now */
+const FADE = 170, LEAST = 420, PATIENCE = 4000;
+function transition(swap, { name = '', view = 'back', instant = false } = {}) {
+  if (TW.busy) return false;
+  const b = TW.busy = { t0: performance.now(), name, view, swapped: 0 };
+  $('twLoadName').textContent = name;
+  veil.classList.toggle('instant', instant); veil.classList.add('on', 'loading'); $('twBanner').classList.remove('show');
+  const go = () => { if (!TW.open || TW.busy !== b) return; swap(); b.swapped = performance.now(); req(); };
+  if (instant) go(); else setTimeout(go, FADE);
+  req(); return true;
+}
+/* the chunks of ground the screen will show, within the map: [cx, cy] */
+function inSight() {
+  follow();
+  const sc = scale(), [tx, ty] = offset(sc), n = Math.ceil(S() * T / CHUNK), cy0 = Math.floor(-TW.F.maxH * LIFT / CHUNK), out = [];
+  const vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (cv.width - tx) / sc, vy1 = (cv.height - ty) / sc;
+  for (let cy = Math.max(cy0, Math.floor(vy0 / CHUNK)); cy * CHUNK < vy1 && cy < n; cy++) for (let cx = Math.max(0, Math.floor(vx0 / CHUNK)); cx * CHUNK < vx1 && cx < n; cx++) out.push([cx, cy]);
+  return out;
+}
+/* fit the pieces of the storey shown that stand in sight to the ground (pieceOn), until `budget` ms are spent;
+   true once every one is ready */
+function warm(budget = 8) {
+  let ready = true; const t = performance.now(), sc = scale(), [tx, ty] = offset(sc), vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (cv.width - tx) / sc, vy1 = (cv.height - ty) / sc;
+  for (const [i, p] of TW.M.objs.entries()) {
+    if (levelOf(p) !== TW.top) continue;
+    const [w, d] = footprint(p), it = { key: (p.y + d) * T - 1, i, p, w, d };
+    /* its sprite and place first (an empty view asks for nothing more), then, once the ground under it is painted, the fit */
+    let c = TW.clipped.get(i); if (!c) { pieceOn(it, 1, 1, 0, 0); c = TW.clipped.get(i); }
+    if (c.can || c.X > vx1 || c.Y > vy1 || c.X + c.w < vx0 || c.Y + c.h < vy0) continue;
+    if (!groundReady(c.X, c.Y, c.w, c.h)) { ready = false; continue; }
+    pieceOn(it, vx0, vy0, vx1, vy1);
+    if (performance.now() - t > budget) return false;
+  }
+  return ready;
+}
+/* each frame the veil is up: walk the figure, and once the place is swapped in and its ground in sight painted, lift
+   the veil */
+function veiled(now) {
+  const b = TW.busy, c = TW.M.chars[TW.hero], ch = c && (characterById(c.sprite) || characterById('villager'));
+  if (ch) { lfg.clearRect(0, 0, loadFig.width, loadFig.height); lfg.drawImage(figure(ch, b.view, WALK[Math.floor(now / 140) % WALK.length]).can, 0, 0); }
+  if (!b.swapped) return;
+  const need = inSight().filter(([cx, cy]) => !TW.chunks.has(keyOf(cx, cy)));
+  /* with no workers the ground is painted here, a piece a frame, so the figure keeps walking */
+  if (need.length && !painters.length) { chunk(...need[0]); return; }
+  const late = now - b.swapped > PATIENCE;
+  if (need.length && !late) return;
+  /* then the pieces in sight, fitted to the new ground a few a frame, so the frame that lifts the veil is light */
+  if (!late && !warm()) return;
+  if (now - b.t0 < LEAST) return;
+  TW.busy = null; paint(); veil.classList.remove('on', 'loading', 'instant');
+  banner(b.name); place();
 }
 function banner(text) { const b = $('twBanner'); b.textContent = text; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); }
 function syncInside() {
@@ -403,7 +481,8 @@ function syncInside() {
 /* a route for the hero to (x, y) in map pixels on storey L: through the middles of the tiles on the editor's
    walking route, then to the point itself; or straight there if there is no route */
 function routeTo(x, y, L) {
-  const M = TW.M, k = TW.hero, tx = Math.floor(x / T), ty = Math.floor(y / T), tiles = findPath(M, k, tx, ty, L);
+  /* the others are left out of the reckoning: whoever stands on the way steps aside when the hero comes (makeWay) */
+  const M = TW.M, k = TW.hero, tx = Math.floor(x / T), ty = Math.floor(y / T), tiles = findPath(Object.assign({}, M, { chars: [M.chars[k]] }), 0, tx, ty, L);
   const pts = (tiles || []).slice(0, -1).map(([a, b, l]) => [a * T + T / 2, b * T + FOOT, l || 0]);
   pts.push([x, y, L || 0]); return pts;
 }
@@ -415,15 +494,43 @@ function stroll(dt) {
     TW.rest[k] = (TW.rest[k] ?? 1 + Math.random() * 3) - dt; if (TW.rest[k] > 0) return;
     TW.rest[k] = 1.5 + Math.random() * 4;
     const home = TW.homes[k], dir = Math.floor(Math.random() * 4), to = stepToward(k, dir);
-    if (Math.random() < 0.35 || !to || to[2] !== levelOf(c) || Math.abs(to[0] - home[0]) + Math.abs(to[1] - home[1]) > 2) { c.face = dir; TW.dirty = true; return; }
+    /* they keep near home, on their own storey, and out of doorways and off stairs, where they would stand in the way */
+    if (Math.random() < 0.35 || !to || to[2] !== levelOf(c) || Math.abs(to[0] - home[0]) + Math.abs(to[1] - home[1]) > 2 || inTheWay(to)) { c.face = dir; TW.dirty = true; return; }
     beginStep(k, to);
   });
+}
+/* a doorway, a flight of stairs or anything else made to walk through, or (in a room) the tile just inside a way
+   out: [x, y, L] */
+const inTheWay = ([x, y, L]) => {
+  const k = objAt(TW.M, x, y, L); if (k >= 0 && ASSET_BY_ID[TW.M.objs[k].id].walk) return true;
+  return !L && TW.stack.length > 0 && doorways(TW.M).some(([dx, dy, side]) => dx - FACE_DELTA[side][0] === x && dy - FACE_DELTA[side][1] === y);
+};
+/* someone standing on the hero's way (where they stand or the next point of their route) steps off it, onto a free
+   tile beside them that is not on the route, the hero's, or in the way; true if someone did */
+function makeWay() {
+  const m = TW.me, M = TW.M, next = TW.path[0]; if (!next) return false;
+  const on = new Set(TW.path.map(([x, y]) => Math.floor(x / T) + ',' + Math.floor(y / T)));
+  on.add(Math.floor(m.x / T) + ',' + Math.floor(m.y / T));
+  for (let k = 0; k < M.chars.length; k++) {
+    if (k === TW.hero || TW.steps.has(k)) continue;
+    const q = charPos(k); if (q.L !== m.L) continue;
+    const near = Math.hypot(q.fx - m.x, q.gy - m.y) < FOOT_R * 2 + 18 || Math.hypot(q.fx - next[0], q.gy - next[1]) < FOOT_R * 2 + 18;
+    if (!near) continue;
+    const c = M.chars[k], steps = [0, 1, 2, 3].map(d => stepToward(k, d)).filter(to => to && to[2] === levelOf(c));
+    let away = steps.filter(to => !on.has(to[0] + ',' + to[1]) && !inTheWay(to));
+    /* hemmed in (a narrow passage): on along the route, away from the hero, to where there is room to stand aside */
+    if (!away.length) { const idx = to => TW.path.findIndex(([x, y]) => Math.floor(x / T) === to[0] && Math.floor(y / T) === to[1]), here = idx([c.x, c.y]); away = steps.filter(to => idx(to) > here && idx(to) > 0); }
+    if (!away.length) continue;
+    beginStep(k, away[Math.floor(Math.random() * away.length)]); TW.homes[k] = [c.x, c.y]; return true;
+  }
+  return false;
 }
 
 /* ---------- talking and looking ---------- */
 /* talk to `to` (someone the hero walked up to), else whoever stands just in front of the hero, else look at the piece
    or ground there */
 function talk(to = -1) {
+  if (TW.busy) return;
   if (TW.say) { closeSay(); return; }
   const M = TW.M, k = TW.hero, m = TW.me; if (!m) return;
   const [fx, fy] = FACE_DELTA[m.face], px = m.x + fx * 18, py = m.y + fy * 18, L = m.L;
@@ -626,6 +733,7 @@ let raf = 0;
 function loop(now) {
   raf = 0; if (!TW.open) return;
   const dt = Math.min(0.1, (now - (TW.lastT || now)) / 1000); TW.lastT = now;
+  if (TW.busy) { veiled(now); if (painters.length) pump(); raf = requestAnimationFrame(loop); return; }
   for (const [k, st] of TW.steps) { st.t += dt * NPC_SPEED; if (st.t >= 1) TW.steps.delete(k); TW.dirty = true; }
   heroTick(dt);
   stroll(dt);
@@ -662,6 +770,7 @@ function tileAt(e) {
 /* a click or a tap: on the hero, talk to whoever they face; on someone else, walk up to them and talk; anywhere
    else, walk there */
 function tapAt(e) {
+  if (TW.busy) return;
   const t = tileAt(e), M = TW.M, k = TW.hero; if (!M.chars[k] || !TW.me) return;
   /* a stairwell (over the dark, so before the ground is asked): to its landing and on down */
   const [ax, ay] = artAt(e), well = TW.top ? (TW.wells || []).find(w => w.box && ax >= w.box[0] - 4 && ax < w.box[2] + 4 && ay >= w.box[1] - 4 && ay < w.box[3] + 4) : null;
@@ -752,7 +861,7 @@ root.addEventListener('keydown', e => {
   else if (k === ' ' || k === 'Enter') { if (!e.repeat) talk(); }
   else if (k === 'Tab') { nextHero(e.shiftKey ? -1 : 1); }
   else if (k === '+' || k === '=') setZoom(TW.zoom + 1); else if (k === '-' || k === '_') setZoom(TW.zoom - 1);
-  else if (k === 'Escape') { if (TW.say) closeSay(); else if (TW.stack.length) goOut(); else closeTown(); }
+  else if (k === 'Escape') { if (TW.busy) { /* on the way somewhere */ } else if (TW.say) closeSay(); else if (TW.stack.length) goOut(); else closeTown(); }
   else return;
   e.preventDefault(); req();
 });
@@ -775,25 +884,30 @@ function takeHero() {
 }
 
 /* ---------- open and close ---------- */
-/* opts: hero, the index of the character to walk as (default the one picked in the editor, else the first); zoom */
+/* opts: hero, the index of the character to walk as (default the one picked in the editor, else the first); zoom;
+   inside: { x, y }, a tile of a building with an interior to start in, the hero having just come in at its door */
 /* The whole map is walked, with its interiors; the editor inside a building starts the walk in there, as whoever is
    picked in the room, else the map's hero walking in at the door. */
 function openTown(opts = {}) {
   if (!ED.M) return;
   const room = ED.outer, M = cloneModel(rootModel());
-  TW.open = true; root.hidden = false; TW.held = []; TW.moved = false; TW.lastT = 0; TW.stack = []; TW.inside = new Map();
+  TW.open = true; root.hidden = false; TW.held = []; TW.moved = false; TW.lastT = 0; TW.stack = []; TW.inside = new Map(); TW.busy = null;
   startPainters();
   useMap(M, opts.hero ?? (!room && ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0));
-  if (room) { const o = M.objs[room.M.objs.indexOf(room.piece)]; if (o && o.interior) goIn(o, ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : M.chars.length ? -1 : 0); }
+  if (room) { const o = M.objs[room.M.objs.indexOf(room.piece)]; if (o && o.interior) enter(o, ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : M.chars.length ? -1 : 0); }
+  /* a scene can start inside a building: opts.inside is any tile it covers */
+  else if (opts.inside) { const { x, y } = opts.inside, o = M.objs.find(p => p.interior && !levelOf(p) && x >= p.x && y >= p.y && x < p.x + footprint(p)[0] && y < p.y + footprint(p)[1]); if (o) enter(o); }
   size();
   setZoom(opts.zoom || Math.max(2, Math.min(5, Math.round(TW.cw / (15 * T)))));
   closeSay(); syncInside(); place();
-  /* the place's name shows for a moment, as a town's does on entering it */
-  banner(TW.M.name);
+  /* the view opens dark, with the loading figure, and the place's name shows as it comes up, as a town's does on
+     entering it */
+  transition(() => {}, { name: TW.M.name, view: 'front', instant: true });
   root.focus({ preventScroll: true }); req();
 }
 function closeTown() {
   if (!TW.open) return; TW.open = false; root.hidden = true; if (raf) cancelAnimationFrame(raf); raf = 0; TW.steps.clear();
+  TW.busy = null; veil.classList.remove('on', 'loading', 'instant');
   fingers.clear(); gesture = null; dropStick();
   /* the painted ground is let go with the view; the workers stay, idle, for the next time it opens */
   for (const c of TW.chunks.values()) if (c.can.close) c.can.close();
@@ -812,7 +926,7 @@ $('editor').addEventListener('keydown', e => { if (ED.open && !TW.open && (e.key
 const resized = new ResizeObserver(([en]) => {
   if (!TW.open) return;
   const box = en && en.devicePixelContentBoxSize && en.devicePixelContentBoxSize[0];
-  size(box); TW.dirty = false; paint(); req();
+  size(box); if (!TW.busy) { TW.dirty = false; paint(); } req();
 });
 try { resized.observe(cv, { box: 'device-pixel-content-box' }); } catch { resized.observe(cv); }
 /* test hook */

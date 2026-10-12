@@ -16,7 +16,8 @@
    Every scene page has the tile editor and the tactical view, and the panel switches between them. view:
    'tactical' opens the page in the tactical view, with tactical: { zoom, center: [x, y] | 'map' } setting its
    camera; edits made in the editor show in the tactical view when it is opened again. view: 'town' opens it in the
-   town view, with town: { zoom, hero } (hero: the index of the character to walk as). */
+   town view, with town: { zoom, hero, inside } (hero: the index of the character to walk as; inside: { x, y }, a tile of
+   a building with an interior to start in). */
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
