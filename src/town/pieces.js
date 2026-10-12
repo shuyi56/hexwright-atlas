@@ -689,8 +689,383 @@ function roomWall(K, o, front) {
   const seg = (a0, b0, a1, b1, f) => { K.rect(a0, b1 - ROOMW, a1, b1, (x, y) => (f ? f(x, y, b1) : null) || (y === b1 - 1 ? P[3] : y < b1 - ROOMW + 3 ? P[1] : P[2])); K.rect(a0, b0 - ROOMW, a1, b1 - ROOMW, (x, y) => Tp[(x + y) % 5 === 0 ? 3 : 2]); };
   seg(x0, c0, x1, c1, front); seg(c0, y0, c1, y1, null);
 }
-function furnBox(K, x0, y0, x1, y1, h, col, opt = {}) { const P = R(col); K.box(x0, y0, x1, y1, h, opt.top || ((x, y) => P[(x + y) % 7 === 0 ? 2 : 1]), opt.front || ((x, y) => P[y === y1 - 1 ? 4 : x === x0 ? 2 : 3])); return P; }
 const facing = o => (o.face || 0);
+
+/* ---------- furniture ----------
+   Each piece is made of blocks in its own frame, described as if it faced south: a across it from its left to its
+   right (0..WD), b from its back to its front (0..DD), z up from the floor, in pixels at the figures' scale (32 to a
+   tile; a figure stands about 30 high). The frame is turned to the piece's facing, so a turned piece shows its side,
+   and from behind its back, as it would: drawers, doors and locks only where its front faces the viewer. A block is
+   drawn as the town's houses are, seen from the south and a little east with the light from the upper left: a lit top
+   (its grain or pattern running the way the piece does), a face toward the viewer, a dark sliver of its east side,
+   and a lit edge where top meets face. Blocks are drawn back to front, then each piece throws a soft shadow east. */
+/* materials: a top, a face and a side colour, each a five-step ramp */
+const MAT = {
+  oak: ['#b48c5c', '#8c6842', '#5c4128'], walnut: ['#9a7350', '#73523a', '#4a3424'], pine: ['#c9a676', '#a5825a', '#6e5236'],
+  iron: ['#6f7276', '#4e5054', '#34363a'], brass: ['#e2c26a', '#c9a24f', '#8e6e30'], stone: ['#ddd5c2', '#bfb59f', '#8f8672'],
+  linen: ['#f6f1e4', '#e2d9c4', '#b9ae96'], straw: ['#e2cb84', '#c9ae64', '#9a8248'], clay: ['#c97a56', '#a85e40', '#7a4430'],
+  red: ['#c25a46', '#a3443a', '#74302a'], blue: ['#6f8fb4', '#56769a', '#3e5470'], green: ['#7f9e62', '#64824c', '#465c36'],
+  velvet: ['#b03a30', '#8e2c26', '#5e1e1c'], gold: ['#ecd27c', '#d1ae58', '#97763a']
+};
+const mat = k => MAT[k].map(R);
+/* footprint rect of the local box [a0, a1) × [b0, b1) for facing f, in a piece WD across and DD deep */
+function turned(f, WD, DD, a0, a1, b0, b1) {
+  return f === 0 ? [a0, b0, a1, b1] : f === 2 ? [WD - a1, DD - b1, WD - a0, DD - b0] : f === 1 ? [b0, a0, b1, a1] : [DD - b1, WD - a1, DD - b0, WD - a0];
+}
+/* which face of the piece's own a box shows toward the viewer (south), and which as its east side */
+const SOUTH = ['front', 'right', 'back', 'left'], EAST = ['right', 'front', 'left', 'back'];
+function furniture(K, o, WD, DD) {
+  const f = facing(o), parts = [];
+  const F = {
+    f, ns: f % 2 === 0, south: SOUTH[f], east: EAST[f],
+    /* a block [a0, a1) × [b0, b1) from z0 to z1 in material m (a MAT key or three ramps); style may give top(u, v, x, y) or
+       face(s, t, which, x, y) colours (u, v across and along the piece's top, 0..1; s, t across and down the face shown),
+       or null to fall back to the material */
+    box(a0, a1, b0, b1, z0, z1, m, style = {}) {
+      const [x0, y0, x1, y1] = turned(f, WD, DD, a0, a1, b0, b1), M3 = typeof m === 'string' ? mat(m) : m;
+      parts.push({ x0, x1, y0, y1, z0, z1, draw: () => {
+        const ux = (x, y) => { const fx = x + 0.5, fy = y + z1 + 0.5; const [a, b] = f === 0 ? [fx, fy] : f === 2 ? [WD - fx, DD - fy] : f === 1 ? [fy, fx] : [WD - fy, DD - fx]; return [(a - a0) / (a1 - a0), (b - b0) / (b1 - b0)]; };
+        /* the face toward the viewer */
+        for (let y = Math.ceil(y1 - z1); y < y1 - z0; y++) for (let x = Math.ceil(x0); x < x1; x++) {
+          const s = (x + 0.5 - x0) / (x1 - x0), t = (y + 0.5 - (y1 - z1)) / Math.max(1, z1 - z0);
+          let c = style.face && style.face(s, t, F.south, x, y);
+          /* a tall face with nothing else on it is a framed, sunken panel: the frame lit, the panel's top and west edges
+             in the frame's shadow */
+          const W0 = Math.ceil(x0), H0 = Math.ceil(y1 - z1), wide = x1 - x0, tall = z1 - z0;
+          if (!c && tall >= 12 && wide >= 8 && style.panel !== false) {
+            const px = x - W0, py = y - H0, inX = px >= 2 && px < wide - 2, inY = py >= 3 && py < tall - 3;
+            c = !(inX && inY) ? M3[1][py === 0 || px === 0 ? 1 : py >= tall - 1 ? 3 : 1] : (px === 2 || py === 3) ? M3[1][3] : (px === Math.ceil(wide) - 3 || py === tall - 4) ? M3[1][1] : M3[1][2];
+          }
+          if (!c) c = M3[1][y === Math.ceil(y1 - z1) ? 1 : x === Math.ceil(x0) ? 1 : y >= y1 - z0 - 1 ? 3 : 2];
+          K.set(x, y, c);
+        }
+        /* the top, its south edge lit */
+        for (let y = Math.ceil(y0 - z1); y < y1 - z1; y++) for (let x = Math.ceil(x0); x < x1; x++) {
+          const [u, v] = ux(x, y); let c = style.top && style.top(u, v, x, y);
+          if (!c) c = M3[0][y >= y1 - z1 - 1 ? 0 : x === Math.ceil(x0) ? 1 : (F.ns ? (h2(x >> 1, y * 3, 7) < 0.12) : (h2(x * 3, y >> 1, 7) < 0.12)) ? 3 : 2];
+          K.set(x, y, c);
+        }
+        /* a sliver of the east side, in shade */
+        if (z1 - z0 >= 3 && !style.noSide) for (let y = Math.ceil(y0 - z1 + 1); y < y1 - z0; y++) K.set(Math.ceil(x1), y, M3[2][y < y1 - z1 ? 2 : 3]);
+      } });
+      return F;
+    },
+    /* anything else, drawn in turn at local (a, b) on the floor or lifted to z: fn(x, y) gets the screen point */
+    at(a, b, z, fn) {
+      const [x0, y0] = turned(f, WD, DD, a, a + 0.001, b, b + 0.001);
+      parts.push({ x0, x1: x0 + 0.001, y0, y1: y0 + 0.001, z0: z, z1: z, draw: () => fn(Math.round(x0), Math.round(y0 - z)) });
+      return F;
+    },
+    /* the four legs of a frame [a0, a1) × [b0, b1), w square, up to z */
+    legs(a0, a1, b0, b1, z, m, w = 2) { for (const a of [a0, a1 - w]) for (const b of [b0, b1 - w]) F.box(a, a + w, b, b + w, 0, z, m, { noSide: true }); return F; },
+    done(shade = 4) {
+      for (const p of order(parts)) p.draw();
+      /* a soft shadow east of it and under it, on the floor, fitted to the blocks it stands on */
+      const boxes = parts.filter(p => p.x1 - p.x0 > 0.01 && !p.z0);
+      if (shade && boxes.length) K.shadow(Math.min(...boxes.map(p => p.x0)) + 1, Math.min(...boxes.map(p => p.y0)), Math.max(...boxes.map(p => p.x1)) - 1, Math.max(...boxes.map(p => p.y1)), shade);
+    }
+  };
+  return F;
+}
+/* the blocks of a piece in drawing order: one drawn after another it stands in front of, or on top of, where the two
+   overlap across the view; otherwise in the order given */
+function order(parts) {
+  const n = parts.length, after = parts.map(() => []), need = new Array(n).fill(0), e = 0.01;
+  const over = (p, q) => p.x0 < q.x1 - e && q.x0 < p.x1 - e;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const p = parts[i], q = parts[j]; if (!over(p, q) && !(p.x1 - p.x0 < 0.01 || q.x1 - q.x0 < 0.01 ? p.x0 >= q.x0 - e && p.x0 <= q.x1 + e || q.x0 >= p.x0 - e && q.x0 <= p.x1 + e : false)) continue;
+    let first = 0;
+    if (q.y0 >= p.y1 - e) first = 1; else if (p.y0 >= q.y1 - e) first = -1;
+    else if (q.z0 >= p.z1 - e) first = 1; else if (p.z0 >= q.z1 - e) first = -1;
+    if (first === 1) { after[i].push(j); need[j]++; } else if (first === -1) { after[j].push(i); need[i]++; }
+  }
+  const out = [], ready = parts.map((p, i) => i).filter(i => !need[i]);
+  while (ready.length) { ready.sort((a, b) => a - b); const i = ready.shift(); out.push(parts[i]); for (const j of after[i]) if (!--need[j]) ready.push(j); }
+  /* a cycle (it should not happen) falls back to the order given */
+  for (let i = 0; i < n; i++) if (!out.includes(parts[i])) out.push(parts[i]);
+  return out;
+}
+/* little things set on furniture: a jug, a mug, a plate, a candle with its flame, a book */
+const JUG = (K, x, y) => { const C = R('#c97a56'); K.rect(x - 2, y - 6, x + 2, y, (px, py) => C[px < x - 1 ? 1 : px > x ? 3 : 2]); K.rect(x - 1, y - 7, x + 1, y - 6, C[1]); K.set(x + 2, y - 4, C[3]); K.set(x + 2, y - 3, C[3]); };
+const MUG = (K, x, y) => { const C = R('#8e6a44'); K.rect(x - 1, y - 3, x + 1, y, C[1]); K.set(x + 1, y - 2, C[3]); K.set(x - 1, y - 3, R('#f6f1e4')[0]); };
+const PLATE = (K, x, y) => { const C = R('#f2ece0'); K.oval(x, y - 1, 3, 1.5, (px, py, dx, dy) => C[Math.hypot(dx, dy) > 0.6 ? 2 : 0]); };
+const CANDLE = (K, x, y, h = 4) => { const W = R('#f4efe2'); K.rect(x, y - h, x + 1, y, W[1]); K.set(x, y - h - 1, R('#f6d36a')[0]); K.set(x, y - h - 2, R('#f4a03a')[1]); for (const [dx, dy] of [[-1, -h - 1], [1, -h - 1], [0, -h - 3]]) K.set(x + dx, y + dy, R('#f6d36a')[0], 90); };
+const BOOK = (K, x, y, col = '#4f6a9a') => { const C = R(col); K.rect(x - 3, y - 2, x + 3, y, (px, py) => (py === y - 2 ? R('#f2ece0')[1] : C[2])); K.rect(x - 3, y - 3, x + 3, y - 2, C[1]); };
+const BLANKET = ['red', 'blue', 'green'];
+
+const FURNITURE = {
+  /* a bed, its head at the back: posts and a panelled headboard, a lower footboard, a mattress under a white sheet
+     turned down over a quilted blanket (red, blue or green), and a plump pillow */
+  bed: (K, o) => {
+    const F = furniture(K, o, 32, 64), B = mat(BLANKET[Math.floor((o.v ?? 0.5) * 3) % 3]), L = mat('linen'), W = mat('walnut');
+    F.box(3, 29, 6, 60, 0, 6, W);
+    F.box(4, 28, 6, 59, 6, 9, L, { top: (u, v, x, y) => {
+      /* the sheet at the head, its hem turned down, then the quilt in squares with sunken seams */
+      if (v < 0.3) return L[0][h2(x, y, 3) < 0.08 ? 2 : 1];
+      if (v < 0.36) return L[0][0];
+      const qu = u * 4, qv = (v - 0.36) * 7;
+      if (Math.abs(qu - Math.round(qu)) < 0.08 || Math.abs(qv - Math.round(qv)) < 0.07) return B[0][3];
+      return B[0][(Math.floor(qu) + Math.floor(qv)) % 2 ? 1 : 2];
+    }, face: (s, t, which) => (which === 'front' || which === 'back' ? L[1][2] : t < 0.5 ? B[1][1] : B[1][2]) });
+    F.box(8, 24, 8, 17, 9, 11, L, { top: (u, v) => L[0][u < 0.15 || v < 0.2 ? 2 : u > 0.85 || v > 0.8 ? 1 : 0] });
+    F.box(2, 30, 2, 6, 0, 17, W, { face: (s, t, which) => (which === 'front' || which === 'back' ? W[1][(s > 0.12 && s < 0.88 && t > 0.3 && t < 0.75) ? 3 : t < 0.12 ? 1 : 2] : null) });
+    for (const a of [2, 27]) F.box(a, a + 3, 2, 6, 0, 20, W, { top: () => W[0][0] });
+    F.box(2, 30, 59, 62, 0, 11, W, { face: (s, t, which) => (which === 'front' || which === 'back' ? W[1][(s > 0.12 && s < 0.88 && t > 0.35) ? 3 : t < 0.15 ? 1 : 2] : null) });
+    F.done(5);
+  },
+  /* a straw pallet on the floor: a rough sacking blanket over its foot and a rolled wool pillow */
+  cot: (K, o) => {
+    const F = furniture(K, o, 32, 64), S = mat('straw'), Wl = [R('#8c7a62'), R('#6e5e4a'), R('#4e4234')];
+    F.box(4, 28, 5, 60, 0, 4, S, { top: (u, v, x, y) => S[0][h2(x, y, 5) < 0.18 ? 3 : h2(x, y, 6) < 0.3 ? 1 : 2] });
+    F.box(5, 27, 26, 58, 4, 5, Wl, { top: (u, v, x, y) => Wl[0][Math.floor(v * 10) % 2 ? 2 : (h2(x, y, 9) < 0.2 ? 3 : 1)] });
+    F.box(7, 25, 7, 13, 4, 7, Wl, { top: (u) => Wl[0][u < 0.2 ? 2 : 0] });
+    F.done(2);
+  },
+  /* a square table on turned legs, a grained top with a jug and a mug on it */
+  table: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak');
+    F.legs(4, 28, 8, 26, 10, W);
+    F.box(4, 28, 8, 11, 7, 10, W); F.box(4, 28, 24, 26, 7, 10, W);
+    F.box(2, 30, 6, 28, 10, 12, W);
+    F.at(12, 15, 12, (x, y) => JUG(K, x, y), 30); F.at(20, 19, 12, (x, y) => MUG(K, x, y), 30);
+    F.done(5);
+  },
+  /* a long trestle table: two trestles and a stretcher, a planked top set with plates, mugs and a loaf */
+  longtable: (K, o) => {
+    const F = furniture(K, o, 64, 32), W = mat('oak');
+    for (const a of [6, 55]) { F.box(a, a + 3, 9, 25, 0, 2, W); F.box(a, a + 3, 15, 18, 0, 10, W); }
+    F.box(8, 56, 15, 17, 4, 6, W);
+    F.box(2, 62, 6, 28, 10, 12, W, { top: (u, v, x, y) => W[0][F.ns ? (Math.floor(v * 4) !== Math.floor((v + 0.04) * 4) ? 3 : h2(x >> 2, y, 7) < 0.1 ? 3 : 2) : (Math.floor(v * 4) !== Math.floor((v + 0.04) * 4) ? 3 : h2(x, y >> 2, 7) < 0.1 ? 3 : 2)] });
+    for (const [a, b] of [[12, 12], [32, 12], [52, 12], [22, 22], [42, 22]]) F.at(a, b, 12, (x, y) => PLATE(K, x, y), 40);
+    for (const [a, b] of [[18, 10], [46, 20]]) F.at(a, b, 12, (x, y) => MUG(K, x, y), 41);
+    F.at(30, 20, 12, (x, y) => { const C = R('#c99a5a'); K.oval(x, y - 2, 4, 2, (px, py, dx, dy) => C[dy < -0.3 ? 0 : dx > 0.4 ? 3 : 1]); });
+    F.done(5);
+  },
+  /* a chair: a seat on four legs and a back of three slats under a top rail */
+  chair: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut');
+    F.legs(10, 22, 12, 24, 8, W);
+    F.box(9, 23, 12, 24, 8, 10, W, { top: (u, v) => W[0][v > 0.85 ? 0 : 2] });
+    F.box(9, 23, 11, 13, 10, 24, W, { face: (s, t, which) => (which === 'front' || which === 'back' ? (t < 0.18 ? W[1][1] : (Math.floor(s * 7) % 2 ? W[1][2] : null) || W[2][4]) : null), top: () => W[0][0] });
+    F.done(3);
+  },
+  /* a three-legged milking stool with a round seat */
+  stool: (K, o) => {
+    /* the same from every side: three legs splayed out from under a thick round seat */
+    const F = furniture(K, o, 32, 32), W = mat('oak');
+    F.at(16, 20, 0, (x, y) => {
+      for (const [dx, dy] of [[-6, 0], [6, 0], [0, 2]]) K.line(x + dx, y + dy, x + Math.round(dx * 0.4), y - 7, W[1][dy ? 3 : dx < 0 ? 1 : 2]);
+      K.rect(x - 4, y - 4, x + 5, y - 3, W[1][3]);
+      K.oval(x, y - 8, 6.5, 2.6, W[1][3]);
+      K.oval(x, y - 9, 6.5, 2.6, (px, py, dx, dy) => W[0][dx + dy < -0.7 ? 0 : dx + dy > 0.6 ? 3 : h2(px, py, 2) < 0.15 ? 2 : 1]);
+      K.ovalShadow(x + 2, y + 1, 7, 2.5);
+    });
+    F.done(0);
+  },
+  /* a plain bench: a thick plank on splayed end boards */
+  bench: (K, o) => {
+    const F = furniture(K, o, 64, 32), W = mat('oak');
+    for (const a of [5, 56]) F.box(a, a + 3, 13, 23, 0, 6, W);
+    F.box(9, 55, 17, 19, 2, 4, W);
+    F.box(2, 62, 12, 24, 6, 9, W);
+    F.done(4);
+  },
+  /* an iron-bound chest with a domed lid, a lock plate on its front */
+  chest: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), I = mat('iron'), G = mat('brass');
+    const band = (s) => Math.abs(s - 0.18) < 0.06 || Math.abs(s - 0.82) < 0.06;
+    F.box(5, 27, 11, 26, 0, 10, W, { face: (s, t, which, x) => (band(s) ? I[1][t > 0.9 ? 3 : 1] : which === 'front' && Math.abs(s - 0.5) < 0.1 && t < 0.55 ? G[1][t < 0.15 ? 0 : 2] : null) });
+    F.box(5, 27, 11, 26, 10, 13, W, { top: (u, v) => (band(F.ns ? u : v) ? I[0][1] : W[0][v > 0.8 || v < 0.15 ? 3 : 1]), face: (s) => (band(s) ? I[1][1] : W[1][1]) });
+    F.done(4);
+  },
+  /* a tall wardrobe: a cornice, two panelled doors with brass knobs, on bracket feet */
+  wardrobe: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), G = mat('brass');
+    F.box(4, 28, 10, 25, 0, 3, W);
+    F.box(4, 28, 10, 25, 3, 36, W, { face: (s, t, which) => {
+      if (which !== 'front') return t < 0.04 ? W[1][1] : null;
+      const door = s < 0.5 ? s * 2 : (s - 0.5) * 2, panel = door > 0.18 && door < 0.82 && ((t > 0.08 && t < 0.45) || (t > 0.52 && t < 0.92));
+      if (Math.abs(s - 0.5) < 0.03) return W[2][4];
+      if (Math.abs(t - 0.5) < 0.02 && (door > 0.7 || door < 0.3)) return null;
+      if ((s > 0.42 && s < 0.47 || s > 0.53 && s < 0.58) && Math.abs(t - 0.5) < 0.04) return G[1][0];
+      return panel ? W[1][door < 0.25 || t < 0.12 ? 1 : 3] : null;
+    } });
+    F.box(3, 29, 9, 26, 36, 39, W, { top: () => W[0][1], face: (s, t) => W[1][t < 0.4 ? 0 : 2] });
+    F.done(6);
+  },
+  /* a bookshelf: four shelves of books of all heights and colours, a few leaning, in a dark frame */
+  bookshelf: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), COLS = ['#b8483a', '#4f6a9a', '#7f9a5a', '#d9b44a', '#8e6a8f', '#7a5a3a', '#c97a56'];
+    F.box(4, 28, 12, 24, 0, 36, W, { face: (s, t, which, x, y) => {
+      if (which !== 'front') return null;
+      if (s < 0.08 || s > 0.92 || t < 0.05) return W[1][s > 0.92 ? 3 : 1];
+      const row = Math.floor(t * 4), tt = t * 4 - row; if (tt > 0.86) return W[1][tt > 0.94 ? 1 : 3];
+      const k = Math.floor((s - 0.08) * 40), c = COLS[Math.floor(h2(k, row, 3) * COLS.length)], hgt = 0.35 + h2(k, row, 4) * 0.5;
+      if (h2(k, row, 5) < 0.1 || 1 - tt / 0.86 > hgt) return W[2][4];
+      return R(c)[((x + 1) % 3 === 0) ? 3 : tt < 0.86 - hgt * 0.86 + 0.12 ? 1 : 2];
+    } });
+    F.box(3, 29, 11, 25, 36, 38, W, { top: () => W[0][1] });
+    F.done(5);
+  },
+  /* a dresser: three drawers with brass pulls under a top set with a jug and a washbowl */
+  dresser: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), G = mat('brass');
+    F.box(4, 28, 12, 25, 0, 2, W);
+    F.box(4, 28, 12, 25, 2, 20, W, { face: (s, t, which) => {
+      if (which !== 'front') return null;
+      const row = Math.floor(t * 3), tt = t * 3 - row;
+      if (tt < 0.12) return W[2][3];
+      if (Math.abs(s - 0.3) < 0.05 && Math.abs(tt - 0.5) < 0.15 || Math.abs(s - 0.7) < 0.05 && Math.abs(tt - 0.5) < 0.15) return G[1][0];
+      return W[1][tt < 0.25 ? 1 : 2];
+    } });
+    F.box(3, 29, 11, 26, 20, 22, W, { top: () => W[0][1] });
+    F.at(11, 18, 22, (x, y) => JUG(K, x, y), 40);
+    F.at(20, 19, 22, (x, y) => { const C = R('#f2ece0'); K.oval(x, y - 1, 4, 2, (px, py, dx, dy) => (dy < -0.2 && Math.hypot(dx, dy) < 0.7 ? R('#9cc0d0')[1] : C[dx > 0.4 ? 2 : 0])); });
+    F.done(5);
+  },
+  /* a writing desk: a pedestal of drawers on one side, legs on the other, paper, a book, an inkwell and a quill */
+  desk: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), G = mat('brass');
+    F.box(3, 12, 10, 24, 0, 11, W, { face: (s, t, which) => (which === 'front' ? (Math.floor(t * 3) !== Math.floor((t + 0.1) * 3) ? W[2][3] : Math.abs(s - 0.5) < 0.12 && Math.abs((t * 3) % 1 - 0.55) < 0.15 ? G[1][0] : null) : null) });
+    F.legs(24, 29, 10, 24, 11, W);
+    F.box(2, 30, 8, 25, 11, 13, W);
+    F.at(9, 14, 13, (x, y) => { K.rect(x - 4, y - 3, x + 3, y, R('#f4efe2')[0]); K.rect(x - 3, y - 2, x + 2, y - 1, R('#c9c0ac')[1]); });
+    F.at(20, 14, 13, (x, y) => BOOK(K, x, y, '#8e2c26'), 40);
+    F.at(25, 19, 13, (x, y) => { K.rect(x - 1, y - 2, x + 1, y, R('#2a2018')[1]); K.line(x, y - 2, x + 3, y - 7, R('#f6f1e4')[0]); });
+    F.done(5);
+  },
+  /* a bar counter: a panelled front, a polished top with tankards on it */
+  counter: (K, o) => {
+    const F = furniture(K, o, 64, 32), W = mat('walnut'), T0 = mat('oak');
+    F.box(2, 62, 10, 25, 0, 14, W, { face: (s, t, which) => {
+      if (which === 'back') return t < 0.1 ? W[1][1] : Math.abs(t - 0.5) < 0.04 ? W[1][3] : null;
+      if (which !== 'front') return null;
+      const k = (s * 4) % 1; if (k < 0.06) return W[2][3];
+      return t > 0.1 && t < 0.88 && k > 0.14 && k < 0.92 ? W[1][(k < 0.2 || t < 0.16) ? 3 : 1] : null;
+    } });
+    F.box(1, 63, 8, 26, 14, 16, T0, { top: (u, v, x, y) => T0[0][v > 0.88 ? 0 : h2(x, y, 3) < 0.06 ? 2 : 1] });
+    for (const [a, b] of [[10, 16], [22, 13], [40, 17], [52, 14]]) F.at(a, b, 16, (x, y) => MUG(K, x, y), 50);
+    F.done(5);
+  },
+  /* a cooking pot hung over embers on an iron tripod, stew in it and steam rising */
+  cauldron: (K, o) => {
+    const F = furniture(K, o, 32, 32), I = mat('iron');
+    F.at(16, 22, 0, (x, y) => {
+      /* the tripod's legs meet over the pot, a chain hanging from them to its bail */
+      for (const [dx, k] of [[-10, 1], [10, 3], [1, 2]]) K.line(x + dx, y + (dx === 1 ? 1 : 0), x, y - 26, I[1][k]);
+      K.set(x, y - 27, I[0][0]);
+      for (let yy = y - 25; yy < y - 18; yy++) K.set(x, yy, I[1][(yy % 2) ? 1 : 3]);
+      K.line(x - 7, y - 13, x, y - 18, I[1][2]); K.line(x + 7, y - 13, x, y - 18, I[1][3]);
+      K.oval(x, y - 1, 7, 2.5, (px, py, dx, dy) => R('#f4a03a')[h2(px, py, 2) < 0.5 ? 1 : 3]);
+      for (const [dx, dy] of [[-3, -2], [2, -3], [0, -1]]) K.set(x + dx, y + dy, R('#f6d36a')[0]);
+      K.oval(x, y - 9, 8, 7, (px, py, dx, dy) => (dy < -0.45 ? null : I[1][dx + dy * 0.3 < -0.4 ? 1 : dx > 0.4 ? 4 : 2]));
+      K.oval(x, y - 13, 8, 2.5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.75 ? I[0][1] : R('#8e6a3a')[h2(px, py, 4) < 0.25 ? 1 : 2]));
+      for (const [dx, dy] of [[-3, -17], [3, -19], [-4, -22], [4, -24]]) K.set(x + dx, y + dy, R('#e8e4dc')[0], 110);
+      K.ovalShadow(x + 3, y, 11, 3);
+    });
+    F.done(0);
+  },
+  /* a coopered wash tub bound with iron hoops, water in it with a little soap foam */
+  tub: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), I = mat('iron');
+    F.at(16, 22, 0, (x, y) => {
+      K.rect(x - 10, y - 9, x + 11, y, (px, py) => ((py === y - 3 || py === y - 7) ? I[1][2] : W[1][(px - x + 20) % 4 === 0 ? 3 : px < x - 5 ? 1 : px > x + 6 ? 3 : 2]));
+      K.oval(x, y - 9, 10.5, 3.5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.78 ? W[0][dy < 0 ? 1 : 2] : R('#9cc0d0')[dy < -0.2 ? 0 : 2]));
+      for (const [dx, dy] of [[-4, -10], [-3, -9], [3, -10], [5, -9], [0, -8]]) K.set(x + dx, y + dy, R('#f6f8f4')[0]);
+      K.ovalShadow(x + 3, y - 1, 12, 3);
+    });
+    F.done(0);
+  },
+  /* a brass candle stand: a domed foot, a turned stem, three arms with candles and a warm glow round the flames */
+  candelabra: (K, o) => {
+    const F = furniture(K, o, 32, 32), G = mat('brass');
+    F.at(16, 22, 0, (x, y) => {
+      K.oval(x, y - 1, 5, 2, (px, py, dx) => G[1][dx < -0.3 ? 0 : dx > 0.4 ? 3 : 1]);
+      K.rect(x, y - 27, x + 1, y - 2, (px, py) => G[1][(py % 6 === 0) ? 0 : 2]); K.set(x + 1, y - 14, G[1][3]);
+      K.rect(x - 6, y - 27, x + 7, y - 26, G[1][1]);
+      for (const dx of [-6, 0, 6]) { K.rect(x + dx - 1, y - 28, x + dx + 2, y - 27, G[1][0]); CANDLE(K, x + dx, y - 28, 5); }
+      for (let r = 4; r <= 9; r++) for (let a = 0; a < 24; a++) { const px = Math.round(x + Math.cos(a / 24 * 6.283) * r * 1.4), py = Math.round(y - 35 + Math.sin(a / 24 * 6.283) * r); if (!K.get(px, py)) K.set(px, py, R('#f6d36a')[0], Math.round(46 * (1 - (r - 4) / 6))); }
+    });
+    F.done(0);
+  },
+  /* a potted fern: a terracotta pot with a rolled rim, fronds arching out of it, lit from the upper left */
+  plantpot: (K, o) => {
+    const F = furniture(K, o, 32, 32), C = mat('clay'), Lf = R('#6f9a52');
+    F.at(16, 22, 0, (x, y) => {
+      K.poly([[x - 5, y - 9], [x + 6, y - 9], [x + 4, y], [x - 3, y]], (px) => C[1][px < x - 2 ? 1 : px > x + 2 ? 3 : 2]);
+      K.rect(x - 6, y - 11, x + 7, y - 9, (px) => C[0][px < x - 2 ? 0 : px > x + 3 ? 2 : 1]);
+      K.oval(x, y - 11, 5.5, 1.2, R('#4a3424')[2]);
+      for (let k = 0; k < 9; k++) {
+        const ang = -Math.PI / 2 + (k - 4) * 0.36, len = 9 + h2(k, 1, 3) * 5;
+        for (let t = 0; t <= 1; t += 0.06) { const px = x + Math.cos(ang) * len * t + (k - 4) * t * t * 1.5, py = y - 11 + Math.sin(ang) * len * t + t * t * 6; K.set(px, py, Lf[t < 0.3 ? 3 : (k < 4 ? 1 : 2)]); if (t > 0.25 && Math.round(t * 16) % 2 === 0) K.set(px + (k < 4 ? -1 : 1), py + 1, Lf[k < 4 ? 0 : 2]); }
+      }
+    });
+    F.done(0);
+  },
+  /* a throne on a stepped dais: a tall gilt back padded in red velvet under a crest, arms and a cushioned seat */
+  throne: (K, o) => {
+    const F = furniture(K, o, 32, 32), G = mat('gold'), V = mat('velvet'), S = mat('stone');
+    F.box(1, 31, 4, 30, 0, 3, S);
+    F.box(7, 25, 12, 26, 3, 10, G, { face: (s, t, which) => (which === 'front' ? (s > 0.15 && s < 0.85 && t > 0.2 && t < 0.8 ? V[1][t < 0.35 ? 1 : 2] : null) : null) });
+    F.box(9, 23, 13, 25, 10, 12, V, { top: (u, v) => V[0][v > 0.8 ? 0 : u < 0.2 ? 1 : 2] });
+    for (const a of [6, 23]) F.box(a, a + 3, 13, 25, 10, 16, G, { top: () => G[0][0] });
+    F.box(7, 25, 10, 13, 3, 36, G, { face: (s, t, which) => (which === 'front' ? (s > 0.16 && s < 0.84 && t > 0.1 && t < 0.78 ? V[1][(Math.floor(s * 6) + Math.floor(t * 8)) % 2 && h2(Math.floor(s * 6), Math.floor(t * 8), 2) < 0.4 ? 1 : 2] : null) : null) });
+    F.at(16, 11, 36, (x, y) => { K.rect(x - 2, y - 5, x + 3, y, G[1][1]); K.set(x, y - 6, R('#b8483a')[0]); K.set(x - 1, y - 2, G[0][0]); });
+    F.done(6);
+  },
+  /* an altar of dressed stone under a white cloth hanging down its front with a gold-edged red panel, a cross,
+     two candles and a book on it */
+  altar: (K, o) => {
+    const F = furniture(K, o, 64, 32), S = mat('stone'), L = mat('linen'), Rd = mat('red'), G = mat('gold');
+    F.box(1, 63, 8, 28, 0, 2, S);
+    F.box(3, 61, 10, 26, 2, 17, S, { face: (s, t, which, x, y) => {
+      if (which === 'front' && Math.abs(s - 0.5) < 0.18) return t < 0.35 ? L[1][1] : Math.abs(s - 0.5) > 0.15 ? G[1][1] : Rd[1][t > 0.92 ? 3 : 2];
+      return S[1][(y % 5 === 0 || (x + (Math.floor(y / 5) % 2) * 6) % 12 === 0) ? 3 : 1];
+    } });
+    F.box(3, 61, 10, 26, 17, 18, L, { top: (u, v) => (Math.abs(u - 0.5) < 0.18 ? L[0][0] : L[0][1]) });
+    F.at(32, 14, 18, (x, y) => { const C = G[0]; K.rect(x, y - 9, x + 1, y, C[1]); K.rect(x - 2, y - 7, x + 3, y - 6, C[1]); });
+    for (const a of [12, 52]) F.at(a, 15, 18, (x, y) => { K.rect(x - 1, y - 1, x + 2, y, G[0][2]); CANDLE(K, x, y - 1, 6); });
+    F.at(22, 20, 18, (x, y) => BOOK(K, x, y, '#8e2c26'), 32);
+    F.done(5);
+  },
+  /* a church pew: a seat and a high back with carved ends */
+  pew: (K, o) => {
+    const F = furniture(K, o, 64, 32), W = mat('walnut');
+    F.box(4, 60, 12, 24, 5, 8, W);
+    F.box(4, 60, 10, 12, 5, 22, W, { face: (s, t) => W[1][t < 0.1 ? 1 : Math.floor(s * 10) % 2 ? 2 : 3] });
+    for (const a of [2, 59]) F.box(a, a + 3, 9, 25, 0, 24, W, { top: () => W[0][0], face: (s, t) => W[1][t < 0.12 ? 1 : 2] });
+    F.done(4);
+  },
+  /* a weapon rack: two uprights and rails holding spears and swords upright, a round shield hung at its end */
+  weaponrack: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), M = R('#c8ccd0'), I = mat('iron'), Sd = mat('red');
+    F.box(3, 29, 16, 20, 0, 2, W);
+    for (const a of [3, 26]) F.box(a, a + 3, 16, 20, 2, 30, W);
+    F.box(3, 29, 17, 19, 24, 26, W); F.box(3, 29, 17, 19, 10, 12, W);
+    F.at(16, 18, 0, (x, y) => {
+      const front = F.south === 'front' || F.south === 'back';
+      if (front) for (let k = 0; k < 4; k++) { const px = x - 7 + k * 5; if (k % 2) { K.rect(px, y - 34, px + 1, y - 2, W[1][1]); K.poly([[px - 1, y - 34], [px + 2, y - 34], [px, y - 40]], M[1]); } else { K.rect(px, y - 30, px + 1, y - 4, M[k ? 1 : 0]); K.rect(px - 2, y - 8, px + 3, y - 7, R('#c9a24f')[1]); K.rect(px, y - 7, px + 1, y - 3, R('#5a3f28')[2]); } }
+      else for (const dz of [0, 3]) K.rect(x - 1, y - 38 + dz, x + 1, y - 2, dz ? W[1][2] : M[1]);
+      K.oval(x + (front ? 10 : 0), y - 12, 5, 6, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.78 ? I[1][1] : Math.hypot(dx, dy) < 0.25 ? R('#c9a24f')[1] : Sd[1][dx + dy < 0 ? 1 : 2]));
+    });
+    F.done(4);
+  },
+  /* a spinning wheel: a slanted bench on three legs, the wheel with its spokes and treadle, a distaff of wool */
+  spinwheel: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('pine');
+    F.legs(6, 27, 14, 22, 6, W);
+    F.box(5, 28, 14, 22, 6, 9, W);
+    F.at(16, 16, 9, (x, y) => {
+      const side = F.ns, cx = x + (side ? 2 : 0);
+      if (side) K.oval(cx, y - 11, 10, 10, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); return d > 0.84 ? W[1][dx + dy < 0 ? 1 : 3] : (Math.abs(dx * 0.7 - dy * 0.7) < 0.08 || Math.abs(dx * 0.7 + dy * 0.7) < 0.08 || Math.abs(dx) < 0.07 || Math.abs(dy) < 0.07) && d > 0.15 ? W[1][2] : null; });
+      else K.rect(cx - 1, y - 21, cx + 1, y - 1, W[1][2]);
+      K.oval(cx, y - 11, 2, 2, W[1][3]);
+      K.line(x - 8, y, x - 8, y - 18, W[1][3]); K.oval(x - 8, y - 20, 3, 3, (px, py, dx, dy) => R('#f0e6cb')[dx + dy < 0 ? 0 : 2]);
+    });
+    F.done(3);
+  }
+};
+
 const INTERIOR = {
   iwall: (K, o) => roomWall(K, o),
   iwindow: (K, o) => roomWall(K, o, (x, y, b) => (Math.abs(x - K.FW / 2) < 5 && y > b - ROOMW + 6 && y < b - 9 ? (Math.abs(x - K.FW / 2) < 4 && y > b - ROOMW + 7 && y < b - 10 ? R('#9cc0d0')[y < b - 16 ? 0 : 2] : R('#7a5a3a')[2]) : null)),
@@ -698,28 +1073,7 @@ const INTERIOR = {
   post: (K) => { const P = R('#7a5a3a'), cx = K.FW / 2, cy = K.FD / 2; K.rect(cx - 3, cy - ROOMW, cx + 3, cy + 3, (x) => P[x < cx - 1 ? 1 : 3]); },
   hearth: (K, o) => { const S = R('#b3aa96'), { FW, FD } = K; K.box(2, 4, FW - 2, FD - 6, 28, (x, y) => S[2], (x, y) => wallTone('stone', S, x, y)); K.rect(FW / 2 - 8, FD - 20, FW / 2 + 8, FD - 6, R('#2a2018')[3]); K.poly([[FW / 2 - 6, FD - 6], [FW / 2 - 2, FD - 16], [FW / 2, FD - 11], [FW / 2 + 3, FD - 17], [FW / 2 + 6, FD - 6]], R('#f4a03a')[1]); K.rect(0, FD - 30, FW, FD - 27, R('#8e6a44')[1]); },
   stairs: (K, o) => stairsSprite(K, o),
-  bed: (K, o) => { const { FW, FD } = K, f = facing(o), F = furnBox(K, 3, 3, FW - 3, FD - 3, 7, '#8e6a44'), B = R('#c4503e'), W = R('#f4efe2'); const pil = f === 0 ? [3, 3, FW - 3, 13] : f === 2 ? [3, FD - 13, FW - 3, FD - 3] : f === 1 ? [3, 3, 13, FD - 3] : [FW - 13, 3, FW - 3, FD - 3]; K.rect(4, 4 - 7, FW - 4, FD - 4 - 7, (x, y) => B[(x + y) % 6 === 0 ? 2 : 1]); K.rect(pil[0] + 1, pil[1] - 7 + 1, pil[2] - 1, pil[3] - 7 - 1, W[1]); void F; },
-  cot: (K) => { const P = R('#d8b968'); K.box(4, 4, K.FW - 4, K.FD - 4, 3, (x, y) => P[h2(x, y) < 0.3 ? 1 : 0], P[3]); },
-  table: (K) => { const P = R('#9a7650'); K.rect(6, K.FD - 14, 9, K.FD - 5, P[3]); K.rect(K.FW - 9, K.FD - 14, K.FW - 6, K.FD - 5, P[3]); K.box(3, 6, K.FW - 3, K.FD - 12, 10, (x, y) => P[((y % 5) + 5) % 5 === 0 ? 2 : 1], P[3]); },
-  longtable: (K) => { const P = R('#8e6a44'); for (const x of [6, K.FW / 2, K.FW - 9]) K.rect(x, K.FD - 14, x + 3, K.FD - 5, P[3]); K.box(3, 6, K.FW - 3, K.FD - 12, 10, (x, y) => P[((y % 5) + 5) % 5 === 0 ? 2 : 1], P[3]); for (const x of [K.FW * 0.25, K.FW * 0.75]) K.oval(x, 0, 3, 2, R('#eeeae0')[1]); },
-  chair: (K, o) => { const P = R('#8e6a44'), f = facing(o), cx = K.FW / 2, cy = K.FD / 2 + 4; K.box(cx - 6, cy - 6, cx + 6, cy + 6, 8, P[1], P[3]); const back = f === 0 ? [cx - 6, cy - 7, cx + 6, cy - 5] : f === 2 ? [cx - 6, cy + 4, cx + 6, cy + 6] : f === 1 ? [cx - 7, cy - 6, cx - 5, cy + 6] : [cx + 5, cy - 6, cx + 7, cy + 6]; K.rect(back[0], back[1] - 22, back[2], back[3] - 8, (x, y) => P[y % 4 === 0 ? 3 : 2]); },
-  stool: (K) => { const P = R('#9a7650'), cx = K.FW / 2, cy = K.FD - 10; K.rect(cx - 4, cy - 4, cx - 2, cy + 3, P[3]); K.rect(cx + 2, cy - 4, cx + 4, cy + 3, P[3]); K.oval(cx, cy - 6, 6, 3, P[1]); },
-  bench: (K) => { const P = R('#9a7650'); K.box(3, K.FD - 14, K.FW - 3, K.FD - 6, 7, P[1], P[3]); },
-  chest: (K) => { const P = furnBox(K, 5, 8, K.FW - 5, K.FD - 6, 12, '#8e6a44'), I = R('#c9a24f'); K.rect(5, K.FD - 14, K.FW - 5, K.FD - 13, I[2]); K.rect(K.FW / 2 - 1, K.FD - 13, K.FW / 2 + 2, K.FD - 10, I[1]); void P; },
-  wardrobe: (K, o) => { const P = furnBox(K, 3, 6, K.FW - 3, K.FD - 6, 40, '#7a5a3a'); if (facing(o) !== 2) { K.rect(K.FW / 2, K.FD - 44, K.FW / 2 + 1, K.FD - 8, P[4]); K.set(K.FW / 2 - 2, K.FD - 26, R('#c9a24f')[1]); K.set(K.FW / 2 + 2, K.FD - 26, R('#c9a24f')[1]); } },
-  bookshelf: (K, o) => { const P = furnBox(K, 3, 6, K.FW - 3, K.FD - 6, 38, '#7a5a3a'); if (facing(o) !== 2) for (let s = 0; s < 4; s++) { const y = K.FD - 42 + s * 9; K.rect(5, y, K.FW - 5, y + 7, (x) => R(['#b8483a', '#4f6a9a', '#7f9a5a', '#d9b44a', '#8e6a8f'][Math.floor(h2(x, s) * 5)])[h2(x, s, 2) < 0.3 ? 1 : 2]); K.rect(4, y + 7, K.FW - 4, y + 9, P[3]); } },
-  dresser: (K, o) => { const P = furnBox(K, 3, 6, K.FW - 3, K.FD - 6, 26, '#8e6a44'); if (facing(o) !== 2) for (let s = 0; s < 3; s++) { const y = K.FD - 28 + s * 8; K.rect(5, y, K.FW - 5, y + 1, P[4]); K.set(K.FW / 2, y + 4, R('#c9a24f')[1]); } K.oval(K.FW / 2 - 6, 6 - 26 + 3, 3, 2, R('#eeeae0')[1]); },
-  desk: (K) => { const P = R('#7a5a3a'); K.box(3, 6, K.FW - 3, K.FD - 8, 16, P[1], (x, y) => P[x > K.FW / 2 - 4 && x < K.FW / 2 + 4 && y > K.FD - 20 ? 4 : 3]); K.rect(8, -6, 16, -2, R('#f4efe2')[0]); K.rect(20, -8, 22, -2, R('#2a2018')[1]); },
-  counter: (K) => { furnBox(K, 2, 8, K.FW - 2, K.FD - 6, 16, '#8e6a44'); K.rect(2, 8 - 16, K.FW - 2, K.FD - 6 - 16, (x, y) => R('#b08a58')[((x % 8) + 8) % 8 === 0 ? 2 : 1]); },
-  cauldron: (K) => { const cx = K.FW / 2, b = K.FD - 8, I = R('#3b3a38'); K.oval(cx, b - 8, 10, 8, (x, y, dx, dy) => (dy < -0.3 ? null : I[dx < -0.3 ? 1 : 2])); K.oval(cx, b - 13, 9, 3, R('#7f9a5a')[1]); K.rect(cx - 12, b - 15, cx - 10, b - 2, I[3]); K.rect(cx + 10, b - 15, cx + 12, b - 2, I[3]); },
-  tub: (K) => { const P = R('#9a7650'), cx = K.FW / 2, b = K.FD - 7; K.rect(cx - 11, b - 8, cx + 11, b, (x, y) => (y % 4 === 0 ? R('#5a5048')[2] : P[x < cx - 6 ? 1 : 2])); K.oval(cx, b - 8, 11, 4, P[1]); K.oval(cx, b - 8, 9, 3, R('#9cc0d0')[1]); },
-  candelabra: (K) => { const cx = K.FW / 2, b = K.FD - 8, G = R('#c9a24f'); K.rect(cx - 1, b - 28, cx + 1, b, G[2]); K.oval(cx, b, 5, 2, G[3]); K.rect(cx - 7, b - 28, cx + 7, b - 26, G[2]); for (const x of [cx - 7, cx - 1, cx + 5]) { K.rect(x, b - 33, x + 2, b - 28, R('#f4efe2')[1]); K.set(x, b - 35, R('#f6d36a')[0]); K.set(x + 1, b - 34, R('#f4a03a')[1]); } },
-  plantpot: (K) => { const cx = K.FW / 2, b = K.FD - 8; K.rect(cx - 5, b - 8, cx + 5, b, (x) => R('#b8684a')[x < cx - 2 ? 1 : x > cx + 2 ? 3 : 2]); K.mass(cx, b - 14, 8, 7, R('#7f9a5a'), 2); },
-  throne: (K, o) => { const G = R('#c9a24f'), Rd = R('#a83a2c'), cx = K.FW / 2, b = K.FD - 6; K.box(cx - 10, b - 14, cx + 10, b, 10, Rd[1], G[2]); if (facing(o) !== 2) { K.rect(cx - 10, b - 44, cx + 10, b - 22, (x, y) => (x < cx - 7 || x > cx + 6 || y < b - 41 ? G[x > cx ? 2 : 1] : Rd[2])); K.rect(cx - 2, b - 48, cx + 2, b - 44, G[0]); } else K.rect(cx - 10, b - 44, cx + 10, b - 22, G[2]); },
-  altar: (K) => { const S = R('#d8cfb9'); K.box(3, 6, K.FW - 3, K.FD - 8, 16, S[1], (x, y) => wallTone('stone', S, x, y)); K.rect(K.FW / 2 - 8, -10, K.FW / 2 + 8, K.FD - 8 - 4, (x, y) => (y < K.FD - 24 ? R('#f4efe2')[1] : R('#a83a2c')[2])); for (const x of [8, K.FW - 10]) { K.rect(x, -16, x + 2, -10, R('#f4efe2')[0]); K.set(x, -17, R('#f6d36a')[0]); } },
-  pew: (K, o) => { const P = R('#7a5a3a'); K.box(2, K.FD - 14, K.FW - 2, K.FD - 6, 8, P[1], P[3]); K.rect(2, K.FD - (facing(o) === 2 ? 8 : 16) - 18, K.FW - 2, K.FD - (facing(o) === 2 ? 8 : 16) - 6, (x, y) => P[y % 4 === 0 ? 3 : 2]); },
-  weaponrack: (K) => { const W = R('#7a5a3a'), M = R('#c8ccd0'); K.rect(4, K.FD - 34, K.FW - 4, K.FD - 31, W[2]); K.rect(4, K.FD - 14, K.FW - 4, K.FD - 11, W[2]); for (const x of [5, K.FW - 7]) K.rect(x, K.FD - 36, x + 2, K.FD - 6, W[3]); for (let k = 0; k < 4; k++) { const x = 9 + k * 5; K.rect(x, K.FD - 42, x + 1, K.FD - 8, k % 2 ? W[1] : M[1]); K.rect(x - 1, K.FD - 44, x + 2, K.FD - 40, M[k % 2 ? 0 : 2]); } },
-  spinwheel: (K) => { const W = R('#9a7650'), cx = K.FW / 2 + 3, cy = K.FD - 22; K.box(4, K.FD - 12, K.FW - 4, K.FD - 6, 6, W[1], W[3]); K.oval(cx, cy, 10, 10, (x, y, dx, dy) => (Math.hypot(dx, dy) > 0.82 || Math.abs(dx - dy) < 0.12 || Math.abs(dx + dy) < 0.12 ? W[2] : null)); K.oval(cx, cy, 2, 2, W[3]); K.rect(8, K.FD - 24, 10, K.FD - 12, W[3]); K.rect(8, K.FD - 26, 12, K.FD - 22, R('#f0e6cb')[1]); }
+  ...FURNITURE
 };
 
 /* ---------- the elven wood (town/elven.js) ---------- */

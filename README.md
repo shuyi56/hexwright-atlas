@@ -441,7 +441,16 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   little off the grid so a wood never grows in rows; the willow is one bell of hanging strands lit over its crown, a
   darker curtain behind its trunk and the front one parting round it;
   pines are tiers of slanting needles with drooping tips, and props and furniture keep the figures' scale in the
-  middle of their tiles. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
+  middle of their tiles. Furniture is built of solid blocks raised to their real heights (a seat at a knee, a table at
+  a hip, a wardrobe over a head), each with a lit top grained the way the piece runs, a face toward the viewer and a
+  dark sliver of its east side, under a soft shadow: a bed with posts, a quilt in squares under a turned-down sheet and
+  a pillow; tables set with jugs, mugs, plates and a loaf; slatted chairs; a three-legged stool; an iron-bound chest; a
+  wardrobe of panelled doors; a bookshelf of books of every height and colour; a dresser of drawers with a jug and
+  washbowl on it; a desk with paper, a book and a quill; a panelled bar counter with tankards; a cooking pot hung over
+  embers from a tripod; a coopered wash tub; a candle stand glowing; a potted fern; a gilt and velvet throne on its
+  dais; an altar under a cloth; pews with carved ends; a weapon rack of spears, swords and a shield; and a spinning
+  wheel. Each is drawn facing south and turned to its facing, so a turned piece shows its side (a plain face there
+  is a framed, sunken panel) and from behind its back. Shadows fall to the east. City and room walls join their neighbours. A piece standing in
   front of the hero fades so they are never lost behind it.
 - **Walking:** the hero walks freely, not tile by tile: the arrow keys or `WASD` (diagonals too, `Shift` runs) move
   them at a figure's pace, about three of their own heights a second, with a stride every few pixels so the feet plant
