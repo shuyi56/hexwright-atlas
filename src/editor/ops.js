@@ -68,6 +68,7 @@ function placePiece(M, inst) {
   if (!ASSET_BY_ID[inst.id]) return { ok: false, reason: `unknown asset "${inst.id}"` };
   const o = { id: inst.id, x: inst.x, y: inst.y, face: (inst.face | 0) & 3, v: inst.v ?? Math.random() }, L = levelOf(inst);
   if (L) o.level = L;
+  if (inst.interior) o.interior = inst.interior;
   if (!fits(M, o)) return { ok: false, reason: whyNot(M, o) };
   M.objs.push(o); return { ok: true, index: M.objs.length - 1, piece: o };
 }

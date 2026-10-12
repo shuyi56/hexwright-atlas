@@ -6,6 +6,7 @@ import { TOWNSFOLK } from '../characters/townsfolk.js';
 import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
+import { addInterior, canHaveInterior, makeInterior } from './interiors.js';
 import { MAX_ELEV, MAX_LEVEL, blankModel, floorAt, levelOf, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, removeFloor, setElev, shiftElev } from './ops.js';
 import { EL, SZ, THH, TWH, frontMask, renderTiles, rotInst, thumb, updateTiles } from './render.js';
@@ -16,18 +17,63 @@ const root = $('editor'), cv = $('edCanvas'), cx = cv.getContext('2d'), ov = $('
 const SC = coarse ? 1.4 : 2, SAVE_KEY = 'hexwright.tiles.v1', HIST = 60;
 const TOOLS = [
   ['paint', 'Paint', 'B', '▦'], ['fill', 'Fill', 'G', '◩'], ['raise', 'Raise', 'U', '▲'], ['lower', 'Lower', 'J', '▼'], ['level', 'Level', 'L', '▬'],
-  ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥']
+  ['place', 'Place', 'P', '⌂'], ['character', 'Person', 'C', '☺'], ['walk', 'Walk', 'W', '➜'], ['erase', 'Erase', 'E', '✕'], ['pick', 'Pick', 'I', '◉'], ['pan', 'Pan', 'H', '✥'], ['interior', 'Interior', 'N', '▣']
 ];
-const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, level: 0, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), occ: new Map(), lastT: 0, preview: null };
+const ED = { open: false, M: null, R: null, rot: 0, z: 1, ox: 0, oy: 0, fitZ: 1, cw: 0, ch: 0, tool: 'paint', brush: 1, terrain: 'grass', asset: 'cottage', face: 0, hover: null, grid: true, level: 0, undo: [], redo: [], stale: true, dirty: false, stroke: null, tab: 'Terrain', char: null, sel: -1, walk: new Map(), occ: new Map(), lastT: 0, preview: null, outer: null };
 /* one sprite pixel in drawing units: a figure stands about as tall as a cottage's eaves and chimney */
 const WALK_SPEED = 3.2, SPRITE_PX = 0.3, FIG_H = FIGURE * SPRITE_PX;
 
 /* ---------- persistence ---------- */
 let saveT = 0;
-function autosave() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(toJSON(ED.M))); } catch { /* storage unavailable: the map still lives in memory */ } }, 400); }
+function autosave() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(toJSON(rootModel()))); } catch { /* storage unavailable: the map still lives in memory */ } }, 400); }
 function restore() { try { const s = localStorage.getItem(SAVE_KEY); return s ? fromJSON(JSON.parse(s)) : null; } catch { return null; } }
 function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
 const slug = s => (s || 'tile-map').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tile-map';
+
+/* ---------- interiors ----------
+   A building given an interior (editor/interiors.js) carries a map of its own. Opening it swaps that map in for the
+   one it stands on: every tool, the storeys, the undo stack and the automation API then work on the room, until
+   Back to map (or Esc) puts the map back. ED.outer holds the map outside, its undo history and its view meanwhile.
+   Everything done inside comes back out as one step on the map's undo stack. */
+/* the whole map, the one saved and walked, with the interior being furnished written back into its building */
+function rootModel() { const o = ED.outer; if (!o) return ED.M; o.piece.interior = ED.M; return o.M; }
+let pendingRoom = null;
+function enterInterior(piece) {
+  if (ED.outer || !piece || !piece.interior) return false;
+  ED.outer = { M: ED.M, piece, undo: ED.undo, redo: ED.redo, snap: cloneModel(ED.M), was: JSON.stringify(toJSON(piece.interior)), view: { rot: ED.rot, level: ED.level, sel: ED.sel, z: ED.z, fitZ: ED.fitZ, ox: ED.ox, oy: ED.oy, tool: ED.tool, tab: ED.tab, asset: ED.asset } };
+  ED.M = piece.interior; ED.undo = []; ED.redo = []; ED.rot = 0; ED.sel = -1; ED.walk.clear(); ED.occ.clear(); ED.area = null; ED.preview = null;
+  setLevel(0); ED.stale = true;
+  /* straight to furnishing */
+  if (!(ASSET_BY_ID[ED.asset] && ASSET_BY_ID[ED.asset].group === 'Interior')) ED.asset = 'table';
+  setTab('Interior'); setTool('place');
+  syncInside(); $('edName').value = ED.M.name; showSize(ED.M.S); syncHist(); autosave();
+  if (ED.open) { rebuild(); fitView(); }
+  walkNote = `Inside ${ED.M.name}: furnish the room, then Back to map (Esc).`; status();
+  return true;
+}
+/* back out to the map; drop: take the interior off the building as well */
+function leaveInterior(drop = false) {
+  const o = ED.outer; if (!o) return false;
+  const room = ED.M, moved = drop || JSON.stringify(toJSON(room)) !== o.was;
+  ED.M = o.M; ED.undo = o.undo; ED.redo = o.redo; ED.outer = null;
+  if (drop) delete o.piece.interior; else o.piece.interior = room;
+  if (moved) { ED.undo.push(o.snap); if (ED.undo.length > HIST) ED.undo.shift(); ED.redo.length = 0; }
+  const v = o.view; ED.rot = v.rot; ED.sel = (ED.M.chars || [])[v.sel] ? v.sel : -1; ED.walk.clear(); ED.occ.clear(); ED.area = null; ED.preview = null;
+  setLevel(v.level); ED.stale = true; ED.asset = v.asset; setTab(v.tab); setTool(v.tool);
+  syncInside(); $('edName').value = ED.M.name; showSize(ED.M.S); syncHist(); autosave();
+  if (ED.open) { rebuild(); if (ED.cw) { ED.z = v.z; ED.fitZ = v.fitZ; ED.ox = v.ox; ED.oy = v.oy; } req(); }
+  walkNote = drop ? `${ASSET_BY_ID[o.piece.id].label} has no interior now (Undo brings it back).` : ''; status();
+  return true;
+}
+/* the bar over the stage while inside, and the controls that make no sense in a room */
+function syncInside() {
+  const o = ED.outer, bar = $('edInside');
+  root.classList.toggle('inside', !!o); bar.hidden = !o;
+  if (o) { const [w, d] = footprint(o.piece); $('edInsideOf').textContent = `${ASSET_BY_ID[o.piece.id].label} at ${o.piece.x}, ${o.piece.y}${w > 1 || d > 1 ? ` (${w}×${d})` : ''}`; }
+  $('edEyebrow').textContent = o ? 'interior' : 'tile editor';
+  $('edGen').disabled = !!o; $('edBiome').disabled = !!o;
+  $('edNew').title = o ? 'Start the room over, empty and walled, at the size chosen' : 'A blank map of the size and land chosen';
+}
 
 /* ---------- history ---------- */
 function checkpoint() { ED.undo.push(cloneModel(ED.M)); if (ED.undo.length > HIST) ED.undo.shift(); ED.redo.length = 0; syncHist(); }
@@ -268,7 +314,7 @@ function draw() {
   if (ED.walk.size) { stepAnim(performance.now()); req(); }
   if (followLevel != null) { const L = followLevel; followLevel = null; setLevel(L); return; }
   const hasChars = ED.M.chars && ED.M.chars.length;
-  if (!ED.hover && !hasChars) return;
+  if (!ED.hover && !hasChars && ED.tool !== 'interior') return;
   g.save(); g.setTransform(dpr * ED.z, 0, 0, dpr * ED.z, dpr * ED.ox, dpr * ED.oy);
   const outline = (tiles, stroke, fill) => {
     g.beginPath();
@@ -291,10 +337,21 @@ function draw() {
       else outline([[x, y]], ED.sel >= 0 && !path ? '#b8483a' : 'rgba(255,240,200,0.7)', ED.sel >= 0 && !path ? 'rgba(184,72,58,0.22)' : null);
     }
   }
+  /* with the Interior tool, every building that has one is ringed in gold */
+  if (ED.tool === 'interior' && !ED.level) {
+    const tiles = []; for (const o of ED.M.objs) { if (!o.interior || levelOf(o)) continue; const [w, d] = footprint(o); for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) tiles.push([o.x + i, o.y + j]); }
+    if (tiles.length) outline(tiles, 'rgba(228,198,132,0.95)', 'rgba(228,198,132,0.28)');
+  }
   if (hasChars) drawChars(g, R);
   if (!ED.hover) { g.restore(); return; }
   const { x, y } = ED.hover;
   if (ED.tool === 'walk' || ED.tool === 'character') { /* drawn above */ }
+  else if (ED.tool === 'interior') {
+    /* the building under the pointer, white if it can have an interior (gold ones already do), red if not */
+    const k = objAt(ED.M, x, y, ED.level), o = k >= 0 ? ED.M.objs[k] : null;
+    if (o) { const ok = !ED.outer && !ED.level && canHaveInterior(o.id), [w, d] = footprint(o), tiles = []; for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) tiles.push([o.x + i, o.y + j]); outline(tiles, ok ? 'rgba(255,240,200,0.95)' : '#b8483a', ok ? 'rgba(255,240,200,0.2)' : 'rgba(184,72,58,0.25)'); }
+    else outline([[x, y]], 'rgba(255,240,200,0.5)');
+  }
   else if (ED.tool === 'place') {
     const o = ghost(), ok = fits(ED.M, o), [w, d] = footprint(o), tiles = [];
     for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) if (x + i < ED.M.S && y + j < ED.M.S) tiles.push([x + i, y + j]);
@@ -344,6 +401,14 @@ function applyAt(p, first) {
     /* a character, else a piece, else (above the ground) the floor itself */
     if (eraseCharAt(M, p.x, p.y, L) || eraseAt(M, p.x, p.y, L) || (L && removeFloor(M, brushTiles(p.x, p.y), L))) changed();
   }
+  else if (ED.tool === 'interior' && first) {
+    /* a building: give it an interior if it has none, and open it to furnish */
+    const k = objAt(M, p.x, p.y, L), o = k >= 0 ? M.objs[k] : null, a = o && ASSET_BY_ID[o.id];
+    if (ED.outer) walkNote = 'Interiors do not nest: go back to the map to open another building.';
+    else if (!o) walkNote = 'Click a building to give it an interior, or to open the one it has.';
+    else if (L || !canHaveInterior(o.id)) walkNote = L ? 'Only buildings standing on the ground can have an interior.' : `The ${a.label.toLowerCase()} ${a.group === 'Buildings' ? 'is open to the air' : 'is not a building'}: it has no inside to furnish.`;
+    else { if (!o.interior) { addInterior(M, o); changed(); } pendingRoom = o; }
+  }
   else if (ED.tool === 'pick' && first) {
     const ck = charAt(M, p.x, p.y, -1, L), k = objAt(M, p.x, p.y, L), f = floorAt(M, L, p.y * S + p.x);
     if (ck >= 0) { ED.char = M.chars[ck].sprite; ED.face = M.chars[ck].face; ED.sel = ck; setTab('Characters'); setTool('character'); }
@@ -369,7 +434,7 @@ function status() {
   if (!ED.hover) { statusEl.textContent = `${ED.M.S}×${ED.M.S} tiles · ${ED.M.objs.length} pieces${nc ? ` · ${nc} character${nc > 1 ? 's' : ''}` : ''}${where}`; return; }
   const { x, y } = ED.hover, u = y * ED.M.S + x, k = objAt(ED.M, x, y, L), ck = charAt(ED.M, x, y, -1, L), f = floorAt(ED.M, L, u);
   const surface = L ? (f ? `${TERRAIN[f - 1].label} · floor ${L}` : `no floor on level ${L}`) : `${TERRAIN[ED.M.terr[u]].label} · height ${ED.M.elev[u]}`;
-  statusEl.textContent = `${x}, ${y} · ${surface}${k >= 0 ? ' · ' + ASSET_BY_ID[ED.M.objs[k].id].label : ''}${ck >= 0 ? ' · ' + cname(ED.M.chars[ck]) : ''}`;
+  statusEl.textContent = `${x}, ${y} · ${surface}${k >= 0 ? ' · ' + ASSET_BY_ID[ED.M.objs[k].id].label + (ED.M.objs[k].interior ? ' (has an interior)' : '') : ''}${ck >= 0 ? ' · ' + cname(ED.M.chars[ck]) : ''}`;
 }
 
 /* ---------- palette ---------- */
@@ -458,7 +523,11 @@ cv.addEventListener('pointermove', e => {
   const p = pick(x, y), same = p && ED.hover && p.x === ED.hover.x && p.y === ED.hover.y;
   if (!same) { ED.hover = p; status(); req(); if (p && ED.stroke) applyAt(p, false); }
 });
-function endStroke() { if (ED.stroke) { ED.stroke = null; const last = ED.undo[ED.undo.length - 1]; if (last && JSON.stringify(toJSON(last)) === JSON.stringify(toJSON(ED.M))) { ED.undo.pop(); syncHist(); } } }
+function endStroke() {
+  if (ED.stroke) { ED.stroke = null; const last = ED.undo[ED.undo.length - 1]; if (last && JSON.stringify(toJSON(last)) === JSON.stringify(toJSON(ED.M))) { ED.undo.pop(); syncHist(); } }
+  /* the Interior tool opens its building once the click is done, so the click's own undo step stays on the map's stack */
+  if (pendingRoom) { const o = pendingRoom; pendingRoom = null; enterInterior(o); }
+}
 const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) { pan = null; endStroke(); cv.style.cursor = ED.tool === 'pan' ? 'grab' : 'crosshair'; } };
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !pts.size) { ED.hover = null; status(); req(); } });
@@ -487,7 +556,7 @@ root.addEventListener('keydown', e => {
   else if (k >= '1' && k <= '3') { ED.brush = +k; syncBrush(); }
   else if (k === 'PageUp') setLevel(ED.level + 1);
   else if (k === 'PageDown') setLevel(ED.level - 1);
-  else if (k === 'Escape') { if (ED.sel >= 0) { ED.sel = -1; req(); } else closeEditor(); }
+  else if (k === 'Escape') { if (ED.sel >= 0) { ED.sel = -1; req(); } else if (ED.outer) leaveInterior(); else closeEditor(); }
   else { const t = TOOLS.find(t2 => t2[2].toLowerCase() === k.toLowerCase()); if (!t) return; setTool(t[0]); }
   e.preventDefault();
 });
@@ -510,11 +579,19 @@ function buildChrome() {
   $('edIn').addEventListener('click', () => zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.4)); $('edOut').addEventListener('click', () => zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.4)); $('edFit').addEventListener('click', fitView);
   $('edName').addEventListener('change', () => { ED.M.name = $('edName').value.trim().slice(0, 60) || 'Untitled survey'; autosave(); });
   $('edGen').addEventListener('click', () => { checkpoint(); const seed = Math.random().toString(36).slice(2, 7); setModel(generateScene(seed, +$('edSize').value, $('edBiome').value)); });
-  $('edNew').addEventListener('click', () => { checkpoint(); const S = +$('edSize').value, B = BIOMES[$('edBiome').value]; const M = blankModel(S, B.ground[0]); M.clim = B.clim; setModel(M); });
+  $('edNew').addEventListener('click', () => {
+    checkpoint(); const S = +$('edSize').value;
+    /* inside a building, Blank starts the room over (keeping its name) at the size chosen */
+    if (ED.outer) { const M = makeInterior(ED.outer.piece, ED.outer.M.clim, S); M.name = ED.M.name; setModel(M); return; }
+    const B = BIOMES[$('edBiome').value]; const M = blankModel(S, B.ground[0]); M.clim = B.clim; setModel(M);
+  });
+  $('edLeave').addEventListener('click', () => { leaveInterior(); cv.focus({ preventScroll: true }); });
+  $('edUnroom').addEventListener('click', () => { leaveInterior(true); cv.focus({ preventScroll: true }); });
   $('edPng').addEventListener('click', () => { const R = renderTiles(ED.M, ED.rot, 2, { grid: false, top: ED.level }); R.can.toBlob(b => b && download(slug(ED.M.name) + '.png', b)); });
-  $('edSave').addEventListener('click', () => download(slug(ED.M.name) + '.json', new Blob([JSON.stringify(toJSON(ED.M))], { type: 'application/json' })));
+  /* Save always writes the whole map, its interiors inside their buildings */
+  $('edSave').addEventListener('click', () => { const M = rootModel(); download(slug(M.name) + '.json', new Blob([JSON.stringify(toJSON(M))], { type: 'application/json' })); });
   $('edLoad').addEventListener('click', () => $('edFile').click());
-  $('edFile').addEventListener('change', async () => { const f = $('edFile').files[0]; $('edFile').value = ''; if (!f) return; try { const M = fromJSON(JSON.parse(await f.text())); checkpoint(); setModel(M); } catch (err) { statusEl.textContent = `Could not open ${f.name}: ${err.message}`; } });
+  $('edFile').addEventListener('change', async () => { const f = $('edFile').files[0]; $('edFile').value = ''; if (!f) return; try { const M = fromJSON(JSON.parse(await f.text())); leaveInterior(); checkpoint(); setModel(M); } catch (err) { statusEl.textContent = `Could not open ${f.name}: ${err.message}`; } });
   new ResizeObserver(() => { const had = ED.cw; size(); if (!had && ED.R) fitView(); }).observe(stage);
 }
 
@@ -522,7 +599,8 @@ function buildChrome() {
 function openEditor(M, back = 'Atlas') {
   ensureModel(); if (!characterById(ED.char)) ED.char = ROSTER[0].id;
   root.hidden = false; ED.open = true; ED.rot = 0; $('edBack').textContent = `← ${back}`;
-  if (M) { if (ED.M) checkpoint(); ED.M = M; autosave(); }
+  /* a new map comes in as the whole map, so any interior open is closed first */
+  if (M) { leaveInterior(); if (ED.M) checkpoint(); ED.M = M; autosave(); }
   $('edName').value = ED.M.name; showSize(ED.M.S);
   if (!$('edItems').childElementCount) setTab('Terrain');
   size(); ED.stale = true; rebuild(); fitView(); syncHist(); setTool(ED.tool); syncBrush(); status();
@@ -539,4 +617,4 @@ function openCharacterMaker() {
 
 buildChrome();
 
-export { ED, LEVEL_NAME, openCharacterMaker, applyAt, characterBoxes, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };
+export { ED, LEVEL_NAME, enterInterior, leaveInterior, rootModel, openCharacterMaker, applyAt, characterBoxes, beginWalk, closeEditor, curPoint, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, status, syncBrush, setLevel, syncPalette, toView, undo, zoomAt };

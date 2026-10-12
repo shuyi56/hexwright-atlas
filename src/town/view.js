@@ -4,7 +4,8 @@ import { BASE } from '../characters/body.js';
 import { H, W } from '../characters/pixels.js';
 import { WALK, renderScaled } from '../characters/roster.js';
 import { unitFor } from '../data/units.js';
-import { ED } from '../editor/editor.js';
+import { ED, rootModel } from '../editor/editor.js';
+import { arrival, doorAcross, doorways } from '../editor/interiors.js';
 import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf } from '../editor/model.js';
 import { FACE_DELTA, findPath, neighbours, stairsAt } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
@@ -34,6 +35,10 @@ import GroundWorker from './ground-worker.js?worker&inline';
    The canvas has one pixel for every device pixel and the art is drawn a whole number of device pixels to the art
    pixel, so the pixel art stays sharp; the camera and the walkers are placed to the nearest device pixel, so they
    glide instead of stepping an art pixel at a time.
+   Buildings given an interior in the editor (editor/interiors.js) can be gone into: walking into the front door,
+   clicking the building, or Space facing it takes the hero inside, and the view walks the room's own map until they
+   go out through a doorway in its outer wall (or Esc), when they come out on the doorstep. TW.stack holds the map
+   outside meanwhile; each room is kept as it was left until the view closes.
    Walking here is a stroll, not an edit: the map is left as it was, and opening the view again starts afresh. */
 const root = $('town'), cv = $('twCanvas'), g = cv.getContext('2d');
 /* figures at three quarters of their sprite, as in the tactical view: about 30 pixels tall, so a one-tile cottage
@@ -44,7 +49,7 @@ const FIGURE_SCALE = 0.75;
    NPC_SPEED tiles a second, STRIDES strides to a tile. A walker's feet are a circle FOOT_R across. */
 const HERO_SPEED = 90, RUN = 1.85, STRIDE = 7, NPC_SPEED = 0.8, STRIDES = 8, FOOT_R = 5;
 const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], FOOT = T / 2 + 6;
-const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, stick: null, F: null, gen: 0, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, dpr: 1, homes: [], rest: [] };
+const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, stick: null, F: null, gen: 0, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, dpr: 1, homes: [], rest: [], stack: [], inside: new Map() };
 /* at most this many chunks are kept (about 40 MB), the furthest from the camera let go first; the workers paint
    ahead out to FILL chunks from the middle of the screen */
 const KEEP = 420, FILL = 9;
@@ -270,6 +275,8 @@ function heroTick(dt) {
     m.dist += gone; m.moving = gone > 0.05;
     if (!m.moving && TW.path.length) { TW.stuck = (TW.stuck || 0) + dt; if (TW.stuck > 0.4) TW.path = []; }
     TW.dirty = true;
+    /* walking into a door goes through it */
+    if (!TW.say && throughDoor(m.face)) return;
   } else if (m.moving) { m.moving = false; TW.dirty = true; place(); }
   /* walked up to someone to talk to them */
   if (TW.talkTo >= 0) {
@@ -279,6 +286,89 @@ function heroTick(dt) {
     else if (!TW.path.length) { if (q.L === m.L && d < 4 * T && (TW.chase = (TW.chase || 0) + 1) < 4) TW.path = routeTo(q.fx, q.gy + (m.y > q.gy ? 14 : -14), q.L); else { TW.talkTo = -1; TW.chase = 0; } }
   }
 }
+/* ---------- going in and out of buildings ---------- */
+/* the building with an interior whose front door the hero at (x, y) stands at, on the ground outside */
+function doorAt(x, y) {
+  if (TW.stack.length) return null;
+  for (const o of TW.M.objs) {
+    if (!o.interior || levelOf(o)) continue;
+    const [w, d] = footprint(o), front = (o.y + d) * T;
+    if (y < front - 3 || y > front + FOOT_R + 6 || Math.abs(x - (o.x + w * doorAcross(o)) * T) > 13) continue;
+    return o;
+  }
+  return null;
+}
+/* the doorway in the room's outer wall the hero at (x, y) stands in, pressing out of the map the way it faces */
+function wayOut(x, y, face, reach = 14) {
+  if (!TW.stack.length || TW.me.L) return false;
+  const n = TW.M.S * T, tx = Math.floor(x / T), ty = Math.floor(y / T);
+  return doorways(TW.M).some(([dx, dy, side]) => dx === tx && dy === ty && side === face && (side === 0 ? y > n - reach : side === 1 ? x > n - reach : side === 2 ? y < reach : x < reach));
+}
+/* the hero, walking the way `face` points, goes through a door if there is one: in at a front door (pressing north),
+   out through a doorway on the room's edge */
+function throughDoor(face) {
+  const m = TW.me; if (!m) return false;
+  if (wayOut(m.x, m.y, face)) { goOut(); return true; }
+  const o = face === 2 && !m.L ? doorAt(m.x, m.y) : null;
+  return o ? goIn(o) : false;
+}
+/* walk map M as character `hero`: everything the view keeps about the map made afresh for it */
+function useMap(M, hero, homes = null) {
+  TW.M = M; M.chars = M.chars || []; M.floors = M.floors || [];
+  TW.steps.clear(); TW.path = []; TW.talkTo = -1; TW.rest = []; TW.stuck = 0;
+  TW.homes = homes || M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(M.objs); cuts.length = 0;
+  TW.hero = hero; TW.G0 = fieldOf(M, 0); TW.shapes = shapesOf(M.objs, TW.links); takeHero();
+  TW.top = TW.me ? TW.me.L : 0; buildField();
+}
+/* into building o's interior. from: the index of someone already inside to walk as, else the hero goes in */
+function goIn(o, from = -1) {
+  let I = TW.inside.get(o);
+  if (!I) { I = cloneModel(o.interior); I.chars = I.chars || []; TW.inside.set(o, I); }
+  const ctx = { M: TW.M, hero: TW.hero, homes: TW.homes, piece: o }; let k = from;
+  if (k < 0) {
+    const c = TW.M.chars[TW.hero]; if (!c) return false;
+    const [x, y, face] = arrival(I) || [0, 0, 2]; I.chars.push({ sprite: c.sprite, x, y, face }); k = I.chars.length - 1;
+  } else ctx.hero = -1;
+  if (TW.say) closeSay();
+  TW.stack.push(ctx); useMap(I, k); arrived(); return true;
+}
+/* back out onto the doorstep of the building the hero is in */
+function goOut() {
+  const ctx = TW.stack.pop(); if (!ctx) return false;
+  const I = TW.M, c = I.chars[TW.hero], O = ctx.M, o = ctx.piece, [w, d] = footprint(o);
+  if (c) I.chars.splice(TW.hero, 1);
+  let k = ctx.hero;
+  if (!O.chars[k]) {
+    if (!c) { useMap(O, Math.max(0, k), ctx.homes); arrived(); return true; }
+    O.chars.push({ sprite: c.sprite, x: 0, y: 0, face: 0 }); k = O.chars.length - 1; ctx.homes[k] = [0, 0];
+  }
+  const x = (o.x + w * doorAcross(o)) * T, y = (o.y + d) * T + FOOT_R + 4, h = O.chars[k], cl = v => Math.max(0, Math.min(O.S - 1, v));
+  h.x = cl(Math.floor(x / T)); h.y = cl(Math.floor(y / T)); h.face = 0; delete h.level;
+  if (TW.say) closeSay();
+  useMap(O, k, ctx.homes);
+  /* on the doorstep, or the nearest spot to it where they can stand */
+  const at = standSpot(x, y); if (at) { TW.me.x = at[0]; TW.me.y = at[1]; } TW.me.face = 0; TW.me.z = null; settle(0); moveHero(0, 0);
+  arrived(); return true;
+}
+function standSpot(x, y) {
+  for (let r = 0; r <= T; r += 6) for (let a = 0; a < (r ? 12 : 1); a++) {
+    const px = x + Math.cos(a / 12 * Math.PI * 2 + Math.PI / 2) * r, py = y + Math.sin(a / 12 * Math.PI * 2 + Math.PI / 2) * r, h = heightOn(0, px, py);
+    if (h != null && standable(0, px, py, h)) return [px, py];
+  }
+  return null;
+}
+/* a moment's fade, the place's name shown, the top bar and the panel brought up to date */
+function arrived() {
+  cv.classList.remove('tw-fade'); void cv.offsetWidth; cv.classList.add('tw-fade');
+  banner(TW.M.name); syncInside(); place(); TW.dirty = true;
+}
+function banner(text) { const b = $('twBanner'); b.textContent = text; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); }
+function syncInside() {
+  const inside = TW.stack.length > 0;
+  $('twName').textContent = inside ? `${TW.stack[0].M.name} › ${TW.M.name}` : TW.M.name;
+  $('twLeave').hidden = !inside; $('twNext').hidden = inside;
+}
+
 /* a route for the hero to (x, y) in map pixels on storey L: through the middles of the tiles on the editor's
    walking route, then to the point itself; or straight there if there is no route */
 function routeTo(x, y, L) {
@@ -313,8 +403,12 @@ function talk(to = -1) {
     if (!TW.steps.has(j)) o.face = (m.face + 2) % 4;
     TW.say = { k: j, who: ch ? ch.name : o.sprite, line: lineFor(o.sprite, unitFor(o.sprite).group, M.name, (TW.talks = (TW.talks || 0) + 1)) };
   } else {
+    /* standing in a doorway of the room's outer wall, facing out: out they go */
+    if (wayOut(m.x, m.y, m.face, T)) { goOut(); return; }
     const x = Math.floor(px / T), y = Math.floor(py / T); if (x < 0 || y < 0 || x >= M.S || y >= M.S) return;
     const piece = M.objs.find(o => (o.level || 0) === L && x >= o.x && y >= o.y && x < o.x + footprint(o)[0] && y < o.y + footprint(o)[1]);
+    /* facing a building's door: in they go */
+    if (piece && piece.interior && !L && m.face === 2 && !TW.stack.length) { goIn(piece); return; }
     const ground = L ? (M.floors[L - 1] && M.floors[L - 1][y * M.S + x] ? TERRAIN[M.floors[L - 1][y * M.S + x] - 1] : null) : TERRAIN[cellAt(TW.G0, Math.round(px), Math.round(py))];
     const line = sightFor(piece ? ASSET_BY_ID[piece.id] : null, ground, M.name); if (!line) return;
     TW.say = { k: -1, who: '', line };
@@ -443,7 +537,7 @@ function place() {
   if (!c) { $('twHint').textContent = 'No one stands on this map: place characters in the editor, then come back to walk about'; $('twPlace').hidden = true; return; }
   const ch = characterById(c.sprite), L = levelOf(c), u = c.y * M.S + c.x, Tn = L ? TERRAIN[M.floors[L - 1][u] - 1] : TERRAIN[M.terr[u]];
   $('twPlace').hidden = false; $('twHero').textContent = ch ? ch.name : c.sprite; $('twWhere').textContent = `${Tn ? Tn.label : ''}${L ? ` · floor ${L}` : ''}`;
-  $('twHint').textContent = touchy() ? (TW.say ? 'Tap to close' : 'Drag to walk · tap a spot to go there') : TW.say ? 'Space to close' : 'Walk with the arrow keys · Space to talk';
+  $('twHint').textContent = touchy() ? (TW.say ? 'Tap to close' : TW.stack.length ? 'Tap the doorway to go out' : 'Drag to walk · tap a spot to go there') : TW.say ? 'Space to close' : TW.stack.length ? 'Walk out through the doorway, or Esc, to go outside' : 'Walk with the arrow keys · Space to talk';
 }
 /* is this a touch screen, with no mouse to point with? */
 const touchy = () => window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -476,9 +570,12 @@ function fillOne() {
 /* ---------- input ---------- */
 /* the art pixel under a point on the screen, and the tile whose ground it shows: [x, y, storey, art x, ground row,
    art y] */
-function tileAt(e) {
+function artAt(e) {
   const r = cv.getBoundingClientRect(), sc = scale(), [tx, ty] = offset(sc), k = r.width ? cv.width / r.width : TW.dpr;
-  const wx = ((e.clientX - r.left) * k - tx) / sc, wy = ((e.clientY - r.top) * k - ty) / sc, d = depthAt(wx, wy);
+  return [((e.clientX - r.left) * k - tx) / sc, ((e.clientY - r.top) * k - ty) / sc];
+}
+function tileAt(e) {
+  const [wx, wy] = artAt(e), d = depthAt(wx, wy);
   /* the ground under the point is the row its pixel shows */
   if (!d) return null;
   const x = Math.floor(wx / T), y = Math.floor((d - 1) / T); return [x, y, TW.F.lev[y * S() + x], wx, d - 1, wy];
@@ -491,10 +588,26 @@ function tapAt(e) {
   const h = charPos(k);
   if (Math.abs(t[3] - h.fx) < 9 && t[5] > h.fy - 32 && t[5] < h.fy + 3) { TW.path = []; TW.talkTo = -1; talk(); req(); return; }
   if (TW.say) closeSay();
+  /* a building with an interior: walk to its door and on in, by pressing on into it */
+  const b = !TW.stack.length && buildingAtPoint(...artAt(e));
+  if (b) { const [w, d] = footprint(b), x = (b.x + w * doorAcross(b)) * T, y = (b.y + d) * T; TW.path = routeTo(x, y + FOOT_R + 2, 0); TW.path.push([x, y - 12]); TW.talkTo = -1; req(); return; }
+  /* a doorway in the room's outer wall: walk to it and on out */
+  const out = TW.stack.length && !t[2] && doorways(M).find(([x, y]) => x === t[0] && y === t[1]);
+  if (out) { const [x, y, side] = out, [fx, fy] = FACE_DELTA[side], cx = x * T + T / 2, cy = y * T + T / 2; TW.path = routeTo(cx, cy, 0); TW.path.push([cx + fx * T, cy + fy * T]); TW.talkTo = -1; req(); return; }
   const j = M.chars.findIndex((o, i) => i !== k && o.x === t[0] && o.y === t[1] && levelOf(o) === t[2]);
   if (j >= 0) { const q = charPos(j); TW.path = routeTo(q.fx, q.gy + (TW.me.y > q.gy ? 14 : -14), t[2]); TW.talkTo = j; }
   else { TW.path = routeTo(t[3], t[4], t[2]); TW.talkTo = -1; }
   req();
+}
+/* the building with an interior drawn at art pixel (x, y), the one in front where they overlap */
+function buildingAtPoint(x, y) {
+  let best = null, key = -Infinity;
+  TW.M.objs.forEach((o, i) => {
+    const c = TW.clipped.get(i); if (!o.interior || levelOf(o) || !c || !c.px) return;
+    const px = Math.floor(x - c.X), py = Math.floor(y - c.Y); if (px < 0 || py < 0 || px >= c.w || py >= c.h || c.px[(py * c.w + px) * 4 + 3] < 128) return;
+    const k = o.y + footprint(o)[1]; if (k > key) { key = k; best = o; }
+  });
+  return best;
 }
 /* A mouse acts as it is pressed. A finger (or pen) waits to see what it does: lifted where it went down, it taps
    (and a tap while someone is speaking closes what they said); dragged, it becomes a stick the hero walks by, its
@@ -552,7 +665,7 @@ root.addEventListener('keydown', e => {
   else if (k === ' ' || k === 'Enter') { if (!e.repeat) talk(); }
   else if (k === 'Tab') { nextHero(e.shiftKey ? -1 : 1); }
   else if (k === '+' || k === '=') setZoom(TW.zoom + 1); else if (k === '-' || k === '_') setZoom(TW.zoom - 1);
-  else if (k === 'Escape') { if (TW.say) closeSay(); else closeTown(); }
+  else if (k === 'Escape') { if (TW.say) closeSay(); else if (TW.stack.length) goOut(); else closeTown(); }
   else return;
   e.preventDefault(); req();
 });
@@ -561,7 +674,8 @@ root.addEventListener('blur', () => { TW.held = []; TW.run = false; });
 /* let go of everything held when the page is put away, so the hero is not still walking when it comes back */
 document.addEventListener('visibilitychange', () => { if (document.hidden) { TW.held = []; TW.run = false; fingers.clear(); gesture = null; dropStick(); } });
 function nextHero(d = 1) {
-  const n = TW.M.chars.length; if (n < 2) return;
+  /* inside a building the hero stays who went in, so they come out again */
+  const n = TW.M.chars.length; if (n < 2 || TW.stack.length) return;
   TW.hero = (TW.hero + d + n) % n; TW.path = []; TW.talkTo = -1; if (TW.say) closeSay();
   takeHero(); setTop(TW.me.L); place(); req();
 }
@@ -575,20 +689,20 @@ function takeHero() {
 
 /* ---------- open and close ---------- */
 /* opts: hero, the index of the character to walk as (default the one picked in the editor, else the first); zoom */
+/* The whole map is walked, with its interiors; the editor inside a building starts the walk in there, as whoever is
+   picked in the room, else the map's hero walking in at the door. */
 function openTown(opts = {}) {
   if (!ED.M) return;
-  TW.M = cloneModel(ED.M); TW.M.chars = TW.M.chars || []; TW.M.floors = TW.M.floors || [];
-  TW.open = true; root.hidden = false; TW.steps.clear(); TW.path = []; TW.held = []; TW.talkTo = -1; TW.moved = false; TW.lastT = 0; TW.rest = [];
-  TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs); cuts.length = 0;
-  TW.hero = opts.hero ?? (ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0);
-  TW.G0 = fieldOf(TW.M, 0); TW.shapes = shapesOf(TW.M.objs, TW.links); takeHero();
-  TW.top = TW.me ? TW.me.L : 0;
-  startPainters(); buildField(); size();
+  const room = ED.outer, M = cloneModel(rootModel());
+  TW.open = true; root.hidden = false; TW.held = []; TW.moved = false; TW.lastT = 0; TW.stack = []; TW.inside = new Map();
+  startPainters();
+  useMap(M, opts.hero ?? (!room && ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0));
+  if (room) { const o = M.objs[room.M.objs.indexOf(room.piece)]; if (o && o.interior) goIn(o, ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : M.chars.length ? -1 : 0); }
+  size();
   setZoom(opts.zoom || Math.max(2, Math.min(5, Math.round(TW.cw / (15 * T)))));
-  $('twName').textContent = TW.M.name;
-  closeSay(); place();
+  closeSay(); syncInside(); place();
   /* the place's name shows for a moment, as a town's does on entering it */
-  const b = $('twBanner'); b.textContent = TW.M.name; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  banner(TW.M.name);
   root.focus({ preventScroll: true }); req();
 }
 function closeTown() {
@@ -603,6 +717,7 @@ function closeTown() {
 $('twBack').addEventListener('click', closeTown);
 $('twNext').addEventListener('click', () => { nextHero(1); root.focus({ preventScroll: true }); });
 $('twIn').addEventListener('click', () => { setZoom(TW.zoom + 1); req(); }); $('twOut').addEventListener('click', () => { setZoom(TW.zoom - 1); req(); });
+$('twLeave').addEventListener('click', () => { goOut(); root.focus({ preventScroll: true }); req(); });
 $('twTalk').addEventListener('click', () => { TW.moved = true; TW.path = []; TW.talkTo = -1; talk(); req(); });
 $('editor').addEventListener('keydown', e => { if (ED.open && !TW.open && (e.key === 'o' || e.key === 'O') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTown(); } });
 /* on a resize the canvas is sized and painted again at once, before the browser shows it, so it never flashes blank
@@ -614,6 +729,6 @@ const resized = new ResizeObserver(([en]) => {
 });
 try { resized.observe(cv, { box: 'device-pixel-content-box' }); } catch { resized.observe(cv); }
 /* test hook */
-window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
+window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, inside: () => TW.stack.length > 0, goIn: (x, y) => { const o = TW.M.objs.find(p => p.interior && !levelOf(p) && x >= p.x && y >= p.y && x < p.x + footprint(p)[0] && y < p.y + footprint(p)[1]); return o ? goIn(o) : false; }, goOut, doorAt, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
 
 export { closeTown, openTown };

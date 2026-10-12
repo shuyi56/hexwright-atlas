@@ -27,7 +27,7 @@ the editor instead. Opening a scene replaces the editor's map; **Undo** brings t
 
 The **Map editor** in the rail opens an isometric workbench built on the same tile set as the city
 districts. Paint 46 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
-turn pieces (`R`) and the view (`[` `]`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
+turn pieces (`R`) and the view (`[` `]`), give buildings interiors to furnish (`N`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
 builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
 fenland, ashlands). The land is kept calm: the main ground covers most of it with the others in a few broad patches,
 heights rise in wide terraces, ponds, islets, plateaus and patches of only a few tiles are smoothed away, water
@@ -112,6 +112,30 @@ dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
   bookshelf, a dresser, a writing desk, a counter, a cooking pot, a wash tub, a candle stand, a potted plant, a
   throne, an altar, a pew, a weapon rack and a spinning wheel. Each is drawn in its own frame, so `R` turns it
   to face any of the four ways and turning the view shows its back.
+
+### Building interiors
+
+Any building can be given an interior: a room of its own to furnish, which the town view lets the hero walk into.
+
+- **Giving one:** the **Interior** tool (`N`) rings in gold every building that already has an interior. Click a
+  building to give it one and open it, or to open the one it has. The city wall, the elven archway and the pavilion
+  are open to the air, so they cannot have one.
+- **The room:** a new interior is its own square map, sized to the building (8 tiles for a one-tile cottage, 12 for a
+  two-tile hall, up to 24). It is walled all round, with windows in the walls, a doorway in the middle of the south
+  wall and, in homes and halls, a fireplace in the back wall. The floor is chosen to suit the building: floorboards,
+  stone, rushes, a chequered floor in the mansion, the inlaid ash floor in the elven buildings.
+- **Furnishing it:** the editor opens the room in place of the map, ringed in brass, with a bar naming the building
+  and the Interior tab ready. Every tool works there: furniture, floors, storeys and stairs, and characters (a
+  shopkeeper behind the counter stays in the shop). The map name box names the room, and the town view shows that
+  name on the way in. **Blank** starts the room over, empty and walled, at the size chosen.
+- **Back to the map:** **← Back to map** (or `Esc`) returns to the map. Everything done inside is one step on the
+  map's undo stack. **Remove interior** takes the room off the building, and Undo brings it back.
+- **Doors out:** any doorway on the room's outer edge leads back outside, so a room can have a back door too.
+- **Saving:** the interior is saved inside its building in the map's JSON (`"interior"` on the piece, a whole map in
+  the same format). Moving or turning the building keeps it, and maps without interiors save exactly as before.
+
+`src/editor/interiors.js` holds the rules: which buildings can have one, how a new room is laid out, where its
+doorways are, and where someone coming in stands.
 
 ### Storeys
 
@@ -421,6 +445,13 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   the hero exactly at its painted edge, a cliff wherever the ground jumps two levels or more, and other walkers by a
   small circle round their feet. Blocked one way, the hero slides along the other and eases round trunks and corners
   (`src/town/collide.js`).
+- **Going indoors:** a building given an interior in the editor (see [Building interiors](#building-interiors)) can
+  be entered in three ways: walk into its front door, click the building, or press `Space` facing the door. The view
+  fades into the room, names it in a banner, and shows it in the top bar after the town's name. The hero comes in just
+  inside the doorway, and anyone placed in the room is there, strolling about. They go back out through a doorway in the
+  room's outer wall: walk out through it, click it, or use `Esc` or **Leave building**. They come out on the doorstep. A
+  room keeps its people where they were left until the view closes. Opened from the editor while a room is open, the
+  walk starts in that room.
 - **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a slate and gold window with their portrait, like the tactical view's),
   or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
 - **Phones and tablets:** a finger dragged anywhere on the map is a stick the hero walks by (a small pull strolls,
@@ -517,6 +548,7 @@ Methods, all in model tile coordinates (x east, y south):
 | -------- | ------- |
 | Discover | `describe` (terrain, assets, biomes, limits), `state`, `ascii` (text map), `getTile`, `getRegion`, `listObjects`, `listSprites`, `listCharacters`, `getMap` |
 | Edit     | `paint`, `fill`, `elevation`, `place`, `erase`, `moveObject`, `removeFloor`, `placeCharacter`, `walkCharacter`, `removeCharacter`, `useTool` (a drag path), `batch` (atomic, one undo step), `rename` |
+| Interior | `enterInterior` (open a building's interior, giving it one first; every other method then works on the room), `leaveInterior` (back to the map; `remove: true` takes the interior off) |
 | Map      | `newMap`, `generate`, `setMap`, `undo`, `redo` |
 | View     | `open`, `close`, `setView` (rotation, zoom, centre, grid), `setSelection`, `tileToScreen`, `screenToTile` |
 | See      | `screenshot` (`map`: offscreen render at any scale, rotation or tile crop; `viewport`: the on-screen canvas) |
