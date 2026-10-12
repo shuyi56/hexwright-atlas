@@ -407,10 +407,12 @@ than a person, a cottage about twice their height, two-storey houses towering ov
 - **Floors and stairs:** one storey is shown at a time, as in the editor: the ground, or an upper floor on its own
   over the dark, its edge showing as a thin slab. Stairs open the next floor rather than being climbed: step onto a
   flight going up it and the view fades to the floor above, with "Floor 1" in a banner and the hero on the landing at
-  the top. Up there the way down shows as a stairwell, a single tile of steps falling away into the dark, and walking
-  into it (or clicking it) fades back down to the foot of the flight. A flight is drawn flat inside its own tile, its
-  treads lighter toward the top between dark stringers. Clicking a flight goes up it, and a route to a tile on another
-  floor goes by the stairs.
+  the top. A flight is drawn at the figures' scale, as the furniture is: flat in the middle of its tile, about a person
+  and a half wide and a few strides long, eight treads lighter toward the top between dark stringers. The floor changes
+  when the hero's feet reach the steps, so walking past beside a flight on its tile does not climb it. Up there the way
+  down shows as a stairwell the flight's own size, cut in the floor (which runs on round it) with its steps falling away
+  into the dark; walking into it (or clicking it) fades back down to the foot of the flight. Clicking a flight goes up
+  it, and a route to a tile on another floor goes by the stairs.
 - **Camera:** it follows the hero's place on the ground and, through a gentle smoothing, their height, so climbing a
   ramp or slope never shakes the view.
 - **Depth:** every screen pixel of ground remembers which row of the map it shows. A piece or figure is cut away
