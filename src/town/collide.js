@@ -45,7 +45,13 @@ function local(o, FW, FD) {
     case 'obelisk': return [circle(FW / 2, FD - 9, 8)];
     case 'fence': return (o.face || 0) % 2 ? [rect(FW / 2 - 3, 0, FW / 2 + 3, FD)] : [rect(0, FD - 15, FW, FD - 8)];
     case 'post': return [circle(FW / 2, FD / 2, 4)];
-    case 'hearth': return [rect(2, 4, FW - 2, FD - 6)];
+    case 'hearth': {
+      /* the wall it stands in and its chimney breast, standing out the way it faces (town/pieces.js) */
+      const L = o.links || [0, 0, 0, 0], f = (o.face || 0) & 3, m = FW / 2, c0 = m - 5, c1 = m + 5, b = 26, p = 16;
+      const wall = f % 2 === 0 ? rect(L[2] ? 0 : c0, c0, L[0] ? FW : c1, c1) : rect(c0, L[3] ? 0 : c0, c1, L[1] ? FD : c1);
+      const breast = [rect(m - b, c0 - 3, m + b, c1 + p), rect(c0 - 3, m - b, c1 + p, m + b), rect(m - b, c0 - p, m + b, c1 + 3), rect(c0 - p, m - b, c1 + 3, m + b)][f];
+      return [wall, breast];
+    }
     case 'idoor': {
       /* the wall either side of the opening (DOOR_HALF either side of the middle, town/pieces.js) */
       const L = o.links || [0, 0, 0, 0], across = L[0] || L[2] || !(L[1] || L[3]), c0 = FW / 2 - 5, c1 = FW / 2 + 5, h = 21;

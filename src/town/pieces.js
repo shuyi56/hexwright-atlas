@@ -692,7 +692,7 @@ const PROPS = {
    room's walls run on as one (pieceSprite). A doorway is an opening in a wall: the wall on either side, timber
    jambs, a lintel carrying the capping beam over it, and a sill on the floor between. */
 const ROOMW = 34, RT = 5, RSIDE = 4, DOOR_HALF = 21;
-const WALLS_JOINED = new Set(['iwall', 'iwindow', 'idoor']);
+const WALLS_JOINED = new Set(['iwall', 'iwindow', 'idoor', 'hearth']);
 function wallKit(K) {
   const { FW } = K, c0 = FW / 2 - RT, c1 = FW / 2 + RT, P = R(WALL.plaster), Tp = R('#7a5a3a'), H = ROOMW;
   /* the face of a run across the view at rows (b - H .. b), r counted from its top */
@@ -755,6 +755,90 @@ function roomDoor(K, o) {
     W.upDown(e1, L[1] ? FD : e1 + 6, !L[1]);
   }
 }
+/* ---------- the fireplace ----------
+   A fireplace stands in a room wall, the wall running into it from either side. A chimney breast of coursed stone
+   projects from the wall into the room it faces, a narrower stack rising from it above the wall's top under a stone
+   cap. In its face an arched firebox: soot, firedogs and two logs, a fire on them (its flames flicker in the town view,
+   FIRE gives where), under a lintel stone with a keystone. Above it a timber mantel shelf with candlesticks and a jug;
+   before it a flagstone hearth on the floor, and the fire's warm light spilling over the hearth and the floor. Facing
+   the viewer's way (face 0, in a north wall) all of it shows; in a side wall the breast is seen from its side, the
+   fire on its flank; in a south wall, facing away, the chimney rises behind the wall. */
+const BREAST = 26, PROJECT = 16, FIREBOX = 15;
+const stoneAt = (S, x, y, x0) => { const row = Math.floor(y / 6), off = row % 2 ? 7 : 0, col = ((x - x0 + off) % 13 + 13) % 13; return y % 6 === 0 || col === 0 ? S[3] : S[h2(Math.floor((x - x0 + off) / 13), row, 21) < 0.3 ? 1 : 2]; };
+function flame(K, cx, base, w, h) {
+  /* a fire seen from the front: tongues of flame of uneven height, white-yellow at the heart, orange, then red */
+  const Y = R('#f6d36a'), O = R('#f08a2a'), Rd = R('#c8502a');
+  for (let i = -w; i <= w; i++) {
+    const t = 1 - Math.abs(i) / (w + 1), hh = Math.max(1, Math.round(h * t * (0.6 + 0.4 * h2(i + 9, 3, 41))));
+    for (let k = 0; k < hh; k++) { const f = k / hh; K.set(cx + i, base - k, f > 0.72 ? Rd[1] : f > 0.42 || Math.abs(i) > w * 0.6 ? O[1] : t > 0.6 && f < 0.25 ? R('#fff4c0')[0] : Y[0]); }
+  }
+}
+function roomHearth(K, o) {
+  const { FW, FD } = K, f = facing(o), L = o.links || [0, 0, 0, 0], W = wallKit(K), { c0, c1, H } = W, m = FW / 2, S = R('#bdb4a2'), Wd = R('#7a5a3a'), G = R('#c9a24f');
+  const across = f % 2 === 0;
+  const glow = (cx, cy, rx, ry) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const d = Math.hypot((x - cx) / rx, (y - cy) / ry); if (d > 1) continue; const a = Math.round(70 * (1 - d) * (1 - d)); if (!K.get(x, y)) K.set(x, y, R('#f4a03a')[1], a); } };
+  /* a block of stone [x0, x1) × [y0, y1) on the floor, z0..z1 high: its top, its face, its east side in shade */
+  const block = (x0, y0, x1, y1, z0, z1, faceFn = null) => {
+    K.rect(x0, y1 - z1, x1, y1 - z0, (x, y) => (faceFn && faceFn(x, y)) || (y === y1 - z1 ? S[0] : stoneAt(S, x, y, x0)));
+    K.rect(x0, y0 - z1, x1, y1 - z1, (x, y) => (y >= y1 - z1 - 1 ? S[0] : (y - (y0 - z1)) % 8 === 0 || ((x - x0 + (Math.floor((y - y0 + z1) / 8) % 2) * 9) % 17) === 0 ? S[2] : S[h2(x >> 3, y >> 3, 27) < 0.3 ? 0 : 1]));
+    K.rect(x1, y0 - z1 + 1, x1 + 3, y1 - z0, (x, y) => S[y > y1 - z0 - 3 ? 4 : 3]);
+  };
+  if (across) {
+    const front = f === 0, b0 = front ? c0 - 3 : c0 - PROJECT, b1 = front ? c1 + PROJECT : c1 + 3, bx0 = m - BREAST, bx1 = m + BREAST;
+    if (!front) { block(bx0, b0, bx1, b1, 0, H + 2); block(m - 14, b0 + 1, m + 14, b0 + 15, H + 2, H + 18); block(m - 16, b0, m + 16, b0 + 16, H + 18, H + 20); }
+    /* the wall either side, drawn round the breast */
+    W.across(L[2] ? 0 : c0, L[0] ? FW : c1, !L[0]);
+    if (!front) return;
+    /* the hearth on the floor and the firelight over it */
+    K.rect(m - 28, b1, m + 28, b1 + 12, (x, y) => (y === b1 || (x - m + 28) % 14 === 0 || y === b1 + 6 ? S[3] : S[h2(x >> 3, y >> 2, 23) < 0.3 ? 0 : 1]));
+    glow(m, b1 + 8, 40, 14);
+    /* the breast with its firebox, lintel and keystone; the stack and its cap above */
+    const fb = (x, y) => {
+      const r = b1 - y, dx = Math.abs(x + 0.5 - m);
+      if (dx < FIREBOX + 3 && r >= 20 && r < 23) return dx < 2.5 ? S[0] : S[r === 22 ? 1 : 2];
+      const top = 20 - Math.max(0, (dx - FIREBOX + 5) * 0.8);
+      if (dx < FIREBOX && r < top) return r < 2 ? R('#3a2c20')[2] : (h2(x >> 2, y >> 1, 25) < 0.25 ? R('#4a3424')[3] : R('#2a2018')[r > 12 ? 4 : 3]);
+      return null;
+    };
+    block(bx0, b0, bx1, b1, 0, H + 2, fb);
+    block(m - 14, b0 + 1, m + 14, b0 + 15, H + 2, H + 18);
+    block(m - 16, b0, m + 16, b0 + 16, H + 18, H + 20, (x, y) => S[y === b0 + 16 - H - 20 ? 0 : 3]);
+    /* firedogs, logs and the fire */
+    for (const dx of [-9, 9]) K.rect(m + dx - 1, b1 - 6, m + dx + 1, b1 - 1, R('#3b3a38')[2]);
+    K.rect(m - 11, b1 - 5, m + 11, b1 - 3, (x) => Wd[x % 5 === 0 ? 4 : 3]); K.rect(m - 9, b1 - 7, m + 10, b1 - 5, (x) => Wd[x % 4 === 0 ? 3 : 2]);
+    for (let i = -11; i <= 11; i += 2) K.set(m + i, b1 - 2, R('#f4a03a')[h2(i, 1, 2) < 0.5 ? 0 : 2]);
+    flame(K, m, b1 - 7, 9, 11);
+    /* the mantel shelf and what stands on it */
+    K.rect(bx0 - 4, b1 - 31, bx1 + 4, b1 - 28, (x) => Wd[x === bx0 - 4 ? 1 : 0]);
+    K.rect(bx0 - 4, b1 - 28, bx1 + 4, b1 - 25, (x) => Wd[x === bx1 + 3 ? 4 : 2]);
+    K.rect(bx0 - 2, b1 - 25, bx1 + 2, b1 - 24, S[4]);
+    for (const cx of [bx0 + 4, bx1 - 5]) { K.rect(cx - 1, b1 - 33, cx + 2, b1 - 31, G[1]); K.rect(cx, b1 - 38, cx + 1, b1 - 33, R('#f4efe2')[0]); K.set(cx, b1 - 39, R('#f6d36a')[0]); K.set(cx, b1 - 40, R('#f4a03a')[1], 160); }
+    K.rect(m - 2, b1 - 37, m + 2, b1 - 31, (x) => R('#c97a56')[x < m - 1 ? 1 : x > m ? 3 : 2]); K.rect(m - 1, b1 - 38, m + 1, b1 - 37, R('#c97a56')[1]);
+  } else {
+    /* in a wall up the view: the wall's run, then the breast standing out from it the way it faces, seen side on */
+    const east = f === 1, a0 = east ? c0 - 3 : c0 - PROJECT, a1 = east ? c1 + PROJECT : c1 + 3, by0 = m - BREAST, by1 = m + BREAST;
+    if (L[3]) W.upDown(0, by0, false);
+    if (!east) { K.rect(a0 - 12, by0 - 2, a0, by1 + 2, (x, y) => S[(x + y) % 9 === 0 || y === by0 - 2 ? 3 : 1]); glow(a0 - 10, m, 18, 34); }
+    else { K.rect(a1, by0 - 2, a1 + 12, by1 + 2, (x, y) => S[(x + y) % 9 === 0 || y === by0 - 2 ? 3 : 1]); glow(a1 + 12, m, 18, 34); }
+    block(a0, by0, a1, by1, 0, H + 2);
+    block(c0 - 1, m - 12, c1 + 1, m + 12, H + 2, H + 18);
+    /* the fire on the flank it faces: seen past the breast's edge, on the east, as the east side shows */
+    if (east) {
+      K.rect(a1, by0 + 6 - H, a1 + 6, by1 - 4, (x, y) => (y > m + 8 && y < by1 - 6 ? R('#2a2018')[3] : S[x === a1 ? 2 : 3]));
+      for (let k = 0; k < 10; k++) for (let i = 0; i < 5; i++) if (h2(i, k, 7) < 0.8 - k * 0.07) K.set(a1 + 1 + i, by1 - 7 - k, k > 6 ? R('#c8502a')[1] : k > 3 ? R('#f08a2a')[1] : R('#f6d36a')[0]);
+      K.rect(a1 + 6, by0 - 8 - H + 12, a1 + 9, by1 - 30, Wd[2]);
+    }
+    if (L[1]) W.upDown(by1, FD, false); else if (!L[3]) W.upDown(by1, by1 + 1, true);
+  }
+}
+/* where the fire burns in a fireplace's sprite (drawing coordinates), for the town view to flicker: { x, y, w, h }
+   with (x, y) the middle of its base; null where it cannot be seen */
+const FIRE = o => {
+  const f = facing(o), m = T / 2, c1 = T / 2 + RT;
+  if (f === 0) return { x: m, y: c1 + PROJECT - 7, w: 9, h: 11 };
+  if (f === 1) return { x: c1 + PROJECT + 3, y: m + BREAST - 7, w: 2, h: 9 };
+  return null;
+};
 const facing = o => (o.face || 0);
 
 /* ---------- furniture ----------
@@ -1137,7 +1221,7 @@ const INTERIOR = {
   iwindow: (K, o) => roomWall(K, o, true),
   idoor: (K, o) => roomDoor(K, o),
   post: (K) => { const P = R('#7a5a3a'), cx = K.FW / 2, cy = K.FD / 2; K.rect(cx - 3, cy - ROOMW, cx + 3, cy + 3, (x) => P[x < cx - 1 ? 1 : 3]); },
-  hearth: (K, o) => { const S = R('#b3aa96'), { FW, FD } = K; K.box(2, 4, FW - 2, FD - 6, 28, (x, y) => S[2], (x, y) => wallTone('stone', S, x, y)); K.rect(FW / 2 - 8, FD - 20, FW / 2 + 8, FD - 6, R('#2a2018')[3]); K.poly([[FW / 2 - 6, FD - 6], [FW / 2 - 2, FD - 16], [FW / 2, FD - 11], [FW / 2 + 3, FD - 17], [FW / 2 + 6, FD - 6]], R('#f4a03a')[1]); K.rect(0, FD - 30, FW, FD - 27, R('#8e6a44')[1]); },
+  hearth: (K, o) => roomHearth(K, o),
   stairs: (K, o) => stairsSprite(K, o),
   ...FURNITURE
 };
@@ -1182,7 +1266,7 @@ const OPEN_SHADOW = {
    top over a stepped stringer, the risers catching the light (east) or turned from it (west). A soft shadow lies east
    of it. Treads carry a grain and lighten toward the top. */
 function stairsSprite(K, o) {
-  const f = facing(o), [x0, y0, x1, y1] = flightBox(f), ns = f % 2 === 0, len = ns ? y1 - y0 : x1 - x0, W = ns ? x1 - x0 : y1 - y0;
+  const f = facing(o), [x0, y0, x1, y1] = o.box || flightBox(f), ns = f % 2 === 0, len = ns ? y1 - y0 : x1 - x0, W = ns ? x1 - x0 : y1 - y0;
   const P = R('#a8814f'), D = R('#6b4c32'), RUN = R('#a8432f'), BRASS = R('#c9a24f'), n = 8, sw = 3, runner = (o.v ?? 0.5) >= 0.5;
   /* side on, the flight rises RISE pixels from foot to top, a step at a time */
   const RISE = ns ? 0 : 12, stepOf = p => Math.min(n - 1, Math.floor(p * n / len)), rise = p => (RISE ? Math.round((stepOf(p) + 1) * RISE / n) : 0);
@@ -1238,6 +1322,7 @@ function stairsSprite(K, o) {
    and a half wide, a few strides long) in the middle, its long side running the way it climbs. The town view walks
    the hero up it (or down the stairwell over it) when their feet reach this box. */
 const FLIGHT_W = 30, FLIGHT_L = 56;
+/* (the town view sets a flight in a corner of its tile: see flightRect in town/view.js) */
 const flightBox = f => { const a = (T - FLIGHT_W) / 2, b = (T - FLIGHT_L) / 2; return f % 2 === 0 ? [a, b, a + FLIGHT_W, b + FLIGHT_L] : [b, a, b + FLIGHT_L, a + FLIGHT_W]; };
 const ROOM = new Set(['iwall', 'iwindow', 'idoor', 'post', 'stairs', 'hearth']);
 const shadowOf = a => (a.group === 'Interior' ? 0 : Math.min(16, 4 + a.h * 0.3));
@@ -1247,8 +1332,9 @@ const shadowOf = a => (a.group === 'Interior' ? 0 : Math.min(16, 4 + a.h * 0.3))
 const SMALL = new Set([...Object.keys(NATURE), ...Object.keys(PROPS).filter(id => id !== 'fence'), ...Object.keys(INTERIOR).filter(id => !ROOM.has(id))]), MID = new Set(['yurt', 'mine', 'watchtower', 'granary', 'dovecote', 'shrine']);
 function pieceSprite(o) {
   const a = ASSET_BY_ID[o.id], [fw, fd] = footprint(o), U = SMALL.has(o.id) ? 32 : MID.has(o.id) ? 64 : T, small = U !== T, FW = fw * U, FD = fd * U, up = Math.round(Math.max(40, (a ? a.h : 16) * 4.4 + 60));
-  const K = kit(FW, FD, up, small ? 50 : 16), draw = DRAW[o.id];
-  const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null };
+  /* a flight set in a corner reaches into the tiles beside its own */
+  const K = kit(FW, FD, up, small ? 50 : o.id === 'stairs' ? 64 : 16), draw = DRAW[o.id];
+  const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null, box: o.box || null };
   if (draw) draw(K, inst);
   else K.box(4, 4, FW - 4, FD - 4, Math.min(30, (a ? a.h : 8) * 1.4), R('#c4b99f')[1], R('#c4b99f')[3]);
   if (SOFT.has(o.id)) K.softEdge();
@@ -1277,4 +1363,4 @@ function trim(K) {
 }
 const DESIGNED = new Set(Object.keys(DRAW));
 
-export { DESIGNED, MID, ROOM, SMALL, TREES, flightBox, pieceSprite, treeOffset };
+export { DESIGNED, FIRE, FLIGHT_L, FLIGHT_W, MID, ROOM, SMALL, TREES, flightBox, pieceSprite, treeOffset };

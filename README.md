@@ -407,9 +407,11 @@ than a person, a cottage about twice their height, two-storey houses towering ov
 - **Floors and stairs:** one storey is shown at a time, as in the editor: the ground, or an upper floor on its own
   over the dark, its edge showing as a thin slab. Stairs open the next floor rather than being climbed: step onto a
   flight going up it and the view fades to the floor above, with "Floor 1" in a banner and the hero on the landing at
-  the top. A flight is drawn at the figures' scale, as the furniture is: flat in the middle of its tile, about a person
-  and a half wide and a few strides long, eight treads lighter toward the top between dark stringers. The floor changes
-  when the hero's feet reach the steps, so walking past beside a flight on its tile does not climb it. Up there the way
+  the top, in line with the flight. A flight is drawn at the figures' scale, as the furniture is: about a person and a
+  half wide and a few strides long, eight treads lighter toward the top between dark stringers. It is set into the
+  corner of its tile, hard against the room walls round it (along the east or north wall when its tile has none, the
+  foot against a wall where there is one), so stairs always stand in a corner. The floor changes when the hero's feet
+  reach the steps heading up them, so walking past beside a flight does not climb it. Up there the way
   down shows as a stairwell the flight's own size, cut in the floor (which runs on round it) behind a banister, its steps
   going down a shade deeper each, in the wood's own browns; walking into it (or clicking it) fades back down to the foot of the flight. Clicking a flight goes up
   it, and a route to a tile on another floor goes by the stairs.
@@ -454,7 +456,10 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   its top, lime plaster, a skirting board) under its capping beam; one running up the view shows its capping beam and
   its east face in shade, so it reads as a wall rather than a crack; where walls join there is no seam. A doorway is an
   opening in its wall, the wall going on either side, with timber jambs, a lintel carrying the capping beam over it and
-  a sill underfoot; only the opening can be walked through. A piece standing in
+  a sill underfoot; only the opening can be walked through. A fireplace is a stone chimney breast built out from its
+  wall: an arched firebox with a keystone lintel, firedogs and logs, a fire whose flames and sparks flicker as the view
+  runs, a glow on the hearthstone, and a mantel with candlesticks and a jug; the breast blocks the hero as the wall
+  does. A piece standing in
   front of the hero fades so they are never lost behind it.
 - **Walking:** the hero walks freely, not tile by tile: the arrow keys or `WASD` (diagonals too, `Shift` runs) move
   them at a figure's pace, about three of their own heights a second, with a stride every few pixels so the feet plant

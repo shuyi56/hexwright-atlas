@@ -7,12 +7,12 @@ import { unitFor } from '../data/units.js';
 import { ED, rootModel } from '../editor/editor.js';
 import { arrival, doorAcross, doorways } from '../editor/interiors.js';
 import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf, objAt } from '../editor/model.js';
-import { FACE_DELTA, blockedBy, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
+import { FACE_DELTA, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
 import { hits, shapesOf } from './collide.js';
-import { flightBox, pieceSprite } from './pieces.js';
+import { FIRE, FLIGHT_L, FLIGHT_W, pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
 import { portrait } from '../tactical/render.js';
 import GroundWorker from './ground-worker.js?worker&inline';
@@ -159,7 +159,7 @@ function clip(px, w, h, X, Y, base, flip = false) {
   return out;
 }
 function spriteOf(o) {
-  const key = `${o.id}|${o.face || 0}|${Math.round((o.v ?? 0.5) * 20)}|${o.links ? o.links.join('') : ''}`; let s = TW.sprites.get(key);
+  const key = `${o.id}|${o.face || 0}|${Math.round((o.v ?? 0.5) * 20)}|${o.links ? o.links.join('') : ''}|${o.box ? o.box.join() : ''}`; let s = TW.sprites.get(key);
   if (!s) { const im = pieceSprite(o); s = { can: toCanvas(im.w, im.h, im.px), px: im.px, ox: im.ox, oy: im.oy, w: im.w, h: im.h }; TW.sprites.set(key, s); }
   return s;
 }
@@ -321,22 +321,62 @@ function throughDoor(face) {
   return o ? goIn(o) : false;
 }
 /* ---------- stairs: a new floor, as in the editor ---------- */
+/* ---------- where a flight stands ----------
+   A flight is drawn at the figures' scale and set in a corner, against the walls beside it: across it, against a
+   room wall on either side (on the east if there is none or both); along it, its foot against a wall it rises from,
+   else its top toward its landing. Room walls stand in the middle of their tiles, so a flight against one reaches into
+   that tile's near half. The box is in its tile's pixels, [x0, y0, x1, y1], and may run past the tile's edges. */
+const ROOM_WALLS = new Set(['iwall', 'iwindow', 'hearth', 'post']);
+function flightRect(M, o) {
+  const f = o.face || 0, L = levelOf(o), [fx, fy] = FACE_DELTA[f], [A, B] = [FLIGHT_W, FLIGHT_L];
+  const wall = (dx, dy) => { const k = objAt(M, o.x + dx, o.y + dy, L); return k >= 0 && ROOM_WALLS.has(M.objs[k].id); };
+  /* how far each side may go: flush against the wall there (its face, or for a wall in front the foot of its face), or
+     to the tile's own edge */
+  const E = wall(1, 0) ? T + T / 2 - 6 : T - 2, Wx = wall(-1, 0) ? -T / 2 + 10 : 2, N = wall(0, -1) ? -T / 2 + 5 : 2, Sy = wall(0, 1) ? T + T / 2 - 29 : T - 2;
+  if (f % 2 === 0) {
+    const x0 = wall(1, 0) || !wall(-1, 0) ? E - A : Wx, footWall = fy > 0 ? wall(0, 1) : wall(0, -1);
+    const y0 = fy > 0 ? (footWall ? Sy - B : N) : (footWall ? N : Sy - B);
+    return [x0, y0, x0 + A, y0 + B];
+  }
+  const y0 = wall(0, -1) || !wall(0, 1) ? N : Sy - A, footWall = fx > 0 ? wall(1, 0) : wall(-1, 0);
+  const x0 = fx > 0 ? (footWall ? E - B : Wx) : (footWall ? Wx : E - B);
+  return [x0, y0, x0 + B, y0 + A];
+}
+/* the flight's box for piece o of the map walked (worked out once a map) */
+function flightOf(o) { let r = TW.flightRects.get(o); if (!r) { r = flightRect(TW.M, o); TW.flightRects.set(o, r); } return r; }
+/* the box in map pixels, and whether (x, y) lies in it */
+const flightMap = o => { const [x0, y0, x1, y1] = flightOf(o); return [o.x * T + x0, o.y * T + y0, o.x * T + x1, o.y * T + y1]; };
+const inBox = (r, x, y) => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3];
 /* the hero, walking the way `face` points, takes the stairs when their feet reach the steps: a flight climbing that
    way takes them up to its landing, the well of a stairwell (going down, away from its landing) down to its foot */
-const inFlight = (x, y, tx, ty, f) => { const [x0, y0, x1, y1] = flightBox(f), lx = x - tx * T, ly = y - ty * T; return lx >= x0 && lx <= x1 && ly >= y0 && ly <= y1; };
 function stairsAhead(face) {
-  const m = TW.me, M = TW.M, tx = Math.floor(m.x / T), ty = Math.floor(m.y / T);
-  const st = stairsAt(M, tx, ty, m.L);
-  if (st && m.L < MAX_LEVEL && FACE_DELTA[face][0] === st.up[0] - tx && FACE_DELTA[face][1] === st.up[1] - ty && inFlight(m.x, m.y, tx, ty, M.objs[st.k].face)) return changeFloor(m.L + 1, st.up[0], st.up[1], face, [tx, ty]);
-  if (!m.L) return false;
-  const w = (TW.wells || []).find(q => q.x === tx && q.y === ty); if (!w || !inFlight(m.x, m.y, tx, ty, w.face)) return false;
-  /* heading down it: away from the landing */
-  const [dx, dy] = FACE_DELTA[face]; if (dx !== tx - w.up[0] || dy !== ty - w.up[1]) return false;
-  /* onto the tile at the flight's foot, or where that is blocked (a flight rising from a wall), onto the foot of the
-     flight itself, facing off it */
-  const [fx, fy] = FACE_DELTA[w.face];
-  if (!blockedBy(M, tx + fx, ty + fy, TW.hero, m.L - 1)) return changeFloor(m.L - 1, tx + fx, ty + fy, w.face, [tx, ty]);
-  return changeFloor(m.L - 1, tx, ty, w.face, [tx, ty], [tx * T + T / 2 + fx * 36, ty * T + T / 2 + fy * 36]);
+  const m = TW.me, M = TW.M, [dx, dy] = FACE_DELTA[face];
+  for (const o of M.objs) {
+    if (o.id !== 'stairs') continue;
+    const L = levelOf(o), st = stairsAt(M, o.x, o.y, L); if (!st) continue;
+    if (L === m.L && L < MAX_LEVEL && dx === st.up[0] - o.x && dy === st.up[1] - o.y && inBox(flightMap(o), m.x, m.y)) return changeFloor(L + 1, st.up[0], st.up[1], face, [o.x, o.y], topSpot(o));
+    if (L !== m.L - 1 || !(TW.wells || []).some(w => w.x === o.x && w.y === o.y)) continue;
+    /* heading down it: away from the landing */
+    if (dx !== o.x - st.up[0] || dy !== o.y - st.up[1] || !inBox(flightMap(o), m.x, m.y)) continue;
+    return changeFloor(L, o.x, o.y, o.face, [o.x, o.y], footSpot(o));
+  }
+  return false;
+}
+/* where someone coming up a flight steps off it on the floor above: just beyond its top, in line with it, so the way
+   back down is straight back the way they came */
+function topSpot(o) {
+  const L = levelOf(o) + 1, [fx, fy] = FACE_DELTA[o.face || 0], r = flightMap(o), cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
+  const hl = (fx ? r[2] - r[0] : r[3] - r[1]) / 2 + 12, x = cx - fx * hl, y = cy - fy * hl, h = heightOn(L, x, y);
+  return h != null && standable(L, x, y, h) ? [x, y] : null;
+}
+/* where someone coming down a flight steps off it: just beyond its foot, or where a wall stands there, beside its
+   foot on the open side */
+function footSpot(o) {
+  const M = TW.M, L = levelOf(o), [fx, fy] = FACE_DELTA[o.face || 0], r = flightMap(o), cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
+  const hl = fx ? (r[2] - r[0]) / 2 : (r[3] - r[1]) / 2, ha = fx ? (r[3] - r[1]) / 2 : (r[2] - r[0]) / 2;
+  const k = objAt(M, o.x + fx, o.y + fy, L), walled = k >= 0 && ROOM_WALLS.has(M.objs[k].id);
+  const spots = walled ? [-1, 1].map(s => (fx ? [cx + fx * (hl - 12), cy + s * (ha + 10)] : [cx + s * (ha + 10), cy + fy * (hl - 12)])) : [[cx + fx * (hl + 10), cy + fy * (hl + 10)]];
+  return spots.find(([x, y]) => { const h = heightOn(L, x, y); return h != null && standable(L, x, y, h); }) || null;
 }
 /* the hero onto storey L at tile (x, y) (or the exact spot given), facing `face`, having come by the flight at tile
    `via`: behind the veil (transition), and a route being followed goes on from the far end of the flight */
@@ -355,7 +395,7 @@ function changeFloor(L, x, y, face, via, spot = null) {
 function useMap(M, hero, homes = null) {
   TW.M = M; M.chars = M.chars || []; M.floors = M.floors || [];
   TW.steps.clear(); TW.path = []; TW.talkTo = -1; TW.rest = []; TW.stuck = 0;
-  TW.homes = homes || M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(M.objs); cuts.length = 0;
+  TW.homes = homes || M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(M.objs); TW.flightRects = new Map(); cuts.length = 0;
   TW.hero = hero; TW.G0 = fieldOf(M, 0); TW.shapes = shapesOf(M.objs, TW.links); takeHero();
   TW.top = TW.me ? TW.me.L : 0; buildField();
 }
@@ -483,7 +523,23 @@ function syncInside() {
 function routeTo(x, y, L) {
   /* the others are left out of the reckoning: whoever stands on the way steps aside when the hero comes (makeWay) */
   const M = TW.M, k = TW.hero, tx = Math.floor(x / T), ty = Math.floor(y / T), tiles = findPath(Object.assign({}, M, { chars: [M.chars[k]] }), 0, tx, ty, L);
-  const pts = (tiles || []).slice(0, -1).map(([a, b, l]) => [a * T + T / 2, b * T + FOOT, l || 0]);
+  /* through the middles of the tiles, but by a flight of stairs through the flight itself (it may stand off the middle of
+     its tile, in a corner): going up, to its foot if that is open and on into it; coming down, into its well */
+  const list = tiles || [], c = M.chars[k], pts = [];
+  for (let i = 0; i < list.length - 1; i++) {
+    const [a, b, l = 0] = list[i], st = stairsAt(M, a, b, l), prev = i ? list[i - 1] : [c.x, c.y, levelOf(c)], nx = list[i + 1];
+    if (st) {
+      const o = M.objs[st.k], r = flightMap(o), cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
+      if (nx[2] === l + 1) {
+        /* (not when a wall stands at its foot: that ground is behind the wall's face) */
+        const [fx, fy] = FACE_DELTA[o.face || 0], hl = (fx ? r[2] - r[0] : r[3] - r[1]) / 2 + 10, px = cx + fx * hl, py = cy + fy * hl, h = heightOn(l, px, py), fk = objAt(M, a + fx, b + fy, l);
+        if (!(fk >= 0 && ROOM_WALLS.has(M.objs[fk].id)) && h != null && standable(l, px, py, h)) pts.push([px, py, l]);
+        pts.push([cx, cy, l]); continue;
+      }
+      if ((prev[2] || 0) === l + 1) { pts.push([cx, cy, l + 1]); continue; }
+    }
+    pts.push([a * T + T / 2, b * T + FOOT, l]);
+  }
   pts.push([x, y, L || 0]); return pts;
 }
 /* the others stroll: now and then one takes a step, staying within two tiles of where it was put */
@@ -613,7 +669,9 @@ function paint() {
     /* a piece standing in front of the hero fades, so they are never lost behind it */
     const fade = hb && it.key > hero.key && s.X < hb[2] && s.X + s.w > hb[0] && s.Y < hb[3] && s.Y + s.h > hb[1] && covers(s, s.X, s.Y, hb);
     if (fade) g.globalAlpha = 0.5;
-    g.drawImage(s.can, s.X, s.Y); g.globalAlpha = 1;
+    g.drawImage(s.can, s.X, s.Y);
+    if (it.p.id === 'hearth') flicker(it.p, s);
+    g.globalAlpha = 1;
   }
 }
 /* piece it as it stands on the surface: its sprite placed at the height of the ground at the middle of its front,
@@ -621,7 +679,7 @@ function paint() {
 function pieceOn(it, vx0, vy0, vx1, vy1) {
   let c = TW.clipped.get(it.i);
   if (!c) {
-    const p = it.p, sp = spriteOf(Object.assign({}, p, { links: TW.links.get(p) || null })), z = lift((p.x + it.w / 2) * T, (p.y + it.d) * T - 4);
+    const p = it.p, sp = spriteOf(Object.assign({}, p, { links: TW.links.get(p) || null, box: p.id === 'stairs' ? flightOf(p) : null })), z = lift((p.x + it.w / 2) * T, (p.y + it.d) * T - 4);
     c = { sp, w: sp.w, h: sp.h, X: p.x * T - sp.ox, Y: Math.round(p.y * T - z) - sp.oy, can: null }; TW.clipped.set(it.i, c);
   }
   if (c.X > vx1 || c.Y > vy1 || c.X + c.w < vx0 || c.Y + c.h < vy0) return null;
@@ -644,7 +702,7 @@ function wellsOf(M, L) {
 function stairwells(vx0, vy0, vx1, vy1) {
   const M = TW.M, L = TW.top;
   for (const w of TW.wells || []) {
-    const z = Math.round((M.elev[w.up[1] * M.S + w.up[0]] + STOREY * L) * LIFT), [bx0, by0, bx1, by1] = flightBox(w.face);
+    const o = M.objs[stairsAt(M, w.x, w.y, L - 1).k], z = Math.round((M.elev[w.up[1] * M.S + w.up[0]] + STOREY * L) * LIFT), [bx0, by0, bx1, by1] = flightOf(o);
     const X = w.x * T + bx0, Y = w.y * T - z + by0, BW = bx1 - bx0, BH = by1 - by0; w.box = [X, Y, X + BW, Y + BH];
     if (X > vx1 || Y > vy1 || X + BW < vx0 || Y + BH < vy0) continue;
     /* steps run from the landing's edge (lit, near the floor's colour) down into shadow */
@@ -675,6 +733,17 @@ function stairwells(vx0, vy0, vx1, vy1) {
     }
     for (const [px, py] of posts) { g.fillStyle = '#6b4c32'; g.fillRect(px - 1, py - RH - 2, 3, RH + 3); g.fillStyle = '#c4a072'; g.fillRect(px - 1, py - RH - 3, 3, 1); g.fillStyle = '#4e3622'; g.fillRect(px + 1, py - RH - 2, 1, RH + 3); }
   }
+}
+/* a fireplace's fire, flickering: tongues of flame redrawn over the sprite's own each tick, their heights wandering */
+function flicker(p, s) {
+  const F = FIRE(p); if (!F) return;
+  const x = s.X + s.sp.ox + F.x, y = s.Y + s.sp.oy + F.y, t = TW.tick;
+  for (let i = -F.w; i <= F.w; i++) {
+    const q = 1 - Math.abs(i) / (F.w + 1), hh = Math.max(1, Math.round(F.h * q * (0.45 + 0.55 * h2(i + 40, t, 43))));
+    for (let k = 0; k < hh; k++) { const f = k / hh; g.fillStyle = f > 0.72 ? '#c8502a' : f > 0.42 || Math.abs(i) > F.w * 0.6 ? '#f08a2a' : q > 0.6 && f < 0.25 ? '#fff4c0' : '#f6d36a'; g.fillRect(x + i, y - k, 1, 1); }
+  }
+  /* now and then a spark above it */
+  if (h2(t, 5, 44) < 0.5) { g.fillStyle = '#f6d36a'; g.fillRect(x + Math.round((h2(t, 6, 45) - 0.5) * F.w * 1.5), y - F.h - 2 - Math.round(h2(t, 7, 46) * 4), 1, 1); }
 }
 /* the water's ripples: short lit dashes drifting to and fro, wherever the water is in sight */
 function ripples(vx0, vy0, vx1, vy1) {
@@ -707,6 +776,8 @@ function drawChar(k, q, vx0, vy0, vx1, vy1, sc) {
   /* placed to the nearest device pixel, so a walker glides with the camera; what hides it is worked out on the art
      pixel it is nearest */
   const view = q.face === 2 ? 'back' : 'front', flip = q.face === 1, x = Math.round(q.fx * sc) / sc, y = Math.round(q.fy * sc) / sc, X = x - W / 2, Y = y - BASE - 1;
+  /* the hero's pose as last drawn, for tests to see the walk cycle turn */
+  if (k === TW.hero) TW.heroPose = view + pose;
   if (X > vx1 || Y > vy1 || X + W < vx0 || Y + H < vy0) return;
   /* the figure and its shadow, cut away wherever the ground shown lies in front of where it stands */
   g.fillStyle = 'rgba(43,33,22,0.32)'; g.beginPath(); g.ellipse(x + 1, y, 7, 2.5, 0, 0, Math.PI * 2); g.fill();
@@ -733,7 +804,7 @@ let raf = 0;
 function loop(now) {
   raf = 0; if (!TW.open) return;
   const dt = Math.min(0.1, (now - (TW.lastT || now)) / 1000); TW.lastT = now;
-  if (TW.busy) { veiled(now); if (painters.length) pump(); raf = requestAnimationFrame(loop); return; }
+  if (TW.busy) { veiled(now); if (painters.length) pump(); next(); return; }
   for (const [k, st] of TW.steps) { st.t += dt * NPC_SPEED; if (st.t >= 1) TW.steps.delete(k); TW.dirty = true; }
   heroTick(dt);
   stroll(dt);
@@ -743,8 +814,12 @@ function loop(now) {
   /* the painters work ahead of the camera; with none, the ground just off screen is painted here, one chunk a frame,
      only while the hero stands still so a walk never waits on it */
   if (painters.length) pump(); else if (!(TW.me && TW.me.moving)) fillOne();
-  raf = requestAnimationFrame(loop);
+  next();
 }
+/* One frame is asked for at a time. Something done during a frame may already have asked for the next (a transition
+   does); asking again would run two loops a frame, the second seeing no time pass and so drawing the hero stood still
+   in mid-stride, a little more of it after each transition. */
+const next = () => { if (!raf && TW.open) raf = requestAnimationFrame(loop); };
 const req = () => { TW.dirty = true; if (!raf && TW.open) raf = requestAnimationFrame(loop); };
 function fillOne() {
   const n = Math.ceil(S() * T / CHUNK), mx = Math.floor(TW.cam.x / CHUNK), my = Math.floor(TW.cam.y / CHUNK);
@@ -930,6 +1005,6 @@ const resized = new ResizeObserver(([en]) => {
 });
 try { resized.observe(cv, { box: 'device-pixel-content-box' }); } catch { resized.observe(cv); }
 /* test hook */
-window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, inside: () => TW.stack.length > 0, goIn: (x, y) => { const o = TW.M.objs.find(p => p.interior && !levelOf(p) && x >= p.x && y >= p.y && x < p.x + footprint(p)[0] && y < p.y + footprint(p)[1]); return o ? goIn(o) : false; }, goOut, doorAt, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
+window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, flight: (x, y, L = 0) => { const st = stairsAt(TW.M, x, y, L); return st ? flightMap(TW.M.objs[st.k]) : null; }, walkPoint: (x, y, L = 0) => { TW.path = routeTo(x, y, L); TW.moved = true; req(); }, inside: () => TW.stack.length > 0, goIn: (x, y) => { const o = TW.M.objs.find(p => p.interior && !levelOf(p) && x >= p.x && y >= p.y && x < p.x + footprint(p)[0] && y < p.y + footprint(p)[1]); return o ? goIn(o) : false; }, goOut, doorAt, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
 
 export { closeTown, openTown };

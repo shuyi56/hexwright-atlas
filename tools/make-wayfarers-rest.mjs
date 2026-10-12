@@ -6,10 +6,10 @@
    A tavern's room, 7 tiles square (five of floor inside the walls), packed full:
    - The common room (ground floor): oak boards and an aisle from the door to the fire; west of it a red rug and a
      candle stand at the hearth and a long table between two benches; east of it the bar (a counter facing the room,
-     a dresser of crockery behind it, a stool before it); a weapon rack and barrels by the door, stairs in the
-     south-east corner.
-   - Upstairs (floor 1), walled and windowed like the room below: a passage along the south with a bench and a candle stand, the open stairwell at its east
-     end, and two bedrooms through doorways in a timber partition: the west on a red carpet with a bed and a dresser,
+     a dresser of crockery behind it, a stool before it); a weapon rack and barrels by the door, and stairs
+     in the south-east corner, stepped onto at their right-hand end and climbing west.
+   - Upstairs (floor 1), walled and windowed like the room below: a passage along the south with a bench and a candle stand, the open stairwell along its south wall,
+     and two bedrooms through doorways in a timber partition: the west on a red carpet with a bed and a dresser,
      the east on a blue one with a bed and a wardrobe.
    - The people: the innkeeper behind the bar, a healer at it, a monk warming himself at the fire, a farmer by the long
      table, a guard by the stairs, and a noble guest upstairs.
@@ -39,8 +39,9 @@ put(I, 'candelabra', 1, 1);
 put(I, 'longtable', 1, 3); put(I, 'bench', 1, 2, 0); put(I, 'bench', 1, 4, 2);
 put(I, 'counter', 4, 2, 0); put(I, 'dresser', 5, 1, 0); put(I, 'stool', 5, 3);
 put(I, 'weaponrack', 1, 5, 1); put(I, 'barrels', 2, 5);
-/* the stairs climbing north to the landing at 5,4 on floor 1, stepped onto from the bar's side or the aisle */
-put(I, 'stairs', 5, 5, 0);
+/* the stairs in the south-east corner, against the south wall with their foot at the east wall: stepped onto at the
+   right-hand end, from the corner, and climbing west to the landing at 4,5 on floor 1 */
+put(I, 'stairs', 5, 5, 1);
 
 /* upstairs: floor out to the walls but the stairwell over the flight, and the outer walls again with their windows */
 paintTiles(I, rectTiles(I, 0, 0, S, S), 'floorboards', 1);
