@@ -120,8 +120,8 @@ Any building can be given an interior: a room of its own to furnish, which the t
 - **Giving one:** the **Interior** tool (`N`) rings in gold every building that already has an interior. Click a
   building to give it one and open it, or to open the one it has. The city wall, the elven archway and the pavilion
   are open to the air, so they cannot have one.
-- **The room:** a new interior is its own square map, sized to the building (8 tiles for a one-tile cottage, 12 for a
-  two-tile hall, up to 24). It is walled all round, with windows in the walls, a doorway in the middle of the south
+- **The room:** a new interior is its own square map, sized to the building at the figures' scale (5 tiles for a one-tile cottage, a
+  room three tiles across inside its walls; 7 for a two-tile hall; up to 12). It is walled all round, with windows in the walls, a doorway in the middle of the south
   wall and, in homes and halls, a fireplace in the back wall. The floor is chosen to suit the building: floorboards,
   stone, rushes, a chequered floor in the mansion, the inlaid ash floor in the elven buildings.
 - **Furnishing it:** the editor opens the room in place of the map, ringed in brass, with a bar naming the building
@@ -455,11 +455,16 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   (`src/town/collide.js`).
 - **Going indoors:** a building given an interior in the editor (see [Building interiors](#building-interiors)) can
   be entered in three ways: walk into its front door, click the building, or press `Space` facing the door. The view
-  fades into the room, names it in a banner, and shows it in the top bar after the town's name. The hero comes in just
+  goes into the room (see **Transitions**), names it in a banner, and shows it in the top bar after the town's name. The hero comes in just
   inside the doorway, and anyone placed in the room is there, strolling about. They go back out through a doorway in the
   room's outer wall: walk out through it, click it, or use `Esc` or **Leave building**. They come out on the doorstep. A
   room keeps its people where they were left until the view closes. Opened from the editor while a room is open, the
   walk starts in that room.
+- **Transitions:** going through a door, taking the stairs, or opening the view, the screen fades to dark and the new
+  place is swapped in behind it. It fades back up only once the ground in sight is painted and the pieces in sight are
+  fitted to it, all of it done a piece at a time by the painters, so no frame stalls and the place being left never
+  shows through. Meanwhile the hero walks in place over the name of where they are going (seen from behind going in or
+  up, from the front coming out or down), over three gold lights rising in turn.
 - **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a slate and gold window with their portrait, like the tactical view's),
   or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
 - **Phones and tablets:** a finger dragged anywhere on the map is a stick the hero walks by (a small pull strolls,
