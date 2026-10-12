@@ -16,13 +16,21 @@ const TI = Object.fromEntries(TERRAIN.map((t, k) => [t.id, k]));
 function blankModel(S = 24, ground = 'grass', name = 'Untitled survey') {
   return { name, S, clim: 'temperate', terr: new Uint8Array(S * S).fill(TI[ground] ?? 0), elev: new Uint8Array(S * S), objs: [], chars: [], floors: [] };
 }
-const cloneModel = M => ({ name: M.name, S: M.S, clim: M.clim, terr: M.terr.slice(), elev: M.elev.slice(), objs: M.objs.map(o => Object.assign({}, o)), chars: (M.chars || []).map(c => Object.assign({}, c)), floors: (M.floors || []).map(f => f && f.slice()) });
+/* a building's interior (editor/interiors.js) is a model of its own, kept on the piece and copied with it */
+const clonePiece = o => (o.interior ? Object.assign({}, o, { interior: cloneModel(o.interior) }) : Object.assign({}, o));
+const cloneModel = M => ({ name: M.name, S: M.S, clim: M.clim, terr: M.terr.slice(), elev: M.elev.slice(), objs: M.objs.map(clonePiece), chars: (M.chars || []).map(c => Object.assign({}, c)), floors: (M.floors || []).map(f => f && f.slice()) });
 
 /* JSON form keeps terrain as ids so it survives the catalogue growing */
 function toJSON(M) {
   const pal = [], at = {}, cells = [];
   for (let u = 0; u < M.terr.length; u++) { const id = TERRAIN[M.terr[u]].id; if (at[id] == null) { at[id] = pal.length; pal.push(id); } cells.push(at[id]); }
-  return { format: 'hexwright-tiles', version: 1, name: M.name, size: M.S, clim: M.clim, palette: pal, terrain: cells, elevation: Array.from(M.elev), objects: M.objs.map(({ id, x, y, face, v, level }) => (level ? { id, x, y, face, v, level } : { id, x, y, face, v })), ...floorsJSON(M), ...charsJSON(M) };
+  return { format: 'hexwright-tiles', version: 1, name: M.name, size: M.S, clim: M.clim, palette: pal, terrain: cells, elevation: Array.from(M.elev), objects: M.objs.map(pieceJSON), ...floorsJSON(M), ...charsJSON(M) };
+}
+/* a piece, with its interior (a whole map of its own, in this same form) when it has one */
+function pieceJSON({ id, x, y, face, v, level, interior }) {
+  const o = level ? { id, x, y, face, v, level } : { id, x, y, face, v };
+  if (interior) o.interior = toJSON(interior);
+  return o;
 }
 /* upper floors as their own palette and cells, 0 meaning no floor */
 function floorsJSON(M) {
@@ -57,7 +65,12 @@ function fromJSON(J) {
     const f = M.floors[L - 1] = new Uint8Array(S * S);
     for (let u = 0; u < S * S; u++) { const c = F.cells[u] | 0, id = c ? F.palette[c - 1] : null; f[u] = id && TI[id] != null ? TI[id] + 1 : 0; }
   }
-  M.objs = (J.objects || []).filter(o => ASSET_BY_ID[o.id]).map(o => { const r = { id: o.id, x: o.x | 0, y: o.y | 0, face: (o.face | 0) & 3, v: +o.v || 0 }; if (lv(o.level)) r.level = lv(o.level); return r; });
+  M.objs = (J.objects || []).filter(o => ASSET_BY_ID[o.id]).map(o => {
+    const r = { id: o.id, x: o.x | 0, y: o.y | 0, face: (o.face | 0) & 3, v: +o.v || 0 }; if (lv(o.level)) r.level = lv(o.level);
+    /* an interior that will not read is left off rather than losing the whole map */
+    if (o.interior) { try { r.interior = fromJSON(o.interior); } catch { /* the building opens with no interior */ } }
+    return r;
+  });
   mergeCustom(Array.isArray(J.customCharacters) ? J.customCharacters : []);
   M.chars = (J.characters || []).filter(c => c && typeof c.sprite === 'string' && Number.isInteger(c.x) && Number.isInteger(c.y) && c.x >= 0 && c.y >= 0 && c.x < S && c.y < S).map(c => { const r = { sprite: characterId(c.sprite), x: c.x, y: c.y, face: (c.face | 0) & 3 }; if (lv(c.level)) r.level = lv(c.level); return r; });
   return M;

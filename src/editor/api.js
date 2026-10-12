@@ -4,8 +4,9 @@ import { METHODS } from './api-spec.js';
 import { characterById, get as getCustom, list as customList, save as saveCustom } from '../characters/library.js';
 import { ELVES, ENEMIES, ROSTER } from '../characters/roster.js';
 import { TOWNSFOLK } from '../characters/townsfolk.js';
-import { ED, LEVEL_NAME, characterBoxes, closeEditor, doWalk, ensureModel, fitView, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
+import { ED, LEVEL_NAME, characterBoxes, closeEditor, doWalk, enterInterior, ensureModel, fitView, leaveInterior, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
 import { BIOMES, generateScene } from './generate.js';
+import { addInterior, canHaveInterior, doorways } from './interiors.js';
 import { MAX_ELEV, MAX_LEVEL, STOREY, TI, blankModel, floorAt, fromJSON, levelOf, objAt, toJSON } from './model.js';
 import { brushTiles, eraseAt, floodFill, inb, paintTiles, placePiece, rectTiles, removeFloor, setElev, shiftElev } from './ops.js';
 import { SZ, renderTiles } from './render.js';
@@ -75,7 +76,9 @@ function charIndex(M, p) {
   if (k < 0 || k >= (M.chars || []).length) fail(p.index != null ? `no character with index ${p.index}; the map has ${(M.chars || []).length}` : `no character at ${p.at.x},${p.at.y}`);
   return k;
 }
-const pieceInfo = (M, o, k) => { const [w, d] = footprint(o), a = ASSET_BY_ID[o.id]; return { index: k, id: o.id, label: a.label, x: o.x, y: o.y, level: levelOf(o), face: o.face, w, d, v: o.v }; };
+const pieceInfo = (M, o, k) => { const [w, d] = footprint(o), a = ASSET_BY_ID[o.id]; return { index: k, id: o.id, label: a.label, x: o.x, y: o.y, level: levelOf(o), face: o.face, w, d, v: o.v, ...(o.interior ? { interior: { name: o.interior.name, size: o.interior.S } } : {}) }; };
+/* the building being furnished, when the editor is inside one */
+const insideInfo = () => { const o = ED.outer; if (!o) return null; const k = o.M.objs.indexOf(o.piece); return { building: pieceInfo(o.M, o.piece, k), name: ED.M.name, size: ED.M.S, doorways: doorways(ED.M).map(([x, y]) => ({ x, y })) }; };
 
 /* ---------- edits: each takes the model and returns { changed, ... } ---------- */
 const EDITS = {
@@ -103,7 +106,7 @@ const EDITS = {
     const k = p.index != null ? p.index : p.at ? (tileOf(M, p.at.x, p.at.y), objAt(M, p.at.x, p.at.y, p.level || 0)) : fail('moveObject needs index or at');
     if (k < 0 || k >= M.objs.length) fail(p.index != null ? `no piece with index ${p.index}` : `no piece covers ${p.at.x},${p.at.y}`);
     const o = M.objs[k]; M.objs.splice(k, 1);
-    const r = placePiece(M, { id: o.id, x: p.to ? p.to.x : o.x, y: p.to ? p.to.y : o.y, face: p.face != null ? p.face : o.face, v: o.v, level: o.level });
+    const r = placePiece(M, { id: o.id, x: p.to ? p.to.x : o.x, y: p.to ? p.to.y : o.y, face: p.face != null ? p.face : o.face, v: o.v, level: o.level, interior: o.interior });
     if (!r.ok) { M.objs.splice(k, 0, o); return { changed: 0, moved: false, reason: r.reason }; }
     M.objs.splice(k, 0, M.objs.pop()); return { changed: 1, moved: true, piece: pieceInfo(M, M.objs[k], k) };
   },
@@ -186,7 +189,8 @@ function describe() {
     api: 'hexwright-tiles automation', version: 1, coordinates: 'x east, y south, (0,0) top-left of the unrotated map; rect = {x, y, w, h}',
     limits: { size: [4, 96], elevation: [0, MAX_ELEV], levels: [0, MAX_LEVEL], brush: [1, 3], facing: [0, 3] },
     storeys: `level 0 is the ground; levels 1-${MAX_LEVEL} are floors laid with paint (level), each ${STOREY} height levels (${SZ} px) above the ground below. Pieces and characters belong to one level; stairs (asset 'stairs') lead from their high end to the tile behind them one level up.`,
-    tools: ['paint', 'fill', 'raise', 'lower', 'level', 'place', 'character', 'walk', 'erase', 'pick', 'pan'],
+    tools: ['paint', 'fill', 'raise', 'lower', 'level', 'place', 'character', 'walk', 'erase', 'pick', 'pan', 'interior'],
+    interiors: 'A building can have an interior, a map of its own kept on the piece: enterInterior opens it (giving it one first), and every method then works on the room until leaveInterior. Doorways (idoor) on the room\'s outer edge lead back out in the town view.',
     sprites: everyone().map(s => ({ id: s.id, name: s.name })),
     biomes: Object.entries(BIOMES).map(([id, B]) => ({ id, label: B.label, climate: B.clim })),
     terrain: TERRAIN.map(t => ({ id: t.id, label: t.label, group: t.group, water: !!t.water, symbol: SYM[t.id] })),
@@ -201,7 +205,7 @@ function state() {
     open: ED.open, name: M.name, size: M.S, climate: M.clim, objects: M.objs.length, characters: (M.chars || []).length, selectedCharacter: ED.sel,
     tool: ED.tool, brush: ED.brush, terrain: ED.terrain, asset: ED.asset, sprite: ED.char, face: ED.face, tab: ED.tab,
     view: { level: ED.level, levelName: LEVEL_NAME(ED.level), rot: ED.rot, zoom: ED.fitZ ? +(ED.z / ED.fitZ).toFixed(3) : null, grid: ED.grid, stage: { width: ED.cw, height: ED.ch } },
-    history: { undo: ED.undo.length, redo: ED.redo.length }, status: $('edStatus').textContent,
+    history: { undo: ED.undo.length, redo: ED.redo.length }, status: $('edStatus').textContent, interior: insideInfo(),
     page: { url: location.href, title: document.title }
   };
 }
@@ -285,6 +289,14 @@ const METHOD_IMPL = {
     const M0 = ensureModel(); biomeOf(p.biome); const seed = p.seed || Math.random().toString(36).slice(2, 7), M = generateScene(seed, sizeOf(p, M0), p.biome || 'vale');
     replaceModel(M); return { name: M.name, seed, size: M.S, objects: M.objs.length };
   },
+  enterInterior(p) {
+    const M = ensureModel(); if (ED.outer) fail(`already inside ${ED.M.name}; call leaveInterior first`);
+    tileOf(M, p.x, p.y); const k = objAt(M, p.x, p.y, 0); if (k < 0) fail(`no piece covers ${p.x},${p.y} on the ground`);
+    const o = M.objs[k], a = ASSET_BY_ID[o.id]; if (!canHaveInterior(o.id)) fail(`${a.label} cannot have an interior: ${a.group === 'Buildings' ? 'it is open to the air' : 'it is not a building'}`);
+    const created = !o.interior; if (created) mutate(() => { addInterior(M, o); return { changed: 1 }; });
+    enterInterior(o); syncName(); return { created, ...insideInfo() };
+  },
+  leaveInterior(p) { if (!ED.outer) fail('the editor is not inside a building'); const was = insideInfo(); leaveInterior(!!p.remove); syncName(); return { left: was.building, removed: !!p.remove, name: ED.M.name }; },
   rename: edit('rename'), removeFloor: edit('removeFloor'), placeCharacter: edit('placeCharacter'), walkCharacter: edit('walkCharacter'), removeCharacter: edit('removeCharacter'), paint: edit('paint'), fill: edit('fill'), elevation: edit('elevation'), place: edit('place'), erase: edit('erase'), moveObject: edit('moveObject'),
   getTile(p) { const M = ensureModel(); tileOf(M, p.x, p.y); return tileInfo(M, p.x, p.y, p.level || 0); },
   getRegion(p) {

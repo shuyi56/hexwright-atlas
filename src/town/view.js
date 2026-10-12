@@ -4,14 +4,15 @@ import { BASE } from '../characters/body.js';
 import { H, W } from '../characters/pixels.js';
 import { WALK, renderScaled } from '../characters/roster.js';
 import { unitFor } from '../data/units.js';
-import { ED } from '../editor/editor.js';
+import { ED, rootModel } from '../editor/editor.js';
+import { arrival, doorAcross, doorways } from '../editor/interiors.js';
 import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf } from '../editor/model.js';
-import { FACE_DELTA, findPath, neighbours, stairsAt } from '../editor/walk.js';
+import { FACE_DELTA, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
 import { hits, shapesOf } from './collide.js';
-import { pieceSprite } from './pieces.js';
+import { flightBox, pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
 import { portrait } from '../tactical/render.js';
 import GroundWorker from './ground-worker.js?worker&inline';
@@ -22,7 +23,10 @@ import GroundWorker from './ground-worker.js?worker&inline';
    is the hero: the arrow keys or WASD walk them a tile at a time (Shift runs), and they turn to face a way
    that is blocked; a click walks them to any tile they can reach, up and down stairs. Space or Enter talks to
    whoever they face, or looks at the piece or ground in front of them. Tab hands the hero's part to the next
-   character. Everyone else strolls about near where they were put. Only the floors up to the hero's own are shown.
+   character. Everyone else strolls about near where they were put.
+   One storey is shown at a time, as in the editor: the ground, or an upper floor on its own. Stairs change it the
+   way a door does: stepping onto a flight to climb it fades up to the floor above, the hero on the landing at its
+   top, and walking into the stairwell up there (drawn as steps going down) fades back down to the flight's foot.
    On a touch screen a finger dragged anywhere is a stick that walks the hero that way (pulled far, they run); a tap
    walks them to the spot or up to whoever is there and talks, a tap on the hero talks to whoever they face, the Talk
    button does the same, and two fingers pinch the zoom.
@@ -34,6 +38,10 @@ import GroundWorker from './ground-worker.js?worker&inline';
    The canvas has one pixel for every device pixel and the art is drawn a whole number of device pixels to the art
    pixel, so the pixel art stays sharp; the camera and the walkers are placed to the nearest device pixel, so they
    glide instead of stepping an art pixel at a time.
+   Buildings given an interior in the editor (editor/interiors.js) can be gone into: walking into the front door,
+   clicking the building, or Space facing it takes the hero inside, and the view walks the room's own map until they
+   go out through a doorway in its outer wall (or Esc), when they come out on the doorstep. TW.stack holds the map
+   outside meanwhile; each room is kept as it was left until the view closes.
    Walking here is a stroll, not an edit: the map is left as it was, and opening the view again starts afresh. */
 const root = $('town'), cv = $('twCanvas'), g = cv.getContext('2d');
 /* figures at three quarters of their sprite, as in the tactical view: about 30 pixels tall, so a one-tile cottage
@@ -44,7 +52,7 @@ const FIGURE_SCALE = 0.75;
    NPC_SPEED tiles a second, STRIDES strides to a tile. A walker's feet are a circle FOOT_R across. */
 const HERO_SPEED = 90, RUN = 1.85, STRIDE = 7, NPC_SPEED = 0.8, STRIDES = 8, FOOT_R = 5;
 const T = TILE, ZOOMS = [1, 2, 3, 4, 5, 6], FOOT = T / 2 + 6;
-const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, stick: null, F: null, gen: 0, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, dpr: 1, homes: [], rest: [] };
+const TW = { open: false, M: null, hero: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, steps: new Map(), path: [], held: [], run: false, stick: null, F: null, gen: 0, chunks: new Map(), clipped: new Map(), sprites: new Map(), say: null, talkTo: -1, lastT: 0, tick: 0, dirty: true, cw: 0, ch: 0, dpr: 1, homes: [], rest: [], stack: [], inside: new Map() };
 /* at most this many chunks are kept (about 40 MB), the furthest from the camera let go first; the workers paint
    ahead out to FILL chunks from the middle of the screen */
 const KEEP = 420, FILL = 9;
@@ -56,7 +64,10 @@ function toCanvas(w, h, px) { const c = canvasOf(w, h), cg = c.getContext('2d'),
 const keyOf = (cx, cy) => (cy + 512) * 1024 + cx;
 function buildField() {
   for (const c of TW.chunks.values()) if (c.can.close) c.can.close();
-  TW.F = fieldOf(TW.M, TW.top); TW.gen++; TW.chunks.clear(); TW.clipped.clear(); lastKey = NaN; lastChunk = null; TW.dirty = true;
+  TW.F = fieldOf(TW.M, TW.top, true); TW.wells = wellsOf(TW.M, TW.top);
+  /* the floor runs on round a stairwell (only its flight-sized well is open), in the landing's floor */
+  for (const w of TW.wells) { const u = w.y * TW.M.S + w.x; if (TW.F.terr[u] < 0) TW.F.terr[u] = TW.M.floors[TW.top - 1][w.up[1] * TW.M.S + w.up[0]] - 1; }
+  TW.gen++; TW.chunks.clear(); TW.clipped.clear(); lastKey = NaN; lastChunk = null; TW.dirty = true;
   const { S: n, top, terr, hgt, lev, maxH, slope, axis } = TW.F;
   for (const p of painters) p.w.postMessage({ gen: TW.gen, field: { S: n, top, terr, hgt, lev, maxH, slope, axis } });
 }
@@ -189,25 +200,16 @@ const DIRS = { ArrowDown: 0, s: 0, ArrowRight: 1, d: 1, ArrowUp: 2, w: 2, ArrowL
    along one axis, the hero slides along the other, so they skirt a trunk or a wall instead of sticking to it.
    Stairs carry them up or down a storey: crossing from a flight onto the tile behind its top goes up, and back
    down the same way. */
-/* the height the hero stands at on storey L, at map pixel (x, y), in levels: the ground (or the floor), raised
-   along a flight of stairs from its foot to its top; null where storey L has no floor */
+/* the height the hero stands at on storey L, at map pixel (x, y), in levels: the ground, or the floor; null where
+   storey L has no floor. A flight of stairs lies flat: the storey changes all at once at its steps (stairsAhead). */
 function heightOn(L, x, y) {
   const M = TW.M, n = M.S, tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || ty < 0 || tx >= n || ty >= n) return null;
-  const u = ty * n + tx; let h;
-  if (L) { if (!floorAt(M, L, u)) return null; h = M.elev[u] + STOREY * L; } else h = heightAt(TW.G0, x, y);
-  const st = stairsAt(M, tx, ty, L);
-  if (st) { const dx = st.up[0] - tx, dy = st.up[1] - ty, lx = x / T - tx, ly = y / T - ty; h += STOREY * (dx > 0 ? lx : dx < 0 ? 1 - lx : dy > 0 ? ly : 1 - ly); }
-  return h;
+  const u = ty * n + tx;
+  /* round a stairwell on the floor shown there is floor too; only its well is open (stairsAhead takes the hero down) */
+  if (L) return floorAt(M, L, u) || (L === TW.top && (TW.wells || []).some(w => w.x === tx && w.y === ty)) ? M.elev[u] + STOREY * L : null;
+  return heightAt(TW.G0, x, y);
 }
 const dry = (L, x, y) => { if (L) return true; const k = cellAt(TW.G0, Math.round(x), Math.round(y)); return k >= 0 && !INFO[k].water && INFO[k].face !== 'lava'; };
-/* the storey a step from (ax, ay) to (bx, by) on storey L lands on: up or down a flight, else the same */
-function storeyAfter(L, ax, ay, bx, by) {
-  const M = TW.M, A = [Math.floor(ax / T), Math.floor(ay / T)], B = [Math.floor(bx / T), Math.floor(by / T)];
-  if (A[0] === B[0] && A[1] === B[1]) return L;
-  const st = stairsAt(M, A[0], A[1], L); if (st && L < MAX_LEVEL && st.up[0] === B[0] && st.up[1] === B[1]) return L + 1;
-  if (L > 0) { const dn = stairsAt(M, B[0], B[1], L - 1); if (dn && dn.up[0] === A[0] && dn.up[1] === A[1]) return L - 1; }
-  return L;
-}
 /* can the hero stand at (x, y) on storey L, coming from a spot h levels high? */
 function standable(L, x, y, h) {
   const n = TW.M.S * T; if (x < FOOT_R || y < FOOT_R || x > n - FOOT_R || y > n - FOOT_R) return false;
@@ -228,8 +230,9 @@ function moveHero(dx, dy) {
     const c1 = Math.cos(0.7), s1 = Math.sin(0.7), c2 = Math.cos(1.2), s2 = Math.sin(1.2);
     for (const [ex, ey] of [[sx, sy], [sx, 0], [0, sy], [sx * c1 - sy * s1, sx * s1 + sy * c1], [sx * c1 + sy * s1, -sx * s1 + sy * c1], [sx * c2 - sy * s2, sx * s2 + sy * c2], [sx * c2 + sy * s2, -sx * s2 + sy * c2]]) {
       if (!ex && !ey) continue;
-      const nx = m.x + ex, ny = m.y + ey, L = storeyAfter(m.L, m.x, m.y, nx, ny);
-      if (standable(L, nx, ny, h)) { m.x = nx; m.y = ny; gone += Math.hypot(ex, ey); moved = true; if (L !== m.L) { m.L = L; setTop(L); } break; }
+      /* the storey changes only by stairs (see stairsAhead), never in the walk itself */
+      const nx = m.x + ex, ny = m.y + ey;
+      if (standable(m.L, nx, ny, h)) { m.x = nx; m.y = ny; gone += Math.hypot(ex, ey); moved = true; break; }
     }
     if (!moved) break;
   }
@@ -270,6 +273,8 @@ function heroTick(dt) {
     m.dist += gone; m.moving = gone > 0.05;
     if (!m.moving && TW.path.length) { TW.stuck = (TW.stuck || 0) + dt; if (TW.stuck > 0.4) TW.path = []; }
     TW.dirty = true;
+    /* walking into a door goes through it */
+    if (!TW.say && throughDoor(m.face)) return;
   } else if (m.moving) { m.moving = false; TW.dirty = true; place(); }
   /* walked up to someone to talk to them */
   if (TW.talkTo >= 0) {
@@ -279,12 +284,128 @@ function heroTick(dt) {
     else if (!TW.path.length) { if (q.L === m.L && d < 4 * T && (TW.chase = (TW.chase || 0) + 1) < 4) TW.path = routeTo(q.fx, q.gy + (m.y > q.gy ? 14 : -14), q.L); else { TW.talkTo = -1; TW.chase = 0; } }
   }
 }
+/* ---------- going in and out of buildings ---------- */
+/* the building with an interior whose front door the hero at (x, y) stands at, on the ground outside */
+function doorAt(x, y) {
+  if (TW.stack.length) return null;
+  for (const o of TW.M.objs) {
+    if (!o.interior || levelOf(o)) continue;
+    const [w, d] = footprint(o), front = (o.y + d) * T;
+    if (y < front - 3 || y > front + FOOT_R + 6 || Math.abs(x - (o.x + w * doorAcross(o)) * T) > 13) continue;
+    return o;
+  }
+  return null;
+}
+/* the doorway in the room's outer wall the hero at (x, y) stands in, pressing out of the map the way it faces */
+function wayOut(x, y, face, reach = 14) {
+  if (!TW.stack.length || TW.me.L) return false;
+  const n = TW.M.S * T, tx = Math.floor(x / T), ty = Math.floor(y / T);
+  return doorways(TW.M).some(([dx, dy, side]) => dx === tx && dy === ty && side === face && (side === 0 ? y > n - reach : side === 1 ? x > n - reach : side === 2 ? y < reach : x < reach));
+}
+/* the hero, walking the way `face` points, goes through a door if there is one: in at a front door (pressing north),
+   out through a doorway on the room's edge */
+function throughDoor(face) {
+  const m = TW.me; if (!m) return false;
+  if (stairsAhead(face)) return true;
+  if (wayOut(m.x, m.y, face)) { goOut(); return true; }
+  const o = face === 2 && !m.L ? doorAt(m.x, m.y) : null;
+  return o ? goIn(o) : false;
+}
+/* ---------- stairs: a new floor, as in the editor ---------- */
+/* the hero, walking the way `face` points, takes the stairs when their feet reach the steps: a flight climbing that
+   way takes them up to its landing, the well of a stairwell (going down, away from its landing) down to its foot */
+const inFlight = (x, y, tx, ty, f) => { const [x0, y0, x1, y1] = flightBox(f), lx = x - tx * T, ly = y - ty * T; return lx >= x0 && lx <= x1 && ly >= y0 && ly <= y1; };
+function stairsAhead(face) {
+  const m = TW.me, M = TW.M, tx = Math.floor(m.x / T), ty = Math.floor(m.y / T);
+  const st = stairsAt(M, tx, ty, m.L);
+  if (st && m.L < MAX_LEVEL && FACE_DELTA[face][0] === st.up[0] - tx && FACE_DELTA[face][1] === st.up[1] - ty && inFlight(m.x, m.y, tx, ty, M.objs[st.k].face)) return changeFloor(m.L + 1, st.up[0], st.up[1], face, [tx, ty]);
+  if (!m.L) return false;
+  const w = (TW.wells || []).find(q => q.x === tx && q.y === ty); if (!w || !inFlight(m.x, m.y, tx, ty, w.face)) return false;
+  /* heading down it: away from the landing */
+  const [dx, dy] = FACE_DELTA[face]; if (dx !== tx - w.up[0] || dy !== ty - w.up[1]) return false;
+  const [fx, fy] = FACE_DELTA[w.face];
+  return changeFloor(m.L - 1, tx + fx, ty + fy, w.face, [tx, ty]);
+}
+/* the hero onto storey L at tile (x, y), facing `face`, having come by the flight at tile `via`: the storey shown
+   changes at once, with a moment's fade, and a route being followed goes on from the far end of the flight */
+function changeFloor(L, x, y, face, via) {
+  const m = TW.me, cx = x * T + T / 2, cy = y * T + FOOT, at = standSpot(cx, cy, L, via);
+  if (!at) return false;
+  m.x = at[0]; m.y = at[1]; m.L = L; m.face = face; m.z = null; m.moving = false;
+  const c = TW.M.chars[TW.hero]; c.x = Math.floor(m.x / T); c.y = Math.floor(m.y / T); c.face = face; if (L) c.level = L; else delete c.level;
+  while (TW.path.length && (TW.path[0][2] != null && TW.path[0][2] !== L || (Math.floor(TW.path[0][0] / T) === via[0] && Math.floor(TW.path[0][1] / T) === via[1]))) TW.path.shift();
+  if (TW.say) closeSay();
+  setTop(L); settle(0);
+  cv.classList.remove('tw-fade'); void cv.offsetWidth; cv.classList.add('tw-fade');
+  banner(L ? `Floor ${L}` : 'Ground floor'); TW.dirty = true;
+  return true;
+}
+/* walk map M as character `hero`: everything the view keeps about the map made afresh for it */
+function useMap(M, hero, homes = null) {
+  TW.M = M; M.chars = M.chars || []; M.floors = M.floors || [];
+  TW.steps.clear(); TW.path = []; TW.talkTo = -1; TW.rest = []; TW.stuck = 0;
+  TW.homes = homes || M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(M.objs); cuts.length = 0;
+  TW.hero = hero; TW.G0 = fieldOf(M, 0); TW.shapes = shapesOf(M.objs, TW.links); takeHero();
+  TW.top = TW.me ? TW.me.L : 0; buildField();
+}
+/* into building o's interior. from: the index of someone already inside to walk as, else the hero goes in */
+function goIn(o, from = -1) {
+  let I = TW.inside.get(o);
+  if (!I) { I = cloneModel(o.interior); I.chars = I.chars || []; TW.inside.set(o, I); }
+  const ctx = { M: TW.M, hero: TW.hero, homes: TW.homes, piece: o }; let k = from;
+  if (k < 0) {
+    const c = TW.M.chars[TW.hero]; if (!c) return false;
+    const [x, y, face] = arrival(I) || [0, 0, 2]; I.chars.push({ sprite: c.sprite, x, y, face }); k = I.chars.length - 1;
+  } else ctx.hero = -1;
+  if (TW.say) closeSay();
+  TW.stack.push(ctx); useMap(I, k); arrived(); return true;
+}
+/* back out onto the doorstep of the building the hero is in */
+function goOut() {
+  const ctx = TW.stack.pop(); if (!ctx) return false;
+  const I = TW.M, c = I.chars[TW.hero], O = ctx.M, o = ctx.piece, [w, d] = footprint(o);
+  if (c) I.chars.splice(TW.hero, 1);
+  let k = ctx.hero;
+  if (!O.chars[k]) {
+    if (!c) { useMap(O, Math.max(0, k), ctx.homes); arrived(); return true; }
+    O.chars.push({ sprite: c.sprite, x: 0, y: 0, face: 0 }); k = O.chars.length - 1; ctx.homes[k] = [0, 0];
+  }
+  const x = (o.x + w * doorAcross(o)) * T, y = (o.y + d) * T + FOOT_R + 4, h = O.chars[k], cl = v => Math.max(0, Math.min(O.S - 1, v));
+  h.x = cl(Math.floor(x / T)); h.y = cl(Math.floor(y / T)); h.face = 0; delete h.level;
+  if (TW.say) closeSay();
+  useMap(O, k, ctx.homes);
+  /* on the doorstep, or the nearest spot to it where they can stand */
+  const at = standSpot(x, y, 0); if (at) { TW.me.x = at[0]; TW.me.y = at[1]; } TW.me.face = 0; TW.me.z = null; settle(0); moveHero(0, 0);
+  arrived(); return true;
+}
+/* the nearest spot to (x, y) on storey L where the hero can stand, if any within a tile; never on the tile `not` (the
+   flight they came by, which would send them straight back) */
+function standSpot(x, y, L = 0, not = null) {
+  for (let r = 0; r <= T; r += 6) for (let a = 0; a < (r ? 12 : 1); a++) {
+    const px = x + Math.cos(a / 12 * Math.PI * 2 + Math.PI / 2) * r, py = y + Math.sin(a / 12 * Math.PI * 2 + Math.PI / 2) * r, h = heightOn(L, px, py);
+    if (not && Math.floor(px / T) === not[0] && Math.floor(py / T) === not[1]) continue;
+    if (h != null && standable(L, px, py, h)) return [px, py];
+  }
+  return null;
+}
+/* a moment's fade, the place's name shown, the top bar and the panel brought up to date */
+function arrived() {
+  cv.classList.remove('tw-fade'); void cv.offsetWidth; cv.classList.add('tw-fade');
+  banner(TW.M.name); syncInside(); place(); TW.dirty = true;
+}
+function banner(text) { const b = $('twBanner'); b.textContent = text; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); }
+function syncInside() {
+  const inside = TW.stack.length > 0;
+  $('twName').textContent = inside ? `${TW.stack[0].M.name} › ${TW.M.name}` : TW.M.name;
+  $('twLeave').hidden = !inside; $('twNext').hidden = inside;
+}
+
 /* a route for the hero to (x, y) in map pixels on storey L: through the middles of the tiles on the editor's
    walking route, then to the point itself; or straight there if there is no route */
 function routeTo(x, y, L) {
   const M = TW.M, k = TW.hero, tx = Math.floor(x / T), ty = Math.floor(y / T), tiles = findPath(M, k, tx, ty, L);
-  const pts = (tiles || []).slice(0, -1).map(([a, b]) => [a * T + T / 2, b * T + FOOT]);
-  pts.push([x, y]); return pts;
+  const pts = (tiles || []).slice(0, -1).map(([a, b, l]) => [a * T + T / 2, b * T + FOOT, l || 0]);
+  pts.push([x, y, L || 0]); return pts;
 }
 /* the others stroll: now and then one takes a step, staying within two tiles of where it was put */
 function stroll(dt) {
@@ -313,8 +434,12 @@ function talk(to = -1) {
     if (!TW.steps.has(j)) o.face = (m.face + 2) % 4;
     TW.say = { k: j, who: ch ? ch.name : o.sprite, line: lineFor(o.sprite, unitFor(o.sprite).group, M.name, (TW.talks = (TW.talks || 0) + 1)) };
   } else {
+    /* standing in a doorway of the room's outer wall, facing out: out they go */
+    if (wayOut(m.x, m.y, m.face, T)) { goOut(); return; }
     const x = Math.floor(px / T), y = Math.floor(py / T); if (x < 0 || y < 0 || x >= M.S || y >= M.S) return;
     const piece = M.objs.find(o => (o.level || 0) === L && x >= o.x && y >= o.y && x < o.x + footprint(o)[0] && y < o.y + footprint(o)[1]);
+    /* facing a building's door: in they go */
+    if (piece && piece.interior && !L && m.face === 2 && !TW.stack.length) { goIn(piece); return; }
     const ground = L ? (M.floors[L - 1] && M.floors[L - 1][y * M.S + x] ? TERRAIN[M.floors[L - 1][y * M.S + x] - 1] : null) : TERRAIN[cellAt(TW.G0, Math.round(px), Math.round(py))];
     const line = sightFor(piece ? ASSET_BY_ID[piece.id] : null, ground, M.name); if (!line) return;
     TW.say = { k: -1, who: '', line };
@@ -359,20 +484,20 @@ function paint() {
   const sc = scale(), Wd = cv.width, Hd = cv.height, [tx, ty] = offset(sc);
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#141b1c'; g.fillRect(0, 0, Wd, Hd);
   g.setTransform(sc, 0, 0, sc, tx, ty); g.imageSmoothingEnabled = false;
-  const vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (Wd - tx) / sc, vy1 = (Hd - ty) / sc, M = TW.M, F = TW.F, n = S();
+  const vx0 = -tx / sc, vy0 = -ty / sc, vx1 = (Wd - tx) / sc, vy1 = (Hd - ty) / sc, M = TW.M, n = S();
   /* the ground, chunk by chunk */
   for (let cy = Math.floor(vy0 / CHUNK); cy * CHUNK < vy1; cy++) for (let cx = Math.max(0, Math.floor(vx0 / CHUNK)); cx * CHUNK < Math.min(vx1, n * T); cx++) { const c = chunk(cx, cy); if (!c.empty) g.drawImage(c.can, cx * CHUNK, cy * CHUNK); }
   ripples(vx0, vy0, vx1, vy1);
   /* then everything standing on it, back to front by where it meets the ground */
   const items = [];
-  /* what stands under a floor that is shown is hidden by it */
-  const roofed = (x, y, L) => F.lev[y * n + x] > L;
+  /* only the storey shown: its pieces and people, and the stairwells going down from it */
+  stairwells(vx0, vy0, vx1, vy1);
   for (const [i, p] of M.objs.entries()) {
-    const L = levelOf(p); if (L > TW.top) continue;
-    const [w, d] = footprint(p); if (L < TW.top && roofed(p.x, p.y, L) && roofed(p.x + w - 1, p.y + d - 1, L)) continue;
+    const L = levelOf(p); if (L !== TW.top) continue;
+    const [w, d] = footprint(p);
     items.push({ key: (p.y + d) * T - 1, L, o: 1, i, p, w, d });
   }
-  M.chars.forEach((c, k) => { const q = charPos(k); if (q.L > TW.top || (q.L < TW.top && roofed(c.x, c.y, q.L))) return; items.push({ key: q.gy, L: q.L, o: 2, k, q }); });
+  M.chars.forEach((c, k) => { const q = charPos(k); if (q.L !== TW.top) return; items.push({ key: q.gy, L: q.L, o: 2, k, q }); });
   items.sort((a, b) => a.key - b.key || a.L - b.L || a.o - b.o);
   const hero = items.find(it => it.o === 2 && it.k === TW.hero), hb = hero ? [hero.q.fx - 8, hero.q.fy - 30, hero.q.fx + 8, hero.q.fy] : null;
   for (const it of items) {
@@ -395,6 +520,54 @@ function pieceOn(it, vx0, vy0, vx1, vy1) {
   if (c.X > vx1 || c.Y > vy1 || c.X + c.w < vx0 || c.Y + c.h < vy0) return null;
   if (!c.can) { c.px = clip(c.sp.px, c.w, c.h, c.X, c.Y, it.key); c.can = toCanvas(c.w, c.h, c.px); }
   return c;
+}
+/* the stairwells on storey L: each flight on the storey below whose top lands on L's floor, as { x, y, up, face } */
+function wellsOf(M, L) {
+  const out = []; if (!L) return out;
+  for (const o of M.objs) {
+    if (o.id !== 'stairs' || levelOf(o) !== L - 1) continue;
+    const st = stairsAt(M, o.x, o.y, L - 1), [ux, uy] = st ? st.up : [-1, -1];
+    if (ux < 0 || uy < 0 || ux >= M.S || uy >= M.S || !floorAt(M, L, uy * M.S + ux)) continue;
+    out.push({ x: o.x, y: o.y, up: [ux, uy], face: o.face });
+  }
+  return out;
+}
+/* The way down from the floor shown: over each flight below, a well the flight's own size cut in the floor, its
+   steps dropping away from the landing, each a shade deeper in the wood's own browns, edged in timber. Each keeps its box on screen for a click. */
+function stairwells(vx0, vy0, vx1, vy1) {
+  const M = TW.M, L = TW.top;
+  for (const w of TW.wells || []) {
+    const z = Math.round((M.elev[w.up[1] * M.S + w.up[0]] + STOREY * L) * LIFT), [bx0, by0, bx1, by1] = flightBox(w.face);
+    const X = w.x * T + bx0, Y = w.y * T - z + by0, BW = bx1 - bx0, BH = by1 - by0; w.box = [X, Y, X + BW, Y + BH];
+    if (X > vx1 || Y > vy1 || X + BW < vx0 || Y + BH < vy0) continue;
+    /* steps run from the landing's edge (lit, near the floor's colour) down into shadow */
+    const ux = w.up[0] - w.x, uy = w.up[1] - w.y, n = 8, along = uy ? BH : BW;
+    g.fillStyle = '#4e3622'; g.fillRect(X - 2, Y - 2, BW + 4, BH + 4);
+    for (let k = 0; k < n; k++) {
+      /* from near the floor's own wood at the top step to a mid brown at the foot: lower, not lost in the dark */
+      const t = 1 - k / (n - 1), shade = `rgb(${Math.round(112 + 64 * t)},${Math.round(82 + 52 * t)},${Math.round(52 + 36 * t)})`;
+      const lo = Math.round(along * k / n), hi = Math.round(along * (k + 1) / n);
+      /* k counts from the landing side */
+      const [x0, y0, x1, y1] = uy < 0 ? [3, lo, BW - 3, hi] : uy > 0 ? [3, BH - hi, BW - 3, BH - lo] : ux < 0 ? [lo, 3, hi, BH - 3] : [BW - hi, 3, BW - lo, BH - 3];
+      g.fillStyle = shade; g.fillRect(X + x0, Y + y0, x1 - x0, y1 - y0);
+      g.fillStyle = 'rgba(43,33,22,0.42)'; if (uy) g.fillRect(X + x0, Y + (uy < 0 ? y1 - 1 : y0), x1 - x0, 1); else g.fillRect(X + (ux < 0 ? x1 - 1 : x0), Y + y0, 1, y1 - y0);
+    }
+    /* a timber rim round the well, open on the landing's side */
+    g.fillStyle = '#5a3f28';
+    if (uy >= 0) g.fillRect(X - 2, Y - 2, BW + 4, 3); if (uy <= 0) g.fillRect(X - 2, Y + BH - 1, BW + 4, 3);
+    if (ux >= 0) g.fillRect(X - 2, Y - 2, 3, BH + 4); if (ux <= 0) g.fillRect(X + BW - 1, Y - 2, 3, BH + 4);
+    /* and a banister round it on the sides away from the landing, as the flight below has: a rail standing RH above the
+       rim on balusters, newel posts at its corners, a soft shadow east of it */
+    const RH = 9, posts = [], rails = [];
+    if (uy) { rails.push([X - 1, Y - 1, X - 1, Y + BH], [X + BW, Y - 1, X + BW, Y + BH]); const far = uy < 0 ? Y + BH : Y - 1; rails.push([X - 1, far, X + BW, far]); posts.push([X - 1, far], [X + BW, far], [X - 1, uy < 0 ? Y - 1 : Y + BH], [X + BW, uy < 0 ? Y - 1 : Y + BH]); }
+    else { rails.push([X - 1, Y - 1, X + BW, Y - 1], [X - 1, Y + BH, X + BW, Y + BH]); const far = ux < 0 ? X + BW : X - 1; rails.push([far, Y - 1, far, Y + BH]); posts.push([far, Y - 1], [far, Y + BH], [ux < 0 ? X - 1 : X + BW, Y - 1], [ux < 0 ? X - 1 : X + BW, Y + BH]); }
+    g.fillStyle = 'rgba(43,33,22,0.25)'; g.fillRect(X + BW + 2, Y - 2, 3, BH + 5);
+    for (const [ax, ay, bx, by] of rails) {
+      if (ay === by) { g.fillStyle = '#4e3622'; for (let x = ax + 2; x < bx - 1; x += 5) g.fillRect(x, ay - RH + 1, 1, RH - 1); g.fillStyle = '#c4a072'; g.fillRect(ax, ay - RH - 1, bx - ax + 1, 1); g.fillStyle = '#6b4c32'; g.fillRect(ax, ay - RH, bx - ax + 1, 1); }
+      else { g.fillStyle = '#c4a072'; g.fillRect(ax - 1, ay - RH, 1, by - ay + 1); g.fillStyle = '#6b4c32'; g.fillRect(ax, ay - RH, 1, by - ay + 1); }
+    }
+    for (const [px, py] of posts) { g.fillStyle = '#6b4c32'; g.fillRect(px - 1, py - RH - 2, 3, RH + 3); g.fillStyle = '#c4a072'; g.fillRect(px - 1, py - RH - 3, 3, 1); g.fillStyle = '#4e3622'; g.fillRect(px + 1, py - RH - 2, 1, RH + 3); }
+  }
 }
 /* the water's ripples: short lit dashes drifting to and fro, wherever the water is in sight */
 function ripples(vx0, vy0, vx1, vy1) {
@@ -443,7 +616,7 @@ function place() {
   if (!c) { $('twHint').textContent = 'No one stands on this map: place characters in the editor, then come back to walk about'; $('twPlace').hidden = true; return; }
   const ch = characterById(c.sprite), L = levelOf(c), u = c.y * M.S + c.x, Tn = L ? TERRAIN[M.floors[L - 1][u] - 1] : TERRAIN[M.terr[u]];
   $('twPlace').hidden = false; $('twHero').textContent = ch ? ch.name : c.sprite; $('twWhere').textContent = `${Tn ? Tn.label : ''}${L ? ` · floor ${L}` : ''}`;
-  $('twHint').textContent = touchy() ? (TW.say ? 'Tap to close' : 'Drag to walk · tap a spot to go there') : TW.say ? 'Space to close' : 'Walk with the arrow keys · Space to talk';
+  $('twHint').textContent = touchy() ? (TW.say ? 'Tap to close' : TW.stack.length ? 'Tap the doorway to go out' : 'Drag to walk · tap a spot to go there') : TW.say ? 'Space to close' : TW.stack.length ? 'Walk out through the doorway, or Esc, to go outside' : 'Walk with the arrow keys · Space to talk';
 }
 /* is this a touch screen, with no mouse to point with? */
 const touchy = () => window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -476,9 +649,12 @@ function fillOne() {
 /* ---------- input ---------- */
 /* the art pixel under a point on the screen, and the tile whose ground it shows: [x, y, storey, art x, ground row,
    art y] */
-function tileAt(e) {
+function artAt(e) {
   const r = cv.getBoundingClientRect(), sc = scale(), [tx, ty] = offset(sc), k = r.width ? cv.width / r.width : TW.dpr;
-  const wx = ((e.clientX - r.left) * k - tx) / sc, wy = ((e.clientY - r.top) * k - ty) / sc, d = depthAt(wx, wy);
+  return [((e.clientX - r.left) * k - tx) / sc, ((e.clientY - r.top) * k - ty) / sc];
+}
+function tileAt(e) {
+  const [wx, wy] = artAt(e), d = depthAt(wx, wy);
   /* the ground under the point is the row its pixel shows */
   if (!d) return null;
   const x = Math.floor(wx / T), y = Math.floor((d - 1) / T); return [x, y, TW.F.lev[y * S() + x], wx, d - 1, wy];
@@ -486,15 +662,39 @@ function tileAt(e) {
 /* a click or a tap: on the hero, talk to whoever they face; on someone else, walk up to them and talk; anywhere
    else, walk there */
 function tapAt(e) {
-  const t = tileAt(e), M = TW.M, k = TW.hero; if (!t || !M.chars[k] || !TW.me) return;
+  const t = tileAt(e), M = TW.M, k = TW.hero; if (!M.chars[k] || !TW.me) return;
+  /* a stairwell (over the dark, so before the ground is asked): to its landing and on down */
+  const [ax, ay] = artAt(e), well = TW.top ? (TW.wells || []).find(w => w.box && ax >= w.box[0] - 4 && ax < w.box[2] + 4 && ay >= w.box[1] - 4 && ay < w.box[3] + 4) : null;
+  if (well) { TW.moved = true; TW.stuck = 0; if (TW.say) closeSay(); const lx = well.up[0] * T + T / 2, ly = well.up[1] * T + FOOT; TW.path = routeTo(lx, ly, TW.top); TW.path.push([well.x * T + T / 2, well.y * T + FOOT, TW.top]); TW.talkTo = -1; req(); return; }
+  if (!t) return;
   TW.moved = true; TW.stuck = 0;
   const h = charPos(k);
   if (Math.abs(t[3] - h.fx) < 9 && t[5] > h.fy - 32 && t[5] < h.fy + 3) { TW.path = []; TW.talkTo = -1; talk(); req(); return; }
   if (TW.say) closeSay();
+  /* a building with an interior: walk to its door and on in, by pressing on into it */
+  const b = !TW.stack.length && buildingAtPoint(...artAt(e));
+  if (b) { const [w, d] = footprint(b), x = (b.x + w * doorAcross(b)) * T, y = (b.y + d) * T; TW.path = routeTo(x, y + FOOT_R + 2, 0); TW.path.push([x, y - 12]); TW.talkTo = -1; req(); return; }
+  /* a doorway in the room's outer wall: walk to it and on out */
+  const out = TW.stack.length && !t[2] && doorways(M).find(([x, y]) => x === t[0] && y === t[1]);
+  if (out) { const [x, y, side] = out, [fx, fy] = FACE_DELTA[side], cx = x * T + T / 2, cy = y * T + T / 2; TW.path = routeTo(cx, cy, 0); TW.path.push([cx + fx * T, cy + fy * T]); TW.talkTo = -1; req(); return; }
   const j = M.chars.findIndex((o, i) => i !== k && o.x === t[0] && o.y === t[1] && levelOf(o) === t[2]);
   if (j >= 0) { const q = charPos(j); TW.path = routeTo(q.fx, q.gy + (TW.me.y > q.gy ? 14 : -14), t[2]); TW.talkTo = j; }
-  else { TW.path = routeTo(t[3], t[4], t[2]); TW.talkTo = -1; }
+  else {
+    /* a flight of stairs: up it, to the landing on the floor above (the editor's walking rule) */
+    const [gx, gy, gL] = walkGoal(M, k, t[0], t[1], t[2]);
+    TW.path = gL !== t[2] ? routeTo(gx * T + T / 2, gy * T + FOOT, gL) : routeTo(t[3], t[4], t[2]); TW.talkTo = -1;
+  }
   req();
+}
+/* the building with an interior drawn at art pixel (x, y), the one in front where they overlap */
+function buildingAtPoint(x, y) {
+  let best = null, key = -Infinity;
+  TW.M.objs.forEach((o, i) => {
+    const c = TW.clipped.get(i); if (!o.interior || levelOf(o) || !c || !c.px) return;
+    const px = Math.floor(x - c.X), py = Math.floor(y - c.Y); if (px < 0 || py < 0 || px >= c.w || py >= c.h || c.px[(py * c.w + px) * 4 + 3] < 128) return;
+    const k = o.y + footprint(o)[1]; if (k > key) { key = k; best = o; }
+  });
+  return best;
 }
 /* A mouse acts as it is pressed. A finger (or pen) waits to see what it does: lifted where it went down, it taps
    (and a tap while someone is speaking closes what they said); dragged, it becomes a stick the hero walks by, its
@@ -552,7 +752,7 @@ root.addEventListener('keydown', e => {
   else if (k === ' ' || k === 'Enter') { if (!e.repeat) talk(); }
   else if (k === 'Tab') { nextHero(e.shiftKey ? -1 : 1); }
   else if (k === '+' || k === '=') setZoom(TW.zoom + 1); else if (k === '-' || k === '_') setZoom(TW.zoom - 1);
-  else if (k === 'Escape') { if (TW.say) closeSay(); else closeTown(); }
+  else if (k === 'Escape') { if (TW.say) closeSay(); else if (TW.stack.length) goOut(); else closeTown(); }
   else return;
   e.preventDefault(); req();
 });
@@ -561,7 +761,8 @@ root.addEventListener('blur', () => { TW.held = []; TW.run = false; });
 /* let go of everything held when the page is put away, so the hero is not still walking when it comes back */
 document.addEventListener('visibilitychange', () => { if (document.hidden) { TW.held = []; TW.run = false; fingers.clear(); gesture = null; dropStick(); } });
 function nextHero(d = 1) {
-  const n = TW.M.chars.length; if (n < 2) return;
+  /* inside a building the hero stays who went in, so they come out again */
+  const n = TW.M.chars.length; if (n < 2 || TW.stack.length) return;
   TW.hero = (TW.hero + d + n) % n; TW.path = []; TW.talkTo = -1; if (TW.say) closeSay();
   takeHero(); setTop(TW.me.L); place(); req();
 }
@@ -575,20 +776,20 @@ function takeHero() {
 
 /* ---------- open and close ---------- */
 /* opts: hero, the index of the character to walk as (default the one picked in the editor, else the first); zoom */
+/* The whole map is walked, with its interiors; the editor inside a building starts the walk in there, as whoever is
+   picked in the room, else the map's hero walking in at the door. */
 function openTown(opts = {}) {
   if (!ED.M) return;
-  TW.M = cloneModel(ED.M); TW.M.chars = TW.M.chars || []; TW.M.floors = TW.M.floors || [];
-  TW.open = true; root.hidden = false; TW.steps.clear(); TW.path = []; TW.held = []; TW.talkTo = -1; TW.moved = false; TW.lastT = 0; TW.rest = [];
-  TW.homes = TW.M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(TW.M.objs); cuts.length = 0;
-  TW.hero = opts.hero ?? (ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0);
-  TW.G0 = fieldOf(TW.M, 0); TW.shapes = shapesOf(TW.M.objs, TW.links); takeHero();
-  TW.top = TW.me ? TW.me.L : 0;
-  startPainters(); buildField(); size();
+  const room = ED.outer, M = cloneModel(rootModel());
+  TW.open = true; root.hidden = false; TW.held = []; TW.moved = false; TW.lastT = 0; TW.stack = []; TW.inside = new Map();
+  startPainters();
+  useMap(M, opts.hero ?? (!room && ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : 0));
+  if (room) { const o = M.objs[room.M.objs.indexOf(room.piece)]; if (o && o.interior) goIn(o, ED.sel >= 0 && ED.M.chars[ED.sel] ? ED.sel : M.chars.length ? -1 : 0); }
+  size();
   setZoom(opts.zoom || Math.max(2, Math.min(5, Math.round(TW.cw / (15 * T)))));
-  $('twName').textContent = TW.M.name;
-  closeSay(); place();
+  closeSay(); syncInside(); place();
   /* the place's name shows for a moment, as a town's does on entering it */
-  const b = $('twBanner'); b.textContent = TW.M.name; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  banner(TW.M.name);
   root.focus({ preventScroll: true }); req();
 }
 function closeTown() {
@@ -603,6 +804,7 @@ function closeTown() {
 $('twBack').addEventListener('click', closeTown);
 $('twNext').addEventListener('click', () => { nextHero(1); root.focus({ preventScroll: true }); });
 $('twIn').addEventListener('click', () => { setZoom(TW.zoom + 1); req(); }); $('twOut').addEventListener('click', () => { setZoom(TW.zoom - 1); req(); });
+$('twLeave').addEventListener('click', () => { goOut(); root.focus({ preventScroll: true }); req(); });
 $('twTalk').addEventListener('click', () => { TW.moved = true; TW.path = []; TW.talkTo = -1; talk(); req(); });
 $('editor').addEventListener('keydown', e => { if (ED.open && !TW.open && (e.key === 'o' || e.key === 'O') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTown(); } });
 /* on a resize the canvas is sized and painted again at once, before the browser shows it, so it never flashes blank
@@ -614,6 +816,6 @@ const resized = new ResizeObserver(([en]) => {
 });
 try { resized.observe(cv, { box: 'device-pixel-content-box' }); } catch { resized.observe(cv); }
 /* test hook */
-window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
+window.__town = { state: TW, open: openTown, close: closeTown, isOpen: () => TW.open, talk, nextHero, inside: () => TW.stack.length > 0, goIn: (x, y) => { const o = TW.M.objs.find(p => p.interior && !levelOf(p) && x >= p.x && y >= p.y && x < p.x + footprint(p)[0] && y < p.y + footprint(p)[1]); return o ? goIn(o) : false; }, goOut, doorAt, walkTo: (x, y, L = 0) => { const ok = !!findPath(TW.M, TW.hero, x, y, L); TW.path = routeTo(x * T + T / 2, y * T + FOOT, L); TW.moved = true; req(); return ok; }, standable: (L, x, y) => standable(L, x, y, heightOn(L, x, y) ?? 0), heightOn, probe: (L, x, y) => ({ h: heightOn(L, x, y), dry: dry(L, x, y), hit: hits(TW.shapes.get(L), x, y, FOOT_R) }) };
 
 export { closeTown, openTown };
