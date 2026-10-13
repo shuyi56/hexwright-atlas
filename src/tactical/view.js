@@ -46,7 +46,7 @@ const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
 /* how long a phase's banner shows, and the computer's pauses between showing an enemy's range, walking, aiming and
    striking (all halved by the 2× chip); after a strike it pauses once the blow has played out, while the damage still
    shows */
-const MENU_FONT = 12, MENU_SCALE = [0.75, 2], RESTART_ARM = 3;
+const RESTART_ARM = 3;
 const BANNER_TIME = 1.5, AI_PAUSE = { pick: 0.45, aim: 0.5, after: 0.6, stay: 0.3 };
 
 /* ---------- the scene and where things are ---------- */
@@ -460,7 +460,6 @@ function paint() {
   TC.view = { k, tx, ty };
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (TC.blow) drawBlow(TC.blow, k, tx, ty);
-  placeMenu();
   const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);
   if (pf) {
     /* a struck unit's health bar shows only while it is hit: it drains from the old HP to the new, then fades */
@@ -506,18 +505,6 @@ function drawBlow(b, k, tx, ty) {
     for (let i = 1; i < L; i++) for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) dot(cx + ox * (i + 1), cy + oy * (i + 1), '#fffaf0', a * 0.8);
   }
   g.globalAlpha = 1;
-}
-/* the actions window stands beside the picked unit on screen: to its right, or its left near the screen's edge. Its
-   type, and everything else in it (sized in em), scales with the zoom as the figures do: MENU_FONT at ×3, kept within
-   MENU_SCALE so it stays legible zoomed out and does not swamp the screen zoomed in. */
-function placeMenu() {
-  const menu = $('tcMenu'), f = !menu.hidden && TC.figs.find(q => q.k === TC.sel); if (!f) return;
-  const { k, tx, ty } = TC.view, d = state.dpr;
-  menu.style.fontSize = (MENU_FONT * Math.max(MENU_SCALE[0], Math.min(MENU_SCALE[1], k / d / 3))).toFixed(1) + 'px';
-  const [x, y] = P(f.X, f.Y, f.z), sx = (x * k + tx) / d, top = ((y - figureHeight(f)) * k + ty) / d, gap = 14 * k / d;
-  const w = menu.offsetWidth, h = menu.offsetHeight, left = sx + gap + w + 8 > TC.cw ? sx - gap - w : sx + gap;
-  menu.style.left = Math.round(Math.max(8, Math.min(TC.cw - w - 8, left))) + 'px';
-  menu.style.top = Math.round(Math.max(64, Math.min(TC.ch - h - 40, top))) + 'px';
 }
 const req = () => { TC.dirty = true; if (!raf && TC.open) raf = requestAnimationFrame(loop); };
 
