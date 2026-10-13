@@ -22,7 +22,7 @@ import GroundWorker from './ground-worker.js?worker&inline';
    painted solid (town/ground.js), houses, trees and furniture standing up from it (town/pieces.js). One character
    is the hero: the arrow keys or WASD walk them a tile at a time (Shift runs), and they turn to face a way
    that is blocked; a click walks them to any tile they can reach, up and down stairs. Space or Enter talks to
-   whoever they face, or looks at the piece or ground in front of them. Tab hands the hero's part to the next
+   whoever they face (or whoever stands across a bar counter they face), or looks at the piece or ground in front of them. Tab hands the hero's part to the next
    character. Everyone else strolls about near where they were put.
    One storey is shown at a time, as in the editor: the ground, or an upper floor on its own. Stairs change it the
    way a door does: stepping onto a flight to climb it fades up to the floor above, the hero on the landing at its
@@ -583,8 +583,8 @@ function makeWay() {
 }
 
 /* ---------- talking and looking ---------- */
-/* talk to `to` (someone the hero walked up to), else whoever stands just in front of the hero, else look at the piece
-   or ground there */
+/* talk to `to` (someone the hero walked up to), else whoever stands just in front of the hero, else whoever stands
+   across a bar counter the hero faces, else look at the piece or ground there */
 function talk(to = -1) {
   if (TW.busy) return;
   if (TW.say) { closeSay(); return; }
@@ -592,6 +592,7 @@ function talk(to = -1) {
   const [fx, fy] = FACE_DELTA[m.face], px = m.x + fx * 18, py = m.y + fy * 18, L = m.L;
   let j = to, best = 20;
   if (j < 0) M.chars.forEach((o, i) => { if (i === k) return; const q = charPos(i), d = Math.hypot(q.fx - px, q.gy - py); if (q.L === L && d < best) { best = d; j = i; } });
+  if (j < 0) j = acrossBar(M, k, m, fx, fy);
   if (j >= 0) {
     const o = M.chars[j], ch = characterById(o.sprite);
     if (!TW.steps.has(j)) o.face = (m.face + 2) % 4;
@@ -611,6 +612,24 @@ function talk(to = -1) {
   const face = $('twFace'), who = TW.say.k >= 0 ? characterById(M.chars[TW.say.k].sprite) : null; face.hidden = !who;
   if (who) { const fg = face.getContext('2d'); fg.clearRect(0, 0, face.width, face.height); fg.imageSmoothingEnabled = false; fg.drawImage(portrait(who), 0, 0, face.width, face.height); }
   $('twWho').textContent = TW.say.who; $('twWho').hidden = !TW.say.who; $('twLine').textContent = TW.say.line; $('twSay').hidden = false; root.classList.add('saying'); TW.dirty = true; place();
+}
+/* whoever stands across a bar counter from the hero: the first bar piece within a tile the way they face, and the
+   one nearest the tile beyond it (within most of a tile the way they face, and up to a tile and a half to either side,
+   so the keeper of a narrow lane can be hailed from beside it as well as straight across), or -1 */
+function acrossBar(M, k, m, fx, fy) {
+  const L = m.L, barAt = (x, y) => M.objs.some(o => o.id === 'bar' && (o.level || 0) === L && o.x === x && o.y === y);
+  for (let s = 18; s <= T; s += 8) {
+    const x = Math.floor((m.x + fx * s) / T), y = Math.floor((m.y + fy * s) / T);
+    if (!barAt(x, y)) continue;
+    const cx = (x + fx + 0.5) * T, cy = (y + fy + 0.5) * T;
+    let j = -1, best = Infinity;
+    M.chars.forEach((o, i) => {
+      if (i === k) return; const q = charPos(i), dx = q.fx - cx, dy = q.gy - cy, on = Math.abs(dx * fx + dy * fy), side = Math.abs(dx * fy - dy * fx);
+      if (q.L === L && on < T * 0.8 && side < T * 1.5 && on + side < best) { best = on + side; j = i; }
+    });
+    return j;
+  }
+  return -1;
 }
 function closeSay() { TW.say = null; $('twSay').hidden = true; root.classList.remove('saying'); TW.dirty = true; if (TW.M) place(); }
 

@@ -502,7 +502,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   fitted to it, all of it done a piece at a time by the painters, so no frame stalls and the place being left never
   shows through. Meanwhile the hero walks in place over the name of where they are going (seen from behind going in or
   up, from the front coming out or down), over three gold lights rising in turn.
-- **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a slate and gold window with their portrait, like the tactical view's),
+- **Talking:** `Space` or `Enter` talks to whoever the hero faces, or to whoever stands across a bar counter the hero faces (they turn to answer, in a slate and gold window with their portrait, like the tactical view's),
   or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
 - **Phones and tablets:** a finger dragged anywhere on the map is a stick the hero walks by (a small pull strolls,
   pulled further they run, and the stick follows a finger dragged past it); a tap walks them to the spot or up to

@@ -16,7 +16,7 @@
    - Upstairs (floor 1), walled and windowed like the room below: two guest rooms through doorways in a timber
      partition (two beds in the east one), a passage along the south with a bench, a candle stand, a chest and a
      plant, sconces and a shield on the partition, and the open stairwell in the south-east corner.
-   - The people: the innkeeper out in front of the bar, a healer and a guard at it, a monk at the fire, a farmer and a
+   - The people: the innkeeper behind the bar (talked to across the counter), a healer and a guard at it, a monk at the fire, a farmer and a
      villager at the tables, and a noble guest upstairs.
    Outside, a cottage and a townhouse flank the inn on the lane, with a well, a lamp post, a signpost, barrels and
    crates, a garden with oaks, a bush and flowers to the south, and the hero on the lane. Deterministic: the same map
@@ -80,7 +80,7 @@ put(I, 'bed', 5, 1, 0, 1); put(I, 'desk', 6, 1, 0, 1); put(I, 'bed', 7, 1, 0, 1)
 put(I, 'candelabra', 1, 5, 0, 1); put(I, 'chest', 1, 7, 0, 1); put(I, 'bench', 2, 7, 2, 1); put(I, 'plantpot', 5, 7, 0, 1);
 
 /* the people inside */
-stand(I, 'merchant', 7, 3, 0);   /* the innkeeper, out in front of the bar */
+stand(I, 'merchant', 6, 1, 0);   /* the innkeeper behind the bar, talked to across it */
 stand(I, 'healer', 5, 3, 2);     /* at the bar */
 stand(I, 'guard', 6, 3, 2);      /* at the bar */
 stand(I, 'monk', 3, 1, 2);       /* at the fire */
