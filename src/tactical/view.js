@@ -372,7 +372,13 @@ function panels() {
   const menu = $('tcMenu'), t = TC.sel >= 0 ? turnOf(TC.sel) : null;
   menu.hidden = !t || !TC.menu || busy();
   if (t) {
-    $('tcActMove').disabled = !battle.canMove(TC.battle, TC.sel); $('tcActAttack').disabled = !battle.canAct(TC.battle, TC.sel);
+    const canMove = battle.canMove(TC.battle, TC.sel), canAct = battle.canAct(TC.battle, TC.sel), c = M.chars[TC.sel], s = characterById(c.sprite), u = unitFor(c.sprite), st = u.stats, mv = u.movement;
+    const pat = (PATTERNS.find(([id]) => id === st.pattern) || PATTERNS[0])[1];
+    $('tcActMove').disabled = !canMove; $('tcActAttack').disabled = !canAct;
+    $('tcMenuWho').textContent = s ? s.name : c.sprite;
+    $('tcActMoveInfo').textContent = canMove ? `Up to ${mv.move} tiles · jump ${mv.jump}` : 'Already moved';
+    $('tcActAttackInfo').textContent = canAct ? `${st.attack} power · ${st.pattern === 'melee' ? pat : `${pat} ${st.range}`}` : 'Already acted';
+    $('tcActWaitInfo').textContent = 'End this unit\'s turn';
     $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move')); $('tcActAttack').setAttribute('aria-pressed', String(TC.mode === 'attack'));
   }
   /* the turn and whose phase it is, and End turn while the player can give it up */

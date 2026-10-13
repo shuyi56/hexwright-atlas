@@ -197,22 +197,36 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-tile{left:14px;bottom:40px;min-width:170px}
 .tc-xy{position:absolute;right:10px;top:8px}
 .tc-unit{display:flex;gap:12px;align-items:center;min-width:220px}
-/* the portrait window sits bottom right, and the picked unit's actions open in a column just to its left */
-.tc-dock{position:absolute;right:14px;bottom:40px;display:flex;align-items:flex-end;gap:12px;pointer-events:none}
+/* the portrait window sits bottom right, and the picked unit's actions open on top of it, as wide as it */
+.tc-dock{position:absolute;right:14px;bottom:40px;display:flex;flex-direction:column;align-items:stretch;gap:12px;pointer-events:none}
 .tc-dock>.tc-win{position:relative;pointer-events:auto}
 /* The unit's portrait has a thin gold rim, one pixel inside a dark outline. The actions menu, a tactics game's command
-   list opening beside the portrait, has the same thin frame in the colours of the rock tiles: a warm stone fill
-   with a sandstone rim. */
+   list stacked on top of the portrait, has a heavier frame to stand out: a warm stone fill under a doubled gold rim
+   with corner studs, a header naming the unit, and a row per action with an icon, what it does and its key. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-.tc-win.tc-menu{--tc-dim:#b3aa98;--tc-pick:rgba(255,244,208,.2);background:linear-gradient(#4a4640,#2d2a26);color:var(--tc-text);border:1px solid #c4b89c;border-radius:2px;box-shadow:0 0 0 1px #141210,0 4px 10px rgba(0,0,0,.4)}
-.tc-menu{display:flex;flex-direction:column;min-width:190px;padding:.3em;z-index:2;font-size:22px;animation:tc-menu .14s ease-out}
+.tc-win.tc-menu{--tc-dim:#c4b89c;--tc-pick:linear-gradient(90deg,rgba(232,196,110,.38),rgba(232,196,110,.08));background:linear-gradient(#4f4a42,#2a2723);color:var(--tc-text);border:2px solid #e2c06e;border-radius:3px;box-shadow:inset 0 0 0 1px #141210,inset 0 0 0 3px rgba(226,192,110,.35),0 0 0 2px #0b1011,0 0 22px rgba(226,192,110,.25),0 10px 26px rgba(0,0,0,.55)}
+.tc-menu{display:flex;flex-direction:column;align-self:stretch;padding:.25em .3em .35em;z-index:2;font-size:21px;animation:tc-menu .16s ease-out}
 .tc-menu[hidden]{display:none}
-.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:.83em;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 1em/1 var(--ui);padding:.4em .55em .4em 1em;min-height:44px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
+.tc-menu::before,.tc-menu::after{content:'';position:absolute;top:-5px;width:8px;height:8px;background:#e2c06e;border:1px solid #0b1011;transform:rotate(45deg)}
+.tc-menu::before{left:-5px}.tc-menu::after{right:-5px}
+.tc-menu-head{display:flex;align-items:baseline;justify-content:space-between;gap:1em;padding:.2em .45em .35em;margin-bottom:.2em;border-bottom:1px solid rgba(226,192,110,.45)}
+.tc-win .tc-menu-head span{display:inline;font:500 .6em var(--ui-sc,var(--ui));letter-spacing:.16em;text-transform:uppercase;color:var(--tc-gold)}
+.tc-win .tc-menu-head b{display:inline;font:400 .85em/1.1 var(--display);color:var(--tc-mark);text-shadow:0 1px 0 #000}
+.tc-menu button{display:flex;align-items:center;gap:.6em;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 1em/1 var(--ui);padding:.38em .5em .38em .9em;min-height:52px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
+.tc-menu button+button{border-top:1px solid rgba(0,0,0,.28);box-shadow:inset 0 1px 0 rgba(255,244,208,.06)}
 .tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
 .tc-menu button[aria-pressed=true]{background:var(--tc-pick);color:var(--tc-mark)}
-.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:.25em;top:50%;margin-top:-.25em;border:.25em solid transparent;border-left:.33em solid currentColor}
+.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:.2em;top:50%;margin-top:-.25em;border:.25em solid transparent;border-left:.33em solid currentColor}
 .tc-menu button:disabled{color:var(--tc-off);cursor:default;text-shadow:none}
-.tc-menu kbd{font:600 .83em var(--ui);color:var(--tc-dim)}
+.tc-ico{flex:none;width:1.15em;height:1.15em;color:var(--tc-gold);filter:drop-shadow(0 1px 0 #000)}
+.tc-menu button:hover:not(:disabled) .tc-ico,.tc-menu button[aria-pressed=true] .tc-ico{color:var(--tc-mark)}
+.tc-menu button:disabled .tc-ico{color:var(--tc-off);filter:none}
+.tc-win .tc-act{display:flex;flex-direction:column;gap:.22em;flex:1;min-width:0;color:inherit;font-size:1em}
+.tc-act b{font:inherit;color:inherit}
+.tc-act small{font:500 .66em/1.15 var(--ui);color:var(--tc-dim);text-shadow:none}
+.tc-menu button:disabled small{color:var(--tc-off)}
+.tc-menu kbd{flex:none;min-width:1.5em;padding:.15em .3em;text-align:center;font:600 .62em/1 var(--ui);color:var(--tc-dim);border:1px solid rgba(196,184,156,.45);border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.25)}
+.tc-menu button:disabled kbd{opacity:.5}
 .tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
@@ -235,10 +249,10 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-win.tc-phase[data-kind=enemy],.tc-win.tc-phase[data-kind=defeat]{border-color:#c9705a}
 .tc-win.tc-phase[data-kind=enemy] span,.tc-win.tc-phase[data-kind=defeat] span{color:#e6a08e}
 .tc-unit[data-side=enemy] b{color:#f0b3a3}
-@keyframes tc-menu{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+@keyframes tc-menu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes tc-phase{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.tc-win.tc-phase,.tc-menu{animation:none}}
-@media (max-width:760px){.tc-keys{display:none}.tc-dock{bottom:110px;flex-direction:column;align-items:flex-end}.tc-menu{font-size:19px;min-width:170px}}
+@media (max-width:760px){.tc-keys{display:none}.tc-dock{bottom:110px}.tc-menu{font-size:18px}.tc-menu button{min-height:46px}}
 /* the town view: the tactical view's frame, a place banner on entering, and a speech window in the same slate and
    gold as the tactical view's windows, with the speaker's portrait framed like the unit's */
 .tw-banner{position:absolute;left:50%;top:18%;transform:translateX(-50%);padding:8px 28px;font:400 clamp(22px,3vw,34px)/1.1 var(--display);color:#f4ead2;text-shadow:0 2px 0 #0b1011,0 0 12px rgba(0,0,0,.6);border-top:1px solid rgba(201,164,90,.7);border-bottom:1px solid rgba(201,164,90,.7);background:linear-gradient(90deg,transparent,rgba(11,16,17,.55) 20%,rgba(11,16,17,.55) 80%,transparent);opacity:0;pointer-events:none;white-space:nowrap}
