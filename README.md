@@ -554,7 +554,7 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   (`town: { inside: { x, y } }` in its `.scene.json` starts the walk in the building on that tile). Downstairs a
   tavern's common room: an aisle from the door to the fire, two tables with their chairs on a red rug at the hearth,
   more tables and long tables between benches, and the bar: a counter with stools along it, the innkeeper's lane behind
-  it with the back bar against the wall and a rack of ale casks, the way in at its end. A coat stand, a notice board,
+  it with the back bar against the wall and a rack of ale casks, closed in by a side counter at its end. A coat stand, a notice board,
   sacks and barrels stand by the door, antlers, a shelf of plates and a sconce hang on the walls, and the stairs stand
   in the corner. Upstairs a passage with sconces and a shield on its partition, and two guest rooms on their carpets.
   The innkeeper, a healer, a guard, a monk, a farmer, a villager and a noble guest are about, and the door leads out

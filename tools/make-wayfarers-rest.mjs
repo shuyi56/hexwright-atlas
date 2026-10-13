@@ -7,8 +7,9 @@
    - Downstairs: an aisle of oak boards runs from the door to the back wall. West of it the fireside: a stone
      fireplace with firewood beside it, two tables with their chairs on a red rug before it, two more tables below
      them, and a long table between benches with a table beside it. In the north-east the bar: a counter of joined bar
-     pieces running from the east wall, stools along it, and behind it the innkeeper's lane with the back bar of
-     bottles against the back wall and a rack of ale casks in the corner; the way behind it is at its west end. South
+     pieces running from the east wall and turning north at its west end to meet the back wall, stools along it, and
+     behind it, closed in, the innkeeper's lane with the back bar of bottles against the back wall and a rack of ale
+     casks in the corner. South
      of the bar two tables and a long table by the stairs; by the door a coat stand, a notice board, grain sacks and
      barrels; on the walls antlers, a shelf of plates and a candle sconce. The stairs stand in the south-east corner,
      stepped onto at their right-hand end and climbing west.
@@ -47,9 +48,10 @@ put(I, 'tableset', 1, 2, 0); put(I, 'tableset', 3, 2, 1);
 put(I, 'tableset', 1, 4, 2); put(I, 'tableset', 3, 4, 3);
 put(I, 'feastset', 1, 6, 0); put(I, 'tableset', 3, 6, 1);
 /* the bar, east of the aisle: a counter across the room (its customers to the south, stools along it) running from the
-   east wall, the innkeeper's lane behind it with the back bar against the back wall and a rack of casks in the corner,
-   and the way in at its west end (5,1) */
+   east wall, and a side counter at its west end (5,1) running back to the back wall, closing in the innkeeper's lane
+   behind it with the back bar against the back wall and a rack of casks in the corner */
 for (const x of [5, 6, 7]) put(I, 'bar', x, 2, 0);
+put(I, 'bar', 5, 1, 1);
 put(I, 'casks', 7, 1, 0);
 /* south of the bar two tables, and a long table by the stairs */
 put(I, 'tableset', 5, 4, 0); put(I, 'tableset', 7, 4, 1); put(I, 'feastset', 5, 6, 0);
