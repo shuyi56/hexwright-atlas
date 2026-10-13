@@ -466,7 +466,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   The tavern's pieces fill their whole tile at the figures' scale: a bar counter of raised panels under a polished
   top, a brass foot rail and stools along its customers' side and tankards, a jug and coins on it, its pieces joining
   into one counter that stands toward the back of its tiles (so the innkeeper's lane behind it stays a stride wide)
-  and runs on to a wall at a free end; a table with up to six slatted chairs pulled up round it; a long trestle table
+  and runs on to a wall at a free end (stopping at the worktop of a back bar against it); a table with up to six slatted chairs pulled up round it; a long trestle table
   set for a feast between two benches; a back bar of bottles and pewter over a panelled cupboard and a rack of casks
   with brass taps, both set back against the wall behind them. Walls carry a shelf of plates, antlers, a painted
   shield over crossed swords or a sconce whose candle warms the plaster. Each is drawn facing south and turned to its facing, so a turned piece shows its side (a plain face there

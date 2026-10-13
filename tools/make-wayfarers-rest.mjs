@@ -16,7 +16,7 @@
    - Upstairs (floor 1), walled and windowed like the room below: two guest rooms through doorways in a timber
      partition (two beds in the east one), a passage along the south with a bench, a candle stand, a chest and a
      plant, sconces and a shield on the partition, and the open stairwell in the south-east corner.
-   - The people: the innkeeper behind the bar, a healer and a guard at it, a monk at the fire, a farmer and a
+   - The people: the innkeeper out in front of the bar, a healer and a guard at it, a monk at the fire, a farmer and a
      villager at the tables, and a noble guest upstairs.
    Outside, a cottage and a townhouse flank the inn on the lane, with a well, a lamp post, a signpost, barrels and
    crates, a garden with oaks, a bush and flowers to the south, and the hero on the lane. Deterministic: the same map
@@ -48,10 +48,10 @@ put(I, 'tableset', 1, 2, 0); put(I, 'tableset', 3, 2, 1);
 put(I, 'tableset', 1, 4, 2); put(I, 'tableset', 3, 4, 3);
 put(I, 'feastset', 1, 6, 0); put(I, 'tableset', 3, 6, 1);
 /* the bar, east of the aisle: a counter across the room (its customers to the south, stools along it) running from the
-   east wall, and a side counter at its west end (5,1) running back to the back wall, closing in the innkeeper's lane
-   behind it with the back bar against the back wall and a rack of casks in the corner */
+   east wall, and a side counter at its west end (5,1), facing the aisle, running back to the back bar, closing in the
+   innkeeper's lane behind it with the back bar against the back wall and a rack of casks in the corner */
 for (const x of [5, 6, 7]) put(I, 'bar', x, 2, 0);
-put(I, 'bar', 5, 1, 1);
+put(I, 'bar', 5, 1, 3);
 put(I, 'casks', 7, 1, 0);
 /* south of the bar two tables, and a long table by the stairs */
 put(I, 'tableset', 5, 4, 0); put(I, 'tableset', 7, 4, 1); put(I, 'feastset', 5, 6, 0);
@@ -80,7 +80,7 @@ put(I, 'bed', 5, 1, 0, 1); put(I, 'desk', 6, 1, 0, 1); put(I, 'bed', 7, 1, 0, 1)
 put(I, 'candelabra', 1, 5, 0, 1); put(I, 'chest', 1, 7, 0, 1); put(I, 'bench', 2, 7, 2, 1); put(I, 'plantpot', 5, 7, 0, 1);
 
 /* the people inside */
-stand(I, 'merchant', 6, 1, 0);   /* the innkeeper behind the bar */
+stand(I, 'merchant', 7, 3, 0);   /* the innkeeper, out in front of the bar */
 stand(I, 'healer', 5, 3, 2);     /* at the bar */
 stand(I, 'guard', 6, 3, 2);      /* at the bar */
 stand(I, 'monk', 3, 1, 2);       /* at the fire */
