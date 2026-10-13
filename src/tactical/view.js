@@ -21,10 +21,12 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    after the cursor and the unit on the move. Pick a unit (click it, Enter on it, or Tab through them) and its move
    range lights up in blue; the route to the tile under the cursor is traced in gold; click a lit tile (or Enter)
    and it walks there, hopping up and down ledges, while the camera follows. Moves are edits of the map, on the
-   editor's undo stack. Once it has arrived (or been picked again to stay where it is) its actions window opens
-   beside it, as in the tactics games: Move, Attack (its pattern and range light up in red; pick a unit of the
-   other side there to strike it for its Attack) and Wait. Esc or a right-click steps back: from the attack to the
-   window, from the window to the move (taking the move back if it walked), from the move to no unit, and with no
+   editor's undo stack. Once it has arrived (or been picked again to stay where it is) its actions window opens on
+   top of its portrait, as in the tactics games: Move, Attack (its pattern and range light up in red; pick a unit of
+   the other side there for an attack preview, its portrait and the hit points the blow would take flashing on its
+   health bar, then pick it again, press Enter or Strike to strike it for its Attack) and Wait. Esc or a right-click
+   steps back: from a target picked to the red tiles, from the red tiles to the window, from the window to the move
+   (taking the move back if it walked), from the move to no unit, and with no
    unit picked it takes back the last Wait, until anything else is done. Esc never leaves the view (← Editor does). An
    attack plays out (tactical/blow.js): the attacker turns to its target, winds up and strikes in its own frames
    (characters/roster.js), lunging in for a blow, loosing an arrow or casting a spell, and the target flashes and
@@ -39,7 +41,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 /* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
    what an overlay changes */
-const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, note: '', walk: null, blow: null, turned: new Map(), fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, aim: -1, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, note: '', walk: null, blow: null, turned: new Map(), fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
@@ -161,7 +163,7 @@ function setMode(m) {
   const k = TC.sel;
   if (k < 0 || (m === 'move' && !battle.canMove(TC.battle, k)) || (m === 'attack' && !battle.canAct(TC.battle, k))) m = null;
   if (m) TC.menu = false;
-  TC.mode = m; TC.range = m === 'move' ? rangeOf(k) : null; TC.reach = m === 'attack' ? reachOf(k) : null; TC.dirty = true;
+  TC.mode = m; TC.aim = -1; TC.range = m === 'move' ? rangeOf(k) : null; TC.reach = m === 'attack' ? reachOf(k) : null; TC.dirty = true;
   panels();
 }
 /* open the picked unit's actions window, with nothing lit until an action is chosen */
@@ -178,7 +180,8 @@ function undoMove() {
 function back() {
   if (busy()) return true;
   const k = TC.sel; if (k < 0) return rewindWait();
-  if (TC.mode === 'attack') openMenu();
+  if (TC.mode === 'attack' && TC.aim >= 0) { TC.aim = -1; panels(); }
+  else if (TC.mode === 'attack') openMenu();
   else if (TC.menu && !turnOf(k).moved) { TC.menu = false; setMode('move'); }
   else if (!(TC.menu && undoMove())) select(-1);
   return true;
@@ -308,7 +311,7 @@ function aiStep(dt) {
     /* strike the foe it planned for, or any other its attack now reaches */
     const targets = reachOf(k).targets, d = targets.includes(A.plan.target) ? A.plan.target : targets.length ? targets[0] : -1;
     if (d < 0) { battle.wait(B, k); TC.note = `${nameOf(k)} waits`; select(-1); A.step = null; A.t = AI_PAUSE.stay; panels(); return; }
-    setMode('attack'); const c = ED.M.chars[d]; setCursor(c.x, c.y, levelOf(c));
+    setMode('attack'); TC.aim = d; const c = ED.M.chars[d]; setCursor(c.x, c.y, levelOf(c));
     A.target = d; A.step = 'aim'; A.t = AI_PAUSE.aim; return;
   }
   if (A.step === 'aim') { const a = k, d = A.target; A.step = null; A.t = AI_PAUSE.after; select(-1); attack(a, d); return; }
@@ -320,13 +323,18 @@ function aiStep(dt) {
   A.plan = planTurn(ED.M, next, { ...u.movement, range: u.stats.range, pattern: u.stats.pattern, isFoe: j => battle.foes(B, next, j), hpOf });
   select(next);
 }
-/* Enter or a click on (x, y, L): strike the unit there if the picked unit is attacking and reaches it, pick up the
+/* in the attack, a pick of unit d on the red tiles: the first opens the attack preview on it, a second strikes */
+function aimAt(d) {
+  if (TC.aim === d) { attack(TC.sel, d); return; }
+  TC.aim = d; TC.dirty = true; panels();
+}
+/* Enter or a click on (x, y, L): preview a strike on the unit there (striking it if it was already previewed) if the picked unit is attacking and reaches it, pick up the
    unit there, send the picked unit there if it can reach it, or open its actions window where it stands if it is
    picked again */
 function act(x, y, L) {
   if (busy()) return;
   let u = unitAt(x, y, L);
-  if (TC.sel >= 0 && TC.reach && TC.reach.targets.includes(u)) { attack(TC.sel, u); return; }
+  if (TC.sel >= 0 && TC.reach && TC.reach.targets.includes(u)) { aimAt(u); return; }
   if (u >= 0 && !alive(u)) u = -1;
   if (u >= 0 && u !== TC.sel) { select(u); return; }
   if (TC.sel < 0) return;
@@ -347,6 +355,8 @@ function turn(d) {
 }
 
 /* ---------- status windows ---------- */
+/* a character's portrait into a window's canvas, in whole pixels */
+function drawFace(f, s) { const fg = f.getContext('2d'); fg.clearRect(0, 0, f.width, f.height); fg.imageSmoothingEnabled = false; if (s) fg.drawImage(portrait(s), 0, 0, f.width, f.height); }
 function panels() {
   const M = ED.M, cur = TC.cursor;
   if (cur) {
@@ -356,8 +366,7 @@ function panels() {
   const k = TC.sel >= 0 ? TC.sel : cur ? unitAt(cur.x, cur.y, cur.L) : -1, box = $('tcUnit');
   box.hidden = k < 0;
   if (k >= 0) {
-    const c = M.chars[k], s = characterById(c.sprite), f = $('tcFace'), fg = f.getContext('2d');
-    fg.clearRect(0, 0, f.width, f.height); fg.imageSmoothingEnabled = false; if (s) fg.drawImage(portrait(s), 0, 0, f.width, f.height);
+    const c = M.chars[k], s = characterById(c.sprite); drawFace($('tcFace'), s);
     $('tcUnitName').textContent = s ? s.name : c.sprite;
     const u = unitFor(c.sprite), st = u.stats, mv = u.movement;
     const pat = (PATTERNS.find(([id]) => id === st.pattern) || PATTERNS[0])[1], t = turnOf(k);
@@ -381,6 +390,22 @@ function panels() {
     $('tcActWaitInfo').textContent = 'End this unit\'s turn';
     $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move')); $('tcActAttack').setAttribute('aria-pressed', String(TC.mode === 'attack'));
   }
+  /* the attack preview: the target's portrait, and what the blow would take off its hit points, flashing on its bar */
+  const aim = $('tcAim'), d = TC.aim, r = d >= 0 && TC.sel >= 0 && !TC.walk && !TC.blow ? battle.forecast(TC.battle, TC.sel, d, statsOf(TC.sel).attack) : null;
+  aim.hidden = !r;
+  $('tcAimGo').hidden = !r;
+  if (r) {
+    drawFace($('tcAimFace'), characterById(M.chars[d].sprite));
+    $('tcAimName').textContent = nameOf(d); aim.dataset.side = turnOf(d).side;
+    $('tcAimDmg').textContent = `−${r.dmg}`;
+    const bar = $('tcAimHp'), left = r.to / r.max, lost = (r.from - r.to) / r.max, ds = statsOf(d);
+    bar.firstElementChild.style.width = (100 * left).toFixed(1) + '%'; bar.firstElementChild.className = left > 0.5 ? '' : left > 0.25 ? 'mid' : 'low';
+    bar.lastElementChild.style.left = (100 * left).toFixed(1) + '%'; bar.lastElementChild.style.width = (100 * lost).toFixed(1) + '%';
+    $('tcAimHpText').innerHTML = `HP ${r.from}/${r.max} <i>→</i> <strong>${r.to}</strong>`;
+    const dpat = (PATTERNS.find(([id]) => id === ds.pattern) || PATTERNS[0])[1];
+    $('tcAimInfo').innerHTML = r.fell ? '<strong>Defeated</strong>' : `Attack ${ds.attack} · ${ds.pattern === 'melee' ? dpat : `${dpat} ${ds.range}`}`;
+    $('tcAimGo').disabled = !!TC.ai;
+  }
   /* the turn and whose phase it is, and End turn while the player can give it up */
   const B = TC.battle, sel = TC.sel, side = sel >= 0 ? turnOf(sel).side : null;
   $('tcTurn').hidden = !B.sides.length; $('tcTurn').dataset.kind = B.outcome || B.phase;
@@ -393,7 +418,8 @@ function panels() {
     : TC.walk ? 'On the move…'
     : TC.blow ? TC.note
     : TC.mode === 'move' ? 'Pick a blue tile to move there, or the unit to stay put · Esc to cancel'
-    : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to attack it · Esc to go back' : 'No one in reach · Esc to go back')
+    : TC.mode === 'attack' && TC.aim >= 0 ? `Pick ${nameOf(TC.aim)} again, press Enter or Strike to attack · Esc to choose another`
+    : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to preview the attack · Esc to go back' : 'No one in reach · Esc to go back')
     : TC.menu ? (canUndoMove(TC.sel) ? 'Choose an action · Esc to take the move back' : 'Choose an action · Esc to go back')
     : sel >= 0 && alive(sel) && side !== B.phase ? (side === 'enemy' ? 'An enemy: it moves in the enemy phase' : 'One of yours: it moves in your phase')
     : sel >= 0 && done(sel) ? 'This unit is done for the turn · T to end the turn'
@@ -599,6 +625,7 @@ $('tcFast').addEventListener('click', () => setFast(!TC.fast));
 $('tcIn').addEventListener('click', () => { setZoom(TC.zoom + 1); req(); }); $('tcOut').addEventListener('click', () => { setZoom(TC.zoom - 1); req(); });
 $('tcActMove').addEventListener('click', () => { setMode('move'); req(); root.focus({ preventScroll: true }); });
 $('tcActAttack').addEventListener('click', () => { setMode('attack'); req(); root.focus({ preventScroll: true }); });
+$('tcAimGo').addEventListener('click', () => { if (TC.aim >= 0 && !busy()) attack(TC.sel, TC.aim); req(); root.focus({ preventScroll: true }); });
 $('tcActWait').addEventListener('click', () => { wait(); req(); root.focus({ preventScroll: true }); });
 $('tcEnd').addEventListener('click', () => { endTurn(); req(); root.focus({ preventScroll: true }); });
 $('tcRestart').addEventListener('click', () => { restart(); req(); root.focus({ preventScroll: true }); });

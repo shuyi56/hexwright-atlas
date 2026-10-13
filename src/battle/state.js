@@ -57,11 +57,19 @@ function wait(B, k) {
 /* unit a strikes unit d for dmg: a's action for the phase. Returns { dmg, from, to, max, fell } (from and to its hit
    points before and after), or null if a cannot act or d is not a foe standing. */
 function strike(B, a, d, dmg) {
-  if (!canAct(B, a) || !foes(B, a, d)) return null;
-  const t = B.units[d], from = t.hp; dmg = Math.max(0, Math.round(dmg));
-  t.hp = Math.max(0, from - dmg); B.units[a].acted = true;
+  if (!canAct(B, a)) return null;
+  const r = forecast(B, a, d, dmg); if (!r) return null;
+  B.units[d].hp = r.to; B.units[a].acted = true;
   B.outcome = outcomeOf(B);
-  return { dmg, from, to: t.hp, max: t.max, fell: t.hp === 0 };
+  return r;
+}
+/* what unit a striking unit d for dmg would come to, without striking: { dmg, from, to, max, fell } as strike returns,
+   or null if d is not a foe standing. The view's attack preview shows it before the blow is struck. */
+function forecast(B, a, d, dmg) {
+  if (!B.units[a] || !foes(B, a, d)) return null;
+  const t = B.units[d], from = t.hp; dmg = Math.max(0, Math.round(dmg));
+  const to = Math.max(0, from - dmg);
+  return { dmg, from, to, max: t.max, fell: to === 0 };
 }
 /* 'victory' once every enemy that took the field has fallen, 'defeat' once every unit of the player's has, else null */
 function outcomeOf(B) {
@@ -99,4 +107,4 @@ function refresh(B, units) {
   B.outcome = outcomeOf(B);
 }
 
-export { OUTCOME_LABEL, SIDES, SIDE_LABEL, alive, canAct, canMove, createBattle, done, endPhase, foes, outcomeOf, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait };
+export { OUTCOME_LABEL, SIDES, SIDE_LABEL, alive, canAct, canMove, createBattle, done, endPhase, foes, forecast, outcomeOf, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait };
