@@ -311,8 +311,14 @@ with the camera gliding after the cursor and the unit on the move.
   weakest foe in reach (or as close to the nearest one as it can get, round anything it cannot climb), and strikes;
   the controls wait until it is done, and the ▶▶ 2× chip speeds it up. **Restart** (`R`) starts the battle over: every unit back where it stood
   when the view opened, at full HP, on the player's turn 1 (one map edit, undoable in the editor). Mid-battle it
-  asks first: the chip turns to **Restart?** for three seconds and a second press restarts. The actions window beside a unit scales
-  with the zoom, as the figures do. The battle is won when the last enemy falls
+  asks first: the chip turns to **Restart?** for three seconds and a second press restarts. The actions window opens large, stacked
+  on top of the unit's portrait in the bottom corner: a command list naming the unit, each action with an icon and
+  what it does (move range, attack power and pattern) or why it is spent. Both windows share a stone-and-gold frame. **Attack** lights the
+  red tiles it reaches; picking a foe there opens an **attack preview** in the same row as the unit's portrait: the
+  target's own portrait window, the damage on a tag at its corner, and its health bar as the blow would leave it,
+  with the hit points it would lose flashing. A crossed-swords clash between the two windows is the **Strike**
+  button; picking the target again or `Enter` strikes too, and `Esc` goes back to choosing. The enemy's attacks show
+  the same preview while it aims. The battle is won when the last enemy falls
   and lost when the last of yours does. A side with no units on the map has its phase skipped, and on a map of
   enemies only they are yours to move.
 - **Attacks:** an attack plays out in the attacker's own frames, and the controls wait until it has.

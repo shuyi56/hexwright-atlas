@@ -196,25 +196,69 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-win span{display:block;color:#a39b86;font-size:13px}
 .tc-tile{left:14px;bottom:40px;min-width:170px}
 .tc-xy{position:absolute;right:10px;top:8px}
-.tc-unit{right:14px;bottom:40px;display:flex;gap:12px;align-items:center;min-width:220px}
-/* The unit's portrait has a thin gold rim, one pixel inside a dark outline. The actions menu, small beside the unit
-   like a tactics game's command list, has the same thin frame in the colours of the rock tiles: a warm stone fill
-   with a sandstone rim. */
+.tc-unit{display:flex;gap:12px;align-items:center;min-width:262px}
+/* the portrait window sits bottom right, and the picked unit's actions open on top of it, as wide as it; the attack
+   preview of a target stands in the same row, just left of the portrait, so the two sides read across */
+.tc-dock{position:absolute;right:14px;bottom:40px;display:flex;flex-direction:column;align-items:flex-end;gap:12px;pointer-events:none}
+.tc-dock-row{display:flex;align-items:stretch;justify-content:flex-end;gap:10px}
+.tc-dock .tc-win{position:relative;pointer-events:auto;--tc-dim:#c4b89c;background:linear-gradient(#4f4a42,#2a2723);color:var(--tc-text);border:2px solid #e2c06e;border-radius:3px;box-shadow:inset 0 0 0 1px #141210,inset 0 0 0 3px rgba(226,192,110,.35),0 0 0 2px #0b1011,0 0 22px rgba(226,192,110,.25),0 10px 26px rgba(0,0,0,.55)}
+.tc-dock .tc-win::before,.tc-dock .tc-win::after{content:'';position:absolute;top:-5px;width:8px;height:8px;background:#e2c06e;border:1px solid #0b1011;transform:rotate(45deg)}
+.tc-dock .tc-win::before{left:-5px}.tc-dock .tc-win::after{right:-5px}
+.tc-dock .tc-unit b{font:400 19px/1.1 var(--display);color:var(--tc-mark);text-shadow:0 1px 0 #000}
+.tc-dock .tc-unit span{color:var(--tc-dim)}
+/* The portrait window and the actions menu, a tactics game's command list stacked on top of it, share a frame that
+   stands out from the other windows: a warm stone fill under a doubled gold rim with corner studs. The menu has a
+   header naming the unit and a row per action with an icon and what it does. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-.tc-win.tc-menu{--tc-dim:#b3aa98;--tc-pick:rgba(255,244,208,.2);background:linear-gradient(#4a4640,#2d2a26);color:var(--tc-text);border:1px solid #c4b89c;border-radius:2px;box-shadow:0 0 0 1px #141210,0 4px 10px rgba(0,0,0,.4)}
-/* sized in em: the view sets its font-size from the zoom */
-.tc-menu{display:flex;flex-direction:column;min-width:0;padding:.42em;z-index:2;font-size:12px}
-.tc-menu button{display:flex;justify-content:space-between;align-items:center;gap:.83em;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 1em/1 var(--ui);padding:.33em .5em .33em 1em;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
+.tc-win.tc-menu{--tc-pick:linear-gradient(90deg,rgba(232,196,110,.38),rgba(232,196,110,.08))}
+.tc-menu{display:flex;flex-direction:column;min-width:262px;box-sizing:border-box;padding:.25em .3em .35em;z-index:2;font-size:21px;animation:tc-menu .16s ease-out}
+.tc-menu[hidden]{display:none}
+.tc-menu-head{display:flex;align-items:baseline;justify-content:space-between;gap:1em;padding:.2em .45em .35em;margin-bottom:.2em;border-bottom:1px solid rgba(226,192,110,.45)}
+.tc-win .tc-menu-head span{display:inline;font:500 .6em var(--ui-sc,var(--ui));letter-spacing:.16em;text-transform:uppercase;color:var(--tc-gold)}
+.tc-win .tc-menu-head b{display:inline;font:400 .85em/1.1 var(--display);color:var(--tc-mark);text-shadow:0 1px 0 #000}
+.tc-menu button{display:flex;align-items:center;gap:.6em;background:none;border:0;border-radius:2px;color:var(--tc-text);font:600 1em/1 var(--ui);padding:.38em .5em .38em .9em;min-height:52px;text-align:left;cursor:pointer;position:relative;text-shadow:0 1px 0 #000}
+.tc-menu button+button{border-top:1px solid rgba(0,0,0,.28);box-shadow:inset 0 1px 0 rgba(255,244,208,.06)}
 .tc-menu button:hover:not(:disabled),.tc-menu button:focus-visible{background:var(--tc-pick);outline:none}
 .tc-menu button[aria-pressed=true]{background:var(--tc-pick);color:var(--tc-mark)}
-.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:.25em;top:50%;margin-top:-.25em;border:.25em solid transparent;border-left:.33em solid currentColor}
+.tc-menu button[aria-pressed=true]::before{content:'';position:absolute;left:.2em;top:50%;margin-top:-.25em;border:.25em solid transparent;border-left:.33em solid currentColor}
 .tc-menu button:disabled{color:var(--tc-off);cursor:default;text-shadow:none}
-.tc-menu kbd{font:600 .83em var(--ui);color:var(--tc-dim)}
-.tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
+.tc-ico{flex:none;width:1.15em;height:1.15em;color:var(--tc-gold);filter:drop-shadow(0 1px 0 #000)}
+.tc-menu button:hover:not(:disabled) .tc-ico,.tc-menu button[aria-pressed=true] .tc-ico{color:var(--tc-mark)}
+.tc-menu button:disabled .tc-ico{color:var(--tc-off);filter:none}
+.tc-win .tc-act{display:flex;flex-direction:column;gap:.22em;flex:1;min-width:0;color:inherit;font-size:1em}
+.tc-act b{font:inherit;color:inherit}
+.tc-act small{font:500 .66em/1.15 var(--ui);color:var(--tc-dim);text-shadow:none}
+.tc-menu button:disabled small{color:var(--tc-off)}
+.tc-win .tc-hp{display:block;width:150px;height:5px;margin:5px 0 6px;background:#2a2420;border:1px solid #0b1011;box-shadow:0 0 0 1px rgba(226,192,110,.3)}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
 .tc-hp i.low{background:#d9553f}
-#tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:1px solid var(--tc-gold);box-shadow:0 0 0 1px #0b1011}
+#tcFace,#tcAimFace{width:72px;height:72px;image-rendering:pixelated;background:#1a1815;border:1px solid #e2c06e;box-shadow:0 0 0 1px #0b1011,inset 0 0 0 1px rgba(0,0,0,.4)}
+/* The attack preview is a second portrait window, built as the attacker's is, standing just left of it with a clash
+   between them: the target's portrait and name, the damage on a tag at its corner, and its health bar as the blow
+   would leave it, with the hit points it would lose flashing between rust and white. The clash, the menu's Attack sword
+   crossed with its mirror over a spark, in a gold-rimmed stone medallion, is the Strike button. */
+.tc-aim{animation:tc-menu .16s ease-out}
+.tc-aim[hidden]{display:none}
+.tc-dock .tc-unit b.tc-dmg{position:absolute;top:-11px;right:14px;padding:2px 8px 3px;font:700 17px/1 var(--ui);color:#fff4d0;background:linear-gradient(#a64632,#6a261b);border:1px solid #e2c06e;border-radius:2px;box-shadow:0 0 0 1px #0b1011,0 0 12px rgba(217,85,63,.55);text-shadow:0 1px 0 #000}
+.tc-win .tc-hp.tc-hp-aim{position:relative}
+.tc-hp-aim em{position:absolute;top:0;bottom:0;background:#fff4d0;animation:tc-flash .7s ease-in-out infinite alternate}
+#tcAimHpText i{font-style:normal;padding:0 .15em}
+#tcAimHpText strong{color:#ff8a70}
+#tcAimInfo strong{color:#ff8a70;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+@keyframes tc-flash{from{background:#d9553f;box-shadow:none}to{background:#fff4d0;box-shadow:0 0 6px rgba(255,244,208,.8)}}
+.tc-clash{align-self:center;flex:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:0;background:none;border:0;color:var(--tc-text);cursor:pointer;pointer-events:auto;animation:tc-menu .16s ease-out}
+.tc-clash[hidden]{display:none}
+.tc-clash svg{width:62px;height:62px;padding:4px;border-radius:50%;color:var(--tc-gold);filter:none;background:linear-gradient(#4f4a42,#2a2723);border:2px solid #e2c06e;box-shadow:inset 0 0 0 1px #141210,inset 0 0 0 3px rgba(226,192,110,.35),0 0 0 2px #0b1011,0 0 18px rgba(226,192,110,.3);animation:tc-clash 1.1s ease-in-out infinite alternate}
+.tc-clash .tc-blades{filter:drop-shadow(0 1px 0 #000)}
+.tc-clash span{font:600 13px var(--ui-sc,var(--ui));letter-spacing:.14em;text-transform:uppercase;color:var(--tc-gold);text-shadow:0 1px 2px #000,0 0 4px #000}
+.tc-clash:hover:not(:disabled) svg,.tc-clash:focus-visible svg{color:var(--tc-mark);background:linear-gradient(#5d5750,#34302b)}
+.tc-clash:focus-visible{outline:none}
+.tc-clash:disabled{cursor:default}
+.tc-clash:disabled span{visibility:hidden}
+.tc-spark{transform-origin:8px 1.65px;animation:tc-spark .55s ease-in-out infinite alternate}
+@keyframes tc-clash{from{box-shadow:inset 0 0 0 1px #141210,inset 0 0 0 3px rgba(226,192,110,.35),0 0 0 2px #0b1011,0 0 8px rgba(226,192,110,.2)}to{box-shadow:inset 0 0 0 1px #141210,inset 0 0 0 3px rgba(226,192,110,.35),0 0 0 2px #0b1011,0 0 22px rgba(226,192,110,.6)}}
+@keyframes tc-spark{from{transform:scale(.8);opacity:.75}to{transform:scale(1.1);opacity:1}}
 .tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
 .tc-keys{color:#a39b86}
 /* The battle: the turn and whose phase it is beside the title, a banner across the top as each phase begins (gold for
@@ -232,9 +276,11 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-win.tc-phase[data-kind=enemy],.tc-win.tc-phase[data-kind=defeat]{border-color:#c9705a}
 .tc-win.tc-phase[data-kind=enemy] span,.tc-win.tc-phase[data-kind=defeat] span{color:#e6a08e}
 .tc-unit[data-side=enemy] b{color:#f0b3a3}
+@keyframes tc-menu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes tc-phase{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translateX(-50%)}}
-@media (prefers-reduced-motion:reduce){.tc-win.tc-phase{animation:none}}
-@media (max-width:760px){.tc-keys{display:none}.tc-unit{bottom:110px}}
+@media (prefers-reduced-motion:reduce){.tc-win.tc-phase,.tc-menu,.tc-aim,.tc-clash,.tc-clash svg,.tc-spark{animation:none}.tc-hp-aim em{animation-duration:1.6s}}
+@media (max-width:640px){.tc-dock-row{flex-direction:column;align-items:flex-end;gap:6px}.tc-clash{flex-direction:row;align-self:flex-end;margin-right:14px}.tc-clash svg{width:46px;height:46px;padding:3px}}
+@media (max-width:760px){.tc-keys{display:none}.tc-dock{bottom:110px}.tc-menu{font-size:18px}.tc-menu button{min-height:46px}}
 /* the town view: the tactical view's frame, a place banner on entering, and a speech window in the same slate and
    gold as the tactical view's windows, with the speaker's portrait framed like the unit's */
 .tw-banner{position:absolute;left:50%;top:18%;transform:translateX(-50%);padding:8px 28px;font:400 clamp(22px,3vw,34px)/1.1 var(--display);color:#f4ead2;text-shadow:0 2px 0 #0b1011,0 0 12px rgba(0,0,0,.6);border-top:1px solid rgba(201,164,90,.7);border-bottom:1px solid rgba(201,164,90,.7);background:linear-gradient(90deg,transparent,rgba(11,16,17,.55) 20%,rgba(11,16,17,.55) 80%,transparent);opacity:0;pointer-events:none;white-space:nowrap}

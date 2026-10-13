@@ -3,7 +3,7 @@ import test from 'node:test';
 import { blankModel } from '../editor/model.js';
 import { placeChar } from '../editor/walk.js';
 import { planTurn } from './ai.js';
-import { canAct, canMove, createBattle, endPhase, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.js';
+import { canAct, canMove, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.js';
 
 const P = 'player', E = 'enemy';
 
@@ -39,6 +39,15 @@ test('a side with no units has its phase skipped', () => {
   const F = createBattle([{ side: E, hp: 10 }]);
   assert.equal(F.phase, E, 'a map of enemies only starts with theirs');
   assert.deepEqual(endPhase(F), { turn: 2, phase: E, newTurn: true });
+});
+
+test('a forecast shows what a strike would do without striking', () => {
+  const B = createBattle([{ side: P, hp: 30 }, { side: E, hp: 12 }, { side: P, hp: 30 }]);
+  assert.deepEqual(forecast(B, 0, 1, 8), { dmg: 8, from: 12, to: 4, max: 12, fell: false });
+  assert.equal(B.units[1].hp, 12, 'nothing is struck'); assert.ok(canAct(B, 0), 'nor is the action spent');
+  assert.deepEqual(forecast(B, 0, 1, 20), { dmg: 20, from: 12, to: 0, max: 12, fell: true });
+  assert.equal(forecast(B, 0, 2, 5), null, 'not one\'s own side');
+  assert.deepEqual(strike(B, 0, 1, 8), forecast(createBattle([{ side: P, hp: 30 }, { side: E, hp: 12 }]), 0, 1, 8), 'the strike lands as forecast');
 });
 
 test('strikes take hit points, the fallen are out, and the last to fall decides the battle', () => {
