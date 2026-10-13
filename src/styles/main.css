@@ -199,16 +199,18 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-unit{display:flex;gap:12px;align-items:center;min-width:220px}
 /* the portrait window sits bottom right, and the picked unit's actions open on top of it, as wide as it */
 .tc-dock{position:absolute;right:14px;bottom:40px;display:flex;flex-direction:column;align-items:stretch;gap:12px;pointer-events:none}
-.tc-dock>.tc-win{position:relative;pointer-events:auto}
-/* The unit's portrait has a thin gold rim, one pixel inside a dark outline. The actions menu, a tactics game's command
-   list stacked on top of the portrait, has a heavier frame to stand out: a warm stone fill under a doubled gold rim
-   with corner studs, a header naming the unit, and a row per action with an icon, what it does and its key. */
+.tc-dock>.tc-win{position:relative;pointer-events:auto;--tc-dim:#c4b89c;background:linear-gradient(#4f4a42,#2a2723);color:var(--tc-text);border:2px solid #e2c06e;border-radius:3px;box-shadow:inset 0 0 0 1px #141210,inset 0 0 0 3px rgba(226,192,110,.35),0 0 0 2px #0b1011,0 0 22px rgba(226,192,110,.25),0 10px 26px rgba(0,0,0,.55)}
+.tc-dock>.tc-win::before,.tc-dock>.tc-win::after{content:'';position:absolute;top:-5px;width:8px;height:8px;background:#e2c06e;border:1px solid #0b1011;transform:rotate(45deg)}
+.tc-dock>.tc-win::before{left:-5px}.tc-dock>.tc-win::after{right:-5px}
+.tc-dock .tc-unit b{font:400 19px/1.1 var(--display);color:var(--tc-mark);text-shadow:0 1px 0 #000}
+.tc-dock .tc-unit span{color:var(--tc-dim)}
+/* The portrait window and the actions menu, a tactics game's command list stacked on top of it, share a frame that
+   stands out from the other windows: a warm stone fill under a doubled gold rim with corner studs. The menu has a
+   header naming the unit and a row per action with an icon and what it does. */
 .tactical{--tc-gold:#c9a45a;--tc-text:#ece2c8;--tc-dim:#a39b86;--tc-pick:rgba(201,164,90,.28);--tc-mark:#fff4d0;--tc-off:#6b665a}
-.tc-win.tc-menu{--tc-dim:#c4b89c;--tc-pick:linear-gradient(90deg,rgba(232,196,110,.38),rgba(232,196,110,.08));background:linear-gradient(#4f4a42,#2a2723);color:var(--tc-text);border:2px solid #e2c06e;border-radius:3px;box-shadow:inset 0 0 0 1px #141210,inset 0 0 0 3px rgba(226,192,110,.35),0 0 0 2px #0b1011,0 0 22px rgba(226,192,110,.25),0 10px 26px rgba(0,0,0,.55)}
+.tc-win.tc-menu{--tc-pick:linear-gradient(90deg,rgba(232,196,110,.38),rgba(232,196,110,.08))}
 .tc-menu{display:flex;flex-direction:column;align-self:stretch;padding:.25em .3em .35em;z-index:2;font-size:21px;animation:tc-menu .16s ease-out}
 .tc-menu[hidden]{display:none}
-.tc-menu::before,.tc-menu::after{content:'';position:absolute;top:-5px;width:8px;height:8px;background:#e2c06e;border:1px solid #0b1011;transform:rotate(45deg)}
-.tc-menu::before{left:-5px}.tc-menu::after{right:-5px}
 .tc-menu-head{display:flex;align-items:baseline;justify-content:space-between;gap:1em;padding:.2em .45em .35em;margin-bottom:.2em;border-bottom:1px solid rgba(226,192,110,.45)}
 .tc-win .tc-menu-head span{display:inline;font:500 .6em var(--ui-sc,var(--ui));letter-spacing:.16em;text-transform:uppercase;color:var(--tc-gold)}
 .tc-win .tc-menu-head b{display:inline;font:400 .85em/1.1 var(--display);color:var(--tc-mark);text-shadow:0 1px 0 #000}
@@ -225,13 +227,11 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-act b{font:inherit;color:inherit}
 .tc-act small{font:500 .66em/1.15 var(--ui);color:var(--tc-dim);text-shadow:none}
 .tc-menu button:disabled small{color:var(--tc-off)}
-.tc-menu kbd{flex:none;min-width:1.5em;padding:.15em .3em;text-align:center;font:600 .62em/1 var(--ui);color:var(--tc-dim);border:1px solid rgba(196,184,156,.45);border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.25)}
-.tc-menu button:disabled kbd{opacity:.5}
-.tc-win .tc-hp{display:block;width:150px;height:4px;margin:4px 0 5px;background:#3a2a24;border:1px solid #0b1011}
+.tc-win .tc-hp{display:block;width:150px;height:5px;margin:5px 0 6px;background:#2a2420;border:1px solid #0b1011;box-shadow:0 0 0 1px rgba(226,192,110,.3)}
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
 .tc-hp i.low{background:#d9553f}
-#tcFace{width:72px;height:72px;image-rendering:pixelated;background:#0b1011;border:1px solid var(--tc-gold);box-shadow:0 0 0 1px #0b1011}
+#tcFace{width:72px;height:72px;image-rendering:pixelated;background:#1a1815;border:1px solid #e2c06e;box-shadow:0 0 0 1px #0b1011,inset 0 0 0 1px rgba(0,0,0,.4)}
 .tc-hint{position:absolute;left:0;right:0;bottom:0;padding:7px 14px;background:linear-gradient(transparent,rgba(11,16,17,.92) 40%);display:flex;justify-content:space-between;gap:12px;font:500 13px var(--ui);color:#ece2c8;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;overflow:hidden}
 .tc-keys{color:#a39b86}
 /* The battle: the turn and whose phase it is beside the title, a banner across the top as each phase begins (gold for
