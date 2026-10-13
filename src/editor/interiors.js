@@ -18,8 +18,9 @@ const hasInterior = o => !!(o && o.interior);
 
 /* the floor a new interior is laid with, after what the building is made of */
 const FLOORS = {
-  stonefloor: ['smithy', 'chapel', 'stonetower', 'keep', 'lighthouse', 'temple', 'markethall', 'church', 'cathedral', 'shrine', 'gatehouse', 'walltower', 'stonehouse', 'ruin', 'mine'],
+  stonefloor: ['smithy', 'blacksmith', 'chapel', 'stonetower', 'keep', 'lighthouse', 'temple', 'markethall', 'church', 'cathedral', 'shrine', 'gatehouse', 'walltower', 'stonehouse', 'ruin', 'mine'],
   checker: ['mansion'],
+  oakfloor: ['alchemist'],
   rushes: ['barn', 'longhouse', 'yurt', 'granary', 'watchtower', 'windmill', 'dovecote'],
   elvenfloor: ['elvenhall', 'elvenmanor', 'elvenrotunda', 'elvenspire', 'flet']
 };

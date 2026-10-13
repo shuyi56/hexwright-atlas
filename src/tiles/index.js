@@ -1,5 +1,5 @@
 import { mulberry32 } from '../core/random.js';
-import { ASSETS, ASSET_BY_ID, ASSET_GROUPS } from './assets.js';
+import { ASSETS, ASSET_BY_ID, ASSET_CATEGORIES, ASSET_GROUPS } from './assets.js';
 import { makeKit } from './kit.js';
 import { TERRAIN, TERRAIN_BY_ID } from './terrain.js';
 
@@ -49,4 +49,4 @@ function decorateTerrain(g, id, at, h, seed) {
   g.save(); t.deco(g, at, h, mulberry32(seed)); g.restore();
 }
 
-export { ASSETS, ASSET_BY_ID, ASSET_GROUPS, TERRAIN, TERRAIN_BY_ID, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset, wallLinks };
+export { ASSETS, ASSET_BY_ID, ASSET_CATEGORIES, ASSET_GROUPS, TERRAIN, TERRAIN_BY_ID, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset, wallLinks };

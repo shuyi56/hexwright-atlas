@@ -27,8 +27,36 @@ the editor instead. Opening a scene replaces the editor's map; **Undo** brings t
 
 The **Map editor** in the rail opens an isometric workbench built on the same tile set as the city
 districts. Paint 46 kinds of ground, raise and lower terrain, place buildings, props, plants, room pieces and furniture,
-turn pieces (`R`) and the view (`[` `]`), give buildings interiors to furnish (`N`), undo with `Ctrl+Z`, and export PNG or JSON. **Generate**
-builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
+turn pieces (`R`) and the view (`[` `]`), give buildings interiors to furnish (`N`), undo with `Ctrl+Z`, and export PNG or JSON.
+
+The palette's tabs (Terrain, Buildings, Props, Nature, Interior, Characters) list their pieces under categories:
+the ground by its kinds (Ground, Water, Farm, Paved, Floors, Elven), and the pieces by what they are for:
+
+| Tab | Categories |
+| --- | --- |
+| Buildings | Homes · Shops and trades · Farm · Faith · Walls and towers · Elven |
+| Props | Farm and field · Street and harbour · Monuments · Camp and woodland · Elven |
+| Nature | Trees · Bushes and cacti · Ground cover · Elven |
+| Interior | Walls and stairs · On the walls · Tables and seats · Beds and storage · Tavern · Smithy · Alchemist · Household · Hall and chapel |
+
+Under **Shops and trades** stand two shops of two tiles, drawn for the editor, the tactical view and the town view:
+the **smithy**, a stone workshop under slate with its door at one end, a horseshoe over it and the anvil sign beside
+it, the rest of its front an open forge bay on timber posts where the forge glows under its hood, tongs and hammers
+hang on the sooty back wall and an anvil and a quenching barrel stand in the opening, a broad stack smoking over it;
+and the **alchemist's shop**, two timbered storeys of lilac plaster under indigo slate, a painted door and a shop
+window of glowing bottles on three shelves, herbs drying under the eave and in boxes under the upper windows, the flask
+sign by the door, a round stone turret with a verdigris cone and a gold star at its far end, and fumes in pale greens
+and violets from its chimney. (The small one-tile smithy is now the **forge hut**.)
+
+A row of chips at the top of a long tab jumps to a category, and a category's heading folds it away (the folds are
+remembered in the browser). The **find** box over the tabs (`/` to reach it, `Esc` to clear it) searches every tab
+at once, by name, category and id, and lists what it finds under *Tab · Category*. The categories live in
+`src/tiles/assets.js` (`ASSET_CATEGORIES`); a new piece no category names shows under **Other**, and the automation
+API's `describe` gives each asset's `category`.
+
+<img src="docs/images/editor-palette.png" alt="The Interior tab: category chips, folded categories, and the Smithy category open" width="320">
+
+**Generate** builds a starting scene for one of six lands (river vale, island harbour, desert oasis, frozen fells,
 fenland, ashlands). The land is kept calm: the main ground covers most of it with the others in a few broad patches,
 heights rise in wide terraces, ponds, islets, plateaus and patches of only a few tiles are smoothed away, water
 deepens with distance from the shore, and woods gather in groves with only the odd tree in the open. On the realm map, **Enter hex** in any hex's survey opens a tiled map of that hex,
@@ -106,15 +134,20 @@ The **Interior** tab holds room pieces and furniture, and the Terrain tab has a 
 dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
 
 - **Room pieces:** an interior wall, a wall with a window, a doorway, a fireplace, stairs, a timber post, and walls
-  with something on them: a shelf of plates, antlers, a shield over crossed swords, a candle sconce, or the back bar
-  of a tavern (shelves of bottles over a cupboard, standing against the wall). Walls are
+  with something on them: a shelf of plates, antlers, a shield over crossed swords, a candle sconce, the back bar
+  of a tavern (shelves of bottles over a cupboard, standing against the wall), a smith's rail of hammers and tongs, a
+  shelf of potions, bunches of herbs hung to dry, or a star chart. Walls are
   kept low, cut away like a dolls' house so the room stays visible, and they join the room pieces beside them
   into corners and tees. Characters can walk through a doorway; every other piece blocks them.
 - **Furniture:** a bed, a straw cot, a table, a long table, a chair, a stool, a bench, a chest, a wardrobe, a
   bookshelf, a dresser, a writing desk, a counter, a cooking pot, a wash tub, a candle stand, a potted plant, a
   throne, an altar, a pew, a weapon rack, a spinning wheel, a coat stand, grain sacks, firewood and a notice board;
   and for a tavern a bar counter, a table with chairs round it, a long table between benches, a back bar and a rack
-  of ale casks. Bar counter pieces join the ones beside them, as walls do, so a run of them makes one counter,
+  of ale casks. For a smithy: a forge (a brick hearth of glowing coals under a stone hood and flue, bellows beside
+  it), an anvil on its stump, a quenching trough, a grindstone, a rack of smith's tools, an armour stand and a bin of
+  coal with bar iron. For an alchemist: a workbench of apparatus (an alembic over its furnace, a retort on a spirit
+  lamp, phials, a mortar, a grimoire, a shelf of jars over it), a bubbling cauldron of green brew, shelves of potions,
+  a herb drying rack and a cabinet of apothecary drawers. Bar counter pieces join the ones beside them, as walls do, so a run of them makes one counter,
   straight or round a corner. Each is drawn in its own frame, so `R` turns it to face any of the four ways and
   turning the view shows its back; a bar counter faces the side its customers stand.
 
@@ -171,12 +204,13 @@ and lookups take a `level` (`paint`, `fill`, `place`, `erase`, `moveObject`, `ge
 
 ### Characters
 
-The **Characters** tab lists the roster: twenty-seven pixel-art figures, 32×48 and big-headed, in the manner of
+The **Characters** tab lists the roster: twenty-nine pixel-art figures, 32×48 and big-headed, in the manner of
 Final Fantasy Tactics and Tactics Ogre.
 
 - **Townsfolk:** a villager in an open vest over a laced shirt, a farmer in rolled sleeves and overalls, a guard with a kettle helm, cape and
   spear, a bearded merchant in a long gold-faced coat with a sash and a satchel, a hooded monk with a rope belt, a healer with a satchel marked with a
-  cross, and a red-haired noble lady in a green gown and gold circlet.
+  cross, a red-haired noble lady in a green gown and gold circlet, a broad bearded smith in a leather apron with his
+  sleeves rolled and a sweatband, and a tall grey-bearded alchemist in a violet coat with a green sash and a satchel.
 - **Jobs:** squire, knight, archer, thief, dragoon, valkyrie, black mage, white mage and summoner.
 - **Elves:** long pointed ears swept back out of long straight hair. A ranger with a grey-green cloak, a gold-fletched
   quiver and a longbow of pale wood; a warden in verdigris plate with a leaf-bladed glaive; a sage in a white robe
@@ -468,7 +502,13 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   into one counter that stands toward the back of its tiles (so the innkeeper's lane behind it stays a stride wide)
   and runs on to a wall at a free end (stopping at the worktop of a back bar against it); a table with up to six slatted chairs pulled up round it; a long trestle table
   set for a feast between two benches; a back bar of bottles and pewter over a panelled cupboard and a rack of casks
-  with brass taps, both set back against the wall behind them. Walls carry a shelf of plates, antlers, a painted
+  with brass taps, both set back against the wall behind them. The smithy's forge and the alchemist's workbench fill
+  their tiles the same way and stand back against the wall: the forge's coals glow hottest at the heart under a fire
+  whose light spills over the floor, and the bench carries its alembic, retort, phials, mortar, book and candle under a
+  shelf of jars. The smaller pieces meant for a wall (shelves of potions or books, apothecary drawers, herb and tool
+  racks, a weapon rack, an armour stand, coal and bar iron, a quenching trough, a wardrobe, a dresser, a desk, a chest,
+  a bed or a cot) stand back against a room wall behind them (north, west or east) instead of at the front of their
+  tile, and are walked round where they stand. Walls carry a shelf of plates, antlers, a painted
   shield over crossed swords or a sconce whose candle warms the plaster. Each is drawn facing south and turned to its facing, so a turned piece shows its side (a plain face there
   is a framed, sunken panel) and from behind its back. Shadows fall to the east. City and room walls join their neighbours. A room wall running across the view shows its face (a timber beam along
   its top, lime plaster, a skirting board) under its capping beam; one running up the view shows its capping beam and
@@ -558,7 +598,19 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   sacks and barrels stand by the door, antlers, a shelf of plates and a sconce hang on the walls, and the stairs stand
   in the corner. Upstairs a passage with sconces and a shield on its partition, and two guest rooms on their carpets.
   The innkeeper, a healer, a guard, a monk, a farmer, a villager and a noble guest are about, and the door leads out
-  to a cobbled lane. Its map is built by `node tools/make-wayfarers-rest.mjs`.
+  to a cobbled lane, where two shops stand either side of the inn, each with its interior. West of it the
+  **alchemist's shop**: a timbered house of lilac plaster under indigo slate with a turret and its gold star, a window
+  of glowing bottles and coloured fumes from the chimney; inside, on a dark oak floor, two workbenches of apparatus and
+  shelves of potions against the back wall, apothecary drawers and a herb rack on the west wall, a bubbling cauldron,
+  the alchemist, and stairs up to a study with a star chart. East of it the **smithy**: a stone workshop whose forge
+  bay stands open to the lane, glowing; inside, the forge with its bellows between coal and bar iron and a quenching
+  trough, hammers and tongs on the walls, the anvil with the smith beside it, a weapon rack, an armour stand and a
+  grindstone. Its map is built by `node tools/make-wayfarers-rest.mjs`.
+
+![Oakfield Lane: the alchemist's shop, the Wayfarer's Rest and the smithy](docs/images/oakfield-lane.png)
+
+![Inside the smithy and the alchemist's shop](docs/images/shop-interiors.png)
+
   `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
   villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
   clothes show, with the dragoon and the black mage beside them as the benchmark.

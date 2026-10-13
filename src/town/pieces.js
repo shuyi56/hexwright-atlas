@@ -102,7 +102,7 @@ function kit(FW, FD, up, side = 16) {
 
 /* ---------- surfaces ---------- */
 const ROOF = {
-  thatch: '#c9a463', tiles: '#a6533b', slate: '#6d7a86', shingle: '#7d6a55', copper: '#6f9c86', felt: '#cbb894', lead: '#8a8f90'
+  thatch: '#c9a463', tiles: '#a6533b', slate: '#6d7a86', shingle: '#7d6a55', copper: '#6f9c86', felt: '#cbb894', lead: '#8a8f90', indigo: '#5e5c80'
 };
 function roofTone(tex, P, u, v, plane = 0) {
   /* u runs along the eave, v up the slope from it; courses sized for the town's big houses */
@@ -115,14 +115,14 @@ function roofTone(tex, P, u, v, plane = 0) {
     if (m === 0) t = 4; else if (m === 1) t = c === 0 ? 4 : 3;
     else { t = c === 0 ? 4 : c === 1 ? 1 : c === 2 ? (m === 5 ? 0 : 1) : c === 5 ? 3 : 2; if (vary < 0.18 && t > 0 && t < 4) t++; else if (vary > 0.88 && t > 1) t--; }
   }
-  else if (tex === 'slate' || tex === 'lead') { const row = Math.floor(v / 4), m = v % 4, c = ((u + (row % 2) * 4) % 8 + 8) % 8; t = m === 0 ? 4 : c === 0 ? 3 : h2(Math.floor((u + (row % 2) * 4) / 8), row, 7) < 0.25 ? 1 : 2; }
+  else if (tex === 'slate' || tex === 'lead' || tex === 'indigo') { const row = Math.floor(v / 4), m = v % 4, c = ((u + (row % 2) * 4) % 8 + 8) % 8; t = m === 0 ? 4 : c === 0 ? 3 : h2(Math.floor((u + (row % 2) * 4) / 8), row, 7) < 0.25 ? 1 : 2; }
   else if (tex === 'shingle') { const row = Math.floor(v / 4), m = v % 4, c = ((u + Math.floor(h2(row, 1) * 6)) % 6 + 6) % 6; t = m === 0 ? 4 : c === 0 ? 3 : 2; }
   else if (tex === 'copper') { t = ((u % 8) + 8) % 8 === 0 ? 3 : v % 9 === 0 ? 1 : 2; }
   else { t = v % 6 === 0 ? 3 : 2; }
   return P[Math.max(0, Math.min(4, t + plane))];
 }
 const WALL = {
-  plaster: '#efe3c4', cream: '#e9d6ae', ochre: '#e6cfa6', rose: '#e9c4b2', stone: '#d8cfb9', grey: '#c4bcab', planks: '#9a7650', barn: '#a4553b', logs: '#8e6a44', white: '#f2ece0', felt: '#d9c9a0', adobe: '#d7b48a'
+  plaster: '#efe3c4', cream: '#e9d6ae', ochre: '#e6cfa6', rose: '#e9c4b2', stone: '#d8cfb9', grey: '#c4bcab', planks: '#9a7650', barn: '#a4553b', logs: '#8e6a44', white: '#f2ece0', felt: '#d9c9a0', adobe: '#d7b48a', lilac: '#e6dde6'
 };
 const TIMBER = R('#76553a');
 function wallTone(tex, P, x, y, wx0, wx1, floorH, top) {
@@ -218,8 +218,8 @@ function doorAt(K, cx, yb, w = 12, h = 20, opts = {}) {
 /* A chimney stack standing h above the roof at (x, y): pale coursed stone like the walls, lit on its west face and
    shaded on its east, under a cap that overhangs by a pixel with the flue a dark slot in it; a faint shadow beside it
    on the roof; and if lit, smoke rising and drifting east, thinning as it goes. */
-function chimney(K, x, y, h, smoke) {
-  const C = R('#bfb196'), w = 7, top = y - h;
+function chimney(K, x, y, h, smoke, w = 7, puff = '#ece9e2') {
+  const C = R('#bfb196'), top = y - h;
   K.rect(x + w, top + 3, x + w + 2, y, (px, py) => (K.get(px, py) ? mix(C[4], INK, 0.35) : null));
   K.rect(x, top, x + w, y, (px, py) => {
     const face = px === x ? 1 : px >= x + w - 2 ? 3 : 2, row = Math.floor((py - top) / 4), m = (py - top) % 4, joint = m === 3 || ((px - x + (row % 2) * 3) % 6 + 6) % 6 === 0;
@@ -228,10 +228,11 @@ function chimney(K, x, y, h, smoke) {
   K.rect(x - 1, top - 2, x + w + 1, top, (px, py) => (py === top - 2 ? C[0] : px === x + w ? C[3] : C[1]));
   K.rect(x + 2, top - 2, x + w - 2, top - 1, C[4]);
   if (smoke) {
-    const Sm = R('#ece9e2');
+    /* puff: one colour, or a colour for each puff (the alchemist's coloured fumes) */
+    const P = [].concat(puff);
     /* translucent (never inked: the outline only touches opaque pixels), lit on top, thinning as it rises */
-    [[0, -6, 3.5, 225], [3, -13, 4.5, 185], [7, -21, 5.5, 140], [12, -30, 6, 95]].forEach(([dx, dy, r, a]) => {
-      const cx = x + w / 2 + dx, cy = top + dy;
+    [[0, -6, 3.5, 225], [3, -13, 4.5, 185], [7, -21, 5.5, 140], [12, -30, 6, 95]].forEach(([dx, dy, r, a], i) => {
+      const cx = x + w / 2 + dx, cy = top + dy, Sm = R(P[i % P.length]);
       for (let py = Math.floor(cy - r); py <= cy + r; py++) for (let px = Math.floor(cx - r); px <= cx + r; px++) {
         const ex = (px + 0.5 - cx) / r, ey = (py + 0.5 - cy) / (r * 0.8); if (ex * ex + ey * ey > 1 || K.get(px, py) === 255) continue;
         K.set(px, py, Sm[ex + ey < -0.4 ? 0 : ex + ey < 0.5 ? 1 : 2], a);
@@ -383,6 +384,136 @@ function keep(K, o, p) {
   return top;
 }
 
+/* ---------- the smithy and the alchemist's shop ---------- */
+/* a sign hung from an iron bracket off the west corner of a front wall at (x, y): a framed board with an emblem drawn
+   by mark(K, cx, cy) about the board's middle */
+function hangingSign(K, x, y, board, mark) {
+  const I = R('#3b3a38'), B = R(board), G = R('#c9a24f');
+  K.rect(x - 19, y, x + 2, y + 2, (px, py) => I[py === y ? 1 : 3]);
+  K.line(x + 1, y + 8, x - 6, y + 2, I[2]);
+  for (const cx of [x - 16, x - 5]) K.rect(cx, y + 2, cx + 1, y + 4, I[2]);
+  K.rect(x - 19, y + 4, x - 1, y + 19, (px, py) => (px === x - 19 || py === y + 4 ? G[1] : px === x - 2 || py === y + 18 ? G[3] : py === y + 5 || px === x - 18 ? B[1] : B[2]));
+  mark(K, x - 10, y + 11);
+}
+/* An anvil on the smith's sign, in the forge bay and on the editor's thumbnail alike: a flat face with its horn to the
+   west, a waist and a broad foot, lit along its top */
+function anvilAt(K, x, y) {
+  const I = R('#5c6066');
+  K.rect(x - 5, y - 2, x + 5, y, (px, py) => I[py === y - 2 ? 0 : px === x + 4 ? 3 : 1]);
+  K.rect(x - 8, y - 2, x - 5, y - 1, I[1]); K.set(x - 9, y - 2, I[2]);
+  K.rect(x - 2, y, x + 2, y + 2, I[3]);
+  K.rect(x - 4, y + 2, x + 4, y + 3, (px) => I[px === x - 4 ? 2 : 3]);
+}
+/* A smithy: a stone workshop under slate, its door at the west end with a horseshoe nailed over it and the anvil sign
+   hung beside it. East of the door the front stands open on timber posts under a heavy lintel: the forge bay, dark with
+   soot, where a brick forge burns under its hood with the bellows beside it, tongs and hammers hang on the back wall,
+   and an anvil on its stump and a quenching barrel stand in the opening. The fire lights the bay and spills out onto the
+   ground before it, and a broad stack over the forge sends up grey smoke. Turned away, the back shows windows. */
+const SMITHY_DOOR = 0.2;
+function smithyShop(K, o) {
+  const { FW } = K, front = o.face !== 2, dX = Math.round(FW * SMITHY_DOOR);
+  const b = house(K, o, { wall: 'stone', roof: 'slate', wallH: 26, rise: 12, doorX: dX, doorCol: '#5a3a28', windows: front ? false : undefined });
+  const { top, yb, x0, x1, ridge, eave } = b, I = R('#3b3a38'), Tm = TIMBER, bx0 = Math.round(x0 + (x1 - x0) * 0.46), bx1 = x1 - 5, by0 = top + 13;
+  const fx0 = bx0 + 6, fx1 = fx0 + Math.min(28, Math.round((bx1 - bx0) * 0.42));
+  chimney(K, Math.round((fx0 + fx1) / 2) - 6, Math.round(ridge + (eave - ridge) * 0.55), 16, true, 12, ['#a8a39b', '#bcb7af', '#cfcbc4', '#e0ddd6']);
+  if (!front) return b;
+  /* a shuttered window between the door and the bay, where there is room */
+  if (bx0 - (dX + 30) >= 4) windowAt(K, dX + 16, top + 16, 12, 15, { shutter: '#6e5236' });
+  /* the horseshoe over the door, points up for luck */
+  const hy = yb - Math.min(yb - top - 8, 34) - 7;
+  for (const [dx, dy] of [[-3, 0], [-3, 1], [-3, 2], [-2, 3], [-1, 4], [0, 4], [1, 4], [2, 3], [3, 2], [3, 1], [3, 0]]) K.set(dX + dx, hy + dy, I[dy > 2 ? 2 : 1]);
+  /* the bay: the sooty back wall, the earth floor, then what stands in it */
+  const back = R('#4e463f');
+  K.rect(bx0, by0, bx1, yb, (x, y) => (y >= yb - 5 ? R('#4a3a2c')[y === yb - 5 ? 4 : h2(x, y, 3) < 0.2 ? 2 : 3] : mix(wallTone('stone', back, x, y), INK, Math.max(0, 0.55 - (y - by0) / (yb - by0) * 0.5))));
+  /* tongs and hammers hung on the back wall */
+  for (let x = fx1 + 8, k = 0; x < bx1 - 6; x += 7, k++) {
+    const y = by0 + 6; K.set(x, y - 1, I[1]);
+    if (k % 2) { K.line(x - 1, y, x - 1, y + 10, I[2]); K.line(x + 1, y, x + 1, y + 10, I[3]); }
+    else { K.rect(x, y, x + 1, y + 9, R('#7a5a3a')[2]); K.rect(x - 2, y + 9, x + 3, y + 12, I[1]); }
+  }
+  /* the forge: a brick hearth under a stone hood, coals glowing on it, the bellows beside it */
+  const fy = yb - 6, Br = R('#9a4e36');
+  K.poly([[fx0 - 3, fy - 13], [fx1 + 3, fy - 13], [fx1 - 5, by0], [fx0 + 5, by0]], (x, y) => mix(wallTone('stone', R('#8a8076'), x, y), INK, 0.2));
+  K.rect(fx0 - 3, fy - 15, fx1 + 3, fy - 13, I[2]);
+  K.rect(fx0, fy - 10, fx1, fy, (x, y) => ((y - fy) % 3 === 0 || ((x + (Math.floor((y - fy) / 3) % 2) * 2) % 5 === 0) ? Br[4] : Br[x === fx0 ? 1 : x >= fx1 - 2 ? 3 : 2]));
+  for (let x = fx0 + 1; x < fx1 - 1; x++) for (let k = 0; k < 3; k++) if (h2(x, k, 61) < 0.8 - k * 0.25) K.set(x, fy - 11 - k, R(k ? '#f08a2a' : '#f6d36a')[h2(x, k, 62) < 0.4 ? 0 : 1]);
+  flame(K, (fx0 + fx1) / 2, fy - 12, 5, 7);
+  K.poly([[fx0 - 10, fy - 5], [fx0 - 1, fy - 8], [fx0 - 1, fy - 3]], R('#7a4a2a')[2]); K.line(fx0 - 13, fy - 4, fx0 - 10, fy - 5, R('#7a5a3a')[3]);
+  candlelight(K, (fx0 + fx1) / 2, fy - 12, 34, 22, 0.6);
+  /* the anvil on its stump, and the quenching barrel, in the opening */
+  const ax = Math.round(bx0 + (bx1 - bx0) * 0.66), ay = yb - 1, Wd = R('#7a5a3a');
+  K.rect(ax - 4, ay - 8, ax + 4, ay, (x) => Wd[x === ax - 4 ? 1 : x === ax + 3 ? 3 : 2]); K.rect(ax - 4, ay - 9, ax + 4, ay - 8, R('#c8a878')[1]);
+  anvilAt(K, ax, ay - 12);
+  if (bx1 - ax > 14) { const qx = bx1 - 7, Wb = R('#8e6a44'); K.rect(qx - 5, ay - 11, qx + 5, ay, (x, y) => ((ay - y) % 4 === 2 ? I[2] : Wb[x === qx - 5 ? 1 : x === qx + 4 ? 3 : 2])); K.rect(qx - 4, ay - 12, qx + 4, ay - 11, R('#5f7f86')[1]); }
+  /* the posts and the lintel over the opening */
+  for (const [px, lit] of [[bx0 - 3, true], [bx1, false]]) K.rect(px, by0, px + 3, yb, (x) => Tm[lit ? (x === px ? 0 : 2) : (x === px + 2 ? 4 : 3)]);
+  K.rect(bx0 - 4, by0 - 5, bx1 + 4, by0, (x, y) => Tm[y === by0 - 5 ? 0 : y === by0 - 1 ? 4 : h2(x >> 2, y, 12) < 0.15 ? 3 : 1]);
+  /* firelight on the ground before the bay */
+  for (let y = yb; y < yb + 4; y++) for (let x = bx0; x < bx1; x++) if (!K.get(x, y)) K.set(x, y, R('#f4a03a')[1], Math.round(70 * (1 - (y - yb) / 4)));
+  hangingSign(K, x0, top + 10, '#4a3424', anvilAt);
+  return b;
+}
+/* A flask on the alchemist's sign: a round-bellied flask of green elixir with a cork, a glint on the glass */
+function flaskAt(K, x, y) {
+  const Gl = R('#cfe4e4'), L = R('#6fbf6a');
+  K.rect(x - 1, y - 6, x + 1, y - 2, Gl[1]); K.rect(x - 1, y - 7, x + 1, y - 6, R('#8e6a44')[1]);
+  K.oval(x, y + 1, 4.5, 4, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.8 ? Gl[2] : dy > -0.1 ? L[dx < -0.3 ? 0 : dx > 0.4 ? 2 : 1] : Gl[0]));
+  K.set(x - 2, y - 1, R('#ffffff')[0]);
+}
+/* An alchemist's shop: a tall timber-framed house of lilac plaster under an indigo slate roof, a round stone turret with a
+   verdigris cone and a golden star rising over its east end. On the ground floor a painted door and a broad shop window
+   lit from within, three shelves of bottles and flasks in it (green, violet, amber, red, teal); upstairs windows with
+   boxes of herbs under them and bunches of herbs drying under the eave; the flask sign hung by the door; and from the
+   chimney, fumes in pale greens and violets. Turned away, the back shows plain windows. */
+const ALCHEMIST_DOOR = 0.24;
+function alchemistShop(K, o) {
+  const { FW } = K, front = o.face !== 2, dX = Math.round(FW * ALCHEMIST_DOOR);
+  const b = house(K, o, { wall: 'lilac', wallTex: 'timber', roof: 'indigo', wallH: 38, floors: 2, rise: 14, doorX: dX, doorCol: '#3e5470', windows: front ? false : undefined, inset: 4 });
+  const { top, yb, x0, x1, ridge, eave } = b, floorH = (yb - top) / 2, tr = FW > T ? 6 : 5, tcx = x1 - Math.round(tr * RS * 0.55);
+  chimney(K, Math.round(x0 + (x1 - x0) * 0.3), Math.round(ridge + (eave - ridge) * 0.4), 12, true, 7, ['#d4ecc8', '#e0d0f0', '#c8e6e4', '#ead8f4']);
+  if (front) {
+    const sx0 = dX + 18, sx1 = tcx - tr * RS - 6, sy0 = Math.round(top + floorH + 6), sy1 = yb - 8, Fr = R('#3e5470');
+    /* the shop window: a painted frame, three shelves of bottles glowing on a warm dark ground, a sill */
+    if (sx1 - sx0 >= 16) {
+      const COL = ['#6fbf6a', '#a46ac8', '#e0a23a', '#c4503e', '#4fb0b0', '#d8d06a'], rows = 3, rh = (sy1 - sy0 - 2) / rows;
+      K.rect(sx0 - 2, sy0 - 3, sx1 + 2, sy1 + 1, (x, y) => Fr[y === sy0 - 3 || x === sx0 - 2 ? 1 : x === sx1 + 1 ? 3 : 2]);
+      K.rect(sx0, sy0, sx1, sy1, (x, y) => R('#3a2c20')[y < sy0 + 2 || x === sx0 ? 4 : 3]);
+      for (let r = 0; r < rows; r++) {
+        const sh = Math.round(sy0 + (r + 1) * rh);
+        for (let x = sx0 + 2, k = 0; x < sx1 - 3; k++) {
+          const C = R(COL[Math.floor(h2(k, r, 71) * COL.length)]), w = h2(k, r, 72) < 0.3 ? 5 : 3, h = Math.min(Math.round(rh) - 2, 4 + Math.floor(h2(k, r, 73) * 4));
+          if (w === 5) { K.oval(x + 2, sh - 3, 2.5, 2.5, (px, py, dx, dy) => C[dy < -0.3 ? 0 : dx > 0.3 ? 2 : 1]); K.rect(x + 2, sh - 7, x + 3, sh - 5, R('#cfe4e4')[1]); }
+          else { K.rect(x, sh - h, x + w, sh, (px, py) => (py === sh - h ? R('#8e6a44')[1] : C[px === x ? 0 : px === x + w - 1 ? 2 : 1])); }
+          x += w + 1 + Math.floor(h2(k, r, 74) * 2);
+        }
+        K.rect(sx0, sh, sx1, sh + 1, R('#7a5a3a')[1]);
+      }
+      for (let x = sx0 + 1; x < sx1; x += Math.max(10, Math.round((sx1 - sx0) / 4))) K.rect(x, sy0, x + 1, sy1, Fr[2]);
+      candlelight(K, (sx0 + sx1) / 2, (sy0 + sy1) / 2, (sx1 - sx0) * 0.6, (sy1 - sy0) * 0.8, 0.35);
+      K.rect(sx0 - 3, sy1 + 1, sx1 + 3, sy1 + 3, (x, y) => Fr[y === sy1 + 1 ? 0 : 3]);
+    }
+    /* upstairs: a window over the door and over the shop, a box of herbs under each */
+    const uy = Math.round(top + floorH * 0.28), wh = Math.min(16, Math.round(floorH * 0.42));
+    for (const wx of [dX - 6, Math.round((sx0 + Math.max(sx0, sx1)) / 2) - 6]) {
+      windowAt(K, wx, uy, 12, wh, { glass: '#3e5a64', shutter: '#3e5470' });
+      const by = uy + wh + 1; K.rect(wx - 1, by, wx + 13, by + 3, (x, y) => R('#8e6a44')[y === by ? 1 : 3]);
+      for (let x = wx; x < wx + 12; x += 2) { const Lf = R(h2(x, 3, 75) < 0.5 ? '#6f9a52' : '#87a05a'); K.set(x, by - 1, Lf[1]); K.set(x + 1, by - 2, Lf[2]); if (h2(x, 1, 76) < 0.3) K.set(x, by - 3, R('#b98ad8')[0]); }
+    }
+    /* bunches of herbs drying under the eave */
+    for (let x = x0 + 8; x < tcx - tr * RS - 4; x += 13) {
+      if (Math.abs(x - dX) < 9) continue;
+      const y = eave + 7, Lf = R(h2(x, 2, 77) < 0.5 ? '#7f9a52' : '#a89a5a');
+      K.rect(x, y, x + 1, y + 3, R('#c8b28a')[2]); K.rect(x - 1, y + 3, x + 2, y + 8, (px, py) => Lf[px === x - 1 ? 1 : py > y + 6 ? 3 : 2]);
+    }
+    hangingSign(K, x0, Math.round(top + floorH + 2), '#3e5470', flaskAt);
+  }
+  /* the turret at the east end, its cone, and a golden star on the point */
+  const ty = tower(K, tcx, yb + 1, tr, 42, { wall: 'stone', top: 'cone', roof: 'copper', rise: 16, windows: true });
+  const rr = Math.round(tr * RS) + 2, rise = Math.max(1, Math.round(16 * HS / rr)) * rr, sy = ty - rise - 7, Gd = R('#e2c26a');
+  for (const [dx, dy] of [[0, -3], [0, -2], [-1, -1], [0, -1], [1, -1], [-3, 0], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [3, 0], [-1, 1], [0, 1], [1, 1], [0, 2], [0, 3]]) K.set(tcx + dx - 1, sy + dy, Gd[Math.abs(dx) + Math.abs(dy) > 2 ? 2 : 0]);
+  return b;
+}
+
 const BUILD = {
   cottage: (K, o) => house(K, o, { wall: ['plaster', 'cream', 'ochre', 'plaster'][Math.floor(o.v * 4) % 4], roof: 'thatch', wallH: 22, rise: 16, chimney: o.v > 0.5 ? 2 : 1, shutter: o.v > 0.3 ? '#6f8a5a' : null }),
   townhouse: (K, o) => house(K, o, { wall: ['plaster', 'cream', 'rose'][Math.floor(o.v * 3) % 3], wallTex: 'timber', roof: 'tiles', wallH: 38, floors: 2, rise: 14, chimney: 1, inset: 1 }),
@@ -390,6 +521,8 @@ const BUILD = {
   barn: (K, o) => house(K, o, { wall: 'barn', roof: 'shingle', wallH: 26, rise: 18, doorW: 16, doorH: 20, doorCol: '#6e3a28', windows: false }),
   granary: (K, o) => house(K, o, { wall: 'planks', roof: 'thatch', wallH: 14, rise: 12, lift: 6, hip: true, inset: 5, door: false, windows: false }),
   smithy: (K, o) => { house(K, o, { wall: 'stone', roof: 'slate', wallH: 22, rise: 12, chimney: 2, open: true, doorW: 12 }); K.oval(K.FW / 2, K.FD - 8, 5, 3, (x, y) => (y > K.FD - 9 ? R('#f4a03a')[1] : null)); },
+  blacksmith: (K, o) => smithyShop(K, o),
+  alchemist: (K, o) => alchemistShop(K, o),
   tavern: (K, o) => { const b = house(K, o, { wall: 'plaster', wallTex: 'timber', roof: 'tiles', wallH: 40, floors: 2, rise: 14, hip: true, chimney: 2, lit: true, shutter: '#7a4a2a' }); K.line(b.x0 + 4, b.top + 12, b.x0 - 2, b.top + 12, TIMBER[3]); K.rect(b.x0 - 5, b.top + 13, b.x0 + 1, b.top + 19, (x, y) => (y === b.top + 16 && x === b.x0 - 2 ? R('#c9a24f')[1] : R('#7a4a2a')[2])); },
   chapel: (K, o) => { const b = house(K, o, { wall: 'stone', roof: 'slate', wallH: 24, rise: 16, arch: true, glass: '#4b5a6e', doorX: K.FW * 0.62 }); tower(K, 20, K.FD - 6, 7, 40, { wall: 'stone', top: 'cone', roof: 'slate', rise: 18 }); return b; },
   watchtower: (K, o) => {
@@ -692,7 +825,7 @@ const PROPS = {
    room's walls run on as one (pieceSprite). A doorway is an opening in a wall: the wall on either side, timber
    jambs, a lintel carrying the capping beam over it, and a sill on the floor between. */
 const ROOMW = 34, RT = 5, RSIDE = 4, DOOR_HALF = 21;
-const HUNG_WALLS = ['wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar'];
+const HUNG_WALLS = ['wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar', 'walltools', 'wallpotions', 'wallherbs', 'wallchart'];
 const WALLS_JOINED = new Set(['iwall', 'iwindow', 'idoor', 'hearth', ...HUNG_WALLS]);
 function wallKit(K) {
   const { FW } = K, c0 = FW / 2 - RT, c1 = FW / 2 + RT, P = R(WALL.plaster), Tp = R('#7a5a3a'), H = ROOMW;
@@ -1102,6 +1235,218 @@ function caskRack(K, o) {
   F.done(4);
 }
 
+/* ---------- the smithy's and the alchemist's pieces ----------
+   The forge and the alchemist's workbench are drawn across their whole tile (FULL) and stand back against the wall
+   behind it (SNUG), as the back bar does; the rest keep the figures' scale in the middle of their tile. */
+const BRICK = '#9a4e36', COAL = ['#f6d36a', '#f08a2a', '#c8502a', '#3a2c20'];
+const brickAt = (B, x, y) => ((((y % 3) + 3) % 3) === 0 || ((((x + (Math.floor(y / 3) % 2) * 2) % 5) + 5) % 5) === 0 ? B[4] : B[h2(x >> 2, y / 3 | 0, 81) < 0.25 ? 1 : 2]);
+/* A smith's forge: a brick hearth waist high with a bed of coals glowing on it and a fire at its heart, a stone hood
+   over it narrowing to a flue that runs up to the ceiling, a pair of great leather bellows on a frame at its side,
+   tongs and a poker hung on the hood and a coal scuttle at its foot. Its light falls on the floor before it. */
+function forgeHearth(K, o) {
+  const F = furniture(K, o, T, T), B = R(BRICK), Bm = [R(BRICK), R(BRICK), R(shade3(BRICK))], S = mat('stone'), I = mat('iron'), W = mat('walnut'), b0 = o.snug ? -40 : 6;
+  /* the hearth: brick, its top a stone kerb round a bed of coals, hottest in the middle */
+  F.box(18, 78, b0, b0 + 26, 0, 18, Bm, { panel: false, face: (s, t, which, x, y) => brickAt(B, x, y), top: (u, v, x, y) => {
+    const d = Math.hypot((u - 0.5) / 0.36, (v - 0.55) / 0.36); if (d > 1) return S[0][u < 0.06 || v > 0.9 ? 0 : 1];
+    const k = d + (h2(x, y, 82) - 0.5) * 0.5; return R(COAL[k < 0.35 ? 0 : k < 0.65 ? 1 : k < 0.9 ? 2 : 3])[h2(x, y, 85) < 0.5 ? 0 : 1];
+  } });
+  /* the hood and its flue, against the wall */
+  F.box(14, 82, b0, b0 + 22, 32, 38, S, { top: () => S[0][1] });
+  F.box(24, 72, b0, b0 + 12, 38, 52, S);
+  F.box(36, 60, b0, b0 + 8, 52, 78, S);
+  /* the bellows on a trestle beside the hearth: two boards with the leather pleated between them, the nozzle toward the
+     fire, a handle to pump them by */
+  F.legs(3, 15, b0 + 10, b0 + 22, 9, W);
+  F.at(9, b0 + 18, 9, (x, y) => {
+    const L = R('#7a4a2a'), Wd = W[1];
+    K.poly([[x - 7, y - 2], [x + 6, y - 1], [x + 9, y - 3], [x + 6, y - 6], [x - 7, y - 8]], (px, py) => L[(px + 40) % 3 === 0 ? 3 : py < y - 5 ? 1 : 2]);
+    K.rect(x - 8, y - 9, x + 6, y - 7, Wd[1]); K.rect(x - 8, y - 2, x + 6, y, Wd[3]);
+    K.rect(x + 8, y - 4, x + 12, y - 2, I[1][2]); K.line(x - 8, y - 9, x - 12, y - 14, Wd[2]);
+  });
+  F.at(48, b0 + 22, 18, (x, y) => {
+    flame(K, x, y - 1, 8, 12);
+    candlelight(K, x, y + 10, 48, 30, 0.45);
+    for (let yy = y + 14; yy < y + 26; yy++) for (let xx = x - 30; xx < x + 30; xx++) if (!K.get(xx, yy)) K.set(xx, yy, R('#f4a03a')[1], Math.round(55 * (1 - Math.hypot((xx - x) / 30, (yy - y - 14) / 12))));
+  });
+  F.at(78, b0 + 31, 18, (x, y) => { K.line(x, y - 22, x + 2, y + 2, I[1][1]); K.line(x + 2, y - 22, x + 4, y + 2, I[1][2]); K.line(x + 6, y - 20, x + 6, y + 4, I[1][3]); });
+  F.at(84, b0 + 34, 0, (x, y) => { K.poly([[x - 5, y], [x + 5, y], [x + 6, y - 7], [x - 6, y - 7]], I[1][2]); K.oval(x, y - 7, 6, 2, (px, py) => R('#2a2420')[h2(px, py, 86) < 0.4 ? 1 : 3]); });
+  F.done(4);
+}
+const shade3 = hex => mixHex(hex, '#000000', 0.3);
+/* An alchemist's workbench: a heavy table against the wall with a shelf of jars above it, and on it the work: a copper
+   alembic over a little furnace with its swan neck running down to a receiving flask, a retort bubbling over a spirit
+   lamp, a rack of phials, a mortar and pestle, an open grimoire and a candle. Vapour curls from the alembic. */
+function alchemyBench(K, o) {
+  const F = furniture(K, o, T, T), W = mat('walnut'), Tp = mat('oak'), G = mat('brass'), Cu = mat('clay'), b0 = o.snug ? -40 : 4;
+  const JARS = ['#6fbf6a', '#a46ac8', '#e0a23a', '#c4503e', '#4fb0b0', '#d8d06a', '#c9d8d0'];
+  F.box(6, 90, b0, b0 + 22, 0, 13, W, { panel: false, face: (s, t, which) => {
+    if (which !== 'front') return null;
+    const k = (s * 3) % 1; if (k < 0.04 || t < 0.12 || t > 0.9) return W[1][t > 0.9 ? 3 : 1];
+    return Math.abs(k - 0.5) < 0.05 && Math.abs(t - 0.4) < 0.08 ? G[1][0] : W[1][k < 0.1 ? 3 : 2];
+  } });
+  F.box(4, 92, b0 - 1, b0 + 24, 13, 15, Tp);
+  /* the shelf of jars on the wall over the bench */
+  F.box(8, 88, b0, b0 + 6, 30, 32, W, { top: () => W[0][1] });
+  F.at(10, b0 + 3, 32, (x, y) => { for (let k = 0, px = x; px < x + 74; k++) { const C = R(JARS[Math.floor(h2(k, 3, 87) * JARS.length)]), w = 3 + Math.floor(h2(k, 4, 88) * 3), h = 4 + Math.floor(h2(k, 5, 89) * 4); K.rect(px, y - h, px + w, y, (qx, qy) => (qy === y - h ? R('#8e6a44')[1] : C[qx === px ? 0 : qx === px + w - 1 ? 2 : 1])); px += w + 2; } });
+  /* the alembic: a copper pot on a brick furnace, its head, the swan neck down to the receiver */
+  F.at(22, b0 + 12, 15, (x, y) => {
+    K.rect(x - 7, y - 8, x + 7, y, (px, py) => brickAt(R(BRICK), px, py)); K.rect(x - 3, y - 4, x + 3, y, R('#2a2018')[3]); K.rect(x - 2, y - 2, x + 2, y, R('#f08a2a')[1]);
+    K.oval(x, y - 14, 7, 6, (px, py, dx, dy) => Cu[1][dx + dy < -0.5 ? 0 : dx > 0.4 ? 3 : 1]);
+    K.oval(x, y - 21, 4, 4, (px, py, dx, dy) => Cu[1][dx + dy < -0.4 ? 0 : 2]);
+    for (let i = 0; i < 16; i++) { const px = x + 3 + i, py = y - 22 + Math.round(i * 0.7); K.set(px, py, Cu[1][1]); K.set(px, py + 1, Cu[1][3]); }
+    K.oval(x + 21, y - 7, 4, 5, (px, py, dx, dy) => (dy > 0.1 ? R('#c4503e')[dx < 0 ? 0 : 1] : R('#cfe4e4')[Math.hypot(dx, dy) > 0.8 ? 2 : 0]));
+    for (const [dx, dy, a] of [[1, -27, 150], [-1, -31, 110], [2, -35, 70]]) K.oval(x + dx, y + dy, 2.5, 2, R('#e0f0e0')[0], a);
+  });
+  /* the retort over its spirit lamp, a rack of phials, the mortar and pestle */
+  F.at(54, b0 + 13, 15, (x, y) => {
+    K.rect(x - 2, y - 3, x + 2, y, G[1][1]); flame(K, x, y - 3, 1, 3);
+    K.oval(x, y - 9, 4.5, 4, (px, py, dx, dy) => (dy > 0 ? R('#a46ac8')[dx < 0 ? 0 : 1] : R('#cfe4e4')[Math.hypot(dx, dy) > 0.8 ? 2 : 0]));
+    for (let i = 0; i < 9; i++) K.set(x + 3 + i, y - 12 - Math.round(i * 0.4), R('#cfe4e4')[i % 3 ? 1 : 2]);
+    for (const [dx, dy] of [[-1, -10], [1, -11], [0, -7]]) K.set(x + dx, y + dy, R('#f0e0ff')[0]);
+  });
+  F.at(68, b0 + 9, 15, (x, y) => { K.rect(x - 1, y - 3, x + 12, y - 2, W[1][1]); for (let k = 0; k < 4; k++) { const C = R(JARS[k + 1]); K.rect(x + k * 3, y - 7, x + k * 3 + 2, y, (px, py) => (py > y - 4 ? C[1] : R('#cfe4e4')[1])); } });
+  F.at(82, b0 + 16, 15, (x, y) => { K.oval(x, y - 2, 4, 3, (px, py, dx, dy) => (dy < -0.4 ? R('#6f7276')[3] : R('#bfb59f')[dx < 0 ? 1 : 2])); K.line(x + 1, y - 4, x + 4, y - 9, W[1][1]); });
+  F.at(40, b0 + 18, 15, (x, y) => { const P = R('#f4efe2'); K.rect(x - 6, y - 2, x, y, (px) => P[px === x - 1 ? 2 : 0]); K.rect(x, y - 2, x + 6, y, (px) => P[px === x ? 2 : 1]); K.rect(x - 5, y - 1, x - 1, y, R('#7a6a5a')[2]); K.rect(x - 6, y, x + 6, y + 1, R('#8e2c26')[2]); });
+  F.at(74, b0 + 19, 15, (x, y) => CANDLE(K, x, y, 5));
+  F.done(4);
+}
+/* little things for the smithy and the alchemist's shelves */
+const BOTTLE = (K, x, y, col, h = 6) => { const C = R(col); K.rect(x - 1, y - h, x + 2, y, (px) => C[px === x - 1 ? 0 : px === x + 1 ? 2 : 1]); K.rect(x, y - h - 2, x + 1, y - h, R('#cfe4e4')[1]); K.set(x, y - h - 3, R('#8e6a44')[1]); };
+const HAMMER = (K, x, y, I, Wd) => { K.rect(x, y, x + 1, y + 10, Wd[2]); K.rect(x - 2, y + 9, x + 3, y + 12, I[1]); };
+const TONGS = (K, x, y, I) => { K.line(x - 1, y, x - 1, y + 11, I[2]); K.line(x + 1, y, x + 1, y + 11, I[3]); K.set(x, y + 4, I[1]); };
+
+const SHOP_FURNITURE = {
+  forge: (K, o) => forgeHearth(K, o),
+  alchemybench: (K, o) => alchemyBench(K, o),
+  /* an anvil on an elm stump, its horn to one side, a hammer resting on its face */
+  anvil: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), I = mat('iron'), Ring = R('#d8bb8a');
+    F.box(10, 22, 13, 25, 0, 9, W, { top: (u, v) => Ring[Math.round(Math.hypot(u - 0.5, v - 0.5) * 7) % 2 ? 1 : 2], face: (s) => W[1][Math.floor(s * 5) % 2 ? 2 : 1] });
+    F.box(12, 20, 15, 23, 9, 11, I);
+    F.box(14, 18, 16, 22, 11, 13, I);
+    F.box(8, 23, 15, 23, 13, 16, I, { top: (u, v) => I[0][v > 0.75 ? 0 : 1] });
+    F.box(4, 8, 17, 21, 14, 16, I, { top: () => I[0][1] });
+    F.at(19, 19, 16, (x, y) => { K.line(x - 1, y, x + 5, y - 2, R('#8e6a44')[2]); K.rect(x - 3, y - 2, x, y + 1, I[1][1]); });
+    F.done(4);
+  },
+  /* a stone quenching trough full of dark water, a pair of tongs left in it */
+  quench: (K, o) => {
+    const F = furniture(K, o, 32, 32), S = mat('stone'), I = mat('iron'), Wt = R('#4f7480');
+    F.box(3, 29, 13, 26, 0, 9, S, { top: (u, v, x, y) => (u > 0.1 && u < 0.9 && v > 0.18 && v < 0.82 ? Wt[v < 0.35 ? 3 : h2(x, y, 90) < 0.1 ? 0 : 2] : null) });
+    F.at(22, 19, 9, (x, y) => TONGS(K, x, y - 12, I[1]));
+    F.done(4);
+  },
+  /* a grindstone: a round stone wheel on an axle in a timber frame with a crank, a drip pan beneath */
+  grindstone: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), S = R('#a59a85'), I = mat('iron');
+    F.legs(7, 25, 13, 23, 10, W);
+    F.box(7, 25, 13, 23, 10, 12, W);
+    F.box(11, 21, 15, 21, 0, 3, mat('iron'), { top: () => R('#5f7f86')[1] });
+    F.at(16, 18, 12, (x, y) => {
+      if (F.ns) K.oval(x, y - 4, 9, 9, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); return d > 0.86 ? S[dx + dy < 0 ? 1 : 3] : d < 0.16 ? I[1][1] : S[dx + dy < -0.3 ? 1 : dx + dy > 0.5 ? 3 : 2]; });
+      else K.rect(x - 2, y - 13, x + 2, y + 5, (px) => S[px === x - 2 ? 1 : px === x + 1 ? 3 : 2]);
+      K.line(x + (F.ns ? 9 : 3), y - 4, x + (F.ns ? 12 : 7), y + 1, I[1][2]);
+    });
+    F.done(4);
+  },
+  /* a smith's tool rack: hammers and tongs hung from a rail between two posts */
+  toolrack: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), I = R('#4e5054'), Wd = R('#8e6a44');
+    F.box(4, 28, 16, 20, 0, 2, W);
+    for (const a of [4, 25]) F.box(a, a + 3, 16, 20, 2, 26, W);
+    F.box(4, 28, 17, 19, 22, 24, W);
+    F.at(16, 18, 22, (x, y) => { if (!(F.south === 'front' || F.south === 'back')) { K.rect(x - 1, y, x + 1, y + 14, I[2]); return; } HAMMER(K, x - 7, y, I, Wd); TONGS(K, x - 2, y, I); HAMMER(K, x + 3, y, I, Wd); TONGS(K, x + 8, y, I); });
+    F.done(4);
+  },
+  /* an armour stand: a mail shirt on a wooden dummy, a helm on its head, a shield leaning on its post */
+  armorstand: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), M = R('#a8aeb0'), I = mat('iron');
+    F.at(16, 22, 0, (x, y) => {
+      for (const [dx, dy] of [[-6, 1], [6, 1], [0, -2]]) K.line(x, y - 2, x + dx, y + dy, W[1][3]);
+      K.rect(x, y - 14, x + 2, y - 1, W[1][2]);
+      K.poly([[x - 7, y - 30], [x + 9, y - 30], [x + 8, y - 13], [x - 6, y - 13]], (px, py) => M[(px + py) % 2 ? 1 : 2]);
+      K.rect(x - 9, y - 30, x - 6, y - 21, (px, py) => M[(px + py) % 2 ? 2 : 3]); K.rect(x + 8, y - 30, x + 11, y - 21, (px, py) => M[(px + py) % 2 ? 2 : 3]);
+      K.rect(x - 6, y - 15, x + 8, y - 14, R('#5a3f28')[2]);
+      K.oval(x + 1, y - 34, 5, 5, (px, py, dx, dy) => (dy > 0.55 ? null : I[0][dx < -0.3 ? 0 : dx > 0.4 ? 2 : 1])); K.rect(x - 4, y - 33, x + 6, y - 32, I[1][3]); K.rect(x, y - 39, x + 2, y - 33, I[1][2]);
+      K.oval(x + 8, y - 6, 4, 5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.75 ? R('#c9a24f')[2] : R('#3e5470')[dx + dy < 0 ? 1 : 2]));
+      K.ovalShadow(x + 3, y + 1, 9, 3);
+    });
+    F.done(0);
+  },
+  /* a coal bin heaped with coal, bars of iron stacked beside it */
+  ironstock: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), I = mat('iron'), C = R('#2a2420');
+    F.box(3, 15, 12, 26, 0, 8, W, { top: (u, v, x, y) => (u > 0.12 && u < 0.88 && v > 0.12 && v < 0.88 ? C[h2(x, y, 91) < 0.3 ? 1 : h2(x, y, 92) < 0.5 ? 2 : 3] : null) });
+    F.box(17, 29, 14, 26, 0, 6, I, { top: (u) => I[0][Math.floor(u * 6) % 2 ? 1 : 2], face: (s) => I[1][Math.floor(s * 6) % 2 ? 1 : 3] });
+    F.done(4);
+  },
+  /* the alchemist's cauldron: a great black pot on a ring of bricks with a fire under it, a green brew bubbling in it and
+     green vapour rising, a ladle hooked on its rim */
+  brewcauldron: (K, o) => {
+    const F = furniture(K, o, 32, 32), I = mat('iron'), Br = R(BRICK), Lq = R('#7fd06a');
+    F.at(16, 24, 0, (x, y) => {
+      K.rect(x - 11, y - 6, x + 12, y, (px, py) => brickAt(Br, px, py)); K.rect(x - 4, y - 5, x + 4, y, R('#2a2018')[3]);
+      flame(K, x, y - 1, 3, 5);
+      K.oval(x, y - 13, 12, 10, (px, py, dx, dy) => (dy < -0.5 ? null : I[1][dx + dy * 0.3 < -0.45 ? 1 : dx > 0.45 ? 4 : 2]));
+      K.oval(x, y - 18, 11, 3.5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.8 ? I[0][1] : Lq[h2(px, py, 93) < 0.15 ? 0 : dy < 0 ? 1 : 2]));
+      for (const [dx, dy] of [[-5, -19], [3, -18], [6, -19]]) K.oval(x + dx, y + dy, 1.5, 1, R('#c8f0b0')[0]);
+      for (const [dx, dy, r, a] of [[-2, -25, 3, 150], [2, -31, 3.5, 110], [-1, -38, 4, 70]]) K.oval(x + dx, y + dy, r, r * 0.8, R('#b8e8a8')[0], a);
+      K.line(x + 8, y - 21, x + 13, y - 10, R('#8e6a44')[2]);
+      K.ovalShadow(x + 3, y, 14, 3);
+    });
+    F.done(0);
+  },
+  /* shelves of potions: bottles and flasks of every colour, labelled jars, a stoppered phial or two lying down */
+  potionshelf: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), COLS = ['#6fbf6a', '#a46ac8', '#e0a23a', '#c4503e', '#4fb0b0', '#d8d06a', '#cfe4e4'];
+    F.box(4, 28, 12, 24, 0, 36, W, { panel: false, face: (s, t, which, x) => {
+      if (which !== 'front') return null;
+      if (s < 0.08 || s > 0.92 || t < 0.05) return W[1][s > 0.92 ? 3 : 1];
+      const row = Math.floor(t * 4), tt = t * 4 - row; if (tt > 0.86) return W[1][tt > 0.94 ? 1 : 3];
+      /* bottles four pixels apart: a body three wide, a neck of glass and a cork over its middle */
+      const cell = Math.floor(x / 4), px = ((x % 4) + 4) % 4, C = R(COLS[Math.floor(h2(cell, row, 94) * COLS.length)]), hgt = 0.28 + h2(cell, row, 95) * 0.25, up = 1 - tt / 0.86;
+      if (h2(cell, row, 96) < 0.12 || px === 3) return W[2][4];
+      if (up > hgt + 0.36) return W[2][4];
+      if (up > hgt) return px === 1 ? (up > hgt + 0.26 ? R('#8e6a44')[1] : R('#cfe4e4')[1]) : W[2][4];
+      return C[up > hgt - 0.08 ? 0 : px === 0 ? 1 : px === 2 ? 3 : 2];
+    } });
+    F.box(3, 29, 11, 25, 36, 38, W, { top: () => W[0][1] });
+    F.at(11, 17, 38, (x, y) => BOTTLE(K, x, y, '#a46ac8', 4)); F.at(21, 18, 38, (x, y) => BOTTLE(K, x, y, '#6fbf6a', 5));
+    F.done(5);
+  },
+  /* a rack of herbs drying: two posts and two rails hung with bunches, green, grey-green, gold and lavender */
+  herbrack: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('pine'), HERB = ['#7f9a52', '#93a862', '#a8a46a', '#b98ad8', '#6f8a5a'];
+    F.box(3, 29, 15, 19, 0, 2, W);
+    for (const a of [3, 26]) F.box(a, a + 3, 15, 19, 2, 30, W);
+    for (const z of [16, 27]) F.box(3, 29, 16, 18, z, z + 2, W);
+    F.at(16, 17, 0, (x, y) => {
+      const front = F.south === 'front' || F.south === 'back', n = front ? 5 : 1;
+      for (const z of [16, 27]) for (let k = 0; k < n; k++) {
+        const px = front ? x - 9 + k * 4 + (z === 16 ? 2 : 0) : x, C = R(HERB[Math.floor(h2(k, z, 97) * HERB.length)]);
+        K.rect(px, y - z, px + 1, y - z + 2, R('#c8b28a')[2]); K.rect(px - 1, y - z + 2, px + 2, y - z + 8, (qx, qy) => C[qx === px - 1 ? 1 : qy > y - z + 6 ? 3 : 2]);
+      }
+    });
+    F.done(4);
+  },
+  /* apothecary drawers: a cabinet of many little labelled drawers with brass pulls, jars on its top */
+  apothecary: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), G = mat('brass');
+    F.box(4, 28, 12, 25, 0, 2, W);
+    F.box(4, 28, 12, 25, 2, 24, W, { panel: false, face: (s, t, which) => {
+      if (which !== 'front') return null;
+      const c = (s * 4) % 1, r = (t * 5) % 1;
+      if (c < 0.1 || r < 0.12) return W[2][3];
+      if (Math.abs(c - 0.55) < 0.12 && Math.abs(r - 0.45) < 0.12) return G[1][0];
+      if (Math.abs(c - 0.55) < 0.25 && r > 0.65 && r < 0.85) return R('#efe3c4')[1];
+      return W[1][r < 0.25 ? 1 : 2];
+    } });
+    F.box(3, 29, 11, 26, 24, 26, W, { top: () => W[0][1] });
+    for (const [a, col] of [[9, '#e0a23a'], [16, '#cfe4e4'], [23, '#a46ac8']]) F.at(a, 18, 26, (x, y) => { const C = R(col); K.rect(x - 2, y - 5, x + 2, y, (px) => C[px === x - 2 ? 0 : px === x + 1 ? 2 : 1]); K.rect(x - 2, y - 6, x + 2, y - 5, R('#8e6a44')[1]); });
+    F.done(5);
+  }
+};
+
 const FURNITURE = {
   /* a bed, its head at the back: posts and a panelled headboard, a lower footboard, a mattress under a white sheet
      turned down over a quilted blanket (red, blue or green), and a plump pillow */
@@ -1461,6 +1806,8 @@ const FURNITURE = {
 
 };
 
+Object.assign(FURNITURE, SHOP_FURNITURE);
+
 /* ---------- things hung on a room wall ----------
    A wall with something on it is the wall (roomWall) with the thing on its face, where the face shows: on a run across
    the view. A shelf of plates and tankards on brackets, a stag's antlers on a carved plaque, a painted shield over
@@ -1500,6 +1847,39 @@ const HUNG = {
     for (const s of [-1, 1]) { for (let i = 0; i <= 22; i++) K.set(m - s * 11 + s * i, top + 4 + i, Mt[i < 3 ? 2 : 1]); K.rect(m + s * 8 - 2, top + 21, m + s * 8 + 2, top + 22, Gd[1]); K.rect(m + s * 10 - 1, top + 22, m + s * 10 + 1, top + 26, R('#5a3f28')[2]); }
     K.oval(m, top + 14, 8, 9, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); if (d > 0.84) return Gd[dx + dy < 0 ? 1 : 3]; if (d < 0.22) return Gd[dx + dy < 0 ? 0 : 2]; return Math.abs(dx) < 0.12 || Math.abs(dy) < 0.12 ? R('#efe3c4')[1] : C[dx + dy < -0.2 ? 1 : 2]; });
   },
+  /* the smith's wall: a rail of hammers and tongs, a horseshoe nailed up at either end */
+  walltools(K, m, top) {
+    const I = R('#4e5054'), Wd = R('#8e6a44'), y = top + 8;
+    K.rect(m - 17, y, m + 18, y + 2, (x, yy) => Wd[yy === y ? 1 : 3]);
+    for (const [dx, k] of [[-12, 0], [-6, 1], [0, 0], [6, 1], [12, 0]]) (k ? TONGS(K, m + dx, y + 2, I) : HAMMER(K, m + dx, y + 2, I, Wd));
+    for (const hx of [m - 16, m + 17]) for (const [dx, dy] of [[-1, 0], [-1, 1], [0, 2], [1, 1], [1, 0]]) K.set(hx + dx, y + 16 + dy, I[1]);
+  },
+  /* the alchemist's wall shelf: two shelves of bottles, flasks and a jar */
+  wallpotions(K, m, top) {
+    const Wd = R('#6b4c32'), COLS = ['#6fbf6a', '#a46ac8', '#e0a23a', '#c4503e', '#4fb0b0'];
+    for (const [y, n] of [[top + 13, 0], [top + 24, 1]]) {
+      for (let k = 0; k < 6; k++) BOTTLE(K, m - 14 + k * 6, y, COLS[(k + n * 2) % COLS.length], 3 + Math.round(h2(k, n, 98) * 3));
+      K.rect(m - 17, y, m + 18, y + 1, Wd[0]); K.rect(m - 17, y + 1, m + 18, y + 3, Wd[2]);
+      for (const x of [m - 15, m + 15]) K.rect(x, y + 3, x + 2, y + 6, Wd[3]);
+    }
+  },
+  /* bunches of herbs hung upside down to dry from a cord along the wall */
+  wallherbs(K, m, top) {
+    const Cd = R('#c8b28a'), HERB = ['#7f9a52', '#93a862', '#a8a46a', '#b98ad8', '#6f8a5a'], y = top + 7;
+    for (let x = m - 18; x <= m + 18; x++) K.set(x, y + Math.round(Math.abs(x - m) / 9), Cd[2]);
+    for (let k = 0; k < 6; k++) {
+      const x = m - 15 + k * 6, yy = y + Math.round(Math.abs(x - m) / 9) + 1, C = R(HERB[k % HERB.length]);
+      K.rect(x, yy, x + 1, yy + 3, Cd[3]); K.rect(x - 1, yy + 3, x + 2, yy + 10, (px, py) => C[px === x - 1 ? 1 : py > yy + 8 ? 3 : 2]);
+    }
+  },
+  /* a star chart pinned to the wall: a dark blue sheet with the circles of the heavens and stars in gold */
+  wallchart(K, m, top) {
+    const B = R('#2f3f66'), G = R('#e2c26a'), P = R('#e8dcc0');
+    K.rect(m - 14, top + 5, m + 15, top + 27, (x, y) => (x === m - 14 || y === top + 5 ? P[1] : x === m + 14 || y === top + 26 ? P[3] : B[h2(x, y, 99) < 0.1 ? 1 : 2]));
+    K.oval(m, top + 16, 9, 8, (x, y, dx, dy) => { const d = Math.hypot(dx, dy); return d > 0.88 || Math.abs(d - 0.5) < 0.08 || Math.abs(dx) < 0.06 ? G[2] : null; });
+    for (const [dx, dy] of [[-10, -7], [-4, -3], [3, -6], [8, 2], [-7, 5], [5, 7], [11, -4], [0, 3]]) K.set(m + dx, top + 16 + dy, G[0]);
+    for (const x of [m - 13, m + 13]) K.set(x, top + 6, R('#c4503e')[1]);
+  },
   wallsconce(K, m, top) {
     const I = R('#3b3a38'), y = top + 20;
     K.rect(m - 1, y, m + 2, y + 6, I[2]); K.line(m, y + 2, m + 3, y - 2, I[1]);
@@ -1526,6 +1906,10 @@ const INTERIOR = {
   wallantlers: (K, o) => wallHung(K, o, 'wallantlers'),
   wallshield: (K, o) => wallHung(K, o, 'wallshield'),
   wallsconce: (K, o) => wallHung(K, o, 'wallsconce'),
+  walltools: (K, o) => wallHung(K, o, 'walltools'),
+  wallpotions: (K, o) => wallHung(K, o, 'wallpotions'),
+  wallherbs: (K, o) => wallHung(K, o, 'wallherbs'),
+  wallchart: (K, o) => wallHung(K, o, 'wallchart'),
   /* a wall with the back bar standing against it (backBar) */
   wallbar: (K, o) => { roomWall(K, o); const L = o.links || [0, 0, 0, 0]; if (L[0] || L[2] || !(L[1] || L[3])) backBar(K, { face: 0, v: o.v }, T / 2 + RT + 1); },
   ...FURNITURE
@@ -1631,11 +2015,23 @@ const FLIGHT_W = 30, FLIGHT_L = 56;
 const flightBox = f => { const a = (T - FLIGHT_W) / 2, b = (T - FLIGHT_L) / 2; return f % 2 === 0 ? [a, b, a + FLIGHT_W, b + FLIGHT_L] : [b, a, b + FLIGHT_L, a + FLIGHT_W]; };
 const ROOM = new Set(['iwall', 'iwindow', 'idoor', 'post', 'stairs', 'hearth', ...HUNG_WALLS]);
 /* the tavern's pieces drawn across their whole tile (see barCounter) */
-const FULL = new Set(['bar', 'tableset', 'feastset', 'backbar', 'casks']);
+const FULL = new Set(['bar', 'tableset', 'feastset', 'backbar', 'casks', 'forge', 'alchemybench']);
 /* the room pieces a piece can stand against, and the pieces that do (drawn back against the wall behind their tile) */
-const WALLED = new Set(['iwall', 'iwindow', 'hearth', 'post', ...HUNG_WALLS]), SNUG = new Set(['backbar', 'casks']);
+const WALLED = new Set(['iwall', 'iwindow', 'hearth', 'post', ...HUNG_WALLS]), SNUG = new Set(['backbar', 'casks', 'forge', 'alchemybench']);
+/* The pieces at the figures' scale that stand back against a room wall behind them, as shelves, cupboards, racks and
+   beds do, instead of at the front of their tile: nudged [x, y] map pixels toward the wall by their facing (north, west or east;
+   a piece with its back to a wall south of it would be hidden by that wall, so it stays where it is). */
+const SNUG_SMALL = new Set(['potionshelf', 'apothecary', 'herbrack', 'toolrack', 'weaponrack', 'armorstand', 'ironstock', 'quench', 'bookshelf', 'wardrobe', 'dresser', 'desk', 'bed', 'cot', 'chest']);
+/* the nudge for piece o facing f, from the middle of the south edge of its footprint (where a piece at the figures'
+   scale stands) to just in front of the wall's face: a north wall's face is 43 pixels into the tile behind, a side
+   wall's shaded east face 39 */
+const nudgeOf = (o, f) => {
+  const [fw, fd] = footprint(o), across = (fw * T - fw * 32) / 2;
+  return f === 0 ? [0, -(fd * T - fd * 32) - 53] : f === 1 ? [-across - 49, 0] : f === 3 ? [across + 53, 0] : null;
+};
 /* how the pieces objs fit the room round them: for piece o, { snug: whether it stands with its back to a room wall on the
-   tile behind it (SNUG pieces only), shift and ends: for a bar piece, how far its counter stands off the middle of
+   tile behind it (SNUG and SNUG_SMALL pieces only), nudge: for a SNUG_SMALL piece standing so, how far it is moved
+   toward that wall ([x, y] map pixels), shift and ends: for a bar piece, how far its counter stands off the middle of
    its tile ([x, y], the same for every piece of a run of joined bar pieces: set back toward the back of the pieces
    facing north or south, and of those facing east or west) and which of its sides have a room wall beside them
    ([+x, +y, -x, -y]) } */
@@ -1655,6 +2051,11 @@ function fitTo(objs) {
   return o => {
     const L = o.level || 0, wall = (dx, dy) => walls.has(key(L, o.x + dx, o.y + dy)), [bx, by] = [[0, -1], [-1, 0], [0, 1], [1, 0]][facing(o) & 3];
     if (o.id === 'bar') return { snug: false, shift: shift.get(o) || null, ends: D.map(([dx, dy]) => (dy < 0 && backs.has(key(L, o.x, o.y - 1)) ? 2 : wall(dx, dy) ? 1 : 0)) };
+    if (SNUG_SMALL.has(o.id)) {
+      /* the wall behind its back: to the north or west of its footprint's corner, or east past its width */
+      const f = facing(o) & 3, [fw] = footprint(o), n = nudgeOf(o, f), back = f === 0 ? wall(0, -1) : f === 1 ? wall(-1, 0) : f === 3 ? wall(fw, 0) : false;
+      return n && back ? { snug: true, nudge: n, shift: null, ends: null } : { snug: false, shift: null, ends: null };
+    }
     return { snug: SNUG.has(o.id) && wall(bx, by), shift: null, ends: null };
   };
 }
@@ -1682,6 +2083,7 @@ function pieceSprite(o) {
   else if (len) K.shadow(2, 4, FW - 2, FD - 2, len);
   const s = trim(K);
   if (small) { s.ox -= (fw * T - FW) / 2; s.oy -= fd * T - FD; }
+  if (o.nudge) { s.ox -= o.nudge[0]; s.oy -= o.nudge[1]; }
   /* trees stand a little off the grid, each its own way, so a wood does not grow in rows */
   if (TREES.has(o.id)) { const [dx, dy] = treeOffset(o); s.ox -= dx; s.oy += dy; }
   return s;
@@ -1696,4 +2098,4 @@ function trim(K) {
 }
 const DESIGNED = new Set(Object.keys(DRAW));
 
-export { DESIGNED, FIRE, FLIGHT_L, FLIGHT_W, MID, ROOM, SMALL, TREES, TABLE, barRuns, barStools, fitTo, flightBox, pieceSprite, seatsOf, treeOffset, turned };
+export { ALCHEMIST_DOOR, DESIGNED, FIRE, SMITHY_DOOR, FLIGHT_L, FLIGHT_W, MID, ROOM, SMALL, TREES, TABLE, barRuns, barStools, fitTo, flightBox, pieceSprite, seatsOf, treeOffset, turned };

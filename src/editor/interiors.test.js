@@ -82,3 +82,21 @@ test('the Wayfarer\'s Rest scene: a furnished inn on two floors, every room reac
   assert.ok(!findPath(solo, 0, 6, 1, 0), 'the lane behind the bar is closed off');
   for (const [tx, ty, L] of [[3, 1, 0], [5, 3, 0], [7, 6, 0], [2, 5, 0], [2, 3, 1], [6, 3, 1], [3, 6, 1], [6, 6, 1]]) assert.ok(findPath(solo, 0, tx, ty, L), `${tx},${ty} on floor ${L}`);
 });
+test('the Wayfarer\'s Rest scene: a smithy and an alchemist\'s shop on the lane, furnished and walkable inside', async () => {
+  const { readFileSync } = await import('node:fs');
+  const M = fromJSON(JSON.parse(readFileSync(new URL('../../scenes/town/wayfarers-rest.json', import.meta.url), 'utf8')));
+  const shop = id => { const o = M.objs.find(p => p.id === id); assert.ok(o && o.interior, `the ${id} has an interior`); return o.interior; };
+  const solo = I => { const [ax, ay] = arrival(I); return { ...I, chars: [{ sprite: 'villager', x: ax, y: ay, face: 2 }] }; };
+  const has = (I, ids) => { for (const id of ids) assert.ok(I.objs.some(o => o.id === id), id); };
+  const H = shop('blacksmith'), A = shop('alchemist');
+  has(H, ['forge', 'anvil', 'quench', 'grindstone', 'weaponrack', 'armorstand', 'ironstock', 'walltools']);
+  has(A, ['alchemybench', 'brewcauldron', 'potionshelf', 'apothecary', 'herbrack', 'wallherbs', 'wallchart', 'stairs']);
+  assert.ok(H.chars.some(c => c.sprite === 'smith') && A.chars.some(c => c.sprite === 'alchemist'), 'each shop is kept');
+  /* the shopkeeper can be walked up to, and every corner of the floor that is not furnished can be reached */
+  for (const [I, spots] of [[H, [[2, 3, 0]]], [A, [[2, 3, 0], [2, 3, 1], [2, 2, 1], [3, 3, 0]]]]) for (const [x, y, L] of spots) assert.ok(findPath(solo(I), 0, x, y, L), `${I.name}: ${x},${y} on floor ${L}`);
+  /* in the town view too, nothing blocks the way in from the door to the shopkeeper */
+  for (const [I, way] of [[H, [[2, 3]]], [A, [[2, 3]]]]) {
+    const shapes = shapesOf(I.objs).get(0), T = TILE;
+    for (const [x, y] of way) assert.ok(!hits(shapes, x * T + T / 2, y * T + T / 2, 8), `${I.name}: ${x},${y} is open`);
+  }
+});

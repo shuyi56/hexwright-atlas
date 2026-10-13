@@ -10,6 +10,8 @@ const SAYS = {
   monk: ['Peace be with you, traveller.', 'The bell rings at dusk. Do stop in.', 'Patience is its own reward.'],
   healer: ['Let me look at those scrapes.', 'Feverfew for headaches, yarrow for cuts.', 'Rest is the best medicine. Then soup.'],
   noble: ['Do you know who I am? No? How refreshing.', 'The harvest ball is next week. You are not invited.', '{place} was my grandfather\'s, and his before him.'],
+  smith: ['Horseshoes, hinges, a good blade if you can wait a week. What will it be?', 'Mind the sparks. And the anvil. And me.', 'Iron is honest: heat it, beat it, and it does as it is told.'],
+  alchemist: ['Touch nothing green. Or violet. Actually, touch nothing.', 'A draught for courage, a salve for burns, and one for warts. Never mix them up.', 'Lead into gold? Do not believe all you hear about {place}.'],
   goblin: ['Shinies! Give shinies!', 'Grrk. Go away.'],
   bandit: ['Your purse or your life. Actually, both.', 'Keep walking, friend.'],
   orc: ['RAAAGH!', 'Puny. Very puny.'],
@@ -41,6 +43,12 @@ const SIGHTS = {
   willow: 'A silver willow, its strands brushing the ground.', moonflowers: 'Moonflowers, glowing faintly.', flet: 'A round house high in the tree. A rope ladder has been drawn up.',
   elvenhall: 'The hall\'s doors are carved with leaves. They are shut.', elvenspire: 'A white spire. Someone is singing at the top.',
   elvenpavilion: 'An open pavilion. A lantern turns slowly under its roof.', elvenrotunda: 'Light falls through the tracery in long gold bars. Inside, someone is reading aloud.',
+  blacksmith: 'Heat rolls out of the open forge. Somewhere inside a hammer rings.', alchemist: 'Bottles glow in the shop window: green, violet, amber. Something inside goes *pop*.',
+  forge: 'The coals glow white at the heart. Too hot to stand close.', anvil: 'A heavy anvil, its face polished by years of blows.', quench: 'Black water, still warm. It hisses when you touch it.',
+  grindstone: 'A grindstone, its wheel worn hollow in the middle.', toolrack: 'Hammers and tongs, each in its place.', armorstand: 'A mail shirt, freshly mended. It is not for sale.',
+  ironstock: 'Coal and bars of iron, waiting their turn.', alchemybench: 'Flasks, coils of glass and a book of crabbed notes. Something is distilling, drop by drop.',
+  brewcauldron: 'A green brew, bubbling. It smells of mint and thunder.', potionshelf: 'Potions in every colour, each labelled in a tiny hand.', herbrack: 'Bunches of herbs hung up to dry: sage, feverfew, lavender.',
+  apothecary: 'A hundred little drawers, each with its label: newt, nightshade, nutmeg...',
   elvenmanor: 'Every window is filled with stone lace. A song drifts down from the balcony.', elvenarch: 'An archway of moonstone, carved as fine as frost.'
 };
 function sightFor(asset, terrain, place) {

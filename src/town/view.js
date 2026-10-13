@@ -326,7 +326,7 @@ function throughDoor(face) {
    room wall on either side (on the east if there is none or both); along it, its foot against a wall it rises from,
    else its top toward its landing. Room walls stand in the middle of their tiles, so a flight against one reaches into
    that tile's near half. The box is in its tile's pixels, [x0, y0, x1, y1], and may run past the tile's edges. */
-const ROOM_WALLS = new Set(['iwall', 'iwindow', 'hearth', 'post', 'wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar']);
+const ROOM_WALLS = new Set(['iwall', 'iwindow', 'hearth', 'post', 'wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar', 'walltools', 'wallpotions', 'wallherbs', 'wallchart']);
 function flightRect(M, o) {
   const f = o.face || 0, L = levelOf(o), [fx, fy] = FACE_DELTA[f], [A, B] = [FLIGHT_W, FLIGHT_L];
   const wall = (dx, dy) => { const k = objAt(M, o.x + dx, o.y + dy, L); return k >= 0 && ROOM_WALLS.has(M.objs[k].id); };
@@ -677,7 +677,9 @@ function paint() {
   for (const [i, p] of M.objs.entries()) {
     const L = levelOf(p); if (L !== TW.top) continue;
     const [w, d] = footprint(p);
-    items.push({ key: (p.y + d) * T - 1, L, o: 1, i, p, w, d });
+    /* a piece moved back against the wall behind it is drawn in turn where it now stands, but still after that wall */
+    const nudge = TW.fit(p).nudge;
+    items.push({ key: (p.y + d) * T - 1 + (nudge ? Math.max(1 - T, Math.min(0, nudge[1])) : 0), L, o: 1, i, p, w, d });
   }
   M.chars.forEach((c, k) => { const q = charPos(k); if (q.L !== TW.top) return; items.push({ key: q.gy, L: q.L, o: 2, k, q }); });
   items.sort((a, b) => a.key - b.key || a.L - b.L || a.o - b.o);
