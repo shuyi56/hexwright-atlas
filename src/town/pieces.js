@@ -954,13 +954,17 @@ const BLANKET = ['red', 'blue', 'green'];
    rail on brackets along the side its customers stand (the way it faces). Tankards, a jug, a candle and a few coins
    stand along the top. Where it meets the next piece there is no ink (pieceSprite). */
 const BAR_D = 10, BAR_H = 15, BAR_BACK = 32, REACH = T / 2 - RT;
+/* the front of the worktop of a back bar in the wall north of a tile (wallbar: backBar at T / 2 + RT + 1, 18 deep), in
+   that tile's pixels */
+const BACKBAR_FRONT = RT + 19 - T / 2;
 /* the runs of counter in a bar piece's tile, [a0, a1, b0, b1, along x] in tile pixels. o.shift ([x, y], fitTo) sets the
    counter back from the middle of its tiles toward the back of the bar, the same all along a run of joined pieces; a
-   free end with a room wall beside it (o.ends, [+x, +y, -x, -y]) runs on to the wall's face. */
+   free end with a room wall beside it (o.ends, [+x, +y, -x, -y]) runs on to the wall's face, or, where the wall to
+   the north carries a back bar (ends 2), up to the back bar's worktop. */
 function barRuns(o) {
   const L = o.links || [0, 0, 0, 0], E = o.ends || [0, 0, 0, 0], f = facing(o), d = BAR_D, any = L.some(Boolean), [sx, sy] = o.shift || [0, 0];
   const mx = T / 2 + sx, my = T / 2 + sy, runs = [];
-  const end = (k, joined, centre, alone) => (L[k] ? joined : E[k] ? (joined ? joined + REACH : -REACH) : any ? centre : alone);
+  const end = (k, joined, centre, alone) => (L[k] ? joined : E[k] === 2 && k === 3 ? BACKBAR_FRONT : E[k] ? (joined ? joined + REACH : -REACH) : any ? centre : alone);
   if (L[0] || L[2] || (!any && f % 2 === 0)) {
     runs.push([end(2, 0, mx - d, 10), end(0, T, mx + d, T - 10), my - d, my + d, true]);
     if (L[3]) runs.push([mx - d, mx + d, 0, my - d, false]);
@@ -1636,8 +1640,8 @@ const WALLED = new Set(['iwall', 'iwindow', 'hearth', 'post', ...HUNG_WALLS]), S
    facing north or south, and of those facing east or west) and which of its sides have a room wall beside them
    ([+x, +y, -x, -y]) } */
 function fitTo(objs) {
-  const key = (L, x, y) => `${L},${x},${y}`, walls = new Set(), bars = new Map(), shift = new Map(), D = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-  for (const p of objs) { if (WALLED.has(p.id)) walls.add(key(p.level || 0, p.x, p.y)); if (p.id === 'bar') bars.set(key(p.level || 0, p.x, p.y), p); }
+  const key = (L, x, y) => `${L},${x},${y}`, walls = new Set(), backs = new Set(), bars = new Map(), shift = new Map(), D = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  for (const p of objs) { if (WALLED.has(p.id)) walls.add(key(p.level || 0, p.x, p.y)); if (p.id === 'wallbar') backs.add(key(p.level || 0, p.x, p.y)); if (p.id === 'bar') bars.set(key(p.level || 0, p.x, p.y), p); }
   for (const p of bars.values()) {
     if (shift.has(p)) continue;
     const net = [p], sh = [0, 0]; shift.set(p, sh);
@@ -1650,7 +1654,7 @@ function fitTo(objs) {
   }
   return o => {
     const L = o.level || 0, wall = (dx, dy) => walls.has(key(L, o.x + dx, o.y + dy)), [bx, by] = [[0, -1], [-1, 0], [0, 1], [1, 0]][facing(o) & 3];
-    if (o.id === 'bar') return { snug: false, shift: shift.get(o) || null, ends: D.map(([dx, dy]) => (wall(dx, dy) ? 1 : 0)) };
+    if (o.id === 'bar') return { snug: false, shift: shift.get(o) || null, ends: D.map(([dx, dy]) => (dy < 0 && backs.has(key(L, o.x, o.y - 1)) ? 2 : wall(dx, dy) ? 1 : 0)) };
     return { snug: SNUG.has(o.id) && wall(bx, by), shift: null, ends: null };
   };
 }

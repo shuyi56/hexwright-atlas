@@ -78,5 +78,7 @@ test('the Wayfarer\'s Rest scene: a furnished inn on two floors, every room reac
   assert.ok(I.objs.some(o => o.level === 1) && I.objs.some(o => o.id === 'stairs'), 'with an upstairs reached by stairs');
   assert.ok(I.objs.filter(o => o.id === 'bar').length >= 3 && I.objs.filter(o => o.id === 'tableset').length >= 4, 'a bar counter and tables with chairs');
   const [ax, ay] = arrival(I), solo = { ...I, chars: [{ sprite: 'villager', x: ax, y: ay, face: 2 }] };
-  for (const [tx, ty, L] of [[3, 1, 0], [6, 1, 0], [7, 6, 0], [2, 5, 0], [2, 3, 1], [6, 3, 1], [3, 6, 1], [6, 6, 1]]) assert.ok(findPath(solo, 0, tx, ty, L), `${tx},${ty} on floor ${L}`);
+  /* the innkeeper's lane behind the bar is closed in by its side counter */
+  assert.ok(!findPath(solo, 0, 6, 1, 0), 'the lane behind the bar is closed off');
+  for (const [tx, ty, L] of [[3, 1, 0], [5, 3, 0], [7, 6, 0], [2, 5, 0], [2, 3, 1], [6, 3, 1], [3, 6, 1], [6, 6, 1]]) assert.ok(findPath(solo, 0, tx, ty, L), `${tx},${ty} on floor ${L}`);
 });

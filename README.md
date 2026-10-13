@@ -466,7 +466,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   The tavern's pieces fill their whole tile at the figures' scale: a bar counter of raised panels under a polished
   top, a brass foot rail and stools along its customers' side and tankards, a jug and coins on it, its pieces joining
   into one counter that stands toward the back of its tiles (so the innkeeper's lane behind it stays a stride wide)
-  and runs on to a wall at a free end; a table with up to six slatted chairs pulled up round it; a long trestle table
+  and runs on to a wall at a free end (stopping at the worktop of a back bar against it); a table with up to six slatted chairs pulled up round it; a long trestle table
   set for a feast between two benches; a back bar of bottles and pewter over a panelled cupboard and a rack of casks
   with brass taps, both set back against the wall behind them. Walls carry a shelf of plates, antlers, a painted
   shield over crossed swords or a sconce whose candle warms the plaster. Each is drawn facing south and turned to its facing, so a turned piece shows its side (a plain face there
@@ -502,7 +502,7 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   fitted to it, all of it done a piece at a time by the painters, so no frame stalls and the place being left never
   shows through. Meanwhile the hero walks in place over the name of where they are going (seen from behind going in or
   up, from the front coming out or down), over three gold lights rising in turn.
-- **Talking:** `Space` or `Enter` talks to whoever the hero faces (they turn to answer, in a slate and gold window with their portrait, like the tactical view's),
+- **Talking:** `Space` or `Enter` talks to whoever the hero faces, or to whoever stands across a bar counter the hero faces (they turn to answer, in a slate and gold window with their portrait, like the tactical view's),
   or looks at the piece or water in front of them. Clicking a character walks up to them and talks.
 - **Phones and tablets:** a finger dragged anywhere on the map is a stick the hero walks by (a small pull strolls,
   pulled further they run, and the stick follows a finger dragged past it); a tap walks them to the spot or up to
@@ -554,7 +554,7 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   (`town: { inside: { x, y } }` in its `.scene.json` starts the walk in the building on that tile). Downstairs a
   tavern's common room: an aisle from the door to the fire, two tables with their chairs on a red rug at the hearth,
   more tables and long tables between benches, and the bar: a counter with stools along it, the innkeeper's lane behind
-  it with the back bar against the wall and a rack of ale casks, the way in at its end. A coat stand, a notice board,
+  it with the back bar against the wall and a rack of ale casks, closed in by a side counter at its end. A coat stand, a notice board,
   sacks and barrels stand by the door, antlers, a shelf of plates and a sconce hang on the walls, and the stairs stand
   in the corner. Upstairs a passage with sconces and a shield on its partition, and two guest rooms on their carpets.
   The innkeeper, a healer, a guard, a monk, a farmer, a villager and a noble guest are about, and the door leads out
