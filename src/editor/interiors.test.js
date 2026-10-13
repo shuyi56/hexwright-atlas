@@ -76,6 +76,7 @@ test('the Wayfarer\'s Rest scene: a furnished inn on two floors, every room reac
   assert.ok(I, 'the scene starts inside a building with an interior');
   assert.ok(I.objs.filter(o => !['iwall', 'iwindow', 'idoor', 'hearth'].includes(o.id)).length >= 15, 'furnished');
   assert.ok(I.objs.some(o => o.level === 1) && I.objs.some(o => o.id === 'stairs'), 'with an upstairs reached by stairs');
+  assert.ok(I.objs.filter(o => o.id === 'bar').length >= 3 && I.objs.filter(o => o.id === 'tableset').length >= 4, 'a bar counter and tables with chairs');
   const [ax, ay] = arrival(I), solo = { ...I, chars: [{ sprite: 'villager', x: ax, y: ay, face: 2 }] };
-  for (const [tx, ty, L] of [[3, 1, 0], [5, 4, 0], [5, 4, 1], [2, 2, 1], [4, 2, 1], [3, 5, 1]]) assert.ok(findPath(solo, 0, tx, ty, L), `${tx},${ty} on floor ${L}`);
+  for (const [tx, ty, L] of [[3, 1, 0], [6, 1, 0], [7, 6, 0], [2, 5, 0], [2, 3, 1], [6, 3, 1], [3, 6, 1], [6, 6, 1]]) assert.ok(findPath(solo, 0, tx, ty, L), `${tx},${ty} on floor ${L}`);
 });

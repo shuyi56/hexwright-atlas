@@ -105,13 +105,18 @@ grounds beside the others in each. `scenes/town/silverleaf-hollow.html` is an el
 The **Interior** tab holds room pieces and furniture, and the Terrain tab has a **Floors** group (floorboards,
 dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
 
-- **Room pieces:** an interior wall, a wall with a window, a doorway, a fireplace, stairs and a timber post. Walls are
+- **Room pieces:** an interior wall, a wall with a window, a doorway, a fireplace, stairs, a timber post, and walls
+  with something on them: a shelf of plates, antlers, a shield over crossed swords, a candle sconce, or the back bar
+  of a tavern (shelves of bottles over a cupboard, standing against the wall). Walls are
   kept low, cut away like a dolls' house so the room stays visible, and they join the room pieces beside them
   into corners and tees. Characters can walk through a doorway; every other piece blocks them.
 - **Furniture:** a bed, a straw cot, a table, a long table, a chair, a stool, a bench, a chest, a wardrobe, a
   bookshelf, a dresser, a writing desk, a counter, a cooking pot, a wash tub, a candle stand, a potted plant, a
-  throne, an altar, a pew, a weapon rack and a spinning wheel. Each is drawn in its own frame, so `R` turns it
-  to face any of the four ways and turning the view shows its back.
+  throne, an altar, a pew, a weapon rack, a spinning wheel, a coat stand, grain sacks, firewood and a notice board;
+  and for a tavern a bar counter, a table with chairs round it, a long table between benches, a back bar and a rack
+  of ale casks. Bar counter pieces join the ones beside them, as walls do, so a run of them makes one counter,
+  straight or round a corner. Each is drawn in its own frame, so `R` turns it to face any of the four ways and
+  turning the view shows its back; a bar counter faces the side its customers stand.
 
 ### Building interiors
 
@@ -451,7 +456,14 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   washbowl on it; a desk with paper, a book and a quill; a panelled bar counter with tankards; a cooking pot hung over
   embers from a tripod; a coopered wash tub; a candle stand glowing; a potted fern; a gilt and velvet throne on its
   dais; an altar under a cloth; pews with carved ends; a weapon rack of spears, swords and a shield; and a spinning
-  wheel. Each is drawn facing south and turned to its facing, so a turned piece shows its side (a plain face there
+  wheel; a coat stand with a cloak and a hat, grain sacks, a crib of firewood and a notice board of pinned bills.
+  The tavern's pieces fill their whole tile at the figures' scale: a bar counter of raised panels under a polished
+  top, a brass foot rail and stools along its customers' side and tankards, a jug and coins on it, its pieces joining
+  into one counter that stands toward the back of its tiles (so the innkeeper's lane behind it stays a stride wide)
+  and runs on to a wall at a free end; a table with up to six slatted chairs pulled up round it; a long trestle table
+  set for a feast between two benches; a back bar of bottles and pewter over a panelled cupboard and a rack of casks
+  with brass taps, both set back against the wall behind them. Walls carry a shelf of plates, antlers, a painted
+  shield over crossed swords or a sconce whose candle warms the plaster. Each is drawn facing south and turned to its facing, so a turned piece shows its side (a plain face there
   is a framed, sunken panel) and from behind its back. Shadows fall to the east. City and room walls join their neighbours. A room wall running across the view shows its face (a timber beam along
   its top, lime plaster, a skirting board) under its capping beam; one running up the view shows its capping beam and
   its east face in shade, so it reads as a wall rather than a crack; where walls join there is no seam. A doorway is an
@@ -533,12 +545,14 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   trees, mallorns on fallen gold leaves and silver willows over a moonlit pool, with the four elves
   about the court and two dark elves creeping in from the west. Its map is built by `node tools/make-silverleaf.mjs`.
   `scenes/town/wayfarers-rest.html` is a fully furnished interior: a village inn that the scene opens inside
-  (`town: { inside: { x, y } }` in its `.scene.json` starts the walk in the building on that tile). Downstairs the
-  common room: an aisle from the door to the fire, a red rug and a candle stand at the hearth, a long table between two
-  benches, the bar with its counter, a dresser of crockery and a stool, a weapon rack and barrels by the door, stairs in
-  the corner. Upstairs a passage with a bench and a candle stand, and two bedrooms through doorways in a timber
-  partition, each with a bed on its own carpet. The innkeeper, a healer, a monk, a farmer, a guard and a noble guest
-  are about, and the door leads out to a cobbled lane. Its map is built by `node tools/make-wayfarers-rest.mjs`.
+  (`town: { inside: { x, y } }` in its `.scene.json` starts the walk in the building on that tile). Downstairs a
+  tavern's common room: an aisle from the door to the fire, two tables with their chairs on a red rug at the hearth,
+  more tables and long tables between benches, and the bar: a counter with stools along it, the innkeeper's lane behind
+  it with the back bar against the wall and a rack of ale casks, the way in at its end. A coat stand, a notice board,
+  sacks and barrels stand by the door, antlers, a shelf of plates and a sconce hang on the walls, and the stairs stand
+  in the corner. Upstairs a passage with sconces and a shield on its partition, and two guest rooms on their carpets.
+  The innkeeper, a healer, a guard, a monk, a farmer, a villager and a noble guest are about, and the door leads out
+  to a cobbled lane. Its map is built by `node tools/make-wayfarers-rest.mjs`.
   `scenes/tactical/market-day.html` is a village market square on market day: merchants at their stalls,
   villagers round the well and farmers in the wheat and by the hay cart, in several facings so the backs of their
   clothes show, with the dragoon and the black mage beside them as the benchmark.

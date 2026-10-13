@@ -68,6 +68,9 @@ function wallBody(K, o, h = WALL_H, col = PLASTER) {
   return out;
 }
 /* the axis a straight piece (window, doorway) runs along: the way it links, else its facing */
+/* a wall with something hung on it: the wall, and where its face is, the middle of it (null for a run whose face does
+   not show) */
+const hung = (K, o) => { const ax = axisOf(o), f = run(K, o, ax, 0, 1, WALL_H, PLASTER); return { ...f, m: (f.a0 + f.a1) / 2 }; };
 const axisOf = o => { const L = o.links || [0, 0, 0, 0]; return L[0] || L[2] ? 'x' : L[1] || L[3] ? 'y' : o.face % 2 === 0 ? 'x' : 'y'; };
 
 const INTERIOR = [
@@ -105,6 +108,20 @@ const INTERIOR = [
     const F = frame(K, o), n = 6, rise = 16 / n;
     for (let i = 0; i < n; i++) F.box(0.16, 0.84, 1 - (i + 1) / n, 1 - i / n, 0, (i + 1) * rise, i % 2 ? WOOD : WOOD_L, { top: shade(WOOD_L, 1.06) });
     for (const a of [0.12, 0.88]) F.box(a - 0.04, a + 0.04, 0, 1, 0, 1.2, WOOD_D);
+    F.done();
+  } },
+  /* walls with something hung on their face: a shelf of plates and tankards, antlers, a shield over crossed swords,
+     a candle sconce */
+  { id: 'wallshelf', label: 'Wall with shelf', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; K.onWall(fc, c, m - 0.3, m + 0.3, o.z + 5.6, o.z + 6.1, TIMBER, 0.35); for (const [d, col] of [[-0.2, LINEN], [-0.05, '#c9d4d8'], [0.12, '#8c6d4b'], [0.22, '#8c6d4b']]) K.onWall(fc, c, m + d - 0.04, m + d + 0.04, o.z + 6.1, o.z + 7.4, col, 0.3); } },
+  { id: 'wallantlers', label: 'Wall with antlers', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; K.onWall(fc, c, m - 0.06, m + 0.06, o.z + 4.6, o.z + 6.6, WOOD_D, 0.35); for (const s of [-1, 1]) K.onWall(fc, c, Math.min(m + s * 0.05, m + s * 0.24), Math.max(m + s * 0.05, m + s * 0.24), o.z + 7, o.z + 7.5, '#e8dcc0', 0.3); } },
+  { id: 'wallshield', label: 'Wall with shield', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; K.onWall(fc, c, m - 0.26, m + 0.26, o.z + 5.6, o.z + 6, '#c8ccd0', 0); K.onWall(fc, c, m - 0.13, m + 0.13, o.z + 3.6, o.z + 8, pickv(['#8e2c26', '#3e5470', '#465c36'], o.v), 0.4); K.onWall(fc, c, m - 0.03, m + 0.03, o.z + 5.5, o.z + 6.1, GOLD, 0); } },
+  { id: 'wallsconce', label: 'Wall with candle sconce', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; K.onWall(fc, c, m - 0.03, m + 0.03, o.z + 4.4, o.z + 6, IRON, 0); K.onWall(fc, c, m - 0.02, m + 0.02, o.z + 6, o.z + 7.2, '#f4eede', 0.2); const [x, y] = fc === 'y' ? [m, c] : [c, m], [px, py] = K.P(x, y, o.z + 7.4); glow(K.g, px, py, 9, 0.5); flame(K.g, px, py + 0.6, 0.5); } },
+  { id: 'wallbar', label: 'Wall with back bar', w: 1, d: 1, h: 16, joins: 'room', draw(K, o) {
+    const f = hung(K, o); if (!f || f.fc !== 'y') return;
+    const { c } = f, F = frame(K, { ...o, face: 0 }), b = c - o.y0;
+    F.box(0.06, 0.94, b, b + 0.22, 0, 5, WOOD, { top: WOOD_L });
+    F.box(0.08, 0.92, b, b + 0.08, 5, 15, WOOD_D, { top: WOOD });
+    for (const z of [6, 9.5, 12.5]) { F.onFront(0.1, 0.9, b + 0.08, z, z + 2.6, '#3a2c1e', 0.3); for (let a = 0.12; a < 0.86; a += 0.08) F.onFront(a, a + 0.04, b + 0.081, z, z + 1.6 + (a * 37 % 1), pickv(['#5f8a4a', '#7a4a2a', '#c9d8d0', '#a8aeb0'], (a * 13 + z) % 1), 0.2); }
     F.done();
   } },
   { id: 'post', label: 'Timber post', w: 1, d: 1, h: WALL_H + 4, joins: 'room', draw(K, o) { const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2]; K.box(cx - 0.12, cy - 0.12, cx + 0.12, cy + 0.12, o.z, o.z + 1, STONE, { lw: 0.45 }); K.box(cx - 0.08, cy - 0.08, cx + 0.08, cy + 0.08, o.z + 1, o.z + WALL_H + 3, TIMBER, { lw: 0.5 }); } }
@@ -255,6 +272,63 @@ const FURNITURE = [
     for (const [a, b] of [[0.3, 0.45], [0.7, 0.45], [0.5, 0.56]]) F.box(a - 0.025, a + 0.025, b - 0.025, b + 0.025, 0, 1.4, WOOD_D, { noTop: true });
     F.at3(0.38, 0.5, 2.2, ([px, py]) => { const g = K.g; g.beginPath(); g.ellipse(px, py - 3.8, 3.2, 3.8, 0, 0, TAU); g.strokeStyle = INK; g.lineWidth = 1.1; g.stroke(); g.strokeStyle = WOOD_L; g.lineWidth = 0.55; g.stroke(); g.lineWidth = 0.35; g.strokeStyle = WOOD_D; g.beginPath(); for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; g.moveTo(px, py - 3.8); g.lineTo(px + Math.cos(a) * 3.2, py - 3.8 + Math.sin(a) * 3.8); } g.stroke(); });
     F.at3(0.7, 0.5, 2.2, ([px, py]) => { const g = K.g; g.fillStyle = '#efe3c4'; g.beginPath(); g.ellipse(px, py - 1.6, 1.2, 1.8, 0, 0, TAU); g.fill(); g.strokeStyle = INK; g.lineWidth = 0.35; g.stroke(); });
+    F.done();
+  } },
+  /* the tavern's: a bar counter that joins the bar pieces beside it into one counter, a table with chairs round it,
+     a long table between benches, a back bar of shelves, a rack of casks, and odds and ends */
+  { id: 'bar', label: 'Bar counter', w: 1, d: 1, h: 7, joins: 'bar', draw(K, o) {
+    const L = o.links && o.links.some(Boolean) ? o.links : null, cx = (o.x0 + o.x1) / 2, cy = (o.y0 + o.y1) / 2, t = 0.2, z = o.z;
+    const [px, py, nx, ny] = L || (o.face % 2 === 0 ? [1, 0, 1, 0] : [0, 1, 0, 1]), e = L ? 0.5 : 0.4;
+    const part = r => { K.box(...r, z, z + 5.4, WOOD_D, { lw: 0.45 }); K.box(r[0] - 0.02, r[1] - 0.02, r[2] + 0.02, r[3] + 0.02, z + 5.4, z + 6.2, WOOD_L, { lw: 0.4 }); };
+    if (nx) part([cx - e, cy - t, cx + t, cy + t]);
+    if (ny) part([cx - t, cy - e, cx + t, cy + t]);
+    part([cx - t, cy - t, cx + t, cy + t]);
+    if (px) part([cx - t, cy - t, cx + e, cy + t]);
+    if (py) part([cx - t, cy - t, cx + t, cy + e]);
+    K.cyl(cx + 0.05, cy - 0.02, 0.05, z + 6.2, z + 7.6, '#8c6d4b', { lw: 0.35, top: '#e6d6a0' });
+  } },
+  { id: 'tableset', label: 'Table and chairs', w: 1, d: 1, h: 8, draw(K, o) {
+    const F = frame(K, o), k = Math.floor(o.v * 997), d1 = o.v < 0.3 ? -1 : k % 6, d2 = o.v < 0.65 ? -1 : (k >> 3) % 6;
+    [[0.38, 0.2, 'n'], [0.62, 0.2, 'n'], [0.38, 0.82, 's'], [0.62, 0.82, 's'], [0.12, 0.5, 'w'], [0.88, 0.5, 'e']].forEach(([a, b, back], i) => {
+      if (i === d1 || i === d2) return;
+      F.box(a - 0.08, a + 0.08, b - 0.08, b + 0.08, 2.4, 3, WOOD);
+      const r = { n: [a - 0.08, a + 0.08, b - 0.08, b - 0.05], s: [a - 0.08, a + 0.08, b + 0.05, b + 0.08], w: [a - 0.08, a - 0.05, b - 0.08, b + 0.08], e: [a + 0.05, a + 0.08, b - 0.08, b + 0.08] }[back];
+      F.box(...r, 3, 7, WOOD_D);
+    });
+    F.box(0.25, 0.75, 0.35, 0.65, 0, 4.2, WOOD_D, { noTop: true });
+    F.box(0.23, 0.77, 0.33, 0.67, 4.2, 4.8, WOOD_L);
+    F.at3(0.42, 0.46, 4.8, (p, x, y) => K.cyl(x, y, 0.04, o.z + 4.8, o.z + 6, '#8c6d4b', { lw: 0.3, top: '#e6d6a0' }));
+    F.done();
+  } },
+  { id: 'feastset', label: 'Long table and benches', w: 2, d: 1, h: 6, draw(K, o) {
+    const F = frame(K, o);
+    for (const b of [0.2, 0.8]) F.box(0.12, 0.88, b - 0.06, b + 0.06, 0, 2.6, WOOD);
+    F.box(0.1, 0.9, 0.34, 0.66, 0, 4.2, WOOD_D, { noTop: true });
+    F.box(0.08, 0.92, 0.32, 0.68, 4.2, 4.8, WOOD_L);
+    for (const a of [0.2, 0.4, 0.6, 0.8]) F.at3(a, 0.42, 4.8, ([px, py]) => { const g = K.g; g.beginPath(); g.ellipse(px, py, 2, 1, 0, 0, TAU); g.fillStyle = '#e6dcc6'; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.3; g.stroke(); });
+    F.done();
+  } },
+  { id: 'backbar', label: 'Back bar', w: 1, d: 1, h: 16, draw(K, o) {
+    const F = frame(K, o);
+    F.box(0.06, 0.94, 0.04, 0.3, 0, 5, WOOD, { top: WOOD_L });
+    F.box(0.08, 0.92, 0.04, 0.12, 5, 15, WOOD_D, { top: WOOD });
+    if (F.front) for (const z of [6, 9.5, 12.5]) { F.onFront(0.1, 0.9, 0.12, z, z + 2.6, '#3a2c1e', 0.3); for (let a = 0.12; a < 0.86; a += 0.08) F.onFront(a, a + 0.04, 0.121, z, z + 1.6 + (a * 37 % 1), pickv(['#5f8a4a', '#7a4a2a', '#c9d8d0', '#a8aeb0'], (a * 13 + z) % 1), 0.2); }
+    F.done();
+  } },
+  { id: 'casks', label: 'Ale casks', w: 1, d: 1, h: 10, draw(K, o) {
+    const F = frame(K, o);
+    F.box(0.12, 0.88, 0.08, 0.4, 0, 1.2, WOOD_D);
+    for (const [a, z] of [[0.3, 1.2], [0.7, 1.2], [0.5, 6]]) F.at3(a, 0.42, z, ([px, py]) => { const g = K.g; g.beginPath(); g.ellipse(px, py - 3, 3.4, 3.4, 0, 0, TAU); g.fillStyle = '#9a6a3a'; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.5; g.stroke(); g.beginPath(); g.ellipse(px, py - 3, 2.6, 2.6, 0, 0, TAU); g.strokeStyle = IRON; g.lineWidth = 0.4; g.stroke(); g.fillStyle = GOLD; g.fillRect(px - 0.4, py - 2.2, 0.8, 1.4); });
+    F.done();
+  } },
+  { id: 'coatrack', label: 'Coat stand', w: 1, d: 1, h: 12, draw(K, o) { const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2]; K.seg([cx, cy, o.z], [cx, cy, o.z + 11], WOOD_D, 1.2); const [px, py] = K.P(cx, cy, o.z + 10), g = K.g; g.beginPath(); g.moveTo(px - 0.5, py); g.lineTo(px - 3, py + 7); g.lineTo(px, py + 6.5); g.closePath(); g.fillStyle = pickv(CLOTHS, o.v); g.fill(); g.strokeStyle = INK; g.lineWidth = 0.35; g.stroke(); g.fillStyle = '#5a4030'; g.fillRect(px - 1.6, py - 3, 3.2, 1.6); g.strokeRect(px - 1.6, py - 3, 3.2, 1.6); } },
+  { id: 'sacks', label: 'Grain sacks', w: 1, d: 1, h: 4, draw(K, o) { const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2]; for (const [dx, dy, r] of [[-0.12, -0.05, 2.6], [0.12, 0.05, 2.8]]) { const [px, py] = K.P(cx + dx, cy + dy, o.z); K.blob(px, py - r, r * 0.9, r, '#c8b28a', 0.45); } } },
+  { id: 'firewood', label: 'Firewood', w: 1, d: 1, h: 4, draw(K, o) { const F = frame(K, o); F.box(0.2, 0.8, 0.3, 0.7, 0, 2.6, '#8c6d4b', { top: '#d8bb8a' }); F.done(); } },
+  { id: 'noticeboard', label: 'Notice board', w: 1, d: 1, h: 11, draw(K, o) {
+    const F = frame(K, o);
+    for (const a of [0.18, 0.82]) F.box(a - 0.03, a + 0.03, 0.46, 0.52, 0, 10, WOOD_D);
+    F.box(0.14, 0.86, 0.46, 0.52, 4.5, 10, '#b08a58');
+    for (const [a, z] of [[0.24, 6.5], [0.44, 7.2], [0.62, 5.6], [0.7, 7.6]]) F.onFront(a, a + 0.12, 0.52, z, z + 1.6, LINEN, 0.25);
     F.done();
   } }
 ];

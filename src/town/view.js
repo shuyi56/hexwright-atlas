@@ -12,7 +12,7 @@ import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
 import { hits, shapesOf } from './collide.js';
-import { FIRE, FLIGHT_L, FLIGHT_W, pieceSprite } from './pieces.js';
+import { FIRE, FLIGHT_L, FLIGHT_W, fitTo, pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
 import { portrait } from '../tactical/render.js';
 import GroundWorker from './ground-worker.js?worker&inline';
@@ -159,7 +159,7 @@ function clip(px, w, h, X, Y, base, flip = false) {
   return out;
 }
 function spriteOf(o) {
-  const key = `${o.id}|${o.face || 0}|${Math.round((o.v ?? 0.5) * 20)}|${o.links ? o.links.join('') : ''}|${o.box ? o.box.join() : ''}`; let s = TW.sprites.get(key);
+  const key = `${o.id}|${o.face || 0}|${Math.round((o.v ?? 0.5) * 20)}|${o.links ? o.links.join('') : ''}|${o.box ? o.box.join() : ''}|${o.snug ? 1 : 0}|${o.shift ? o.shift.join() : ''}|${o.ends ? o.ends.join('') : ''}`; let s = TW.sprites.get(key);
   if (!s) { const im = pieceSprite(o); s = { can: toCanvas(im.w, im.h, im.px), px: im.px, ox: im.ox, oy: im.oy, w: im.w, h: im.h }; TW.sprites.set(key, s); }
   return s;
 }
@@ -326,7 +326,7 @@ function throughDoor(face) {
    room wall on either side (on the east if there is none or both); along it, its foot against a wall it rises from,
    else its top toward its landing. Room walls stand in the middle of their tiles, so a flight against one reaches into
    that tile's near half. The box is in its tile's pixels, [x0, y0, x1, y1], and may run past the tile's edges. */
-const ROOM_WALLS = new Set(['iwall', 'iwindow', 'hearth', 'post']);
+const ROOM_WALLS = new Set(['iwall', 'iwindow', 'hearth', 'post', 'wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar']);
 function flightRect(M, o) {
   const f = o.face || 0, L = levelOf(o), [fx, fy] = FACE_DELTA[f], [A, B] = [FLIGHT_W, FLIGHT_L];
   const wall = (dx, dy) => { const k = objAt(M, o.x + dx, o.y + dy, L); return k >= 0 && ROOM_WALLS.has(M.objs[k].id); };
@@ -396,7 +396,7 @@ function useMap(M, hero, homes = null) {
   TW.M = M; M.chars = M.chars || []; M.floors = M.floors || [];
   TW.steps.clear(); TW.path = []; TW.talkTo = -1; TW.rest = []; TW.stuck = 0;
   TW.homes = homes || M.chars.map(c => [c.x, c.y]); TW.links = wallLinks(M.objs); TW.flightRects = new Map(); cuts.length = 0;
-  TW.hero = hero; TW.G0 = fieldOf(M, 0); TW.shapes = shapesOf(M.objs, TW.links); takeHero();
+  TW.hero = hero; TW.G0 = fieldOf(M, 0); TW.shapes = shapesOf(M.objs, TW.links); TW.fit = fitTo(M.objs); takeHero();
   TW.top = TW.me ? TW.me.L : 0; buildField();
 }
 /* into building o's interior, behind the veil. from: the index of someone already inside to walk as, else the hero
@@ -679,7 +679,7 @@ function paint() {
 function pieceOn(it, vx0, vy0, vx1, vy1) {
   let c = TW.clipped.get(it.i);
   if (!c) {
-    const p = it.p, sp = spriteOf(Object.assign({}, p, { links: TW.links.get(p) || null, box: p.id === 'stairs' ? flightOf(p) : null })), z = lift((p.x + it.w / 2) * T, (p.y + it.d) * T - 4);
+    const p = it.p, sp = spriteOf(Object.assign({}, p, { links: TW.links.get(p) || null, box: p.id === 'stairs' ? flightOf(p) : null, ...TW.fit(p) })), z = lift((p.x + it.w / 2) * T, (p.y + it.d) * T - 4);
     c = { sp, w: sp.w, h: sp.h, X: p.x * T - sp.ox, Y: Math.round(p.y * T - z) - sp.oy, can: null }; TW.clipped.set(it.i, c);
   }
   if (c.X > vx1 || c.Y > vy1 || c.X + c.w < vx0 || c.Y + c.h < vy0) return null;

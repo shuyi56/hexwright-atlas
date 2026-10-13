@@ -3,16 +3,20 @@
    node tools/make-wayfarers-rest.mjs [out.json]
    Builds scenes/town/wayfarers-rest.json by hand: a village inn with a fully furnished interior (editor/interiors.js)
    on a cobbled lane. The scene opens inside it (town.inside in its .scene.json).
-   A tavern's room, 7 tiles square (five of floor inside the walls), packed full:
-   - The common room (ground floor): oak boards and an aisle from the door to the fire; west of it a red rug and a
-     candle stand at the hearth and a long table between two benches; east of it the bar (a counter facing the room,
-     a dresser of crockery behind it, a stool before it); a weapon rack and barrels by the door, and stairs
-     in the south-east corner, stepped onto at their right-hand end and climbing west.
-   - Upstairs (floor 1), walled and windowed like the room below: a passage along the south with a bench and a candle stand, the open stairwell along its south wall,
-     and two bedrooms through doorways in a timber partition: the west on a red carpet with a bed and a dresser,
-     the east on a blue one with a bed and a wardrobe.
-   - The people: the innkeeper behind the bar, a healer at it, a monk warming himself at the fire, a farmer by the long
-     table, a guard by the stairs, and a noble guest upstairs.
+   A tavern's common room, 9 tiles square (seven of floor inside the walls), and an upper floor of guest rooms:
+   - Downstairs: an aisle of oak boards runs from the door to the back wall. West of it the fireside: a stone
+     fireplace with firewood beside it, two tables with their chairs on a red rug before it, two more tables below
+     them, and a long table between benches with a table beside it. In the north-east the bar: a counter of joined bar
+     pieces running from the east wall, stools along it, and behind it the innkeeper's lane with the back bar of
+     bottles against the back wall and a rack of ale casks in the corner; the way behind it is at its west end. South
+     of the bar two tables and a long table by the stairs; by the door a coat stand, a notice board, grain sacks and
+     barrels; on the walls antlers, a shelf of plates and a candle sconce. The stairs stand in the south-east corner,
+     stepped onto at their right-hand end and climbing west.
+   - Upstairs (floor 1), walled and windowed like the room below: two guest rooms through doorways in a timber
+     partition (two beds in the east one), a passage along the south with a bench, a candle stand, a chest and a
+     plant, sconces and a shield on the partition, and the open stairwell in the south-east corner.
+   - The people: the innkeeper behind the bar, a healer and a guard at it, a monk at the fire, a farmer and a
+     villager at the tables, and a noble guest upstairs.
    Outside, a cottage and a townhouse flank the inn on the lane, with a well, a lamp post, a signpost, barrels and
    crates, a garden with oaks, a bush and flowers to the south, and the hero on the lane. Deterministic: the same map
    every time. */
@@ -26,46 +30,61 @@ let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 21474836
 const put = (M, id, x, y, face = 0, level = 0) => { const r = placePiece(M, { id, x, y, face, v: rnd(), ...(level ? { level } : {}) }); if (!r.ok) fail.push(`${M.name}: ${id}@${x},${y}${level ? ' L' + level : ''}: ${r.reason}`); return r.piece; };
 const stand = (M, sprite, x, y, face = 0, level = 0) => { const r = placeChar(M, { sprite, x, y, face, ...(level ? { level } : {}) }); if (!r.ok) fail.push(`${M.name}: ${sprite}@${x},${y}: ${r.reason}`); };
 
-/* ---------- the inn's interior: 7 tiles square (five of floor inside the walls), the door in the middle of the south wall ---------- */
-const S = 7, I = blankModel(S, 'oakfloor', 'The Wayfarer\'s Rest');
-/* the outer walls: the fireplace in the back wall, windows round about, the door at 3,6 */
-const special = { '2,0': 'hearth', '4,0': 'iwindow', '0,2': 'iwindow', '0,4': 'iwindow', '6,2': 'iwindow', '6,4': 'iwindow', '1,6': 'iwindow', '5,6': 'iwindow', '3,6': 'idoor' };
+/* ---------- the inn's interior: 9 tiles square (seven of floor inside the walls), the door in the middle of the south wall ---------- */
+const S = 9, I = blankModel(S, 'oakfloor', 'The Wayfarer\'s Rest');
+/* the outer walls: the fireplace in the back wall between a shelf of plates, a sconce and antlers, the back bar against
+   the wall behind the counter, windows round about, the door at 4,8 */
+const special = {
+  '1,0': 'wallshelf', '2,0': 'wallsconce', '3,0': 'hearth', '4,0': 'wallantlers', '5,0': 'wallbar', '6,0': 'wallbar',
+  '0,3': 'iwindow', '0,6': 'iwindow', '8,4': 'iwindow', '8,6': 'iwindow', '2,8': 'iwindow', '6,8': 'iwindow', '4,8': 'idoor'
+};
 for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (!x || !y || x === S - 1 || y === S - 1) put(I, special[x + ',' + y] || 'iwall', x, y);
-/* the common room, an aisle up the middle (x = 3) from the door to the fire. West of it the hearth corner (a red rug,
-   a candle stand) and the long table between two benches; east of it the bar (the counter facing the room, a dresser
-   of crockery behind it, a stool before it); a weapon rack by the door, and the stairs in the south-east corner. */
-paintTiles(I, rectTiles(I, 1, 1, 3, 1), 'carpet');
-put(I, 'candelabra', 1, 1);
-put(I, 'longtable', 1, 3); put(I, 'bench', 1, 2, 0); put(I, 'bench', 1, 4, 2);
-put(I, 'counter', 4, 2, 0); put(I, 'dresser', 5, 1, 0); put(I, 'stool', 5, 3);
-put(I, 'weaponrack', 1, 5, 1); put(I, 'barrels', 2, 5);
+/* the fireside, west of the aisle (x = 4): a red rug before the fire with two tables on it, a candle stand and firewood
+   by the hearth; two more tables below, and a long table between benches with a table beside it */
+paintTiles(I, rectTiles(I, 1, 1, 3, 2), 'carpet');
+put(I, 'candelabra', 1, 1); put(I, 'firewood', 2, 1);
+put(I, 'tableset', 1, 2, 0); put(I, 'tableset', 3, 2, 1);
+put(I, 'tableset', 1, 4, 2); put(I, 'tableset', 3, 4, 3);
+put(I, 'feastset', 1, 6, 0); put(I, 'tableset', 3, 6, 1);
+/* the bar, east of the aisle: a counter across the room (its customers to the south, stools along it) running from the
+   east wall, the innkeeper's lane behind it with the back bar against the back wall and a rack of casks in the corner,
+   and the way in at its west end (5,1) */
+for (const x of [5, 6, 7]) put(I, 'bar', x, 2, 0);
+put(I, 'casks', 7, 1, 0);
+/* south of the bar two tables, and a long table by the stairs */
+put(I, 'tableset', 5, 4, 0); put(I, 'tableset', 7, 4, 1); put(I, 'feastset', 5, 6, 0);
+/* by the door: sacks, barrels and a coat stand along the south wall west of it, a notice board east of it */
+put(I, 'sacks', 1, 7); put(I, 'barrels', 2, 7); put(I, 'coatrack', 3, 7); put(I, 'noticeboard', 5, 7, 0);
 /* the stairs in the south-east corner, against the south wall with their foot at the east wall: stepped onto at the
-   right-hand end, from the corner, and climbing west to the landing at 4,5 on floor 1 */
-put(I, 'stairs', 5, 5, 1);
+   right-hand end, from the corner, and climbing west to the landing on floor 1 */
+put(I, 'stairs', 7, 7, 1);
 
 /* upstairs: floor out to the walls but the stairwell over the flight, and the outer walls again with their windows */
 paintTiles(I, rectTiles(I, 0, 0, S, S), 'floorboards', 1);
-removeFloor(I, [[5, 5]], 1);
-const upper = { '2,0': 'iwindow', '4,0': 'iwindow', '0,2': 'iwindow', '0,4': 'iwindow', '6,2': 'iwindow', '6,4': 'iwindow', '1,6': 'iwindow', '5,6': 'iwindow' };
+removeFloor(I, [[7, 7]], 1);
+const upper = { '2,0': 'iwindow', '6,0': 'iwindow', '0,2': 'iwindow', '0,6': 'iwindow', '8,2': 'iwindow', '8,6': 'iwindow', '2,8': 'iwindow', '6,8': 'iwindow' };
 for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (!x || !y || x === S - 1 || y === S - 1) put(I, upper[x + ',' + y] || 'iwall', x, y, 0, 1);
-/* a timber partition: two bedrooms to the north, a doorway into each, the passage along the south */
-for (let x = 1; x <= 5; x++) put(I, x === 2 || x === 4 ? 'idoor' : 'iwall', x, 3, 0, 1);
-for (let y = 1; y <= 2; y++) put(I, 'iwall', 3, y, 0, 1);
-/* the west room on a red carpet: a bed and a dresser; the east room on a blue one: a bed and a wardrobe; each keeps
-   the tile inside its doorway clear */
-paintTiles(I, rectTiles(I, 1, 1, 2, 2), 'carpet', 1); paintTiles(I, rectTiles(I, 4, 1, 2, 2), 'carpetblue', 1);
-put(I, 'bed', 1, 1, 0, 1); put(I, 'dresser', 2, 1, 0, 1);
-put(I, 'bed', 5, 1, 0, 1); put(I, 'wardrobe', 4, 1, 0, 1);
-/* the passage, two tiles wide all along: a bench under the window and a candle stand at its west end */
-put(I, 'bench', 1, 5, 2, 1); put(I, 'candelabra', 1, 4, 0, 1);
+/* a timber partition along y = 4 with a doorway into each of two rooms, sconces and a shield on its passage side, and a
+   wall between the rooms */
+const partition = { 2: 'idoor', 6: 'idoor', 3: 'wallsconce', 4: 'wallshield', 5: 'wallsconce' };
+for (let x = 1; x <= 7; x++) put(I, partition[x] || 'iwall', x, 4, 0, 1);
+for (let y = 1; y <= 3; y++) put(I, 'iwall', 4, y, 0, 1);
+/* the west room on a red carpet: a bed, a dresser, a chest and a wardrobe; the east one on a blue carpet: two beds
+   with a writing desk between them and a wardrobe. Each keeps the tile inside its doorway clear */
+paintTiles(I, rectTiles(I, 1, 1, 3, 3), 'carpet', 1); paintTiles(I, rectTiles(I, 5, 1, 3, 3), 'carpetblue', 1);
+put(I, 'bed', 1, 1, 0, 1); put(I, 'dresser', 2, 1, 0, 1); put(I, 'chest', 3, 1, 0, 1); put(I, 'wardrobe', 3, 3, 0, 1);
+put(I, 'bed', 5, 1, 0, 1); put(I, 'desk', 6, 1, 0, 1); put(I, 'bed', 7, 1, 0, 1); put(I, 'wardrobe', 7, 3, 0, 1); put(I, 'chest', 5, 3, 0, 1);
+/* the passage: a candle stand and a chest at its west end, a bench under the window, a plant */
+put(I, 'candelabra', 1, 5, 0, 1); put(I, 'chest', 1, 7, 0, 1); put(I, 'bench', 2, 7, 2, 1); put(I, 'plantpot', 5, 7, 0, 1);
 
 /* the people inside */
-stand(I, 'merchant', 4, 1, 0);   /* the innkeeper behind the bar */
-stand(I, 'healer', 4, 3, 2);     /* at the bar */
-stand(I, 'monk', 2, 1, 2);       /* at the fire */
-stand(I, 'farmer', 3, 3, 3);     /* by the long table */
-stand(I, 'guard', 4, 4, 0);      /* by the stairs */
-stand(I, 'noble', 2, 4, 0, 1);   /* a guest upstairs */
+stand(I, 'merchant', 6, 1, 0);   /* the innkeeper behind the bar */
+stand(I, 'healer', 5, 3, 2);     /* at the bar */
+stand(I, 'guard', 6, 3, 2);      /* at the bar */
+stand(I, 'monk', 3, 1, 2);       /* at the fire */
+stand(I, 'farmer', 2, 3, 0);     /* among the tables */
+stand(I, 'villager', 2, 5, 2);   /* by the long table */
+stand(I, 'noble', 4, 6, 0, 1);   /* a guest upstairs */
 
 /* ---------- the lane outside ---------- */
 const N = 14, M = blankModel(N, 'grass', 'Oakfield Lane');

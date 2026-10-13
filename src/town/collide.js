@@ -1,12 +1,13 @@
 import { ASSET_BY_ID, footprint } from '../tiles/index.js';
 import { TILE } from './ground.js';
-import { MID, SMALL, TREES, treeOffset } from './pieces.js';
+import { MID, SMALL, TABLE, TREES, barRuns, barStools, fitTo, seatsOf, treeOffset, turned } from './pieces.js';
 
 /* ================= town view: what a walker bumps into =================
    The hero walks freely in map pixels, not tile by tile, so each piece blocks only the ground it is drawn
    standing on: a tree its trunk, a bush or a well its round base, a house its walls (the step in front of the door
    stays open), a fence a strip along its rails, an interior wall the band it is drawn as, joined to the walls
-   beside it, a doorway the wall either side of its opening. Flowers, toadstools, reeds and stairs block nothing. Shapes are circles { x, y, r } and
+   beside it, a doorway the wall either side of its opening, a bar counter its band (joined like a wall), a table set its table
+   and each chair round it. Flowers, toadstools, reeds and stairs block nothing. Shapes are circles { x, y, r } and
    rectangles { x0, y0, x1, y1 } in map pixels, grouped by storey. No DOM. */
 const T = TILE;
 const circle = (x, y, r) => ({ x, y, r });
@@ -57,7 +58,29 @@ function local(o, FW, FD) {
       const L = o.links || [0, 0, 0, 0], across = L[0] || L[2] || !(L[1] || L[3]), c0 = FW / 2 - 5, c1 = FW / 2 + 5, h = 21;
       return across ? [rect(0, c0, FW / 2 - h, c1), rect(FW / 2 + h, c0, FW, c1)] : [rect(c0, 0, c1, FD / 2 - h), rect(c0, FD / 2 + h, c1, FD)];
     }
-    case 'iwall': case 'iwindow': case 'wall': case 'walltower': {
+    case 'bar': {
+      /* the counter's runs (joined like a wall), a little wider than drawn, and its stools */
+      return [...barRuns(o).map(([a0, a1, b0, b1]) => rect(a0 - 2, b0 - 2, a1 + 2, b1 + 2)), ...barStools(o).map(([x, y]) => circle(x, y - 2, 4))];
+    }
+    case 'tableset': {
+      /* the table, and a round seat for each chair pulled up to it */
+      const f = (o.face || 0) & 3, t = turned(f, FW, FD, TABLE[0] - 2, TABLE[1] + 2, TABLE[2] - 2, TABLE[3] + 2);
+      return [rect(...t), ...seatsOf(o).map(([a, b]) => { const r = turned(f, FW, FD, a - 6, a + 6, b - 6, b + 6); return circle((r[0] + r[2]) / 2, (r[1] + r[3]) / 2, 7); })];
+    }
+    case 'feastset': return [(o.face || 0) % 2 ? rect(14, 22, FW - 14, FD - 22) : rect(22, 14, FW - 22, FD - 14)];
+    case 'backbar': case 'casks': {
+      /* along the back of its tile, or against the wall behind it */
+      const b0 = o.snug ? -40 : 4; return [rect(...turned((o.face || 0) & 3, FW, FD, 6, 90, b0, b0 + 20))];
+    }
+    case 'coatrack': return [circle(FW / 2, FD - 10, 4)];
+    case 'wallbar': {
+      /* the wall, and the back bar standing before it on a run across the view */
+      const L = o.links || [0, 0, 0, 0], c0 = FW / 2 - 5, c1 = FW / 2 + 5, out = [rect(L[2] ? 0 : c0, c0, L[0] ? FW : c1, c1)];
+      if (L[1]) out.push(rect(c0, c1, c1, FD)); if (L[3]) out.push(rect(c0, 0, c1, c0));
+      if (L[0] || L[2] || !(L[1] || L[3])) out.push(rect(6, c1, FW - 6, c1 + 18));
+      return out;
+    }
+    case 'iwall': case 'iwindow': case 'wall': case 'walltower': case 'wallshelf': case 'wallantlers': case 'wallshield': case 'wallsconce': {
       /* a band through the middle, with an arm to each side it joins */
       const L = o.links || [0, 0, 0, 0], t = id === 'wall' || id === 'walltower' ? FW / 2 - 12 : 5, c0 = FW / 2 - t, c1 = FW / 2 + t;
       const out = [rect(c0, c0, c1, c1)];
@@ -76,14 +99,14 @@ function local(o, FW, FD) {
 }
 /* every piece's shapes in map pixels, by storey: Map level -> [shape] */
 function shapesOf(objs, links = new Map()) {
-  const out = new Map();
+  const out = new Map(), fit = fitTo(objs);
   for (const p of objs) {
     if (OPEN.has(p.id) || !ASSET_BY_ID[p.id]) continue;
     const [fw, fd] = footprint(p), U = SMALL.has(p.id) ? 32 : MID.has(p.id) ? 64 : T, FW = fw * U, FD = fd * U;
     /* drawings at a smaller scale stand in the middle of the south edge of their footprint */
     const ox = p.x * T + (fw * T - FW) / 2, oy = p.y * T + (fd * T - FD), L = p.level || 0;
     const list = out.get(L) || []; out.set(L, list);
-    for (const s of local({ ...p, links: links.get(p) || p.links || null }, FW, FD)) list.push('r' in s ? circle(s.x + ox, s.y + oy, s.r) : rect(s.x0 + ox, s.y0 + oy, s.x1 + ox, s.y1 + oy));
+    for (const s of local({ ...p, links: links.get(p) || p.links || null, ...fit(p) }, FW, FD)) list.push('r' in s ? circle(s.x + ox, s.y + oy, s.r) : rect(s.x0 + ox, s.y0 + oy, s.x1 + ox, s.y1 + oy));
   }
   return out;
 }

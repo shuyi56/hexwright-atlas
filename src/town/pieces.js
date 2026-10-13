@@ -692,7 +692,8 @@ const PROPS = {
    room's walls run on as one (pieceSprite). A doorway is an opening in a wall: the wall on either side, timber
    jambs, a lintel carrying the capping beam over it, and a sill on the floor between. */
 const ROOMW = 34, RT = 5, RSIDE = 4, DOOR_HALF = 21;
-const WALLS_JOINED = new Set(['iwall', 'iwindow', 'idoor', 'hearth']);
+const HUNG_WALLS = ['wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar'];
+const WALLS_JOINED = new Set(['iwall', 'iwindow', 'idoor', 'hearth', ...HUNG_WALLS]);
 function wallKit(K) {
   const { FW } = K, c0 = FW / 2 - RT, c1 = FW / 2 + RT, P = R(WALL.plaster), Tp = R('#7a5a3a'), H = ROOMW;
   /* the face of a run across the view at rows (b - H .. b), r counted from its top */
@@ -942,6 +943,160 @@ const PLATE = (K, x, y) => { const C = R('#f2ece0'); K.oval(x, y - 1, 3, 1.5, (p
 const CANDLE = (K, x, y, h = 4) => { const W = R('#f4efe2'); K.rect(x, y - h, x + 1, y, W[1]); K.set(x, y - h - 1, R('#f6d36a')[0]); K.set(x, y - h - 2, R('#f4a03a')[1]); for (const [dx, dy] of [[-1, -h - 1], [1, -h - 1], [0, -h - 3]]) K.set(x + dx, y + dy, R('#f6d36a')[0], 90); };
 const BOOK = (K, x, y, col = '#4f6a9a') => { const C = R(col); K.rect(x - 3, y - 2, x + 3, y, (px, py) => (py === y - 2 ? R('#f2ece0')[1] : C[2])); K.rect(x - 3, y - 3, x + 3, y - 2, C[1]); };
 const BLANKET = ['red', 'blue', 'green'];
+
+/* ---------- the tavern's pieces ----------
+   A bar counter, the table sets and the back bar and casks are drawn at the figures' scale across their whole tile
+   (FULL), not a third of it as the rest of the furniture is: a table with its chairs pulled up round it fills a tile,
+   and the bar's pieces meet the next across the tile's edge. */
+/* a bar counter, built a tile at a time: it joins the bar pieces beside it (links, as the room walls do), so a run of
+   them makes one counter, straight or round a corner. In its tile it is a band BAR_D either side of the middle, BAR_H
+   high: a front of raised panels between stiles over a kick board, a polished oak top overhanging it, and a brass foot
+   rail on brackets along the side its customers stand (the way it faces). Tankards, a jug, a candle and a few coins
+   stand along the top. Where it meets the next piece there is no ink (pieceSprite). */
+const BAR_D = 10, BAR_H = 15, BAR_BACK = 32, REACH = T / 2 - RT;
+/* the runs of counter in a bar piece's tile, [a0, a1, b0, b1, along x] in tile pixels. o.shift ([x, y], fitTo) sets the
+   counter back from the middle of its tiles toward the back of the bar, the same all along a run of joined pieces; a
+   free end with a room wall beside it (o.ends, [+x, +y, -x, -y]) runs on to the wall's face. */
+function barRuns(o) {
+  const L = o.links || [0, 0, 0, 0], E = o.ends || [0, 0, 0, 0], f = facing(o), d = BAR_D, any = L.some(Boolean), [sx, sy] = o.shift || [0, 0];
+  const mx = T / 2 + sx, my = T / 2 + sy, runs = [];
+  const end = (k, joined, centre, alone) => (L[k] ? joined : E[k] ? (joined ? joined + REACH : -REACH) : any ? centre : alone);
+  if (L[0] || L[2] || (!any && f % 2 === 0)) {
+    runs.push([end(2, 0, mx - d, 10), end(0, T, mx + d, T - 10), my - d, my + d, true]);
+    if (L[3]) runs.push([mx - d, mx + d, 0, my - d, false]);
+    if (L[1]) runs.push([mx - d, mx + d, my + d, T, false]);
+  } else runs.push([mx - d, mx + d, end(3, 0, my - d, 10), end(1, T, my + d, T - 10), false]);
+  return runs;
+}
+/* the bar stools pulled up to a bar piece on its customers' side, [x, y] in tile pixels: up to two a tile, by o.v */
+function barStools(o) {
+  const f = facing(o), v = Math.floor((o.v ?? 0.5) * 997), out = [];
+  for (const [a0, a1, b0, b1, ax] of barRuns(o)) {
+    if (ax !== (f % 2 === 0)) continue;
+    for (const p of [24, 72]) {
+      if (h2(p, v, 12) > 0.75 || p < (ax ? a0 : b0) + 6 || p > (ax ? a1 : b1) - 6) continue;
+      out.push(ax ? [p, f === 0 ? b1 + 14 : b0 - 14] : [f === 1 ? a1 + 14 : a0 - 14, p]);
+    }
+  }
+  return out;
+}
+function barCounter(K, o) {
+  const L = o.links || [0, 0, 0, 0], f = facing(o), F = furniture(K, { face: 0 }, T, T), runs = barRuns(o);
+  const W = [R('#7a5238'), R('#5e3e2a'), R('#3e2a1e')], Tp = mat('walnut'), G = mat('brass'), I = mat('iron'), BODY = BAR_H - 2;
+  /* the front: stiles every 16 pixels (so the panels run on from tile to tile), raised panels lit on their top and west
+     edges, a rail above and below them and a dark kick board at the foot */
+  const front = (s, t, which, x) => {
+    const r = Math.floor(t * BODY), k = ((x % 16) + 16) % 16;
+    if (r === 0) return W[1][1];
+    if (r >= BODY - 2) return W[1][r === BODY - 1 ? 4 : 3];
+    if (k < 2) return W[1][k ? 2 : 1];
+    if (r < 2 || r > BODY - 4) return W[1][2];
+    return W[1][r === 2 || k === 2 ? 1 : r === BODY - 4 || k === 15 ? 3 : 2];
+  };
+  for (const [a0, a1, b0, b1] of runs) F.box(a0, a1, b0, b1, 0, BODY, W, { face: front, panel: false });
+  for (const [a0, a1, b0, b1, ax] of runs) {
+    const top = ax ? [a0 - (L[2] ? 0 : 2), a1 + (L[0] ? 0 : 2), b0 - 2, b1 + 2] : [a0 - 2, a1 + 2, b0 - (b0 && !L[3] ? 2 : 0), b1 + (b1 < T || !L[1] ? 2 : 0)];
+    F.box(top[0], top[1], top[2], top[3], BODY, BAR_H, Tp, { top: (u, v, x, y) => (h2(x >> 3, y, 4) < 0.05 ? Tp[0][0] : null) });
+  }
+  /* the foot rail on the customers' side of the runs that lie the way it faces */
+  for (const [a0, a1, b0, b1, ax] of runs) {
+    if (ax !== (f % 2 === 0)) continue;
+    if (ax) { const b = f === 0 ? b1 + 4 : b0 - 5; F.box(a0 + (L[2] ? 0 : 2), a1 - (L[0] ? 0 : 2), b, b + 1, 3, 4, G, { noSide: true }); for (let a = a0 + 8; a < a1 - 2; a += 24) F.box(a, a + 1, f === 0 ? b1 : b0 - 5, f === 0 ? b1 + 5 : b0, 3, 4, I, { noSide: true }); }
+    else { const a = f === 1 ? a1 + 4 : a0 - 5; F.box(a, a + 1, b0 + (L[3] ? 0 : 2), b1 - (L[1] ? 0 : 2), 3, 4, G, { noSide: true }); }
+  }
+  /* what stands along the top */
+  const v = Math.floor((o.v ?? 0.5) * 997);
+  for (const [a0, a1, b0, b1, ax] of runs) for (let p = 12; p < T; p += 24) {
+    const a = ax ? p : (a0 + a1) / 2, b = ax ? (b0 + b1) / 2 - 2 + Math.round(h2(p, v, 8) * 4) : p;
+    if (ax ? a < a0 + 4 || a > a1 - 4 : b < b0 + 6 || b > b1 - 4) continue;
+    const k = h2(p, v + (ax ? 0 : 7), 5);
+    F.at(a, b, BAR_H, (x, y) => {
+      if (k < 0.3) MUG(K, x, y); else if (k < 0.45) { MUG(K, x - 2, y); MUG(K, x + 3, y + 1); } else if (k < 0.55) JUG(K, x, y);
+      else if (k < 0.63) CANDLE(K, x, y, 4); else if (k < 0.72) { K.set(x, y, G[0][0]); K.set(x + 2, y, G[0][1]); K.set(x + 1, y - 1, G[0][0]); }
+    });
+  }
+  /* the stools: three splayed legs and a rung under a round seat */
+  for (const [a, b] of barStools(o)) F.at(a, b, 0, (x, y) => {
+    for (const [dx, dy] of [[-5, 0], [5, 0], [0, 1]]) { K.line(x + dx, y + dy, x + Math.round(dx * 0.6), y - 11, W[1][dy ? 3 : dx < 0 ? 1 : 2]); K.line(x + dx + 1, y + dy, x + Math.round(dx * 0.6) + 1, y - 11, W[1][3]); }
+    K.rect(x - 4, y - 5, x + 5, y - 4, W[1][3]);
+    K.oval(x, y - 12, 6, 2.5, W[1][3]); K.oval(x, y - 13, 6, 2.5, (px, py, dx, dy) => Tp[0][dx + dy < -0.6 ? 0 : dx + dy > 0.6 ? 3 : 1]);
+    K.ovalShadow(x + 2, y + 1, 6, 2);
+  });
+  F.done(0);
+  if (!L[0]) { const e = runs.reduce((q, r) => (r[1] > q[1] ? r : q)); K.shadow(e[1] - 2, e[2] + 2, e[1] + 2, e[3] + 2, 4); }
+}
+/* a tavern table: a square table on four legs, things on its top, chairs pulled up on three or four sides of it (by
+   o.v), each chair's back on the side away from the table */
+const SEATS = [[36, 18, 'n'], [60, 18, 'n'], [36, 80, 's'], [60, 80, 's'], [8, 48, 'w'], [88, 48, 'e']], TABLE = [22, 74, 32, 64];
+const seatsOf = o => { const v = o.v ?? 0.5, k = Math.floor(v * 997), d1 = v < 0.3 ? -1 : k % 6, d2 = v < 0.65 ? -1 : (k >> 3) % 6; return SEATS.filter((s, i) => i !== d1 && i !== d2); };
+function chairAt(F, a, b, back, W) {
+  F.legs(a - 6, a + 6, b - 6, b + 6, 8, W);
+  F.box(a - 7, a + 7, b - 7, b + 7, 8, 10, W, { top: (u, v) => W[0][u < 0.15 || v < 0.15 ? 1 : 2] });
+  /* the back: two stiles, three slats with the room showing between them, a top rail; seen end on, a plain board */
+  const lit = { top: () => W[0][1] };
+  if (back === 'n' || back === 's') {
+    const b0 = back === 'n' ? b - 7 : b + 5;
+    for (const k of [-7, 5]) F.box(a + k, a + k + 2, b0, b0 + 2, 10, 20, W, lit);
+    for (const k of [-3, 0, 3]) F.box(a + k - 1, a + k + 1, b0, b0 + 2, 10, 17, W, { noSide: true });
+    F.box(a - 7, a + 7, b0, b0 + 2, 17, 20, W, lit);
+  } else {
+    const a0 = back === 'w' ? a - 7 : a + 5;
+    F.box(a0, a0 + 2, b - 7, b + 7, 10, 20, W, { face: (s2, t) => W[1][t < 0.25 ? 1 : 2], top: () => W[0][1] });
+  }
+}
+/* a back bar: a cupboard of four panelled doors under a worktop, and over it open shelves of bottles (green, brown,
+   clear) and pewter tankards under a cornice. snug: its back is set against the room wall behind its tile */
+function backBar(K, o, b0 = o.snug ? -40 : 4) {
+  const F = furniture(K, o, T, T), W = mat('walnut'), Tp = mat('oak'), G = mat('brass');
+  const BOT = ['#5f8a4a', '#7a4a2a', '#c9d8d0', '#8e2c26', '#6a7a3a'];
+  F.box(6, 90, b0, b0 + 16, 0, 14, W, { panel: false, face: (s, t, which) => {
+    if (which !== 'front') return null;
+    const k = (s * 4) % 1, door = Math.floor(s * 4);
+    if (k < 0.03 || k > 0.97 || t < 0.1 || t > 0.88) return W[1][t > 0.88 ? 3 : 1];
+    if (Math.abs(t - 0.45) < 0.08 && Math.abs(k - (door % 2 ? 0.15 : 0.85)) < 0.04) return G[1][0];
+    return W[1][k < 0.12 || t < 0.2 ? 3 : k > 0.88 || t > 0.8 ? 1 : 2];
+  } });
+  F.box(4, 92, b0 - 1, b0 + 18, 14, 16, Tp);
+  F.box(8, 88, b0, b0 + 6, 16, 46, W, { panel: false, face: (s, t, which, x) => {
+    if (which !== 'front') return null;
+    if (s < 0.03 || s > 0.97) return W[1][s < 0.03 ? 1 : 3];
+    const row = Math.floor(t * 3), tt = t * 3 - row;
+    if (tt > 0.86) return W[1][tt > 0.93 ? 3 : 0];
+    const cell = Math.floor(x / 4), px = ((x % 4) + 4) % 4, kind = h2(cell, row, 31), hgt = 0.4 + h2(cell, row, 32) * 0.35, up = 1 - tt / 0.86;
+    if (px === 3 || kind < 0.12 || up > hgt) return W[2][4];
+    if (kind < 0.3) return up > hgt * 0.6 ? W[2][4] : R('#a8aeb0')[px === 0 ? 1 : px === 2 ? 3 : 2];
+    if (up > hgt - 0.12 && px !== 1) return W[2][4];
+    const C = R(BOT[Math.floor(h2(cell, row, 33) * BOT.length)]);
+    return C[up > hgt - 0.12 ? 3 : px === 0 ? 1 : px === 2 ? 3 : 2];
+  } });
+  F.box(6, 90, b0 - 1, b0 + 8, 46, 49, W, { top: () => W[0][1], face: (s, t) => W[1][t < 0.4 ? 0 : 2] });
+  F.at(20, b0 + 12, 16, (x, y) => MUG(K, x, y)); F.at(70, b0 + 11, 16, (x, y) => JUG(K, x, y));
+  F.done(4);
+}
+/* a cask rack: a timber cradle with two casks lying on it and a third on those, their heads to the front with a
+   brass tap in each, hooped in iron. snug: set against the room wall behind its tile */
+function caskRack(K, o) {
+  const F = furniture(K, o, T, T), W = mat('oak'), Cw = R('#9a6a40'), I = mat('iron'), G = mat('brass'), b0 = o.snug ? -40 : 6, LEN = 24, r = 11;
+  F.box(10, 86, b0 + 2, b0 + LEN - 2, 0, 4, W);
+  const f = F.f, ns = F.ns;
+  const cask = (a, z) => F.at(a, b0 + LEN, z, (x, y) => {
+    const cy = y - r;
+    if (ns) {
+      /* seen from its head: the staves running back, the round head in front */
+      K.rect(x - r, cy - LEN, x + r + 1, cy, (px, py) => ((cy - py) % 8 === 3 ? I[1][2] : Cw[px < x - r / 2 ? 1 : px > x + r / 2 ? 3 : 2]));
+      K.oval(x, cy - LEN, r, r * 0.5, (px, py, dx) => Cw[dx < 0 ? 1 : 2]);
+      K.oval(x, cy, r, r, (px, py, dx, dy) => { const dd = Math.hypot(dx, dy); return dd > 0.86 ? I[1][dx + dy < 0 ? 1 : 3] : dd > 0.72 ? Cw[3] : Cw[(Math.floor((px - x + r) / 4) % 2) ? 1 : 2]; });
+      if (f === 0) { K.rect(x - 1, cy + 2, x + 2, cy + 4, G[1][1]); K.set(x, cy + 4, G[1][3]); K.set(x, cy + 5, G[1][3]); }
+    } else {
+      /* side on: its length across the view, hoops round it, its head at the front end */
+      const dir = f === 1 ? 1 : -1, x0 = dir > 0 ? x - LEN : x, x1 = dir > 0 ? x : x + LEN;
+      K.rect(x0, cy - r, x1, cy + r, (px, py) => (Math.abs(px - (x0 + x1) / 2) % 9 < 1.5 ? I[1][2] : Cw[py < cy - r / 2 ? 1 : py > cy + r / 2 ? 3 : 2]));
+      K.oval(dir > 0 ? x1 : x0, cy, 3, r, (px, py, dx) => Cw[dx * dir > 0 ? 1 : 3]);
+    }
+  });
+  cask(30, 4); cask(66, 4); cask(48, 4 + r * 2 - 4);
+  F.done(4);
+}
 
 const FURNITURE = {
   /* a bed, its head at the back: posts and a panelled headboard, a lower footboard, a mattress under a white sheet
@@ -1213,8 +1368,148 @@ const FURNITURE = {
       K.line(x - 8, y, x - 8, y - 18, W[1][3]); K.oval(x - 8, y - 20, 3, 3, (px, py, dx, dy) => R('#f0e6cb')[dx + dy < 0 ? 0 : 2]);
     });
     F.done(3);
+  }  ,
+  /* the tavern's: the bar counter, a table with chairs, a long table between benches, the back bar and the casks
+     (see barCounter and the rest above) */
+  bar: (K, o) => barCounter(K, o),
+  tableset: (K, o) => {
+    const F = furniture(K, o, T, T), W = mat('oak'), C = mat('walnut'), v = Math.floor((o.v ?? 0.5) * 991);
+    const [t0, t1, t2, t3] = TABLE;
+    for (const [a, b, back] of seatsOf(o)) chairAt(F, a, b, back, C);
+    F.legs(t0 + 2, t1 - 2, t2 + 2, t3 - 2, 11, W, 3);
+    F.box(t0 + 2, t1 - 2, t2 + 2, t2 + 4, 8, 11, W); F.box(t0 + 2, t1 - 2, t3 - 4, t3 - 2, 8, 11, W);
+    F.box(t0, t1, t2, t3, 11, 13, W, { top: (u, vv, x, y) => W[0][(F.ns ? y : x) % 8 === 0 ? 3 : h2(x, y, 6) < 0.05 ? 1 : 2] });
+    const things = [[32, 40, MUG], [62, 54, MUG], [44, 52, PLATE], [56, 40, JUG], [36, 56, (K2, x, y) => CANDLE(K2, x, y, 3)], [66, 42, PLATE], [50, 46, MUG]];
+    for (const [a, b, fn] of things) if (h2(a, v, 3) < 0.7) F.at(a, b, 13, (x, y) => fn(K, x, y));
+    F.done(0);
+    /* a soft shadow east of the table and under it, and one beside each chair */
+    const tr = turned(F.f, T, T, t0, t1, t2, t3); K.shadow(tr[0] + 2, tr[1] + 2, tr[2], tr[3], 4);
+  },
+  feastset: (K, o) => {
+    const F = furniture(K, o, 2 * T, T), W = mat('oak'), v = Math.floor((o.v ?? 0.5) * 991);
+    for (const b of [16, 70]) { for (const a of [32, 156]) F.box(a, a + 3, b + 1, b + 9, 0, 7, W); F.box(28, 164, b, b + 10, 7, 10, W); }
+    for (const a of [26, 162]) { F.box(a, a + 4, 36, 60, 0, 2, W); F.box(a, a + 4, 46, 50, 2, 11, W); }
+    F.box(30, 162, 47, 49, 4, 6, W);
+    F.box(22, 170, 34, 62, 11, 13, W, { top: (u, vv, x, y) => W[0][Math.floor(vv * 4) !== Math.floor((vv + 0.06) * 4) ? 3 : h2(x >> 2, y, 7) < 0.08 ? 3 : 2] });
+    for (let a = 34; a < 166; a += 22) { F.at(a, 39, 13, (x, y) => PLATE(K, x, y)); F.at(a + 11, 57, 13, (x, y) => PLATE(K, x, y)); if (h2(a, v, 2) < 0.6) F.at(a + 6, 44, 13, (x, y) => MUG(K, x, y)); }
+    F.at(96, 50, 13, (x, y) => { const P = R('#e6dcc6'), M = R('#b8743a'); K.oval(x, y - 1, 7, 3, P[1]); K.oval(x, y - 3, 5, 3, (px, py, dx, dy) => M[dx + dy < -0.4 ? 0 : dx > 0.4 ? 3 : 1]); K.set(x - 5, y - 5, R('#f2ece0')[0]); K.set(x - 6, y - 6, R('#f2ece0')[0]); });
+    for (const a of [62, 130]) F.at(a, 50, 13, (x, y) => { K.rect(x - 1, y - 1, x + 2, y, R('#c9a24f')[1]); CANDLE(K, x, y - 1, 5); });
+    F.at(150, 52, 13, (x, y) => JUG(K, x, y)); F.at(44, 52, 13, (x, y) => { const C = R('#c99a5a'); K.oval(x, y - 2, 5, 2.5, (px, py, dx, dy) => C[dy < -0.3 ? 0 : dx > 0.4 ? 3 : 1]); });
+    F.done(0);
+    const tr = turned(F.f, 2 * T, T, 22, 170, 34, 62); K.shadow(tr[0] + 2, tr[1] + 2, tr[2], tr[3], 4);
+  },
+  backbar: (K, o) => backBar(K, o),
+  casks: (K, o) => caskRack(K, o),
+  /* a coat stand: a turned pole on splayed feet, a cloak and a satchel on its pegs and a hat on top */
+  coatrack: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('walnut'), cloak = mat(['green', 'blue', 'red'][Math.floor((o.v ?? 0.5) * 3) % 3]), Lr = R('#8e6a44');
+    F.at(16, 22, 0, (x, y) => {
+      for (const [dx, dy] of [[-5, 1], [5, 1], [0, -2]]) K.line(x, y - 3, x + dx, y + dy, W[1][3]);
+      K.rect(x, y - 32, x + 2, y - 2, (px) => W[1][px === x ? 1 : 3]);
+      K.rect(x - 4, y - 29, x + 6, y - 28, W[1][2]);
+      K.poly([[x - 3, y - 29], [x - 9, y - 9], [x - 6, y - 7], [x - 1, y - 9], [x, y - 28]], (px, py) => cloak[1][px < x - 6 ? 1 : py > y - 12 ? 3 : 2]);
+      K.rect(x + 3, y - 27, x + 4, y - 19, Lr[3]); K.rect(x + 2, y - 20, x + 8, y - 14, (px) => Lr[px === x + 2 ? 1 : px === x + 7 ? 3 : 2]);
+      K.rect(x - 4, y - 34, x + 6, y - 32, R('#4a3424')[2]); K.rect(x - 2, y - 38, x + 4, y - 34, (px) => R('#5a4030')[px === x - 2 ? 1 : 2]); K.rect(x - 2, y - 35, x + 4, y - 34, R('#8e2c26')[2]);
+      K.ovalShadow(x + 3, y + 1, 7, 2.5);
+    });
+    F.done(0);
+  },
+  /* sacks of grain: two leaning together, tied at the neck, one open with the grain showing */
+  sacks: (K, o) => {
+    const F = furniture(K, o, 32, 32), S = R('#c8b28a'), Gr = R('#e2cb84');
+    F.at(16, 24, 0, (x, y) => {
+      K.mass(x - 5, y - 7, 6, 8, S, 3); K.rect(x - 6, y - 17, x - 3, y - 14, S[3]); K.oval(x - 5, y - 17, 2.5, 1.5, S[1]);
+      K.mass(x + 5, y - 6, 7, 7, S, 5); K.oval(x + 5, y - 12, 5, 2, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.7 ? S[3] : Gr[h2(px, py, 3) < 0.4 ? 0 : 2]));
+      K.mass(x - 1, y - 2, 5, 3, S, 7);
+      K.ovalShadow(x + 3, y, 12, 3);
+    });
+    F.done(0);
+  },
+  /* a crib of split firewood, the cut ends to the front, an axe leaning on it */
+  firewood: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), Lg = R('#8e6a44'), End = R('#d8bb8a');
+    F.box(5, 27, 14, 26, 0, 2, W);
+    for (const a of [5, 25]) F.box(a, a + 2, 14, 26, 2, 14, W);
+    F.at(16, 26, 2, (x, y) => {
+      for (let row = 0; row < 3; row++) for (let k = 0; k < 4 - (row === 2 ? 1 : 0); k++) {
+        const cx = x - 7 + k * 5 + (row % 2) * 2, cy = y - 3 - row * 4;
+        K.rect(cx - 2, cy - 14, cx + 3, cy - 2, Lg[2]);
+        K.oval(cx, cy, 2.5, 2, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.7 ? Lg[3] : End[h2(px, py, row) < 0.3 ? 2 : 1]));
+      }
+      K.line(x + 11, y - 1, x + 9, y - 14, W[1][1]); K.rect(x + 7, y - 16, x + 11, y - 13, R('#a8aeb0')[1]);
+    });
+    F.done(3);
+  },
+  /* a notice board on two posts, bills and notices pinned to it */
+  noticeboard: (K, o) => {
+    const F = furniture(K, o, 32, 32), W = mat('oak'), Cork = R('#b08a58');
+    for (const a of [5, 25]) F.box(a, a + 2, 15, 17, 0, 30, W);
+    F.box(4, 28, 15, 17, 12, 30, W, { panel: false, face: (s, t, which, x, y) => {
+      if (s < 0.06 || s > 0.94 || t < 0.08 || t > 0.92) return W[1][t < 0.08 || s < 0.06 ? 1 : 3];
+      if (which !== 'front') return null;
+      const k = Math.floor(s * 4), rw = t < 0.5 ? 0 : 1, n = h2(k, rw, 11), ok = n < 0.75 && Math.abs((s * 4) % 1 - 0.5) < 0.38 && Math.abs((t * 2) % 1 - 0.5) < 0.32;
+      if (ok) return R(n < 0.25 ? '#f4efe2' : n < 0.5 ? '#e8d8a8' : '#d9c4a0')[((y + x) % 3 === 0 && (t * 2) % 1 > 0.35) ? 3 : 1];
+      return Cork[h2(x, y, 4) < 0.3 ? 1 : 2];
+    } });
+    F.box(3, 29, 14, 18, 30, 32, W, { top: () => W[0][1] });
+    F.done(3);
+  }
+
+};
+
+/* ---------- things hung on a room wall ----------
+   A wall with something on it is the wall (roomWall) with the thing on its face, where the face shows: on a run across
+   the view. A shelf of plates and tankards on brackets, a stag's antlers on a carved plaque, a painted shield over
+   crossed swords, an iron sconce whose candle warms the plaster round it. */
+/* warm what is drawn round (cx, cy) toward candlelight, most at the middle */
+function candlelight(K, cx, cy, rx, ry, k = 0.5) {
+  for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+    const d = Math.hypot((x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry); if (d > 1) continue;
+    const X = x + K.ox, Y = y + K.oy; if (X < 0 || Y < 0 || X >= K.w || Y >= K.h) continue;
+    const i = (Y * K.w + X) * 4, a = k * (1 - d) * (1 - d); if (K.px[i + 3] !== 255) continue;
+    K.px[i] += (255 - K.px[i]) * a; K.px[i + 1] += (214 - K.px[i + 1]) * a; K.px[i + 2] += (130 - K.px[i + 2]) * a * 0.5;
+  }
+}
+const HUNG = {
+  wallshelf(K, m, top) {
+    const Wd = R('#7a5a3a'), y = top + 16;
+    for (const x of [m - 15, m + 14]) { K.rect(x, y + 1, x + 2, y + 6, Wd[3]); K.line(x, y + 5, x - 2, y + 1, Wd[3]); }
+    /* plates standing on the back of the shelf, tankards and a jug in front of them */
+    for (const [dx, c] of [[-12, '#f2ece0'], [-4, '#c9d4d8'], [5, '#e8c49a']]) K.oval(m + dx, y - 4, 3.5, 3.5, (px, py, ddx, ddy) => R(c)[Math.hypot(ddx, ddy) > 0.7 ? 2 : Math.hypot(ddx, ddy) < 0.3 ? 1 : 0]);
+    for (const dx of [-8, 1, 10]) { const C = R(dx === 1 ? '#a8aeb0' : '#8e6a44'); K.rect(m + dx - 1, y - 4, m + dx + 2, y, (px) => C[px === m + dx - 1 ? 1 : 2]); K.set(m + dx + 2, y - 3, C[3]); K.set(m + dx + 2, y - 2, C[3]); }
+    JUG(K, m + 15, y);
+    K.rect(m - 18, y, m + 19, y + 1, Wd[0]); K.rect(m - 18, y + 1, m + 19, y + 3, Wd[2]);
+  },
+  wallantlers(K, m, top) {
+    const Wd = R('#6b4c32'), B = R('#e8dcc0');
+    K.oval(m, top + 18, 5, 7, (px, py, dx, dy) => Wd[Math.hypot(dx, dy) > 0.75 ? 3 : dx + dy < -0.3 ? 1 : 2]);
+    K.oval(m, top + 15, 2.5, 3, R('#c8b28a')[2]);
+    for (const s of [-1, 1]) {
+      /* a beam curving up and out, tines off it */
+      let px = m + s * 2, py = top + 13;
+      for (let k = 0; k < 12; k++) { px += s * (k < 6 ? 1 : 0.5); py -= k < 6 ? 0.6 : 1; K.set(px, py, B[k % 3 === 0 ? 2 : 1]); K.set(px, py + 1, B[3]); }
+      for (const [k, l] of [[3, 4], [7, 4], [10, 3]]) { const bx = m + s * (2 + Math.min(k, 6) + Math.max(0, k - 6) * 0.5), by = top + 13 - (Math.min(k, 6) * 0.6 + Math.max(0, k - 6)); for (let i = 1; i <= l; i++) K.set(bx - s * i * 0.3, by - i, B[1]); }
+    }
+  },
+  wallshield(K, m, top, o) {
+    const Mt = R('#c8ccd0'), Gd = R('#c9a24f'), C = R(['#8e2c26', '#3e5470', '#465c36'][Math.floor((o.v ?? 0.5) * 3) % 3]);
+    for (const s of [-1, 1]) { for (let i = 0; i <= 22; i++) K.set(m - s * 11 + s * i, top + 4 + i, Mt[i < 3 ? 2 : 1]); K.rect(m + s * 8 - 2, top + 21, m + s * 8 + 2, top + 22, Gd[1]); K.rect(m + s * 10 - 1, top + 22, m + s * 10 + 1, top + 26, R('#5a3f28')[2]); }
+    K.oval(m, top + 14, 8, 9, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); if (d > 0.84) return Gd[dx + dy < 0 ? 1 : 3]; if (d < 0.22) return Gd[dx + dy < 0 ? 0 : 2]; return Math.abs(dx) < 0.12 || Math.abs(dy) < 0.12 ? R('#efe3c4')[1] : C[dx + dy < -0.2 ? 1 : 2]; });
+  },
+  wallsconce(K, m, top) {
+    const I = R('#3b3a38'), y = top + 20;
+    K.rect(m - 1, y, m + 2, y + 6, I[2]); K.line(m, y + 2, m + 3, y - 2, I[1]);
+    K.rect(m + 1, y - 3, m + 6, y - 2, I[2]);
+    K.rect(m + 3, y - 9, m + 5, y - 3, R('#f4efe2')[1]);
+    K.set(m + 3, y - 10, R('#f6d36a')[0]); K.set(m + 4, y - 10, R('#f6d36a')[0]); K.set(m + 3, y - 11, R('#f4a03a')[1]); K.set(m + 3, y - 12, R('#f6d36a')[0], 140);
+    candlelight(K, m + 4, y - 10, 18, 15, 0.55);
   }
 };
+function wallHung(K, o, id) {
+  roomWall(K, o);
+  const L = o.links || [0, 0, 0, 0];
+  if (L[0] || L[2] || !(L[1] || L[3])) HUNG[id](K, T / 2, T / 2 + RT - ROOMW, o);
+}
 
 const INTERIOR = {
   iwall: (K, o) => roomWall(K, o),
@@ -1223,6 +1518,12 @@ const INTERIOR = {
   post: (K) => { const P = R('#7a5a3a'), cx = K.FW / 2, cy = K.FD / 2; K.rect(cx - 3, cy - ROOMW, cx + 3, cy + 3, (x) => P[x < cx - 1 ? 1 : 3]); },
   hearth: (K, o) => roomHearth(K, o),
   stairs: (K, o) => stairsSprite(K, o),
+  wallshelf: (K, o) => wallHung(K, o, 'wallshelf'),
+  wallantlers: (K, o) => wallHung(K, o, 'wallantlers'),
+  wallshield: (K, o) => wallHung(K, o, 'wallshield'),
+  wallsconce: (K, o) => wallHung(K, o, 'wallsconce'),
+  /* a wall with the back bar standing against it (backBar) */
+  wallbar: (K, o) => { roomWall(K, o); const L = o.links || [0, 0, 0, 0]; if (L[0] || L[2] || !(L[1] || L[3])) backBar(K, { face: 0, v: o.v }, T / 2 + RT + 1); },
   ...FURNITURE
 };
 
@@ -1324,22 +1625,50 @@ function stairsSprite(K, o) {
 const FLIGHT_W = 30, FLIGHT_L = 56;
 /* (the town view sets a flight in a corner of its tile: see flightRect in town/view.js) */
 const flightBox = f => { const a = (T - FLIGHT_W) / 2, b = (T - FLIGHT_L) / 2; return f % 2 === 0 ? [a, b, a + FLIGHT_W, b + FLIGHT_L] : [b, a, b + FLIGHT_L, a + FLIGHT_W]; };
-const ROOM = new Set(['iwall', 'iwindow', 'idoor', 'post', 'stairs', 'hearth']);
+const ROOM = new Set(['iwall', 'iwindow', 'idoor', 'post', 'stairs', 'hearth', ...HUNG_WALLS]);
+/* the tavern's pieces drawn across their whole tile (see barCounter) */
+const FULL = new Set(['bar', 'tableset', 'feastset', 'backbar', 'casks']);
+/* the room pieces a piece can stand against, and the pieces that do (drawn back against the wall behind their tile) */
+const WALLED = new Set(['iwall', 'iwindow', 'hearth', 'post', ...HUNG_WALLS]), SNUG = new Set(['backbar', 'casks']);
+/* how the pieces objs fit the room round them: for piece o, { snug: whether it stands with its back to a room wall on the
+   tile behind it (SNUG pieces only), shift and ends: for a bar piece, how far its counter stands off the middle of
+   its tile ([x, y], the same for every piece of a run of joined bar pieces: set back toward the back of the pieces
+   facing north or south, and of those facing east or west) and which of its sides have a room wall beside them
+   ([+x, +y, -x, -y]) } */
+function fitTo(objs) {
+  const key = (L, x, y) => `${L},${x},${y}`, walls = new Set(), bars = new Map(), shift = new Map(), D = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  for (const p of objs) { if (WALLED.has(p.id)) walls.add(key(p.level || 0, p.x, p.y)); if (p.id === 'bar') bars.set(key(p.level || 0, p.x, p.y), p); }
+  for (const p of bars.values()) {
+    if (shift.has(p)) continue;
+    const net = [p], sh = [0, 0]; shift.set(p, sh);
+    for (let i = 0; i < net.length; i++) {
+      const c = net[i], f = facing(c) & 3;
+      if (f % 2 === 0 && !sh[1]) sh[1] = f === 0 ? -BAR_BACK : BAR_BACK;
+      if (f % 2 && !sh[0]) sh[0] = f === 3 ? BAR_BACK : -BAR_BACK;
+      for (const [dx, dy] of D) { const n = bars.get(key(c.level || 0, c.x + dx, c.y + dy)); if (n && !shift.has(n)) { shift.set(n, sh); net.push(n); } }
+    }
+  }
+  return o => {
+    const L = o.level || 0, wall = (dx, dy) => walls.has(key(L, o.x + dx, o.y + dy)), [bx, by] = [[0, -1], [-1, 0], [0, 1], [1, 0]][facing(o) & 3];
+    if (o.id === 'bar') return { snug: false, shift: shift.get(o) || null, ends: D.map(([dx, dy]) => (wall(dx, dy) ? 1 : 0)) };
+    return { snug: SNUG.has(o.id) && wall(bx, by), shift: null, ends: null };
+  };
+}
 const shadowOf = a => (a.group === 'Interior' ? 0 : Math.min(16, 4 + a.h * 0.3));
 /* the sprite for placed piece o ({ id, face, v, links }), trimmed to what is drawn:
    { w, h, px, ox, oy } with (ox, oy) the footprint's north-west corner */
 /* drawn at the tile set's 32 scale and stood in the middle of the south edge of their footprint */
-const SMALL = new Set([...Object.keys(NATURE), ...Object.keys(PROPS).filter(id => id !== 'fence'), ...Object.keys(INTERIOR).filter(id => !ROOM.has(id))]), MID = new Set(['yurt', 'mine', 'watchtower', 'granary', 'dovecote', 'shrine']);
+const SMALL = new Set([...Object.keys(NATURE), ...Object.keys(PROPS).filter(id => id !== 'fence'), ...Object.keys(INTERIOR).filter(id => !ROOM.has(id) && !FULL.has(id))]), MID = new Set(['yurt', 'mine', 'watchtower', 'granary', 'dovecote', 'shrine']);
 function pieceSprite(o) {
   const a = ASSET_BY_ID[o.id], [fw, fd] = footprint(o), U = SMALL.has(o.id) ? 32 : MID.has(o.id) ? 64 : T, small = U !== T, FW = fw * U, FD = fd * U, up = Math.round(Math.max(40, (a ? a.h : 16) * 4.4 + 60));
   /* a flight set in a corner reaches into the tiles beside its own */
-  const K = kit(FW, FD, up, small ? 50 : o.id === 'stairs' ? 64 : 16), draw = DRAW[o.id];
-  const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null, box: o.box || null };
+  const K = kit(FW, FD, up, small ? 50 : o.id === 'stairs' || o.id === 'bar' ? 64 : 16), draw = DRAW[o.id];
+  const inst = { face: o.face || 0, v: o.v ?? 0.5, links: o.links || null, box: o.box || null, snug: o.snug || 0, shift: o.shift || null, ends: o.ends || null };
   if (draw) draw(K, inst);
   else K.box(4, 4, FW - 4, FD - 4, Math.min(30, (a ? a.h : 8) * 1.4), R('#c4b99f')[1], R('#c4b99f')[3]);
   if (SOFT.has(o.id)) K.softEdge();
   /* room walls join the next seamlessly: no ink where they meet it */
-  else if (WALLS_JOINED.has(o.id)) { const L = o.links || [0, 0, 0, 0]; K.outline(0.6, (x, y) => (L[2] && x <= 0) || (L[0] && x >= FW - 1) || (L[3] && y <= -ROOMW + 1) || (L[1] && y >= FD - 1)); }
+  else if (WALLS_JOINED.has(o.id) || o.id === 'bar') { const L = o.links || [0, 0, 0, 0], top = o.id === 'bar' ? -BAR_H : -ROOMW + 1; K.outline(0.6, (x, y) => (L[2] && x <= 0) || (L[0] && x >= FW - 1) || (L[3] && y <= top) || (L[1] && y >= FD - 1)); }
   else K.outline(a && a.group === 'Interior' ? 0.6 : TREES.has(o.id) ? 0.5 : 0.75);
   /* the shadow falls on the ground to the east, and under trees and props as a pool round their foot */
   const len = a ? shadowOf(a) : 6;
@@ -1363,4 +1692,4 @@ function trim(K) {
 }
 const DESIGNED = new Set(Object.keys(DRAW));
 
-export { DESIGNED, FIRE, FLIGHT_L, FLIGHT_W, MID, ROOM, SMALL, TREES, flightBox, pieceSprite, treeOffset };
+export { DESIGNED, FIRE, FLIGHT_L, FLIGHT_W, MID, ROOM, SMALL, TREES, TABLE, barRuns, barStools, fitTo, flightBox, pieceSprite, seatsOf, treeOffset, turned };
