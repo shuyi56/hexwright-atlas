@@ -19,16 +19,16 @@
    - The people: the innkeeper behind the bar (talked to across the counter), a healer and a guard at it, a monk at the fire, a farmer and a
      villager at the tables, and a noble guest upstairs.
    Two shops stand on the lane either side of the inn, each furnished inside:
-   - The smithy, east of the inn, a stone-floored workshop three tiles across: a forge against the back wall with its
-     bellows, coal and bar iron beside it and a quenching trough, hammers and tongs hung on the wall either side; the
-     anvil before the forge with the smith beside it; a weapon rack and an armour stand on the west wall and a
-     grindstone by the east one.
+   - The smithy, east of the inn, a stone-floored workshop two tiles across: the forge in the back corner with its
+     bellows, hammers and tongs hung on the wall beside it, the anvil before it and the smith at its side. Outside,
+     the smith's yard: coal and bar iron, a quenching trough, a grindstone, and a weapon rack and an armour stand set
+     out as wares.
    - The alchemist's shop, west of the inn, three tiles across on a dark oak floor with a blue runner: two workbenches
      of apparatus against the back wall beside shelves of potions, herbs drying on the wall, a cabinet of apothecary
      drawers and a herb rack on the west wall, a bubbling cauldron, the alchemist before the benches, and stairs in
      the corner up to a study: a bed, a chest under the star chart, a bookshelf, a desk and more potions.
    Outside, cottages and a townhouse stand on the lane with the shops and the inn, with a well, lamp posts, a
-   signpost, barrels, crates and a log pile, a garden with oaks, a bush and flowers to the south, and the hero on the
+   signpost, barrels and crates, a garden with oaks, a bush and flowers to the south, and the hero on the
    lane. Deterministic: the same map every time. */
 import { writeFileSync } from 'node:fs';
 import { blankModel, TI, toJSON } from '../src/editor/model.js';
@@ -101,16 +101,14 @@ stand(I, 'noble', 4, 6, 0, 1);   /* a guest upstairs */
 /* the outer walls of room R (side S) on floor L: the special pieces by 'x,y', interior wall elsewhere */
 const shell = (R, S, special, L = 0) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (!x || !y || x === S - 1 || y === S - 1) put(R, special[x + ',' + y] || 'iwall', x, y, 0, L); };
 
-/* the smithy: 5 tiles square (three of stone floor inside the walls), the door in the middle of the south wall */
-const SM = 5, H = blankModel(SM, 'stonefloor', 'The Smithy');
-/* hammers and tongs hung on the back wall either side of the forge, windows in the side walls and by the door */
-shell(H, SM, { '1,0': 'walltools', '3,0': 'walltools', '0,2': 'iwindow', '4,2': 'iwindow', '1,4': 'iwindow', '2,4': 'idoor' });
-/* along the back wall: coal and bar iron, the forge and the quenching trough */
-put(H, 'ironstock', 1, 1); put(H, 'forge', 2, 1, 0); put(H, 'quench', 3, 1);
-/* the anvil before the forge, the smith beside it; a weapon rack and an armour stand on the west wall, a grindstone by
-   the east one */
-put(H, 'anvil', 2, 2); put(H, 'weaponrack', 1, 2, 1); put(H, 'armorstand', 1, 3, 1); put(H, 'grindstone', 3, 3);
-stand(H, 'smith', 3, 2, 3);     /* beside the anvil, turned to it */
+/* the smithy: 4 tiles square (two of stone floor inside the walls, a workshop about six paces across), the door at the
+   east end of the south wall */
+const SM = 4, H = blankModel(SM, 'stonefloor', 'The Smithy');
+/* hammers and tongs hung on the back wall beside the forge, a window in the east wall and by the door */
+shell(H, SM, { '2,0': 'walltools', '3,1': 'iwindow', '1,3': 'iwindow', '2,3': 'idoor' });
+/* the forge in the back corner, the anvil before it, and the smith beside the forge, facing the door */
+put(H, 'forge', 1, 1, 0); put(H, 'anvil', 1, 2);
+stand(H, 'smith', 2, 1, 0);
 
 /* the alchemist's shop: 5 tiles square on a dark oak floor with a blue runner, the stairs in the south-east corner up to
    a study */
@@ -134,17 +132,20 @@ put(A, 'desk', 3, 2, 3, 1); put(A, 'potionshelf', 1, 3, 1, 1);
 stand(A, 'alchemist', 2, 2, 0); /* before the benches, facing the shop */
 
 /* ---------- the lane outside ---------- */
-const N = 16, M = blankModel(N, 'grass', 'Oakfield Lane');
+const N = 18, M = blankModel(N, 'grass', 'Oakfield Lane');
 const set = (x, y, t) => { if (x >= 0 && y >= 0 && x < N && y < N) M.terr[y * N + x] = TI[t]; };
 for (let x = 0; x < N; x++) for (const y of [5, 6]) set(x, y, 'cobble');
 for (let y = 7; y < N; y++) set(9, y, 'dirt');
 for (let y = 9; y < 13; y++) for (let x = 2; x < 7; x++) set(x, y, rnd() < 0.5 ? 'meadow' : 'grass');
 const inn = put(M, 'tavern', 5, 4, 0);
 inn.interior = I;
-/* the alchemist's shop west of the inn, the smithy east of it with its log pile */
+/* the alchemist's shop west of the inn, the smithy east of it */
 put(M, 'alchemist', 1, 4, 0).interior = A;
 put(M, 'blacksmith', 9, 4, 0).interior = H;
-put(M, 'logpile', 11, 4, 0); put(M, 'townhouse', 12, 4, 0); put(M, 'cottage', 14, 4, 0);
+/* the smith's yard east of the smithy: the coal and bar iron, the quenching trough and the grindstone, and a weapon
+   rack and an armour stand set out as wares */
+put(M, 'ironstock', 11, 4, 0); put(M, 'quench', 12, 4, 0); put(M, 'grindstone', 13, 4, 0); put(M, 'weaponrack', 14, 4, 0); put(M, 'armorstand', 15, 4, 0);
+put(M, 'townhouse', 16, 4, 0); put(M, 'cottage', 17, 4, 0);
 put(M, 'barrels', 7, 4); put(M, 'crates', 4, 4); put(M, 'signpost', 8, 4); put(M, 'bush', 3, 4);
 put(M, 'well', 10, 8); put(M, 'lamppost', 4, 7); put(M, 'lamppost', 11, 7);
 /* the garden to the south behind a fence, oaks, a bush and flowers */
@@ -153,6 +154,7 @@ for (const [x, y] of [[2, 11], [6, 12], [12, 11]]) put(M, 'oak', x, y);
 for (const [x, y] of [[3, 10], [5, 10], [4, 12], [11, 10]]) put(M, 'flowers', x, y);
 put(M, 'bush', 7, 10); put(M, 'beech', 13, 13); put(M, 'oak', 0, 1); put(M, 'birch', 7, 1); put(M, 'oak', 13, 0);
 put(M, 'oak', 15, 10); put(M, 'birch', 14, 15); put(M, 'flowers', 13, 9); put(M, 'pine', 15, 2);
+put(M, 'oak', 17, 12); put(M, 'beech', 16, 16); put(M, 'bush', 17, 8); put(M, 'pine', 17, 1);
 stand(M, 'villager', 6, 6, 2);
 stand(M, 'farmer', 11, 6, 3);
 

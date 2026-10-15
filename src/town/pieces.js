@@ -2264,13 +2264,14 @@ const nudgeOf = (o, f) => {
 };
 /* how the pieces objs fit the room round them: for piece o, { snug: whether it stands with its back to a room wall on the
    tile behind it (SNUG and SNUG_SMALL pieces only), nudge: for a SNUG_SMALL piece standing so, how far it is moved
-   toward that wall ([x, y] map pixels), shift and ends: for a bar piece, how far its counter stands off the middle of
+   toward that wall ([x, y] map pixels), and for an anvil before a forge, how far it is drawn up to it, shift and ends: for a bar piece, how far its counter stands off the middle of
    its tile ([x, y], the same for every piece of a run of joined bar pieces: set back toward the back of the pieces
    facing north or south, and of those facing east or west) and which of its sides have a room wall beside them
    ([+x, +y, -x, -y]) } */
 function fitTo(objs) {
   const key = (L, x, y) => `${L},${x},${y}`, walls = new Set(), backs = new Set(), bars = new Map(), shift = new Map(), D = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-  for (const p of objs) { if (WALLED.has(p.id)) walls.add(key(p.level || 0, p.x, p.y)); if (p.id === 'wallbar') backs.add(key(p.level || 0, p.x, p.y)); if (p.id === 'bar') bars.set(key(p.level || 0, p.x, p.y), p); }
+  const forges = new Set();
+  for (const p of objs) { if (WALLED.has(p.id)) walls.add(key(p.level || 0, p.x, p.y)); if (p.id === 'wallbar') backs.add(key(p.level || 0, p.x, p.y)); if (p.id === 'bar') bars.set(key(p.level || 0, p.x, p.y), p); if (p.id === 'forge') forges.add(key(p.level || 0, p.x, p.y)); }
   for (const p of bars.values()) {
     if (shift.has(p)) continue;
     const net = [p], sh = [0, 0]; shift.set(p, sh);
@@ -2284,6 +2285,8 @@ function fitTo(objs) {
   return o => {
     const L = o.level || 0, wall = (dx, dy) => walls.has(key(L, o.x + dx, o.y + dy)), [bx, by] = [[0, -1], [-1, 0], [0, 1], [1, 0]][facing(o) & 3];
     if (o.id === 'bar') return { snug: false, shift: shift.get(o) || null, ends: D.map(([dx, dy]) => (dy < 0 && backs.has(key(L, o.x, o.y - 1)) ? 2 : wall(dx, dy) ? 1 : 0)) };
+    /* an anvil with a forge on the tile north of it stands up close before the forge, where the smith works */
+    if (o.id === 'anvil' && forges.has(key(L, o.x, o.y - 1))) return { snug: false, nudge: [0, -100], shift: null, ends: null };
     if (SNUG_SMALL.has(o.id)) {
       /* the wall behind its back: to the north or west of its footprint's corner, or east past its width */
       const f = facing(o) & 3, [fw] = footprint(o), n = nudgeOf(o, f), back = f === 0 ? wall(0, -1) : f === 1 ? wall(-1, 0) : f === 3 ? wall(fw, 0) : false;

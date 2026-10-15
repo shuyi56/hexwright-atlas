@@ -610,9 +610,10 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   of glowing bottles and coloured fumes from the chimney; inside, on a dark oak floor, two workbenches of apparatus and
   shelves of potions against the back wall, apothecary drawers and a herb rack on the west wall, a bubbling cauldron,
   the alchemist, and stairs up to a study with a star chart. East of it the **smithy**: a stone workshop whose forge
-  bay stands open to the lane, glowing; inside, the forge with its bellows between coal and bar iron and a quenching
-  trough, hammers and tongs on the walls, the anvil with the smith beside it, a weapon rack, an armour stand and a
-  grindstone. Its map is built by `node tools/make-wayfarers-rest.mjs`.
+  bay stands open to the lane, glowing; inside, a workshop two tiles across with the forge and its bellows in the back
+  corner, hammers and tongs on the wall, the anvil drawn up before the forge and the smith beside it; outside, the
+  smith's yard of coal and bar iron, a quenching trough, a grindstone, and a weapon rack and an armour stand set out
+  as wares. (An anvil with a forge just north of it stands up close before the forge in the town view.) Its map is built by `node tools/make-wayfarers-rest.mjs`.
 
 ![Oakfield Lane: the alchemist's shop, the Wayfarer's Rest and the smithy](docs/images/oakfield-lane.png)
 

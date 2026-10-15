@@ -89,13 +89,14 @@ test('the Wayfarer\'s Rest scene: a smithy and an alchemist\'s shop on the lane,
   const solo = I => { const [ax, ay] = arrival(I); return { ...I, chars: [{ sprite: 'villager', x: ax, y: ay, face: 2 }] }; };
   const has = (I, ids) => { for (const id of ids) assert.ok(I.objs.some(o => o.id === id), id); };
   const H = shop('blacksmith'), A = shop('alchemist');
-  has(H, ['forge', 'anvil', 'quench', 'grindstone', 'weaponrack', 'armorstand', 'ironstock', 'walltools']);
+  has(H, ['forge', 'anvil', 'walltools']);
+  for (const id of ['quench', 'grindstone', 'ironstock', 'weaponrack', 'armorstand']) assert.ok(M.objs.some(o => o.id === id), `the smith's ${id} outside`);
   has(A, ['alchemybench', 'brewcauldron', 'potionshelf', 'apothecary', 'herbrack', 'wallherbs', 'wallchart', 'stairs']);
   assert.ok(H.chars.some(c => c.sprite === 'smith') && A.chars.some(c => c.sprite === 'alchemist'), 'each shop is kept');
   /* the shopkeeper can be walked up to, and every corner of the floor that is not furnished can be reached */
-  for (const [I, spots] of [[H, [[2, 3, 0]]], [A, [[2, 3, 0], [2, 3, 1], [2, 2, 1], [3, 3, 0]]]]) for (const [x, y, L] of spots) assert.ok(findPath(solo(I), 0, x, y, L), `${I.name}: ${x},${y} on floor ${L}`);
+  for (const [I, spots] of [[H, [[2, 2, 0]]], [A, [[2, 3, 0], [2, 3, 1], [2, 2, 1], [3, 3, 0]]]]) for (const [x, y, L] of spots) assert.ok(findPath(solo(I), 0, x, y, L), `${I.name}: ${x},${y} on floor ${L}`);
   /* in the town view too, nothing blocks the way in from the door to the shopkeeper */
-  for (const [I, way] of [[H, [[2, 3]]], [A, [[2, 3]]]]) {
+  for (const [I, way] of [[H, [[2, 2]]], [A, [[2, 3]]]]) {
     const shapes = shapesOf(I.objs).get(0), T = TILE;
     for (const [x, y] of way) assert.ok(!hits(shapes, x * T + T / 2, y * T + T / 2, 8), `${I.name}: ${x},${y} is open`);
   }
