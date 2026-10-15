@@ -409,9 +409,8 @@ function anvilAt(K, x, y) {
    soot, where a brick forge burns under its hood with the bellows beside it, tongs and hammers hang on the back wall,
    and an anvil on its stump and a quenching barrel stand in the opening. The fire lights the bay and spills out onto the
    ground before it, and a broad stack over the forge sends up grey smoke. Turned away, the back shows windows. */
-const SMITHY_DOOR = 0.2;
 function smithyShop(K, o) {
-  const { FW } = K, front = o.face !== 2, dX = Math.round(FW * SMITHY_DOOR);
+  const { FW } = K, front = o.face !== 2, dX = Math.round(FW * ASSET_BY_ID.blacksmith.door);
   const b = house(K, o, { wall: 'stone', roof: 'slate', wallH: 26, rise: 12, doorX: dX, doorCol: '#5a3a28', windows: front ? false : undefined });
   const { top, yb, x0, x1, ridge, eave } = b, I = R('#3b3a38'), Tm = TIMBER, bx0 = Math.round(x0 + (x1 - x0) * 0.46), bx1 = x1 - 5, by0 = top + 13;
   const fx0 = bx0 + 6, fx1 = fx0 + Math.min(28, Math.round((bx1 - bx0) * 0.42));
@@ -465,9 +464,8 @@ function flaskAt(K, x, y) {
    lit from within, three shelves of bottles and flasks in it (green, violet, amber, red, teal); upstairs windows with
    boxes of herbs under them and bunches of herbs drying under the eave; the flask sign hung by the door; and from the
    chimney, fumes in pale greens and violets. Turned away, the back shows plain windows. */
-const ALCHEMIST_DOOR = 0.24;
 function alchemistShop(K, o) {
-  const { FW } = K, front = o.face !== 2, dX = Math.round(FW * ALCHEMIST_DOOR);
+  const { FW } = K, front = o.face !== 2, dX = Math.round(FW * ASSET_BY_ID.alchemist.door);
   const b = house(K, o, { wall: 'lilac', wallTex: 'timber', roof: 'indigo', wallH: 38, floors: 2, rise: 14, doorX: dX, doorCol: '#3e5470', windows: front ? false : undefined, inset: 4 });
   const { top, yb, x0, x1, ridge, eave } = b, floorH = (yb - top) / 2, tr = FW > T ? 6 : 5, tcx = x1 - Math.round(tr * RS * 0.55);
   chimney(K, Math.round(x0 + (x1 - x0) * 0.3), Math.round(ridge + (eave - ridge) * 0.4), 12, true, 7, ['#d4ecc8', '#e0d0f0', '#c8e6e4', '#ead8f4']);
@@ -2341,4 +2339,4 @@ function trim(K) {
 }
 const DESIGNED = new Set(Object.keys(DRAW));
 
-export { ALCHEMIST_DOOR, DESIGNED, FIRE, SMITHY_DOOR, FLIGHT_L, FLIGHT_W, MID, ROOM, SMALL, TREES, TABLE, barRuns, barStools, fitTo, flightBox, pieceSprite, seatsOf, treeOffset, turned };
+export { DESIGNED, FIRE, FLIGHT_L, FLIGHT_W, MID, ROOM, SMALL, TREES, TABLE, barRuns, barStools, fitTo, flightBox, pieceSprite, seatsOf, treeOffset, turned };

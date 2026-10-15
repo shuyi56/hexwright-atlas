@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hits, shapesOf } from '../town/collide.js';
 import { TILE } from '../town/ground.js';
-import { addInterior, arrival, buildingAt, canHaveInterior, doorways, interiorSize, makeInterior } from './interiors.js';
+import { addInterior, arrival, buildingAt, canHaveInterior, doorAcross, doorways, interiorSize, makeInterior } from './interiors.js';
 import { TERRAIN } from '../tiles/index.js';
 import { blankModel, cloneModel, fromJSON, objAt, toJSON } from './model.js';
 import { placePiece } from './ops.js';
@@ -115,4 +115,10 @@ test('furniture against a wall stands on the wall\'s own tile, facing into the r
   const sh = shapesOf(M.objs).get(0), T = TILE;
   assert.ok(hits(sh, 2.5 * T, 0.5 * T + 14, 4), 'the chest before the wall');
   assert.ok(!hits(sh, 2.5 * T, 1.5 * T, 6), 'the tile in front stays open');
+});
+
+test('the shops\' doors are where the town view draws them, so walking up to one goes in', () => {
+  assert.equal(doorAcross({ id: 'blacksmith', face: 0 }), 0.2);
+  assert.equal(doorAcross({ id: 'alchemist', face: 0 }), 0.24);
+  assert.equal(doorAcross({ id: 'cottage', face: 0 }), 0.5);
 });

@@ -66,7 +66,7 @@ const BUILDINGS = [
   } },
   /* the smithy: a stone workshop, its door at the west end and the rest of its front an open forge bay glowing under a
      timber lintel, an anvil in the opening and a broad stack over the forge */
-  { id: 'blacksmith', label: 'Smithy', w: 2, d: 1, h: 26, draw(K, o) {
+  { id: 'blacksmith', label: 'Smithy', w: 2, d: 1, h: 26, door: 0.2, draw(K, o) {
     const [x0, y0, x1, y1] = inset(o, 0.1), z = o.z, g = K.g, dw = doorWall(o, x0, y0, x1, y1);
     const fc = dw ? dw[0] : o.axis === 'x' ? 'y' : 'x', c = fc === 'y' ? y1 : x1, a0 = fc === 'y' ? x0 : y0, a1 = fc === 'y' ? x1 : y1, L = a1 - a0, b0 = a0 + L * 0.48, b1 = a1 - 0.1;
     const on = (a, zz) => sx(K, ...(fc === 'y' ? [a, c, zz] : [c, a, zz]));
@@ -90,7 +90,7 @@ const BUILDINGS = [
   } },
   /* the alchemist's shop: a tall timbered house of lilac plaster under indigo slate, a shop window of coloured bottles by
      its door, a round turret with a verdigris cone and a golden star at its far end, coloured fumes from its chimney */
-  { id: 'alchemist', label: 'Alchemist\'s shop', w: 2, d: 1, h: 36, draw(K, o) {
+  { id: 'alchemist', label: 'Alchemist\'s shop', w: 2, d: 1, h: 36, door: 0.24, draw(K, o) {
     const [x0, y0, x1, y1] = inset(o, 0.1), z = o.z, g = K.g, dw = doorWall(o, x0, y0, x1, y1), wall = '#e6dde6', h = 17;
     const fc = dw ? dw[0] : o.axis === 'x' ? 'y' : 'x', c = fc === 'y' ? y1 : x1, a0 = fc === 'y' ? x0 : y0, a1 = fc === 'y' ? x1 : y1, L = a1 - a0;
     K.box(x0, y0, x1, y1, z, z + h, wall, { noTop: true }); K.timber('y', y1, x0, x1, z, z + h, '#4a3424'); K.timber('x', x1, y0, y1, z, z + h, '#4a3424');
