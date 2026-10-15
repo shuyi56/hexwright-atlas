@@ -1240,39 +1240,323 @@ function caskRack(K, o) {
    behind it (SNUG), as the back bar does; the rest keep the figures' scale in the middle of their tile. */
 const BRICK = '#9a4e36', COAL = ['#f6d36a', '#f08a2a', '#c8502a', '#3a2c20'];
 const brickAt = (B, x, y) => ((((y % 3) + 3) % 3) === 0 || ((((x + (Math.floor(y / 3) % 2) * 2) % 5) + 5) % 5) === 0 ? B[4] : B[h2(x >> 2, y / 3 | 0, 81) < 0.25 ? 1 : 2]);
-/* A smith's forge: a brick hearth waist high with a bed of coals glowing on it and a fire at its heart, a stone hood
-   over it narrowing to a flue that runs up to the ceiling, a pair of great leather bellows on a frame at its side,
-   tongs and a poker hung on the hood and a coal scuttle at its foot. Its light falls on the floor before it. */
+/* ---------- modelling the smithy's pieces ----------
+   The smith's things are drawn as lit volumes, the light from the upper left: steel in a wide ramp from a white glint
+   to near black (STEEL, 0 the glint), so an anvil's face shines and its waist falls into shadow; wood shaded round as
+   a log or a handle is; stone in courses with mortar, lit along the top of each course. */
+const STEEL = ['#e4e7ea', '#b4bac0', '#8d939a', '#6c7279', '#52575d', '#3d4146', '#2b2e32'].map(hexRgb);
+const OAK = ['#c4a274', '#a8875a', '#8e6a44', '#755434', '#5c4028', '#45301e'].map(hexRgb);
+const LEATHER = ['#a8744a', '#8e5c38', '#76482a', '#5e3820', '#472a18'].map(hexRgb);
+/* the tone across a lit cylinder, t from -1 at its west edge to 1 at its east: a highlight left of the middle, the east
+   side turned from the light */
+const acrossCyl = t => (t < -0.8 ? 2 : t < -0.45 ? 1 : t < -0.15 ? 0 : t < 0.3 ? 2 : t < 0.7 ? 3 : 4);
+/* the tone over a rounded mass at (dx, dy) in radii from its middle */
+const overBall = (dx, dy) => { const l = dx * 0.62 + dy * 0.78; return l < -0.62 ? 0 : l < -0.2 ? 1 : l < 0.3 ? 2 : l < 0.66 ? 3 : 4; };
+/* a translucent puff (steam, smoke) round (cx, cy), lit on its upper left, over nothing already drawn */
+function haze(K, cx, cy, rx, ry, P, a) {
+  for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+    const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry; if (dx * dx + dy * dy > 1 || K.get(x, y) === 255) continue;
+    K.set(x, y, P[dx + dy < -0.3 ? 0 : 1], a);
+  }
+}
+/* a cast shadow: darken what is drawn at (x, y) */
+const umbra = (K, x, y, k = 0.32) => K.shade(x, y, k);
+/* a handle: a rod from (x0, y0) to (x1, y1), w wide, shaded round across its width */
+function rod(K, x0, y0, x1, y1, P, w = 2) {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1), steep = Math.abs(y1 - y0) >= Math.abs(x1 - x0);
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
+    for (let k = 0; k < w; k++) K.set(steep ? x + k : x, steep ? y : y + k, P[w === 1 ? 2 : k === 0 ? 1 : k === w - 1 ? 3 : 2]);
+  }
+}
+/* a smith's hammer hanging from (x, y) by its handle: a turned handle, an iron head lit along its top, a glint on its
+   face, a dark underside; peen to the west */
+function hammerAt(K, x, y, len = 10, wide = 3) {
+  rod(K, x, y, x, y + len, OAK, 2);
+  K.rect(x - wide, y + len, x + wide + 2, y + len + 3, (px, py) => STEEL[py === y + len ? (px === x + wide + 1 ? 0 : 2) : py === y + len + 2 ? 5 : px === x - wide ? 3 : px === x + wide + 1 ? 4 : 3]);
+  K.set(x - wide - 1, y + len + 1, STEEL[4]);
+}
+/* smith's tongs hanging from (x, y): two long reins pinned at a rivet, opening into curved jaws */
+function tongsAt(K, x, y, len = 12) {
+  for (let i = 0; i <= len; i++) { const s = i < len - 4 ? Math.round(i * 0.12) : 1 - (i - len + 4) * 0.5; K.set(x - 1 - Math.round(s), y + i, STEEL[2]); K.set(x + 1 + Math.round(s), y + i, STEEL[4]); }
+  K.set(x, y + len - 4, STEEL[0]); K.set(x - 2, y + len + 1, STEEL[3]); K.set(x + 2, y + len + 1, STEEL[5]);
+}
+/* a horseshoe, points down, lit on its upper left */
+function shoeAt(K, x, y) { for (const [dx, dy, k] of [[-2, 2, 2], [-2, 1, 1], [-2, 0, 1], [-1, -1, 0], [0, -1, 1], [1, -1, 2], [2, 0, 3], [2, 1, 3], [2, 2, 4]]) K.set(x + dx, y + dy, STEEL[k]); }
+/* coursed stone at (x, y) on a face whose left edge is x0: blocks lit along their top, mortar between */
+const ashlarAt = (S, x, y, x0, course = 5, len = 11) => { const row = Math.floor(y / course), m = ((y % course) + course) % course, c = (((x - x0 + (row % 2) * Math.floor(len / 2)) % len) + len) % len; return m === course - 1 || c === 0 ? S[4] : m === 0 ? S[1] : S[h2(Math.floor((x - x0 + (row % 2) * 5) / len), row, 23) < 0.3 ? 3 : 2]; };
+
+/* A smith's forge. A brick hearth waist high, its top a stone kerb round a sunken firepot where the coals glow
+   white at the heart through orange to dull red and grey clinker at the edge, a fire burning on them; over it a hood of
+   coursed stone, sloping back to a flue that rises to the ceiling, blackened with soot above its mouth, an iron
+   lintel along its lower edge with tongs and a poker hung from it. At its side a pair of great leather bellows on a
+   trestle, pleated between their boards, their nozzle in the hearth's flank and a lever to work them; a coal scuttle
+   at its foot. The fire's light falls on the floor before it. */
 function forgeHearth(K, o) {
-  const F = furniture(K, o, T, T), B = R(BRICK), Bm = [R(BRICK), R(BRICK), R(shade3(BRICK))], S = mat('stone'), I = mat('iron'), W = mat('walnut'), b0 = o.snug ? -40 : 6;
-  /* the hearth: brick, its top a stone kerb round a bed of coals, hottest in the middle */
-  F.box(18, 78, b0, b0 + 26, 0, 18, Bm, { panel: false, face: (s, t, which, x, y) => brickAt(B, x, y), top: (u, v, x, y) => {
-    const d = Math.hypot((u - 0.5) / 0.36, (v - 0.55) / 0.36); if (d > 1) return S[0][u < 0.06 || v > 0.9 ? 0 : 1];
-    const k = d + (h2(x, y, 82) - 0.5) * 0.5; return R(COAL[k < 0.35 ? 0 : k < 0.65 ? 1 : k < 0.9 ? 2 : 3])[h2(x, y, 85) < 0.5 ? 0 : 1];
+  const F = furniture(K, o, T, T), B = R(BRICK), Bm = [R(BRICK), R(BRICK), R(shade3(BRICK))], S = mat('stone'), b0 = o.snug ? -40 : 6, ns = F.ns;
+  const Sk = R('#cfc6b2'), Soot = R('#4a423a');
+  /* the hearth: brick under a stone kerb, the firepot sunk in its top */
+  F.box(18, 78, b0, b0 + 26, 0, 16, Bm, { panel: false, face: (s, t, which, x, y) => (t < 0.08 ? Sk[1] : t > 0.94 ? B[4] : brickAt(B, x, y)) });
+  F.box(16, 80, b0 - 1, b0 + 27, 16, 18, [Sk, Sk, R('#a89f8c')], { top: (u, v, x, y) => {
+    const d = Math.hypot((u - 0.5) / 0.34, (v - 0.56) / 0.32);
+    if (d > 1.12) return Sk[u < 0.04 || v > 0.94 ? 0 : h2(x, y, 84) < 0.12 ? 2 : 1];
+    if (d > 1) return v < 0.56 ? Soot[4] : Sk[3];                                  /* the firepot's rim: its far wall in shadow */
+    const k = d + (h2(x, y, 82) - 0.5) * 0.45;
+    if (k > 0.86 && h2(x, y, 83) < 0.5) return R('#5a524a')[h2(x, y, 86) < 0.5 ? 2 : 3]; /* clinker */
+    return R(COAL[k < 0.32 ? 0 : k < 0.6 ? 1 : k < 0.84 ? 2 : 3])[h2(x, y, 85) < 0.4 ? 0 : 1];
   } });
-  /* the hood and its flue, against the wall */
-  F.box(14, 82, b0, b0 + 22, 32, 38, S, { top: () => S[0][1] });
-  F.box(24, 72, b0, b0 + 12, 38, 52, S);
-  F.box(36, 60, b0, b0 + 8, 52, 78, S);
-  /* the bellows on a trestle beside the hearth: two boards with the leather pleated between them, the nozzle toward the
-     fire, a handle to pump them by */
-  F.legs(3, 15, b0 + 10, b0 + 22, 9, W);
-  F.at(9, b0 + 18, 9, (x, y) => {
-    const L = R('#7a4a2a'), Wd = W[1];
-    K.poly([[x - 7, y - 2], [x + 6, y - 1], [x + 9, y - 3], [x + 6, y - 6], [x - 7, y - 8]], (px, py) => L[(px + 40) % 3 === 0 ? 3 : py < y - 5 ? 1 : 2]);
-    K.rect(x - 8, y - 9, x + 6, y - 7, Wd[1]); K.rect(x - 8, y - 2, x + 6, y, Wd[3]);
-    K.rect(x + 8, y - 4, x + 12, y - 2, I[1][2]); K.line(x - 8, y - 9, x - 12, y - 14, Wd[2]);
+  /* the bellows on their trestle, the nozzle into the hearth's flank */
+  F.legs(4, 14, b0 + 12, b0 + 22, 7, mat('oak'));
+  F.at(9, b0 + 18, 7, (x, y) => {
+    /* teardrop boards, broad at the back and narrowing to the nozzle; the leather between them pleated in ridges that
+       catch the light and bulging a little past the boards */
+    const x0 = x - 10, x1 = x + 7, top = px => Math.round(y - 14 + (px - x0) * 8 / (x1 - x0)), bot = px => Math.round(y - 1 - (px - x0) * 2 / (x1 - x0));
+    for (let px = x0; px <= x1; px++) {
+      const t0 = top(px) + 2, t1 = bot(px) - 2, bulge = px < x1 - 3 ? 1 : 0;
+      for (let py = t0 - bulge; py <= t1 + bulge; py++) { const r = (py - t0 + 9) % 3; K.set(px, py, LEATHER[Math.min(4, (r === 0 ? 0 : r === 1 ? 2 : 3) + (px > x1 - 5 ? 1 : 0) + (py > t1 ? 1 : 0))]); }
+      for (const [py, k] of [[top(px), 1], [top(px) + 1, 3], [bot(px) - 1, 2], [bot(px), 4]]) K.set(px, py, OAK[k]);
+    }
+    K.rect(x1 + 1, y - 6, x1 + 8, y - 4, (px, py) => STEEL[py === y - 6 ? 1 : 4]); K.set(x1 + 8, y - 5, STEEL[6]);
+    /* the lever and the chain up to it */
+    rod(K, x0 + 2, y - 15, x0 - 4, y - 27, OAK, 2); K.rect(x0 - 6, y - 29, x0 - 2, y - 27, OAK[1]);
+    for (let py = y - 26; py < y - 15; py += 2) K.set(x0 + 4, py, STEEL[(py >> 1) & 1 ? 2 : 4]);
   });
-  F.at(48, b0 + 22, 18, (x, y) => {
-    flame(K, x, y - 1, 8, 12);
-    candlelight(K, x, y + 10, 48, 30, 0.45);
-    for (let yy = y + 14; yy < y + 26; yy++) for (let xx = x - 30; xx < x + 30; xx++) if (!K.get(xx, yy)) K.set(xx, yy, R('#f4a03a')[1], Math.round(55 * (1 - Math.hypot((xx - x) / 30, (yy - y - 14) / 12))));
+  /* the hood: a sloping front of coursed stone narrowing from the mouth to the flue, sooty above the fire, an iron
+     lintel along its mouth; the flue above it, capped */
+  const hb = ns ? 36 : 16, ht = ns ? 13 : 7;
+  F.at(48, b0 + 22, 32, (x, y) => {
+    const top = y - 30, cap = top - 30;
+    for (let py = top; py <= y; py++) {
+      const f = (py - top) / (y - top), half = Math.round(ht + (hb - ht) * f);
+      for (let px = x - half; px <= x + half; px++) {
+        let c = ashlarAt(S[0], px, py, x - half, 5, 12);
+        const sootK = Math.max(0, 1 - Math.abs(px - x) / (half * 0.9)) * (0.25 + 0.55 * f);
+        c = mix(c, Soot[3], sootK);
+        if (px === x - half) c = mix(c, [255, 250, 235], 0.25); if (px >= x + half - 1) c = mix(c, INK, 0.3);
+        K.set(px, py, c);
+      }
+    }
+    /* the flue: its face, its east side in shade, its cap */
+    K.rect(x - ht, cap, x + ht + 1, top, (px, py) => mix(ashlarAt(S[1], px, py, x - ht, 5, 9), Soot[3], 0.15 + 0.2 * (py - cap) / (top - cap)));
+    K.rect(x + ht + 1, cap - 3, x + ht + 4, top - 2, (px, py) => S[2][py < cap ? 2 : 4]);
+    K.rect(x - ht - 1, cap - 4, x + ht + 4, cap, (px, py) => (py === cap - 4 ? Sk[0] : py === cap - 1 ? S[2][3] : Sk[1]));
+    /* the lintel along the mouth, riveted */
+    K.rect(x - hb - 1, y - 1, x + hb + 2, y + 3, (px, py) => STEEL[py === y - 1 ? 2 : py === y + 2 ? 6 : (px - x) % 9 === 0 && py === y ? 0 : 4]);
+    /* tongs and a poker hung from it on the east */
+    tongsAt(K, x + hb - 6, y + 3, 14); rod(K, x + hb - 1, y + 3, x + hb - 1, y + 19, STEEL, 1); K.set(x + hb - 2, y + 19, STEEL[3]);
   });
-  F.at(78, b0 + 31, 18, (x, y) => { K.line(x, y - 22, x + 2, y + 2, I[1][1]); K.line(x + 2, y - 22, x + 4, y + 2, I[1][2]); K.line(x + 6, y - 20, x + 6, y + 4, I[1][3]); });
-  F.at(84, b0 + 34, 0, (x, y) => { K.poly([[x - 5, y], [x + 5, y], [x + 6, y - 7], [x - 6, y - 7]], I[1][2]); K.oval(x, y - 7, 6, 2, (px, py) => R('#2a2420')[h2(px, py, 86) < 0.4 ? 1 : 3]); });
+  /* the fire, and its light on the hood and the floor */
+  F.at(48, b0 + 15, 18, (x, y) => {
+    flame(K, x, y - 1, 7, 12); flame(K, x - 9, y + 1, 3, 6); flame(K, x + 8, y, 3, 7);
+    candlelight(K, x, y - 6, 52, 34, 0.5);
+    for (let yy = y + 16; yy < y + 30; yy++) for (let xx = x - 32; xx < x + 32; xx++) if (!K.get(xx, yy)) { const a = 1 - Math.hypot((xx - x) / 32, (yy - y - 16) / 14); if (a > 0) K.set(xx, yy, R('#f4a03a')[1], Math.round(60 * a)); }
+  });
+  /* the coal scuttle at its foot */
+  F.at(85, b0 + 33, 0, (x, y) => {
+    K.poly([[x - 6, y], [x + 5, y], [x + 7, y - 8], [x - 7, y - 8]], (px) => STEEL[acrossCyl((px - x) / 7) + 2]);
+    K.oval(x, y - 8, 7, 2.5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.78 ? STEEL[dy < 0 ? 3 : 2] : R('#2a2622')[h2(px, py, 87) < 0.25 ? 0 : 3]));
+    K.oval(x - 1, y - 9, 4, 2, (px, py) => R('#3a3632')[h2(px, py, 88) < 0.3 ? 0 : 2]);
+    K.ovalShadow(x + 3, y + 1, 8, 2.5);
+  });
   F.done(4);
 }
 const shade3 = hex => mixHex(hex, '#000000', 0.3);
+/* a stand-in for the kit that casts what is drawn through it as a shadow one pixel down and east, on what is already
+   there (a tool's shadow on the board or wall it hangs on) */
+const caster = (K, k = 0.3) => { const C = { set: (x, y) => umbra(K, x + 1, y + 1, k), rect(x0, y0, x1, y1) { for (let y = Math.ceil(y0); y < y1; y++) for (let x = Math.ceil(x0); x < x1; x++) C.set(x, y); }, shade() {} }; return C; };
+/* rows of a steel silhouette, [y, x0, x1, role]: 'top' a lit upper face with a glint at gx, 'face' toward the viewer
+   (lit on its west end, dark on its east), 'under' a shaded underside; dk darkens a row (a waist in shadow) */
+function steelRows(K, rows, gx) {
+  for (const [y, x0, x1, role, dk = 0] of rows) for (let x = x0; x <= x1; x++) {
+    const c = role === 'top' ? (Math.abs(x - gx) <= 1 ? 0 : x === x1 ? 2 : 1) : role === 'under' ? 5 : x === x0 ? 2 : x === x1 ? 5 : x === x1 - 1 ? 4 : 3;
+    K.set(x, y, STEEL[Math.min(6, c + dk)]);
+  }
+}
+const SMITHY = {
+  /* An anvil on an elm stump. The stump is shaded round, an iron hoop about it and its cut top ringed with years. The
+     anvil's polished face catches the light, its horn tapers away to the west (seen from the side) or points out at
+     the viewer (end on), its waist falls into the shadow of the overhang above it, and it stands on a broad foot. A
+     hammer rests on its face. */
+  anvil: (K, o) => {
+    const F = furniture(K, o, 32, 32), ns = F.ns, f = F.f;
+    F.at(16, 23, 0, (x, y) => {
+      K.ovalShadow(x + 3, y + 1, 10, 3);
+      const r = ns ? 6 : 5, h = 9, top = y - h;
+      for (let py = top; py <= y; py++) for (let px = x - r; px <= x + r; px++) {
+        const t = (px + 0.5 - x) / (r + 0.5); let k = acrossCyl(t);
+        if (py === top + 3 || py === top + 4) { K.set(px, py, STEEL[k + (py === top + 3 ? 1 : 2)]); continue; }
+        if (h2(px, py >> 1, 5) < 0.2) k++;
+        K.set(px, py, OAK[Math.min(5, k + (py >= y - 1 ? 1 : 0))]);
+      }
+      K.oval(x, top, r + 0.5, 2.2, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); return d > 0.8 ? OAK[dx + dy < 0 ? 1 : 4] : R('#d8bb8a')[d < 0.25 ? 3 : Math.round(d * 5) % 2 ? 1 : 2]; });
+      const b = top - 1;
+      if (ns) {
+        const s = f === 0 ? 1 : -1, X = dx => x + s * dx, span = (a0, a1) => [Math.min(X(a0), X(a1)), Math.max(X(a0), X(a1))];
+        steelRows(K, [
+          [b, ...span(-6, 5), 'under'], [b - 1, ...span(-6, 5), 'face'], [b - 2, ...span(-5, 4), 'face'],
+          [b - 3, ...span(-3, 2), 'face', 1], [b - 4, ...span(-3, 2), 'face', 1], [b - 5, ...span(-5, 4), 'face', 1],
+          [b - 6, ...span(-8, 7), 'under'], [b - 7, ...span(-8, 7), 'face'], [b - 8, ...span(-8, 7), 'face'],
+          [b - 9, ...span(-8, 7), 'top'],
+          /* the horn, tapering */
+          [b - 9, ...span(-12, -9), 'top'], [b - 8, ...span(-11, -9), 'face'], [b - 7, ...span(-10, -9), 'under'], [b - 9, ...span(-13, -13), 'face']
+        ], X(-3));
+        K.set(X(5), b - 9, STEEL[6]); K.set(X(3), b - 9, STEEL[5]);
+        /* the hammer resting on the face */
+        rod(K, X(-6), b - 10, X(1), b - 10, OAK, 1);
+        K.rect(Math.min(X(2), X(4)), b - 12, Math.max(X(2), X(4)) + 1, b - 9, (px, py) => STEEL[py === b - 12 ? 1 : py === b - 10 ? 4 : 3]);
+      } else {
+        steelRows(K, [
+          [b, x - 4, x + 3, 'under'], [b - 1, x - 4, x + 3, 'face'], [b - 2, x - 3, x + 2, 'face'],
+          [b - 3, x - 2, x + 1, 'face', 1], [b - 4, x - 2, x + 1, 'face', 1], [b - 5, x - 3, x + 2, 'face', 1],
+          [b - 6, x - 4, x + 3, 'under'], [b - 7, x - 4, x + 3, 'face'], [b - 8, x - 4, x + 3, 'face'], [b - 9, x - 4, x + 3, 'top'], [b - 10, x - 4, x + 3, 'top']
+        ], x - 2);
+        /* end on: the horn pointing out at the viewer, or the heel toward them */
+        if (f === 3) K.oval(x - 0.5, b - 7, 2.6, 2.2, (px, py, dx, dy) => STEEL[overBall(dx, dy) + 1]);
+        K.rect(x - 1, b - 13, x + 2, b - 10, (px, py) => STEEL[py === b - 13 ? 1 : 3]); rod(K, x, b - 10, x, b - 7, OAK, 1);
+      }
+    });
+    F.done(0);
+  },
+  /* A quenching trough of dressed stone, its front coursed and damp at the foot, a lit rim round dark water that holds
+     a glint of the light; steam curls off it, and a pair of tongs stands in it. */
+  quench: (K, o) => {
+    const F = furniture(K, o, 32, 32), ns = F.ns, S = R('#bdb4a2'), Wt = R('#4e6e78'), hw = ns ? 12 : 6, D = ns ? 9 : 15, H = 8;
+    F.at(16, 24, 0, (x, y) => {
+      const ft = y - H, tt = ft - D;
+      K.ovalShadow(x + 3, y + 1, hw + 2, 3);
+      /* the front: coursed stone, its top edge lit, its foot damp */
+      K.rect(x - hw, ft, x + hw + 1, y + 1, (px, py) => { let c = py === ft ? S[0] : px === x - hw ? S[1] : ashlarAt(S, px, py, x - hw, 4, 7); if (py >= y - 1) c = mix(c, R('#5a6a5e')[3], 0.35); return c; });
+      K.rect(x + hw + 1, tt + 1, x + hw + 3, y + 1, (px, py) => S[py < ft ? 3 : 4]);
+      /* the rim and, inside it, the far wall and the water */
+      K.rect(x - hw, tt, x + hw + 1, ft, (px, py) => {
+        const rim = px <= x - hw + 1 || px >= x + hw - 1 || py <= tt + 1 || py >= ft - 1;
+        if (rim) return S[py === tt || px === x - hw ? 0 : py >= ft - 1 ? 0 : 1];
+        if (py <= tt + 3) return S[py === tt + 2 ? 2 : 3];
+        if (px <= x - hw + 2) return Wt[3];
+        const glint = h2(px >> 1, py, 41) < 0.12 && py > tt + 4, back = py === tt + 4;
+        return Wt[back ? 4 : glint ? 0 : (px + py) % 7 === 0 ? 1 : py > ft - 3 ? 3 : 2];
+      });
+      /* the tongs standing in the water, a ring of ripples round them */
+      const tx = x + (ns ? 5 : 2), ty = ft - 3;
+      for (const [dx, dy] of [[-2, 0], [2, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) K.set(tx + dx, ty + dy, Wt[0]);
+      for (let i = 0; i < 14; i++) { K.set(tx - 1 - Math.round(i * 0.2), ty - i, STEEL[2]); K.set(tx + 1 - Math.round(i * 0.08), ty - i, STEEL[4]); }
+      K.set(tx, ty - 3, STEEL[0]); K.set(tx - 4, ty - 14, STEEL[3]); K.set(tx, ty - 14, STEEL[5]);
+      /* steam */
+      for (const [dx, dy, rr, a] of [[-5, -3, 2.5, 120], [-3, -8, 3, 90], [-6, -13, 3.5, 60]]) haze(K, x + dx, tt + dy, rr, rr * 0.8, R('#eef0ee'), a);
+    });
+    F.done(0);
+  },
+  /* A grindstone: a sandstone wheel on an iron axle between two timber uprights, its face lit on the upper left and its
+     thickness showing in shade on the east, dipping into a trough of water at its foot; a crank to turn it. Edge on,
+     the wheel is a narrow band rounded at top and bottom. */
+  grindstone: (K, o) => {
+    const F = furniture(K, o, 32, 32), ns = F.ns, Sd = R('#b9ad90'), Wt = R('#4e6e78');
+    F.at(16, 24, 0, (x, y) => {
+      K.ovalShadow(x + 3, y + 1, 12, 3);
+      const cy = y - 14, post = (px) => { for (let py = y - 18; py <= y; py++) { K.set(px, py, OAK[py === y - 18 ? 0 : 1]); K.set(px + 1, py, OAK[py === y - 18 ? 1 : 3]); } K.rect(px - 1, y - 1, px + 3, y + 1, OAK[4]); };
+      if (ns) {
+        post(x - 12); rod(K, x - 11, cy, x + 12, cy, STEEL, 1);
+        K.oval(x + 1.5, cy, 8.5, 8.5, (px, py, dx, dy) => Sd[dy > 0.4 ? 4 : 3]);
+        K.oval(x, cy, 8.5, 8.5, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); let k = overBall(dx * 0.8, dy * 0.8); if (d > 0.88) k = Math.min(4, k + 1); if (Math.abs(d - 0.55) < 0.07) k = Math.max(0, k - 1); if (h2(px, py, 44) < 0.12) k = Math.min(4, k + 1); return Sd[k]; });
+        K.rect(x - 1, cy - 1, x + 2, cy + 2, (px, py) => STEEL[px === x - 1 && py === cy - 1 ? 0 : 3]);
+        post(x + 10);
+        rod(K, x + 12, cy, x + 14, cy + 5, STEEL, 1); K.rect(x + 13, cy + 5, x + 16, cy + 8, (px, py) => OAK[px === x + 13 ? 1 : 3]);
+      } else {
+        post(x - 4);
+        for (let py = cy - 9; py <= cy + 8; py++) { const e = Math.abs(py - cy) > 7 ? 1 : 0; for (let px = x - 2 + e; px <= x + 2 - e; px++) K.set(px, py, Sd[Math.min(4, acrossCyl((px + 0.5 - x) / 2.5) + (py > cy + 4 ? 1 : 0))]); }
+        K.rect(x - 1, cy - 1, x + 1, cy + 1, STEEL[2]);
+        post(x + 3); K.rect(x + 5, cy + 3, x + 8, cy + 6, OAK[2]);
+      }
+      /* the water trough at its foot, in front of the wheel's lower edge */
+      const tw = ns ? 8 : 5;
+      K.rect(x - tw, y - 9, x + tw + 1, y - 5, (px, py) => (py === y - 9 || px === x - tw || px === x + tw ? OAK[1] : Wt[py === y - 8 ? 3 : h2(px, py, 45) < 0.15 ? 0 : 2]));
+      K.rect(x - tw, y - 5, x + tw + 1, y + 1, (px, py) => OAK[py === y - 5 ? 1 : py === y ? 5 : (py - y) % 3 === 0 ? 4 : px === x - tw ? 2 : 3]);
+    });
+    F.done(0);
+  },
+  /* A smith's tool rack against the wall: a board of three planks between two stout posts under a rail, hammers,
+     tongs and a file hung on its pegs, each throwing a shadow on the boards; a crate of horseshoes on the shelf below.
+     Side on, the posts and the edge of the board, the tools' heads standing out from it. */
+  toolrack: (K, o) => {
+    const F = furniture(K, o, 32, 32), front = F.south === 'front' || F.south === 'back';
+    F.at(16, 20, 0, (x, y) => {
+      const post = (px) => { for (let py = y - 29; py <= y; py++) for (let k = 0; k < 3; k++) K.set(px + k, py, OAK[py === y - 29 ? 0 : k === 0 ? 1 : k === 1 ? 2 : 4]); };
+      if (!front) {
+        post(x - 1); K.rect(x + 2, y - 26, x + 3, y - 6, OAK[4]);
+        for (const [py, sz] of [[y - 22, 2], [y - 15, 3], [y - 9, 2]]) K.rect(x + 3, py, x + 3 + sz, py + 3, (px, ppy) => STEEL[ppy === py ? 1 : 3]);
+        return;
+      }
+      post(x - 13); post(x + 11);
+      K.rect(x - 10, y - 25, x + 11, y - 6, (px, py) => { const pl = Math.floor((py - (y - 25)) / 6), r = (py - (y - 25)) % 6; return OAK[r === 0 ? 1 : r === 5 ? 4 : h2(px >> 2, py, 46 + pl) < 0.2 ? 3 : 2]; });
+      K.rect(x - 13, y - 28, x + 14, y - 25, (px, py) => OAK[py === y - 28 ? 0 : py === y - 26 ? 3 : 1]);
+      for (let px = x - 10; px < x + 11; px++) umbra(K, px, y - 25, 0.35);
+      for (const S2 of [caster(K), K]) { hammerAt(S2, x - 7, y - 24, 9, 2); tongsAt(S2, x - 2, y - 24, 13); hammerAt(S2, x + 3, y - 24, 6, 2); rod(S2, x + 8, y - 24, x + 8, y - 12, STEEL, 1); }
+      for (const px of [x - 7, x - 2, x + 3, x + 8]) K.set(px, y - 24, STEEL[0]);
+      /* the shelf and a crate of horseshoes on it */
+      K.rect(x - 11, y - 6, x + 12, y - 4, (px, py) => OAK[py === y - 6 ? 0 : 3]);
+      K.rect(x - 8, y - 3, x + 9, y + 1, (px, py) => OAK[py === y - 3 ? 1 : px === x - 8 ? 2 : (py - y) % 2 ? 3 : 4]);
+      for (const [dx, dy] of [[-5, -5], [-1, -6], [3, -5], [6, -6]]) shoeAt(K, x + dx, y + dy);
+    });
+    F.done(4);
+  },
+  /* An armour stand: a mail hauberk on a wooden form, rounded and lit across the chest, the rings glinting, short
+     sleeves, a belt with a brass buckle; a coif and a domed helm with a nasal over it; the post on three splayed feet,
+     a kite shield leaning on it. */
+  armorstand: (K, o) => {
+    const F = furniture(K, o, 32, 32), wf = F.ns ? 1 : 0.62;
+    F.at(16, 22, 0, (x, y) => {
+      K.ovalShadow(x + 3, y + 1, 9, 3);
+      for (const [dx, dy] of [[-6, 1], [6, 1], [0, -2]]) rod(K, x, y - 2, x + dx, y + dy, OAK, 1);
+      rod(K, x, y - 13, x, y - 2, OAK, 2);
+      /* the hauberk: its half width down the body */
+      const half = py => (py < y - 27 ? 8 : py < y - 19 ? 7 : py < y - 16 ? 6 : 6 + (py - (y - 16)) * 0.4) * wf;
+      for (let py = y - 31; py <= y - 12; py++) {
+        const hw = half(py);
+        for (let px = Math.round(x - hw); px <= Math.round(x + hw); px++) {
+          if (py > y - 15 && Math.abs(px + 0.5 - x - 0.5) < 0.6) continue;
+          let k = acrossCyl((px + 0.5 - x) / (hw + 0.5)) + 1 + (py > y - 14 ? 1 : 0);
+          if (((px + (py >> 1)) & 1) === 0 && (py & 1) === 0) k--; else if ((px + py) % 3 === 0) k++;
+          K.set(px, py, STEEL[Math.max(0, Math.min(6, k))]);
+        }
+      }
+      for (const s of [-1, 1]) for (let py = y - 30; py <= y - 24; py++) for (let k = 0; k < 3; k++) { const px = Math.round(x + s * (half(py) + 1 + k)); K.set(px, py, STEEL[Math.min(6, (s < 0 ? 2 : 4) + (py > y - 26 ? 1 : 0) + (k === 2 ? 1 : 0))]); }
+      K.rect(Math.round(x - 6 * wf), y - 19, Math.round(x + 6 * wf) + 1, y - 17, (px, py) => LEATHER[py === y - 19 ? 1 : 3]); K.rect(x, y - 19, x + 2, y - 17, R('#e2c26a')[1]);
+      /* the coif, the helm and its nasal */
+      K.oval(x + 0.5, y - 33, 5 * wf, 3.5, (px, py, dx, dy) => STEEL[Math.min(6, overBall(dx, dy) + 2 + ((px + py) & 1))]);
+      K.oval(x + 0.5, y - 36, 5 * wf, 4.5, (px, py, dx, dy) => (dy > 0.2 ? null : STEEL[dx < -0.2 && dy < -0.4 ? 0 : overBall(dx, dy) + 1]));
+      K.rect(Math.round(x - 5 * wf), y - 36, Math.round(x + 5 * wf) + 2, y - 35, STEEL[4]); K.rect(x, y - 35, x + 1, y - 32, STEEL[2]);
+      /* the shield, leaning on the post */
+      if (F.ns) {
+        const Sd = R('#3e5470'), G = R('#c9a24f');
+        K.poly([[x + 6, y - 13], [x + 15, y - 13], [x + 14, y - 6], [x + 10.5, y + 1], [x + 7, y - 6]], (px, py) => { const dx = (px - x - 10.5) / 5, dy = (py - y + 7) / 7; return Math.abs(px - x - 10.5) < 0.6 || py === y - 9 ? G[1] : Sd[overBall(dx, dy)]; });
+        K.rect(x + 10, y - 10, x + 12, y - 8, (px, py) => G[px === x + 10 && py === y - 10 ? 0 : 2]);
+      }
+    });
+    F.done(0);
+  },
+  /* A coal bin heaped with coal, the lumps catching the light here and there, a shovel stuck in it; beside it bars of
+     iron stacked in three layers on two bearers, each bar lit along its top. */
+  ironstock: (K, o) => {
+    const F = furniture(K, o, 32, 32), Co = ['#6e6862', '#4c4844', '#36322e', '#272320', '#1a1816'].map(hexRgb);
+    F.at(16, 22, 0, (x, y) => {
+      K.ovalShadow(x + 2, y + 1, 14, 3);
+      /* the coal, heaped over the bin's rim */
+      K.oval(x - 7, y - 9, 6.5, 4.5, (px, py, dx, dy) => (dy > 0 ? null : Co[Math.max(0, Math.min(4, overBall(dx, dy) + (h2(px, py, 47) < 0.3 ? 1 : 0) - (h2(px, py, 48) < 0.08 ? 2 : 0)))]));
+      K.set(x - 9, y - 12, R('#aab4c0')[0]); K.set(x - 5, y - 11, R('#aab4c0')[1]);
+      rod(K, x - 3, y - 21, x - 6, y - 11, OAK, 1); K.rect(x - 5, y - 23, x - 1, y - 21, OAK[1]);
+      /* the bin: two planks between iron corner straps */
+      K.rect(x - 13, y - 9, x, y + 1, (px, py) => (px === x - 13 || px === x - 1 ? STEEL[px === x - 13 ? 2 : 4] : OAK[py === y - 9 || py === y - 4 ? 1 : py === y - 5 || py === y ? 4 : h2(px >> 1, py, 49) < 0.2 ? 3 : 2]));
+      /* the bars on their bearers */
+      for (const bx of [x + 2, x + 10]) K.rect(bx, y - 2, bx + 3, y + 1, (px, py) => OAK[py === y - 2 ? 1 : 3]);
+      for (let i = 0; i < 3; i++) {
+        const y0 = y - 4 - i * 2, x0 = x + 1 + i, x1 = x + 14 - i, g = x0 + 2 + Math.floor(h2(i, 3, 50) * (x1 - x0 - 4));
+        for (let px = x0; px <= x1; px++) { K.set(px, y0, STEEL[px === g ? 0 : px === x1 ? 3 : 1]); K.set(px, y0 + 1, STEEL[px === x0 ? 3 : px === x1 ? 5 : 4]); }
+      }
+    });
+    F.done(0);
+  }
+};
+
 /* An alchemist's workbench: a heavy table against the wall with a shelf of jars above it, and on it the work: a copper
    alembic over a little furnace with its swan neck running down to a receiving flask, a retort bubbling over a spirit
    lamp, a rack of phials, a mortar and pestle, an open grimoire and a candle. Vapour curls from the alembic. */
@@ -1312,74 +1596,11 @@ function alchemyBench(K, o) {
 }
 /* little things for the smithy and the alchemist's shelves */
 const BOTTLE = (K, x, y, col, h = 6) => { const C = R(col); K.rect(x - 1, y - h, x + 2, y, (px) => C[px === x - 1 ? 0 : px === x + 1 ? 2 : 1]); K.rect(x, y - h - 2, x + 1, y - h, R('#cfe4e4')[1]); K.set(x, y - h - 3, R('#8e6a44')[1]); };
-const HAMMER = (K, x, y, I, Wd) => { K.rect(x, y, x + 1, y + 10, Wd[2]); K.rect(x - 2, y + 9, x + 3, y + 12, I[1]); };
-const TONGS = (K, x, y, I) => { K.line(x - 1, y, x - 1, y + 11, I[2]); K.line(x + 1, y, x + 1, y + 11, I[3]); K.set(x, y + 4, I[1]); };
 
 const SHOP_FURNITURE = {
   forge: (K, o) => forgeHearth(K, o),
   alchemybench: (K, o) => alchemyBench(K, o),
-  /* an anvil on an elm stump, its horn to one side, a hammer resting on its face */
-  anvil: (K, o) => {
-    const F = furniture(K, o, 32, 32), W = mat('oak'), I = mat('iron'), Ring = R('#d8bb8a');
-    F.box(10, 22, 13, 25, 0, 9, W, { top: (u, v) => Ring[Math.round(Math.hypot(u - 0.5, v - 0.5) * 7) % 2 ? 1 : 2], face: (s) => W[1][Math.floor(s * 5) % 2 ? 2 : 1] });
-    F.box(12, 20, 15, 23, 9, 11, I);
-    F.box(14, 18, 16, 22, 11, 13, I);
-    F.box(8, 23, 15, 23, 13, 16, I, { top: (u, v) => I[0][v > 0.75 ? 0 : 1] });
-    F.box(4, 8, 17, 21, 14, 16, I, { top: () => I[0][1] });
-    F.at(19, 19, 16, (x, y) => { K.line(x - 1, y, x + 5, y - 2, R('#8e6a44')[2]); K.rect(x - 3, y - 2, x, y + 1, I[1][1]); });
-    F.done(4);
-  },
-  /* a stone quenching trough full of dark water, a pair of tongs left in it */
-  quench: (K, o) => {
-    const F = furniture(K, o, 32, 32), S = mat('stone'), I = mat('iron'), Wt = R('#4f7480');
-    F.box(3, 29, 13, 26, 0, 9, S, { top: (u, v, x, y) => (u > 0.1 && u < 0.9 && v > 0.18 && v < 0.82 ? Wt[v < 0.35 ? 3 : h2(x, y, 90) < 0.1 ? 0 : 2] : null) });
-    F.at(22, 19, 9, (x, y) => TONGS(K, x, y - 12, I[1]));
-    F.done(4);
-  },
-  /* a grindstone: a round stone wheel on an axle in a timber frame with a crank, a drip pan beneath */
-  grindstone: (K, o) => {
-    const F = furniture(K, o, 32, 32), W = mat('oak'), S = R('#a59a85'), I = mat('iron');
-    F.legs(7, 25, 13, 23, 10, W);
-    F.box(7, 25, 13, 23, 10, 12, W);
-    F.box(11, 21, 15, 21, 0, 3, mat('iron'), { top: () => R('#5f7f86')[1] });
-    F.at(16, 18, 12, (x, y) => {
-      if (F.ns) K.oval(x, y - 4, 9, 9, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); return d > 0.86 ? S[dx + dy < 0 ? 1 : 3] : d < 0.16 ? I[1][1] : S[dx + dy < -0.3 ? 1 : dx + dy > 0.5 ? 3 : 2]; });
-      else K.rect(x - 2, y - 13, x + 2, y + 5, (px) => S[px === x - 2 ? 1 : px === x + 1 ? 3 : 2]);
-      K.line(x + (F.ns ? 9 : 3), y - 4, x + (F.ns ? 12 : 7), y + 1, I[1][2]);
-    });
-    F.done(4);
-  },
-  /* a smith's tool rack: hammers and tongs hung from a rail between two posts */
-  toolrack: (K, o) => {
-    const F = furniture(K, o, 32, 32), W = mat('oak'), I = R('#4e5054'), Wd = R('#8e6a44');
-    F.box(4, 28, 16, 20, 0, 2, W);
-    for (const a of [4, 25]) F.box(a, a + 3, 16, 20, 2, 26, W);
-    F.box(4, 28, 17, 19, 22, 24, W);
-    F.at(16, 18, 22, (x, y) => { if (!(F.south === 'front' || F.south === 'back')) { K.rect(x - 1, y, x + 1, y + 14, I[2]); return; } HAMMER(K, x - 7, y, I, Wd); TONGS(K, x - 2, y, I); HAMMER(K, x + 3, y, I, Wd); TONGS(K, x + 8, y, I); });
-    F.done(4);
-  },
-  /* an armour stand: a mail shirt on a wooden dummy, a helm on its head, a shield leaning on its post */
-  armorstand: (K, o) => {
-    const F = furniture(K, o, 32, 32), W = mat('walnut'), M = R('#a8aeb0'), I = mat('iron');
-    F.at(16, 22, 0, (x, y) => {
-      for (const [dx, dy] of [[-6, 1], [6, 1], [0, -2]]) K.line(x, y - 2, x + dx, y + dy, W[1][3]);
-      K.rect(x, y - 14, x + 2, y - 1, W[1][2]);
-      K.poly([[x - 7, y - 30], [x + 9, y - 30], [x + 8, y - 13], [x - 6, y - 13]], (px, py) => M[(px + py) % 2 ? 1 : 2]);
-      K.rect(x - 9, y - 30, x - 6, y - 21, (px, py) => M[(px + py) % 2 ? 2 : 3]); K.rect(x + 8, y - 30, x + 11, y - 21, (px, py) => M[(px + py) % 2 ? 2 : 3]);
-      K.rect(x - 6, y - 15, x + 8, y - 14, R('#5a3f28')[2]);
-      K.oval(x + 1, y - 34, 5, 5, (px, py, dx, dy) => (dy > 0.55 ? null : I[0][dx < -0.3 ? 0 : dx > 0.4 ? 2 : 1])); K.rect(x - 4, y - 33, x + 6, y - 32, I[1][3]); K.rect(x, y - 39, x + 2, y - 33, I[1][2]);
-      K.oval(x + 8, y - 6, 4, 5, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.75 ? R('#c9a24f')[2] : R('#3e5470')[dx + dy < 0 ? 1 : 2]));
-      K.ovalShadow(x + 3, y + 1, 9, 3);
-    });
-    F.done(0);
-  },
-  /* a coal bin heaped with coal, bars of iron stacked beside it */
-  ironstock: (K, o) => {
-    const F = furniture(K, o, 32, 32), W = mat('oak'), I = mat('iron'), C = R('#2a2420');
-    F.box(3, 15, 12, 26, 0, 8, W, { top: (u, v, x, y) => (u > 0.12 && u < 0.88 && v > 0.12 && v < 0.88 ? C[h2(x, y, 91) < 0.3 ? 1 : h2(x, y, 92) < 0.5 ? 2 : 3] : null) });
-    F.box(17, 29, 14, 26, 0, 6, I, { top: (u) => I[0][Math.floor(u * 6) % 2 ? 1 : 2], face: (s) => I[1][Math.floor(s * 6) % 2 ? 1 : 3] });
-    F.done(4);
-  },
+  ...SMITHY,
   /* the alchemist's cauldron: a great black pot on a ring of bricks with a fire under it, a green brew bubbling in it and
      green vapour rising, a ladle hooked on its rim */
   brewcauldron: (K, o) => {
@@ -1699,7 +1920,17 @@ const FURNITURE = {
     F.at(16, 18, 0, (x, y) => {
       const front = F.south === 'front' || F.south === 'back';
       if (front) for (let k = 0; k < 4; k++) { const px = x - 7 + k * 5; if (k % 2) { K.rect(px, y - 34, px + 1, y - 2, W[1][1]); K.poly([[px - 1, y - 34], [px + 2, y - 34], [px, y - 40]], M[1]); } else { K.rect(px, y - 30, px + 1, y - 4, M[k ? 1 : 0]); K.rect(px - 2, y - 8, px + 3, y - 7, R('#c9a24f')[1]); K.rect(px, y - 7, px + 1, y - 3, R('#5a3f28')[2]); } }
-      else for (const dz of [0, 3]) K.rect(x - 1, y - 38 + dz, x + 1, y - 2, dz ? W[1][2] : M[1]);
+      else {
+        /* side on: a post with its rails standing out, the shafts of the spears and the swords' grips beside it, their
+           heads and pommels above */
+        for (let py = y - 30; py <= y - 2; py++) for (let k = 0; k < 3; k++) K.set(x - 1 + k, py, OAK[k === 0 ? 1 : k === 1 ? 2 : 4]);
+        for (const ry of [y - 25, y - 11]) K.rect(x - 3, ry, x + 4, ry + 2, (px, py) => OAK[py === ry ? 1 : 3]);
+        for (const [dx, h, spear] of [[-3, 38, true], [3, 35, true], [-2, 30, false]]) {
+          rod(K, x + dx, y - h + 3, x + dx, y - 3, spear ? OAK : STEEL, 1);
+          if (spear) { K.set(x + dx, y - h, STEEL[0]); K.set(x + dx, y - h + 1, STEEL[1]); K.set(x + dx, y - h + 2, STEEL[3]); }
+          else { K.rect(x + dx - 1, y - h + 2, x + dx + 2, y - h + 3, R('#c9a24f')[1]); K.set(x + dx, y - h + 1, R('#c9a24f')[0]); }
+        }
+      }
       K.oval(x + (front ? 10 : 0), y - 12, 5, 6, (px, py, dx, dy) => (Math.hypot(dx, dy) > 0.78 ? I[1][1] : Math.hypot(dx, dy) < 0.25 ? R('#c9a24f')[1] : Sd[1][dx + dy < 0 ? 1 : 2]));
     });
     F.done(4);
@@ -1847,12 +2078,14 @@ const HUNG = {
     for (const s of [-1, 1]) { for (let i = 0; i <= 22; i++) K.set(m - s * 11 + s * i, top + 4 + i, Mt[i < 3 ? 2 : 1]); K.rect(m + s * 8 - 2, top + 21, m + s * 8 + 2, top + 22, Gd[1]); K.rect(m + s * 10 - 1, top + 22, m + s * 10 + 1, top + 26, R('#5a3f28')[2]); }
     K.oval(m, top + 14, 8, 9, (px, py, dx, dy) => { const d = Math.hypot(dx, dy); if (d > 0.84) return Gd[dx + dy < 0 ? 1 : 3]; if (d < 0.22) return Gd[dx + dy < 0 ? 0 : 2]; return Math.abs(dx) < 0.12 || Math.abs(dy) < 0.12 ? R('#efe3c4')[1] : C[dx + dy < -0.2 ? 1 : 2]; });
   },
-  /* the smith's wall: a rail of hammers and tongs, a horseshoe nailed up at either end */
+  /* the smith's wall: a rail on the plaster with hammers and tongs hung from its pegs and a horseshoe nailed up at
+     either end, each throwing its shadow on the wall */
   walltools(K, m, top) {
-    const I = R('#4e5054'), Wd = R('#8e6a44'), y = top + 8;
-    K.rect(m - 17, y, m + 18, y + 2, (x, yy) => Wd[yy === y ? 1 : 3]);
-    for (const [dx, k] of [[-12, 0], [-6, 1], [0, 0], [6, 1], [12, 0]]) (k ? TONGS(K, m + dx, y + 2, I) : HAMMER(K, m + dx, y + 2, I, Wd));
-    for (const hx of [m - 16, m + 17]) for (const [dx, dy] of [[-1, 0], [-1, 1], [0, 2], [1, 1], [1, 0]]) K.set(hx + dx, y + 16 + dy, I[1]);
+    const y = top + 8;
+    K.rect(m - 18, y, m + 19, y + 3, (x, yy) => OAK[yy === y ? 0 : yy === y + 2 ? 4 : h2(x >> 2, yy, 51) < 0.2 ? 3 : 2]);
+    for (let x = m - 18; x < m + 19; x++) umbra(K, x, y + 3, 0.35);
+    for (const S2 of [caster(K, 0.35), K]) { hammerAt(S2, m - 13, y + 3, 9, 2); tongsAt(S2, m - 7, y + 3, 14); hammerAt(S2, m - 1, y + 3, 7, 3); tongsAt(S2, m + 5, y + 3, 12); hammerAt(S2, m + 11, y + 3, 9, 2); shoeAt(S2, m - 17, y + 17); shoeAt(S2, m + 17, y + 17); }
+    for (const px of [m - 13, m - 7, m - 1, m + 5, m + 11]) K.set(px, y + 1, STEEL[0]);
   },
   /* the alchemist's wall shelf: two shelves of bottles, flasks and a jar */
   wallpotions(K, m, top) {

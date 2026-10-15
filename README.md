@@ -505,7 +505,14 @@ than a person, a cottage about twice their height, two-storey houses towering ov
   with brass taps, both set back against the wall behind them. The smithy's forge and the alchemist's workbench fill
   their tiles the same way and stand back against the wall: the forge's coals glow hottest at the heart under a fire
   whose light spills over the floor, and the bench carries its alembic, retort, phials, mortar, book and candle under a
-  shelf of jars. The smaller pieces meant for a wall (shelves of potions or books, apothecary drawers, herb and tool
+  shelf of jars. The smithy's things are modelled as lit volumes, the light from the upper left: steel in a wide ramp
+  from a white glint to near black, so an anvil's polished face shines while its waist falls into the shadow of the
+  overhang; wood and stone shaded round or in lit courses; the forge's hood a sloping front of coursed stone narrowing
+  to its flue and blackened with soot above the fire, an iron lintel along its mouth; teardrop bellows pleated in
+  ridges that catch the light; a quenching trough of dark water with a glint, steam and tongs standing in it; a
+  grindstone whose wheel shows its thickness in shade; a hauberk whose rings glint across a rounded chest under a
+  domed helm; and hammers, tongs and horseshoes that throw their shadows on the board or wall they hang on. The
+  smaller pieces meant for a wall (shelves of potions or books, apothecary drawers, herb and tool
   racks, a weapon rack, an armour stand, coal and bar iron, a quenching trough, a wardrobe, a dresser, a desk, a chest,
   a bed or a cot) stand back against a room wall behind them (north, west or east) instead of at the front of their
   tile, and are walked round where they stand. Walls carry a shelf of plates, antlers, a painted
