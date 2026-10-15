@@ -89,8 +89,8 @@ test('the Wayfarer\'s Rest scene: a smithy and an alchemist\'s shop on the lane,
   const solo = I => { const [ax, ay] = arrival(I); return { ...I, chars: [{ sprite: 'villager', x: ax, y: ay, face: 2 }] }; };
   const has = (I, ids) => { for (const id of ids) assert.ok(I.objs.some(o => o.id === id), id); };
   const H = shop('blacksmith'), A = shop('alchemist');
-  has(H, ['forge', 'anvil', 'walltools']);
-  for (const id of ['quench', 'grindstone', 'ironstock', 'weaponrack', 'armorstand']) assert.ok(M.objs.some(o => o.id === id), `the smith's ${id} outside`);
+  has(H, ['forge', 'anvil', 'quench', 'grindstone', 'weaponrack', 'armorstand', 'ironstock', 'walltools']);
+  assert.equal(H.S, 4, 'the smithy is a small workshop');
   has(A, ['alchemybench', 'brewcauldron', 'potionshelf', 'apothecary', 'herbrack', 'wallherbs', 'wallchart', 'stairs']);
   assert.ok(H.chars.some(c => c.sprite === 'smith') && A.chars.some(c => c.sprite === 'alchemist'), 'each shop is kept');
   /* the shopkeeper can be walked up to, and every corner of the floor that is not furnished can be reached */
@@ -100,4 +100,19 @@ test('the Wayfarer\'s Rest scene: a smithy and an alchemist\'s shop on the lane,
     const shapes = shapesOf(I.objs).get(0), T = TILE;
     for (const [x, y] of way) assert.ok(!hits(shapes, x * T + T / 2, y * T + T / 2, 8), `${I.name}: ${x},${y} is open`);
   }
+});
+
+test('furniture against a wall stands on the wall\'s own tile, facing into the room', () => {
+  const M = blankModel(6, 'stonefloor');
+  for (let x = 0; x < 6; x++) assert.ok(placePiece(M, { id: 'iwall', x, y: 0 }).ok);
+  assert.ok(placePiece(M, { id: 'chest', x: 2, y: 0, face: 0 }).ok, 'a chest against the back wall');
+  assert.ok(!placePiece(M, { id: 'chest', x: 2, y: 0, face: 0 }).ok, 'one piece against a wall a tile');
+  const r = placePiece(M, { id: 'chest', x: 3, y: 0, face: 2 }); assert.ok(!r.ok); assert.match(r.reason, /facing into the room/);
+  assert.ok(!placePiece(M, { id: 'table', x: 4, y: 0 }).ok, 'a table does not stand against a wall');
+  assert.equal(M.objs[objAt(M, 2, 0)].id, 'chest', 'the chest is the piece found there');
+  assert.ok(placePiece(M, { id: 'iwindow', x: 0, y: 3 }).ok && placePiece(M, { id: 'armorstand', x: 0, y: 3, face: 1 }).ok, 'an armour stand against a window wall');
+  /* in the town view it stands just in front of the wall's face and blocks only where it stands */
+  const sh = shapesOf(M.objs).get(0), T = TILE;
+  assert.ok(hits(sh, 2.5 * T, 0.5 * T + 14, 4), 'the chest before the wall');
+  assert.ok(!hits(sh, 2.5 * T, 1.5 * T, 6), 'the tile in front stays open');
 });

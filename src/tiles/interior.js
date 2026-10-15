@@ -425,6 +425,10 @@ const FURNITURE = [
     F.done();
   } }
 ];
+/* the furniture that stands back against a wall, and so may stand on a room wall's own tile, in front of it on the side
+   it faces (tiles/index.js standsOnWall) */
+const WALLSIDE = new Set(['potionshelf', 'apothecary', 'herbrack', 'toolrack', 'weaponrack', 'armorstand', 'ironstock', 'quench', 'grindstone', 'bookshelf', 'wardrobe', 'dresser', 'desk', 'chest']);
+for (const a of FURNITURE) if (WALLSIDE.has(a.id)) a.wallside = true;
 /* soft shadows: walls are thin, furniture sits inside its tile */
 for (const a of INTERIOR) a.shade = a.id === 'hearth' || a.id === 'stairs' ? 0.12 : 0.38;
 for (const a of FURNITURE) a.shade = 0.16;

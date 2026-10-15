@@ -1,5 +1,5 @@
 import { characterById, get as getCustom, merge as mergeCustom } from '../characters/library.js';
-import { ASSET_BY_ID, TERRAIN, TERRAIN_BY_ID, footprint } from '../tiles/index.js';
+import { ASSET_BY_ID, HOLDS_FURNITURE, TERRAIN, TERRAIN_BY_ID, canStandOnWall, footprint } from '../tiles/index.js';
 import { MAX_ELEV, MAX_LEVEL, STOREY } from './storeys.js';
 
 /* ================= tile editor: the map model =================
@@ -79,13 +79,18 @@ function fromJSON(J) {
 /* footprint helpers */
 const covers = (o, x, y) => { const [w, d] = footprint(o); return x >= o.x && y >= o.y && x < o.x + w && y < o.y + d; };
 const objAt = (M, x, y, L = 0) => { for (let k = M.objs.length - 1; k >= 0; k--) if (levelOf(M.objs[k]) === L && covers(M.objs[k], x, y)) return k; return -1; };
+/* every piece covering tile (x, y) on level L, by index: a wall and the furniture standing against it share a tile, and
+   objAt finds the furniture (the later of the two) */
+const piecesAt = (M, x, y, L = 0) => M.objs.map((o, k) => k).filter(k => levelOf(M.objs[k]) === L && covers(M.objs[k], x, y));
+/* may inst stand on tile (x, y), level L, against the room wall that is all that stands there? */
+const againstWall = (M, inst, x, y, L) => { const ks = piecesAt(M, x, y, L); return canStandOnWall(inst) && ks.length === 1 && HOLDS_FURNITURE(ASSET_BY_ID[M.objs[ks[0]].id]); };
 /* the floor of level L at tile u: 1 + TERRAIN index, 0 for none; the ground is always there */
 const floorAt = (M, L, u) => (L ? (M.floors && M.floors[L - 1] ? M.floors[L - 1][u] : 0) : M.terr[u] + 1);
 function fits(M, inst) {
   const [w, d] = footprint(inst), a = ASSET_BY_ID[inst.id], L = levelOf(inst);
   if (inst.x < 0 || inst.y < 0 || inst.x + w > M.S || inst.y + d > M.S || L > MAX_LEVEL) return false;
   for (let y = inst.y; y < inst.y + d; y++) for (let x = inst.x; x < inst.x + w; x++) {
-    if (objAt(M, x, y, L) >= 0 || (M.chars || []).some(c => c.x === x && c.y === y && levelOf(c) === L)) return false;
+    if ((objAt(M, x, y, L) >= 0 && !againstWall(M, inst, x, y, L)) || (M.chars || []).some(c => c.x === x && c.y === y && levelOf(c) === L)) return false;
     const u = y * M.S + x;
     if (L) { if (!floorAt(M, L, u) || a.water) return false; continue; }
     const wet = !!TERRAIN[M.terr[u]].water;
@@ -96,4 +101,4 @@ function fits(M, inst) {
 const isWater = (M, u) => !!TERRAIN[M.terr[u]].water;
 const terrainOf = (M, u) => TERRAIN[M.terr[u]];
 
-export { MAX_ELEV, MAX_LEVEL, STOREY, TI, TERRAIN_BY_ID, blankModel, floorAt, levelOf, cloneModel, covers, fits, fromJSON, isWater, objAt, terrainOf, toJSON };
+export { MAX_ELEV, MAX_LEVEL, STOREY, TI, TERRAIN_BY_ID, blankModel, floorAt, levelOf, cloneModel, covers, fits, fromJSON, isWater, objAt, piecesAt, terrainOf, toJSON };

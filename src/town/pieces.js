@@ -1,5 +1,5 @@
 import { OUTLINE, hexRgb, mixHex, ramp } from '../characters/pixels.js';
-import { ASSET_BY_ID, footprint } from '../tiles/index.js';
+import { ASSET_BY_ID, footprint, standsOnWall } from '../tiles/index.js';
 import { TREE } from '../render/palette.js';
 import { elvenTown } from './elven.js';
 import { TILE } from './ground.js';
@@ -2264,7 +2264,8 @@ const nudgeOf = (o, f) => {
 };
 /* how the pieces objs fit the room round them: for piece o, { snug: whether it stands with its back to a room wall on the
    tile behind it (SNUG and SNUG_SMALL pieces only), nudge: for a SNUG_SMALL piece standing so, how far it is moved
-   toward that wall ([x, y] map pixels), and for an anvil before a forge, how far it is drawn up to it, shift and ends: for a bar piece, how far its counter stands off the middle of
+   toward that wall ([x, y] map pixels), and for an anvil before a forge, how far it is drawn up to it, onWall: whether
+   it is furniture standing on a wall's own tile (tiles/index.js standsOnWall), shift and ends: for a bar piece, how far its counter stands off the middle of
    its tile ([x, y], the same for every piece of a run of joined bar pieces: set back toward the back of the pieces
    facing north or south, and of those facing east or west) and which of its sides have a room wall beside them
    ([+x, +y, -x, -y]) } */
@@ -2282,7 +2283,13 @@ function fitTo(objs) {
       for (const [dx, dy] of D) { const n = bars.get(key(c.level || 0, c.x + dx, c.y + dy)); if (n && !shift.has(n)) { shift.set(n, sh); net.push(n); } }
     }
   }
+  const onWall = standsOnWall(objs);
   return o => {
+    /* furniture on a wall's own tile: back against the wall's face on the side it faces, drawn after the wall */
+    if (onWall.has(o)) {
+      const f = facing(o) & 3, n = nudgeOf(o, f), [sx, sy] = [[0, 1], [1, 0], [0, -1], [-1, 0]][f];
+      return { snug: true, nudge: [n[0] + sx * T, n[1] + sy * T], onWall: true, shift: null, ends: null };
+    }
     const L = o.level || 0, wall = (dx, dy) => walls.has(key(L, o.x + dx, o.y + dy)), [bx, by] = [[0, -1], [-1, 0], [0, 1], [1, 0]][facing(o) & 3];
     if (o.id === 'bar') return { snug: false, shift: shift.get(o) || null, ends: D.map(([dx, dy]) => (dy < 0 && backs.has(key(L, o.x, o.y - 1)) ? 2 : wall(dx, dy) ? 1 : 0)) };
     /* an anvil with a forge on the tile north of it stands up close before the forge, where the smith works */

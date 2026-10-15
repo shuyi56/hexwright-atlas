@@ -150,6 +150,12 @@ dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
   a herb drying rack and a cabinet of apothecary drawers. Bar counter pieces join the ones beside them, as walls do, so a run of them makes one counter,
   straight or round a corner. Each is drawn in its own frame, so `R` turns it to face any of the four ways and
   turning the view shows its back; a bar counter faces the side its customers stand.
+- **Against a wall:** a room's walls stand in the middle of their tiles, so half a wall's tile is floor on the room's
+  side. Furniture that stands against a wall (shelves of books or potions, a wardrobe, a dresser, a desk, a chest,
+  apothecary drawers, herb, tool and weapon racks, an armour stand, coal and bar iron, a quenching trough, a
+  grindstone) can be placed on a plain, windowed or hung wall's own tile and stands in front of the wall on the side
+  it faces, turned into the room (any way but north). A small room can then keep its walls lined and its floor free.
+  The piece is the one Erase and Pick find there; the wall stays when it goes.
 
 ### Building interiors
 
@@ -610,10 +616,11 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   of glowing bottles and coloured fumes from the chimney; inside, on a dark oak floor, two workbenches of apparatus and
   shelves of potions against the back wall, apothecary drawers and a herb rack on the west wall, a bubbling cauldron,
   the alchemist, and stairs up to a study with a star chart. East of it the **smithy**: a stone workshop whose forge
-  bay stands open to the lane, glowing; inside, a workshop two tiles across with the forge and its bellows in the back
-  corner, hammers and tongs on the wall, the anvil drawn up before the forge and the smith beside it; outside, the
-  smith's yard of coal and bar iron, a quenching trough, a grindstone, and a weapon rack and an armour stand set out
-  as wares. (An anvil with a forge just north of it stands up close before the forge in the town view.) Its map is built by `node tools/make-wayfarers-rest.mjs`.
+  bay stands open to the lane, glowing; inside, a workshop two tiles across laid out as a smith works: the forge
+  and its bellows in the back corner with coal and bar iron beside them, the quenching trough at its side under a rail
+  of hammers and tongs, the anvil drawn up before the fire and the smith between them; the grindstone on the west
+  wall; and on the east wall by the door, where customers come in, a weapon rack and an armour stand of finished work.
+  (An anvil with a forge just north of it stands up close before the forge in the town view.) Its map is built by `node tools/make-wayfarers-rest.mjs`.
 
 ![Oakfield Lane: the alchemist's shop, the Wayfarer's Rest and the smithy](docs/images/oakfield-lane.png)
 
