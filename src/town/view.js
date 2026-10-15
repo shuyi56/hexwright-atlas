@@ -12,7 +12,7 @@ import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
 import { CHUNK, INFO, LIFT, TILE, cellAt, fieldOf, h2, heightAt, isWater, renderChunk } from './ground.js';
 import { hits, shapesOf } from './collide.js';
-import { FIRE, FLIGHT_L, FLIGHT_W, fitTo, pieceSprite } from './pieces.js';
+import { COUNTERS, FIRE, FLIGHT_L, FLIGHT_W, fitTo, pieceSprite } from './pieces.js';
 import { lineFor, sightFor } from './talk.js';
 import { portrait } from '../tactical/render.js';
 import GroundWorker from './ground-worker.js?worker&inline';
@@ -613,11 +613,11 @@ function talk(to = -1) {
   if (who) { const fg = face.getContext('2d'); fg.clearRect(0, 0, face.width, face.height); fg.imageSmoothingEnabled = false; fg.drawImage(portrait(who), 0, 0, face.width, face.height); }
   $('twWho').textContent = TW.say.who; $('twWho').hidden = !TW.say.who; $('twLine').textContent = TW.say.line; $('twSay').hidden = false; root.classList.add('saying'); TW.dirty = true; place();
 }
-/* whoever stands across a bar counter from the hero: the first bar piece within a tile the way they face, and the
+/* whoever stands across a counter (a bar or a shop's) from the hero: the first bar piece within a tile the way they face, and the
    one nearest the tile beyond it (within most of a tile the way they face, and up to a tile and a half to either side,
    so the keeper of a narrow lane can be hailed from beside it as well as straight across), or -1 */
 function acrossBar(M, k, m, fx, fy) {
-  const L = m.L, barAt = (x, y) => M.objs.some(o => o.id === 'bar' && (o.level || 0) === L && o.x === x && o.y === y);
+  const L = m.L, barAt = (x, y) => M.objs.some(o => COUNTERS.has(o.id) && (o.level || 0) === L && o.x === x && o.y === y);
   for (let s = 18; s <= T; s += 8) {
     const x = Math.floor((m.x + fx * s) / T), y = Math.floor((m.y + fy * s) / T);
     if (!barAt(x, y)) continue;

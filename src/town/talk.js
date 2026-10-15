@@ -44,6 +44,7 @@ const SIGHTS = {
   elvenhall: 'The hall\'s doors are carved with leaves. They are shut.', elvenspire: 'A white spire. Someone is singing at the top.',
   elvenpavilion: 'An open pavilion. A lantern turns slowly under its roof.', elvenrotunda: 'Light falls through the tracery in long gold bars. Inside, someone is reading aloud.',
   blacksmith: 'Heat rolls out of the open forge. Somewhere inside a hammer rings.', alchemist: 'Bottles glow in the shop window: green, violet, amber. Something inside goes *pop*.',
+  smithcounter: 'Horseshoes by the pair, nails by the box, and a sword nobody has paid for yet.', alchcounter: 'Brass scales, a ledger in a crabbed hand, and a hundred little drawers below.',
   forge: 'The coals glow white at the heart. Too hot to stand close.', anvil: 'A heavy anvil, its face polished by years of blows.', quench: 'Black water, still warm. It hisses when you touch it.',
   grindstone: 'A grindstone, its wheel worn hollow in the middle.', toolrack: 'Hammers and tongs, each in its place.', armorstand: 'A mail shirt, freshly mended. It is not for sale.',
   ironstock: 'Coal and bars of iron, waiting their turn.', alchemybench: 'Flasks, coils of glass and a book of crabbed notes. Something is distilling, drop by drop.',
