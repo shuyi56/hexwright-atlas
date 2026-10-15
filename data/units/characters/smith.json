@@ -1,0 +1,14 @@
+{
+  "id": "smith",
+  "name": "Smith",
+  "stats": {
+    "hp": 34,
+    "attack": 8,
+    "range": 1,
+    "pattern": "melee"
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

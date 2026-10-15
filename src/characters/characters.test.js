@@ -24,7 +24,7 @@ test('every shared part is a rectangle of rows', () => {
   for (const [name, v] of Object.entries({ ...parts, ...hats })) if (typeof v !== 'function') each(v, name);
 });
 test('every job in every build draws all its frames inside the frame, in colours it defines', () => {
-  assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 7); assert.equal(ENEMIES.length, 6); assert.equal(ELVES.length, 5); assert.equal(ROSTER.length, 27);
+  assert.equal(JOBS.length, 9); assert.equal(TOWNSFOLK.length, 9); assert.equal(ENEMIES.length, 6); assert.equal(ELVES.length, 5); assert.equal(ROSTER.length, 29);
   assert.equal(new Set(ROSTER.map(j => j.id)).size, ROSTER.length); for (const j of ROSTER) assert.equal(byId(j.id), j);
   for (const job of ROSTER) {
     const pal = palette(job); assert.ok(BODY_TYPES[job.body], `${job.id} has a build`);

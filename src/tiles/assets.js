@@ -54,7 +54,7 @@ const BUILDINGS = [
     K.box(x0, y0, x1, y1, z + 3.5, z + 10, PLANK, { noTop: true }); K.timber('y', y1, x0, x1, z + 3.5, z + 10, '#5a3f28');
     K.hip(x0, y0, x1, y1, z + 10, 8, THATCH, { tex: 'thatch', ov: 0.12 });
   } },
-  { id: 'smithy', label: 'Smithy', w: 1, d: 1, h: 18, draw(K, o) {
+  { id: 'smithy', label: 'Forge hut', w: 1, d: 1, h: 18, draw(K, o) {
     const [x0, y0, x1, y1] = inset(o, 0.12), z = o.z, g = K.g;
     K.box(x0, y0, x1, y1, z, z + 8, STONE, { noTop: true }); K.courses('y', y1, x0, x1, z, z + 8); K.courses('x', x1, y0, y1, z, z + 8);
     const fc = o.face === 1 || o.face === 3 ? 'x' : 'y', c = fc === 'y' ? y1 : x1, m = fc === 'y' ? (x0 + x1) / 2 : (y0 + y1) / 2;
@@ -63,6 +63,55 @@ const BUILDINGS = [
     const gl = g.createRadialGradient(gx, gy, 0, gx, gy, 9); gl.addColorStop(0, 'rgba(255,170,60,0.9)'); gl.addColorStop(1, 'rgba(255,140,40,0)'); g.fillStyle = gl; g.beginPath(); g.arc(gx, gy, 9, 0, TAU); g.fill();
     K.gable(x0, y0, x1, y1, z + 8, 7, o.axis, SLATE[0], STONE);
     const cx = x0 + 0.18, cy = y0 + 0.2; K.box(cx - 0.1, cy - 0.1, cx + 0.1, cy + 0.1, z + 6, z + 22, '#a99f8c'); const [px, py] = sx(K, cx, cy, z + 22); K.smoke(px, py); K.smoke(px + 2, py - 6);
+  } },
+  /* the smithy: a stone workshop, its door at the west end and the rest of its front an open forge bay glowing under a
+     timber lintel, an anvil in the opening and a broad stack over the forge */
+  { id: 'blacksmith', label: 'Smithy', w: 2, d: 1, h: 26, door: 0.2, draw(K, o) {
+    const [x0, y0, x1, y1] = inset(o, 0.1), z = o.z, g = K.g, dw = doorWall(o, x0, y0, x1, y1);
+    const fc = dw ? dw[0] : o.axis === 'x' ? 'y' : 'x', c = fc === 'y' ? y1 : x1, a0 = fc === 'y' ? x0 : y0, a1 = fc === 'y' ? x1 : y1, L = a1 - a0, b0 = a0 + L * 0.48, b1 = a1 - 0.1;
+    const on = (a, zz) => sx(K, ...(fc === 'y' ? [a, c, zz] : [c, a, zz]));
+    K.box(x0, y0, x1, y1, z, z + 9, STONE, { noTop: true }); K.courses('y', y1, x0, x1, z, z + 9); K.courses('x', x1, y0, y1, z, z + 9);
+    if (dw) {
+      K.door(fc, c, a0 + L * 0.2, z, '#5a3a28');
+      K.windows(fc, c, a0 + L * 0.3, a0 + L * 0.4, z + 4, 1);
+      K.onWall(fc, c, b0, b1, z, z + 6.5, '#2a2018', 0.5);
+      const [gx, gy] = on(b0 + (b1 - b0) * 0.3, z + 2), gl = g.createRadialGradient(gx, gy, 0, gx, gy, 14);
+      gl.addColorStop(0, 'rgba(255,170,60,0.95)'); gl.addColorStop(1, 'rgba(255,140,40,0)'); g.fillStyle = gl; g.beginPath(); g.arc(gx, gy, 14, 0, TAU); g.fill();
+      for (const a of [b0, (b0 + b1) / 2, b1]) K.onWall(fc, c, a - 0.025, a + 0.025, z, z + 6.5, PLANK_D, 0.3);
+      K.onWall(fc, c, b0 - 0.05, b1 + 0.05, z + 6.5, z + 7.4, PLANK_D, 0.4);
+      const ax = b0 + (b1 - b0) * 0.68, [px, py] = on(ax, z);
+      K.seg(fc === 'y' ? [ax, c + 0.1, z] : [c + 0.1, ax, z], fc === 'y' ? [ax, c + 0.1, z + 2] : [c + 0.1, ax, z + 2], '#7a5a3a', 2.2);
+      g.fillStyle = '#4e5054'; g.strokeStyle = INK; g.lineWidth = 0.4; g.beginPath(); g.moveTo(px - 3.5, py + 1.2 - 3.4); g.lineTo(px + 2.4, py + 1.2 - 3.4); g.lineTo(px + 2.4, py + 1.2 - 2.4); g.lineTo(px - 1.6, py + 1.2 - 2.4); g.lineTo(px - 3.5, py + 1.2 - 3); g.closePath(); g.fill(); g.stroke();
+      const sp = on(a0 + 0.05, z + 7); g.strokeStyle = INK; g.lineWidth = 0.6; g.beginPath(); g.moveTo(sp[0], sp[1]); g.lineTo(sp[0] - 5, sp[1] + 2.5); g.stroke(); g.fillStyle = '#4a3424'; g.fillRect(sp[0] - 7.4, sp[1] + 2.5, 4.8, 3.6); g.strokeRect(sp[0] - 7.4, sp[1] + 2.5, 4.8, 3.6); g.fillStyle = '#9aa0a6'; g.fillRect(sp[0] - 6.4, sp[1] + 3.8, 2.8, 0.9);
+    }
+    K.gable(x0, y0, x1, y1, z + 9, 7, o.axis, SLATE[0], STONE);
+    const m = b0 + (b1 - b0) * 0.3, [cx, cy] = fc === 'y' ? [m, (y0 + y1) / 2] : [(x0 + x1) / 2, m];
+    K.box(cx - 0.13, cy - 0.11, cx + 0.13, cy + 0.11, z + 9, z + 22, '#a99f8c'); const [qx, qy] = sx(K, cx, cy, z + 22); K.smoke(qx, qy); K.smoke(qx + 2, qy - 6);
+  } },
+  /* the alchemist's shop: a tall timbered house of lilac plaster under indigo slate, a shop window of coloured bottles by
+     its door, a round turret with a verdigris cone and a golden star at its far end, coloured fumes from its chimney */
+  { id: 'alchemist', label: 'Alchemist\'s shop', w: 2, d: 1, h: 36, door: 0.24, draw(K, o) {
+    const [x0, y0, x1, y1] = inset(o, 0.1), z = o.z, g = K.g, dw = doorWall(o, x0, y0, x1, y1), wall = '#e6dde6', h = 17;
+    const fc = dw ? dw[0] : o.axis === 'x' ? 'y' : 'x', c = fc === 'y' ? y1 : x1, a0 = fc === 'y' ? x0 : y0, a1 = fc === 'y' ? x1 : y1, L = a1 - a0;
+    K.box(x0, y0, x1, y1, z, z + h, wall, { noTop: true }); K.timber('y', y1, x0, x1, z, z + h, '#4a3424'); K.timber('x', x1, y0, y1, z, z + h, '#4a3424');
+    K.windows('y', y1, x0, x1, z + 11.5, Math.max(1, Math.round((x1 - x0) / 0.45)), '#3e5a64'); K.windows('x', x1, y0, y1, z + 11.5, Math.max(1, Math.round((y1 - y0) / 0.45)), '#2f454e');
+    if (dw) {
+      K.door(fc, c, a0 + L * 0.24, z, '#3e5470');
+      const s0 = a0 + L * 0.38, s1 = a0 + L * 0.72;
+      K.onWall(fc, c, s0, s1, z + 1.5, z + 6.5, '#3a2c20', 0.5);
+      const COL = ['#6fbf6a', '#a46ac8', '#e0a23a', '#c4503e', '#4fb0b0'];
+      for (let r = 0; r < 2; r++) for (let k = 0; k < 7; k++) { const a = s0 + (s1 - s0) * (k + 0.5) / 7, [px, py] = sx(K, ...(fc === 'y' ? [a, c, z + 2 + r * 2.4] : [c, a, z + 2 + r * 2.4])); g.fillStyle = COL[(k + r * 3) % COL.length]; g.fillRect(px - 0.6, py - 1.6, 1.2, 1.6); }
+      K.onWall(fc, c, s0 - 0.03, s1 + 0.03, z + 1, z + 1.5, '#3e5470', 0.3);
+    }
+    K.gable(x0, y0, x1, y1, z + h, 8, o.axis, '#5e5c80', wall, { tex: 'tiles' });
+    const [cx, cy] = fc === 'y' ? [x1 - 0.22, y1 - 0.2] : [x1 - 0.2, y1 - 0.22];
+    K.cyl(cx, cy, 0.2, z, z + 26, '#d8cfb9', { noTop: true }); K.courses('y', cy + 0.2, cx - 0.2, cx + 0.2, z, z + 26);
+    const [tx, ty] = K.cone(cx, cy, 0.24, z + 26, 13, COPPER[0]);
+    g.fillStyle = GOLD; g.beginPath(); for (let k = 0; k < 10; k++) { const rr = k % 2 ? 1 : 2.4, a = k / 10 * TAU - Math.PI / 2; g.lineTo(tx + Math.cos(a) * rr, ty - 3 + Math.sin(a) * rr); } g.closePath(); g.fill();
+    const [hx, hy] = fc === 'y' ? [x0 + (x1 - x0) * 0.3, (y0 + y1) / 2] : [(x0 + x1) / 2, y0 + (y1 - y0) * 0.3];
+    K.box(hx - 0.07, hy - 0.07, hx + 0.07, hy + 0.07, z + h + 3, z + h + 10, '#b9a98a'); const [qx, qy] = sx(K, hx, hy, z + h + 10);
+    for (const [k, col] of [[0, 'rgba(170,220,160,0.7)'], [1, 'rgba(200,170,230,0.6)'], [2, 'rgba(170,220,220,0.5)']]) { g.fillStyle = col; g.beginPath(); g.arc(qx + k * 1.6, qy - 3 - k * 3.2, 1.6 + k * 0.7, 0, TAU); g.fill(); }
+    if (dw) { const sp = sx(K, ...(fc === 'y' ? [a0 + 0.05, c, z + 9] : [c, a0 + 0.05, z + 9])); g.strokeStyle = INK; g.lineWidth = 0.6; g.beginPath(); g.moveTo(sp[0], sp[1]); g.lineTo(sp[0] - 5, sp[1] + 2.5); g.stroke(); g.fillStyle = '#3e5470'; g.fillRect(sp[0] - 7.4, sp[1] + 2.5, 4.8, 3.6); g.strokeRect(sp[0] - 7.4, sp[1] + 2.5, 4.8, 3.6); g.fillStyle = '#6fbf6a'; g.beginPath(); g.arc(sp[0] - 5, sp[1] + 4.6, 1.1, 0, TAU); g.fill(); }
   } },
   { id: 'tavern', label: 'Tavern', w: 2, d: 1, h: 30, draw(K, o) {
     const [x0, y0, x1, y1] = house(K, o, { wall: '#efdfc0', roof: ROOFS[0][0], h: 18, rh: 10, timber: true, floors: 2, hip: true, chimney: 2, ins: 0.08 });
@@ -366,4 +415,55 @@ const ASSETS = ASSET_GROUPS.flatMap(([, list]) => list);
 for (const [grp, list] of ASSET_GROUPS) for (const a of list) a.group = grp;
 const ASSET_BY_ID = Object.fromEntries(ASSETS.map(a => [a.id, a]));
 
-export { ASSETS, ASSET_BY_ID, ASSET_GROUPS };
+/* ---- categories ----
+   Within its group each asset belongs to one category, in the order the editor's palette shows them. The elven pieces
+   gather in a category of their own in each group. An asset no category names lands in Other, so none goes missing. */
+const ids = list => list.map(a => a.id);
+const CATEGORIES = {
+  Buildings: [
+    ['Homes', ['cottage', 'townhouse', 'longhouse', 'slatehouse', 'stonehouse', 'mansion', 'yurt']],
+    ['Shops and trades', ['blacksmith', 'alchemist', 'tavern', 'smithy', 'markethall', 'windmill', 'mine']],
+    ['Farm', ['barn', 'granary', 'dovecote']],
+    ['Faith', ['chapel', 'church', 'cathedral', 'temple', 'shrine']],
+    ['Walls and towers', ['wall', 'walltower', 'gatehouse', 'watchtower', 'stonetower', 'keep', 'lighthouse', 'ruin']],
+    ['Elven', ids(ELVEN_BUILDINGS)]
+  ],
+  Props: [
+    ['Farm and field', ['haystack', 'haybales', 'cart', 'fence', 'scarecrow', 'beehives']],
+    ['Street and harbour', ['barrels', 'crates', 'stall', 'well', 'lamppost', 'signpost', 'rowboat']],
+    ['Monuments', ['statue', 'obelisk', 'graves', 'stones']],
+    ['Camp and woodland', ['campfire', 'logpile', 'stump', 'boulders']],
+    ['Elven', ids(ELVEN_PROPS)]
+  ],
+  Nature: [
+    ['Trees', ['oak', 'beech', 'birch', 'poplar', 'pine', 'snowpine', 'palm', 'deadtree']],
+    ['Bushes and cacti', ['bush', 'cactus']],
+    ['Ground cover', ['flowers', 'mushrooms', 'reeds', 'rocks']],
+    ['Elven', ids(ELVEN_NATURE)]
+  ],
+  Interior: [
+    ['Walls and stairs', ['iwall', 'iwindow', 'idoor', 'post', 'hearth', 'stairs']],
+    ['On the walls', ['wallshelf', 'wallsconce', 'wallantlers', 'wallshield', 'wallbar', 'walltools', 'wallpotions', 'wallherbs', 'wallchart']],
+    ['Tables and seats', ['table', 'tableset', 'longtable', 'feastset', 'chair', 'stool', 'bench', 'desk']],
+    ['Beds and storage', ['bed', 'cot', 'chest', 'wardrobe', 'dresser', 'bookshelf']],
+    ['Tavern', ['bar', 'backbar', 'casks', 'counter']],
+    ['Smithy', ['forge', 'anvil', 'quench', 'grindstone', 'toolrack', 'weaponrack', 'armorstand', 'ironstock']],
+    ['Alchemist', ['alchemybench', 'brewcauldron', 'potionshelf', 'apothecary', 'herbrack']],
+    ['Household', ['cauldron', 'tub', 'spinwheel', 'sacks', 'firewood', 'coatrack', 'candelabra', 'plantpot', 'noticeboard']],
+    ['Hall and chapel', ['throne', 'altar', 'pew']]
+  ]
+};
+/* ASSET_CATEGORIES: group name -> [[category, [asset]]], every asset of the group in exactly one */
+const ASSET_CATEGORIES = Object.fromEntries(ASSET_GROUPS.map(([grp, list]) => {
+  const out = [], seen = new Set();
+  for (const [cat, members] of CATEGORIES[grp] || []) {
+    const items = members.map(id => ASSET_BY_ID[id]).filter(a => a && a.group === grp && !seen.has(a.id));
+    for (const a of items) { a.cat = cat; seen.add(a.id); }
+    if (items.length) out.push([cat, items]);
+  }
+  const rest = list.filter(a => !seen.has(a.id)); for (const a of rest) a.cat = 'Other';
+  if (rest.length) out.push(['Other', rest]);
+  return [grp, out];
+}));
+
+export { ASSETS, ASSET_BY_ID, ASSET_CATEGORIES, ASSET_GROUPS };

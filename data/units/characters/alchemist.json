@@ -1,0 +1,14 @@
+{
+  "id": "alchemist",
+  "name": "Alchemist",
+  "stats": {
+    "hp": 22,
+    "attack": 5,
+    "range": 3,
+    "pattern": "ranged"
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

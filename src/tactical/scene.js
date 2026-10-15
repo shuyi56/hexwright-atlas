@@ -1,5 +1,5 @@
 import { MAX_LEVEL, STOREY, levelOf } from '../editor/model.js';
-import { ASSET_BY_ID, TERRAIN, footprint, linkWalls, turnAsset } from '../tiles/index.js';
+import { ASSET_BY_ID, TERRAIN, footprint, linkWalls, offWall, standsOnWall, turnAsset } from '../tiles/index.js';
 import { designTop, hasDesign } from './pieces.js';
 import { ANIMATED, DIRECTIONAL, PAD, STEP, TH, inDiamond, tileUV } from './tiles.js';
 
@@ -75,6 +75,7 @@ function buildScene(M, { rot = 0, top = MAX_LEVEL } = {}) {
   /* pieces, turned with the view, joined up (walls), at the height they stand on */
   const objs = M.objs.map((o, k) => Object.assign({}, turnAsset(o, rot, S), { k })).filter(o => levelOf(o) <= top);
   linkWalls(objs);
+  const onWall = standsOnWall(objs);
   for (const o of objs) {
     const a = ASSET_BY_ID[o.id], [w, d] = footprint(o), L = levelOf(o); let z = 0, zmin = Infinity, roofed = false;
     for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) {
@@ -83,6 +84,8 @@ function buildScene(M, { rot = 0, top = MAX_LEVEL } = {}) {
     }
     const lift = a.walk && a.top ? 1 : roofed ? Math.min(liftOf(a.h), (SZ - 1) / a.h) : liftOf(a.h);
     o.z = a.water ? zmin : z;
+    /* furniture standing on a wall's tile, in front of the wall on the side it faces */
+    if (onWall.has(o)) { const [dx, dy] = offWall(o); o.x += dx; o.y += dy; }
     const [lx] = P(o.x, o.y + d, o.z), [rx] = P(o.x + w, o.y, o.z), ty = P(o.x, o.y, o.z)[1], by = P(o.x + w, o.y + d, o.z)[1];
     /* a piece with a tactical design (tactical/pieces.js) is drawn from it, unless a floor overhead squeezes it */
     const designed = hasDesign(o.id) && !roofed;

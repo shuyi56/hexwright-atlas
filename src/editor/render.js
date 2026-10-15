@@ -1,6 +1,6 @@
 import { mulberry32 } from '../core/random.js';
 import { INK, hexRgb, rgbStr } from '../render/palette.js';
-import { ASSET_BY_ID, TERRAIN, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset, wallLinks } from '../tiles/index.js';
+import { ASSET_BY_ID, TERRAIN, decorateTerrain, drawAsset, footprint, linkWalls, offWall, standsOnWall, turnAsset, wallLinks } from '../tiles/index.js';
 import { MAX_LEVEL, STOREY, levelOf } from './model.js';
 
 /* ================= tile editor: rendering =================
@@ -68,10 +68,13 @@ function scene(R, M) {
   /* copies: at rot 0 turnAsset hands back the model's own piece, and render data (key, links) must not leak into it */
   R.objs = M.objs.map((o, k) => Object.assign({}, rotInst(o, rot, S), { k, key: keys[k] })).filter(o => levelOf(o) <= R.top);
   linkWalls(R.objs);
+  const onWall = standsOnWall(R.objs);
   for (const o of R.objs) {
     const [w, d] = footprint(o), L = levelOf(o); let z = 0, zmin = Infinity;
     for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) { const u = y * S + x, zz = R.zAt(u, L); if (!L) covered[u] = 1; z = Math.max(z, zz); zmin = Math.min(zmin, zz); }
     o.z = ASSET_BY_ID[o.id].water ? zmin : z;
+    /* furniture standing on a wall's tile is drawn in front of the wall, on the side it faces */
+    if (onWall.has(o)) { const [dx, dy] = offWall(o); o.x += dx; o.y += dy; }
   }
   R.terr = M.terr.slice(); R.elev = M.elev.slice(); R.fl = (M.floors || []).map(f => f && f.slice()); R.ver = (R.ver || 0) + 1;
 }

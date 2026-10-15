@@ -11,6 +11,7 @@ import { shade } from './kit.js';
 const PLASTER = '#efe3c4', TIMBER = '#7a5a3a', WOOD = '#9a7650', WOOD_L = '#b48a58', WOOD_D = '#6b4c32';
 const LINEN = '#f0e6cb', STONE = '#d8cfb9', IRON = '#5f646a', GLASS = '#8eaab0', CLOTHS = ['#a6533b', '#5f7b3d', '#4f6f8f', '#c9a24f', '#7a6a8a'];
 const WALL_H = 10, WALL_T = 0.11;
+const BRICK = '#9a4e36', COPPER = '#c97a56', POTIONS = ['#6fbf6a', '#a46ac8', '#e0a23a', '#c4503e', '#4fb0b0'], HERBS = ['#7f9a52', '#93a862', '#a8a46a', '#b98ad8', '#6f8a5a'];
 const pickv = (a, v) => a[Math.floor(v * a.length) % a.length];
 
 /* ---------- the piece's own frame ---------- */
@@ -124,6 +125,12 @@ const INTERIOR = [
     for (const z of [6, 9.5, 12.5]) { F.onFront(0.1, 0.9, b + 0.08, z, z + 2.6, '#3a2c1e', 0.3); for (let a = 0.12; a < 0.86; a += 0.08) F.onFront(a, a + 0.04, b + 0.081, z, z + 1.6 + (a * 37 % 1), pickv(['#5f8a4a', '#7a4a2a', '#c9d8d0', '#a8aeb0'], (a * 13 + z) % 1), 0.2); }
     F.done();
   } },
+  /* the smithy's and the alchemist's walls: hammers and tongs on a rail, a shelf of potions, herbs hung to dry, a star
+     chart */
+  { id: 'walltools', label: 'Wall with smith\'s tools', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; K.onWall(fc, c, m - 0.32, m + 0.32, o.z + 7.6, o.z + 8, WOOD_D, 0.3); for (let k = 0; k < 5; k++) { const a = m - 0.24 + k * 0.12; K.onWall(fc, c, a - 0.012, a + 0.012, o.z + 4.8, o.z + 7.6, k % 2 ? IRON : WOOD_D, 0); if (!(k % 2)) K.onWall(fc, c, a - 0.04, a + 0.04, o.z + 4.4, o.z + 5.1, IRON, 0.2); } } },
+  { id: 'wallpotions', label: 'Wall with potion shelf', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; for (const z of [4.4, 7]) { K.onWall(fc, c, m - 0.3, m + 0.3, o.z + z - 0.4, o.z + z, TIMBER, 0.3); for (let k = 0; k < 6; k++) { const a = m - 0.25 + k * 0.1; K.onWall(fc, c, a - 0.025, a + 0.025, o.z + z, o.z + z + 1.2 + (k * 7 + z) % 3 * 0.25, POTIONS[(k + z * 3) % POTIONS.length], 0.2); } } } },
+  { id: 'wallherbs', label: 'Wall with drying herbs', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; K.onWall(fc, c, m - 0.34, m + 0.34, o.z + 8, o.z + 8.2, '#c8b28a', 0); for (let k = 0; k < 6; k++) { const a = m - 0.27 + k * 0.11; K.onWall(fc, c, a - 0.03, a + 0.03, o.z + 5.6, o.z + 8, pickv(HERBS, k / 6), 0.25); } } },
+  { id: 'wallchart', label: 'Wall with star chart', w: 1, d: 1, h: WALL_H, joins: 'room', draw(K, o) { const f = hung(K, o); if (!f) return; const { fc, c, m } = f; K.onWall(fc, c, m - 0.26, m + 0.26, o.z + 3.6, o.z + 8.4, '#2f3f66', 0.4); const [x, y] = fc === 'y' ? [m, c] : [c, m], [px, py] = K.P(x, y, o.z + 6), g = K.g; g.strokeStyle = GOLD; g.lineWidth = 0.4; g.beginPath(); g.ellipse(px, py, 4.2, 2.6, fc === 'y' ? 0.46 : -0.46, 0, TAU); g.stroke(); g.fillStyle = '#f6e6a0'; for (const [dx, dy] of [[-3, -1.5], [2, -2], [3, 1], [-1, 2], [0, 0]]) g.fillRect(px + dx, py + dy, 0.8, 0.8); } },
   { id: 'post', label: 'Timber post', w: 1, d: 1, h: WALL_H + 4, joins: 'room', draw(K, o) { const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2]; K.box(cx - 0.12, cy - 0.12, cx + 0.12, cy + 0.12, o.z, o.z + 1, STONE, { lw: 0.45 }); K.box(cx - 0.08, cy - 0.08, cx + 0.08, cy + 0.08, o.z + 1, o.z + WALL_H + 3, TIMBER, { lw: 0.5 }); } }
 ];
 
@@ -330,8 +337,98 @@ const FURNITURE = [
     F.box(0.14, 0.86, 0.46, 0.52, 4.5, 10, '#b08a58');
     for (const [a, z] of [[0.24, 6.5], [0.44, 7.2], [0.62, 5.6], [0.7, 7.6]]) F.onFront(a, a + 0.12, 0.52, z, z + 1.6, LINEN, 0.25);
     F.done();
+  } },
+  /* the smithy's: a forge, an anvil, a quenching trough, a grindstone, racks of tools and armour, coal and bar iron */
+  { id: 'forge', label: 'Forge', w: 1, d: 1, h: 18, draw(K, o) {
+    const F = frame(K, o);
+    F.box(0.15, 0.85, 0.04, 0.5, 0, 5, BRICK, { top: '#3a2c20' });
+    F.at3(0.5, 0.27, 5, ([px, py]) => { const g = K.g; glow(g, px, py - 1, 14, 0.7); for (const dx of [-2.4, 0, 2.4]) flame(g, px + dx, py + 0.6, dx ? 0.7 : 1); });
+    F.box(0.1, 0.9, 0.02, 0.44, 10, 11.4, STONE);
+    F.box(0.32, 0.68, 0.02, 0.2, 11.4, 18, STONE);
+    for (const a of [0.14, 0.86]) F.box(a - 0.03, a + 0.03, 0.4, 0.46, 5, 10, IRON);
+    F.box(0.0, 0.13, 0.18, 0.46, 2.6, 4.2, '#7a4a2a');
+    F.done();
+  } },
+  { id: 'anvil', label: 'Anvil', w: 1, d: 1, h: 5, draw(K, o) {
+    const F = frame(K, o);
+    F.box(0.38, 0.62, 0.38, 0.62, 0, 2.8, WOOD, { top: '#d8bb8a' });
+    F.box(0.42, 0.58, 0.44, 0.56, 2.8, 3.6, IRON);
+    F.box(0.3, 0.72, 0.42, 0.58, 3.6, 4.6, IRON, { top: '#8a8e94' });
+    F.box(0.18, 0.3, 0.46, 0.54, 3.9, 4.5, IRON);
+    F.done();
+  } },
+  { id: 'quench', label: 'Quenching trough', w: 1, d: 1, h: 4, draw(K, o) { const F = frame(K, o); F.box(0.1, 0.9, 0.36, 0.76, 0, 3, STONE, { top: '#4f7480' }); F.at3(0.72, 0.56, 3, ([px, py]) => { const g = K.g; g.strokeStyle = INK; g.lineWidth = 0.6; g.beginPath(); g.moveTo(px - 0.6, py); g.lineTo(px - 0.6, py - 5); g.moveTo(px + 0.6, py); g.lineTo(px + 0.6, py - 5); g.stroke(); }); F.done(); } },
+  { id: 'grindstone', label: 'Grindstone', w: 1, d: 1, h: 8, draw(K, o) {
+    const F = frame(K, o);
+    for (const [a, b] of [[0.25, 0.4], [0.75, 0.4], [0.25, 0.62], [0.75, 0.62]]) F.box(a - 0.03, a + 0.03, b - 0.03, b + 0.03, 0, 3.4, WOOD_D, { noTop: true });
+    F.box(0.22, 0.78, 0.37, 0.65, 3.4, 4, WOOD);
+    F.at3(0.5, 0.51, 4, ([px, py]) => { const g = K.g; g.beginPath(); g.ellipse(px, py - 2.6, F.front === (o.face % 2 === 0) ? 3.6 : 2.2, 3.6, 0, 0, TAU); g.fillStyle = '#a59a85'; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.5; g.stroke(); g.fillStyle = IRON; g.fillRect(px - 0.5, py - 3.1, 1, 1); });
+    F.done();
+  } },
+  { id: 'toolrack', label: 'Smith\'s tool rack', w: 1, d: 1, h: 10, draw(K, o) {
+    const F = frame(K, o);
+    F.box(0.12, 0.88, 0.32, 0.42, 0, 0.8, WOOD_D);
+    for (const a of [0.15, 0.85]) F.box(a - 0.03, a + 0.03, 0.34, 0.4, 0.8, 8, WOOD_D);
+    F.box(0.12, 0.88, 0.34, 0.4, 7.2, 7.8, WOOD);
+    for (const [a, k] of [[0.3, 0], [0.42, 1], [0.58, 0], [0.7, 1]]) F.at3(a, 0.38, 7.2, ([px, py]) => { const g = K.g; g.strokeStyle = k ? IRON : WOOD_D; g.lineWidth = 0.6; g.beginPath(); g.moveTo(px, py); g.lineTo(px, py + 4.4); g.stroke(); if (!k) { g.fillStyle = IRON; g.fillRect(px - 1.2, py + 4.2, 2.4, 1.2); } });
+    F.done();
+  } },
+  { id: 'armorstand', label: 'Armour stand', w: 1, d: 1, h: 13, draw(K, o) {
+    const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2], [px, py] = K.P(cx, cy, o.z), g = K.g;
+    K.seg([cx, cy, o.z], [cx, cy, o.z + 6], WOOD_D, 1.2);
+    g.beginPath(); g.moveTo(px - 3.4, py - 11.5); g.lineTo(px + 3.4, py - 11.5); g.lineTo(px + 2.8, py - 5.5); g.lineTo(px - 2.8, py - 5.5); g.closePath(); g.fillStyle = '#a8aeb0'; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.5; g.stroke();
+    g.beginPath(); g.arc(px, py - 13, 2, Math.PI, 0); g.lineTo(px + 2, py - 12); g.lineTo(px - 2, py - 12); g.closePath(); g.fillStyle = '#7d8288'; g.fill(); g.stroke();
+  } },
+  { id: 'ironstock', label: 'Coal and bar iron', w: 1, d: 1, h: 4, draw(K, o) { const F = frame(K, o); F.box(0.1, 0.48, 0.3, 0.75, 0, 2.6, WOOD, { top: '#2a2420' }); F.box(0.54, 0.9, 0.38, 0.75, 0, 1.6, IRON, { top: '#7d8288' }); F.done(); } },
+  /* the alchemist's: a workbench with its apparatus, a bubbling cauldron, shelves of potions, herbs drying, a cabinet of
+     little drawers */
+  { id: 'alchemybench', label: 'Alchemist\'s workbench', w: 1, d: 1, h: 12, draw(K, o) {
+    const F = frame(K, o);
+    F.box(0.04, 0.96, 0.05, 0.4, 0, 5, WOOD_D);
+    F.box(0.02, 0.98, 0.03, 0.42, 5, 5.6, WOOD_L);
+    F.box(0.06, 0.94, 0.02, 0.12, 9, 9.5, WOOD_D);
+    for (let k = 0; k < 7; k++) F.at3(0.12 + k * 0.12, 0.07, 9.5, ([px, py]) => { K.g.fillStyle = POTIONS[k % POTIONS.length]; K.g.fillRect(px - 0.7, py - 1.6, 1.4, 1.6); });
+    F.at3(0.22, 0.22, 5.6, (p, x, y) => { K.cyl(x, y, 0.06, o.z + 5.6, o.z + 8, COPPER, { lw: 0.4 }); });
+    F.at3(0.5, 0.25, 5.6, ([px, py]) => { const g = K.g; g.beginPath(); g.arc(px, py - 1.6, 1.6, 0, TAU); g.fillStyle = '#a46ac8'; g.fill(); g.strokeStyle = INK; g.lineWidth = 0.35; g.stroke(); });
+    F.at3(0.72, 0.28, 5.6, ([px, py]) => { const g = K.g; g.fillStyle = LINEN; g.fillRect(px - 2, py - 0.8, 4, 1.4); g.strokeStyle = INK; g.lineWidth = 0.3; g.strokeRect(px - 2, py - 0.8, 4, 1.4); });
+    F.at3(0.86, 0.22, 5.6, (p, x, y) => candle(K, x, y, o.z + 5.6));
+    F.done();
+  } },
+  { id: 'brewcauldron', label: 'Alchemist\'s cauldron', w: 1, d: 1, h: 9, draw(K, o) {
+    const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2], g = K.g, [px, py] = K.P(cx, cy, o.z);
+    glow(g, px, py - 1, 9, 0.45);
+    K.cyl(cx, cy, 0.24, o.z, o.z + 1.6, BRICK, { lw: 0.5 });
+    const c = K.cyl(cx, cy, 0.2, o.z + 1.6, o.z + 5.6, '#3e4248', { lw: 0.5, top: '#7fd06a' });
+    g.fillStyle = 'rgba(184,232,168,0.6)'; for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(c.x + k * 1.2, c.ty - 3 - k * 3, 1.6 + k * 0.6, 0, TAU); g.fill(); }
+  } },
+  { id: 'potionshelf', label: 'Potion shelves', w: 1, d: 1, h: 15, draw(K, o) {
+    const F = frame(K, o), r = o.r;
+    F.box(0.12, 0.88, 0.15, 0.45, 0, 14.5, WOOD_D, { top: WOOD });
+    if (F.front) for (const z of [1, 4.6, 8.2, 11.6]) {
+      F.onFront(0.16, 0.84, 0.45, z, z + 3.2, '#3a2c1e', 0.3);
+      let a = 0.18; while (a < 0.8) { const h = 1.4 + r() * 1.2; F.onFront(a, a + 0.05, 0.451, z, z + h, pickv(POTIONS, r()), 0.2); a += 0.09; }
+    }
+    F.done();
+  } },
+  { id: 'herbrack', label: 'Herb drying rack', w: 1, d: 1, h: 10, draw(K, o) {
+    const F = frame(K, o);
+    for (const a of [0.14, 0.86]) F.box(a - 0.03, a + 0.03, 0.44, 0.5, 0, 9, WOOD);
+    for (const z of [5, 8.4]) F.box(0.12, 0.88, 0.45, 0.49, z, z + 0.5, WOOD_L);
+    for (const z of [5, 8.4]) for (let k = 0; k < 5; k++) F.at3(0.24 + k * 0.13, 0.47, z, ([px, py]) => { K.g.fillStyle = HERBS[(k + z) % HERBS.length | 0]; K.g.fillRect(px - 0.8, py, 1.6, 2.4); });
+    F.done();
+  } },
+  { id: 'apothecary', label: 'Apothecary drawers', w: 1, d: 1, h: 10, draw(K, o) {
+    const F = frame(K, o);
+    F.box(0.12, 0.88, 0.2, 0.62, 0, 8, WOOD, { top: WOOD_L });
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) { const a = 0.15 + k * 0.18, z = 0.6 + r * 1.85; F.onFront(a, a + 0.15, 0.62, z, z + 1.5, WOOD_D, 0.25); F.onFront(a + 0.06, a + 0.09, 0.621, z + 0.6, z + 0.9, GOLD, 0); }
+    for (const [a, col] of [[0.3, '#e0a23a'], [0.5, '#cfe4e4'], [0.7, '#a46ac8']]) F.at3(a, 0.4, 8, (p, x, y) => K.cyl(x, y, 0.05, o.z + 8, o.z + 9.6, col, { lw: 0.35, top: '#8e6a44' }));
+    F.done();
   } }
 ];
+/* the furniture that stands back against a wall, and so may stand on a room wall's own tile, in front of it on the side
+   it faces (tiles/index.js standsOnWall) */
+const WALLSIDE = new Set(['potionshelf', 'apothecary', 'herbrack', 'toolrack', 'weaponrack', 'armorstand', 'ironstock', 'quench', 'grindstone', 'bookshelf', 'wardrobe', 'dresser', 'desk', 'chest']);
+for (const a of FURNITURE) if (WALLSIDE.has(a.id)) a.wallside = true;
 /* soft shadows: walls are thin, furniture sits inside its tile */
 for (const a of INTERIOR) a.shade = a.id === 'hearth' || a.id === 'stairs' ? 0.12 : 0.38;
 for (const a of FURNITURE) a.shade = 0.16;

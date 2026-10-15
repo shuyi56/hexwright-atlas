@@ -13,7 +13,7 @@ const T = TILE;
 const circle = (x, y, r) => ({ x, y, r });
 const rect = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
 const OPEN = new Set(['flowers', 'mushrooms', 'reeds', 'rowboat', 'stairs', 'moonflowers']);
-const ROUND_FURNITURE = { chair: 6, stool: 5, candelabra: 4, plantpot: 6, cauldron: 10, spinwheel: 9 };
+const ROUND_FURNITURE = { chair: 6, stool: 5, candelabra: 4, plantpot: 6, cauldron: 10, spinwheel: 9, anvil: 8, grindstone: 9, brewcauldron: 12, armorstand: 7 };
 
 /* the shapes of piece o in its own drawing's coordinates (kit pixels, the footprint FW × FD from (0, 0)) */
 function local(o, FW, FD) {
@@ -72,6 +72,11 @@ function local(o, FW, FD) {
       /* along the back of its tile, or against the wall behind it */
       const b0 = o.snug ? -40 : 4; return [rect(...turned((o.face || 0) & 3, FW, FD, 6, 90, b0, b0 + 20))];
     }
+    case 'forge': case 'alchemybench': {
+      /* the forge with its bellows, the bench: along the back of its tile, or against the wall behind it */
+      const b0 = o.snug ? -40 : id === 'forge' ? 6 : 4, [a0, a1, d] = id === 'forge' ? [2, 84, 30] : [4, 92, 25];
+      return [rect(...turned((o.face || 0) & 3, FW, FD, a0, a1, b0, b0 + d))];
+    }
     case 'coatrack': return [circle(FW / 2, FD - 10, 4)];
     case 'wallbar': {
       /* the wall, and the back bar standing before it on a run across the view */
@@ -80,7 +85,8 @@ function local(o, FW, FD) {
       if (L[0] || L[2] || !(L[1] || L[3])) out.push(rect(6, c1, FW - 6, c1 + 18));
       return out;
     }
-    case 'iwall': case 'iwindow': case 'wall': case 'walltower': case 'wallshelf': case 'wallantlers': case 'wallshield': case 'wallsconce': {
+    case 'iwall': case 'iwindow': case 'wall': case 'walltower': case 'wallshelf': case 'wallantlers': case 'wallshield': case 'wallsconce':
+    case 'walltools': case 'wallpotions': case 'wallherbs': case 'wallchart': {
       /* a band through the middle, with an arm to each side it joins */
       const L = o.links || [0, 0, 0, 0], t = id === 'wall' || id === 'walltower' ? FW / 2 - 12 : 5, c0 = FW / 2 - t, c1 = FW / 2 + t;
       const out = [rect(c0, c0, c1, c1)];
@@ -103,10 +109,11 @@ function shapesOf(objs, links = new Map()) {
   for (const p of objs) {
     if (OPEN.has(p.id) || !ASSET_BY_ID[p.id]) continue;
     const [fw, fd] = footprint(p), U = SMALL.has(p.id) ? 32 : MID.has(p.id) ? 64 : T, FW = fw * U, FD = fd * U;
-    /* drawings at a smaller scale stand in the middle of the south edge of their footprint */
-    const ox = p.x * T + (fw * T - FW) / 2, oy = p.y * T + (fd * T - FD), L = p.level || 0;
+    /* drawings at a smaller scale stand in the middle of the south edge of their footprint, or back against the wall
+       behind them (fitTo's nudge) */
+    const f = fit(p), [nx, ny] = f.nudge || [0, 0], ox = p.x * T + (fw * T - FW) / 2 + nx, oy = p.y * T + (fd * T - FD) + ny, L = p.level || 0;
     const list = out.get(L) || []; out.set(L, list);
-    for (const s of local({ ...p, links: links.get(p) || p.links || null, ...fit(p) }, FW, FD)) list.push('r' in s ? circle(s.x + ox, s.y + oy, s.r) : rect(s.x0 + ox, s.y0 + oy, s.x1 + ox, s.y1 + oy));
+    for (const s of local({ ...p, links: links.get(p) || p.links || null, ...f }, FW, FD)) list.push('r' in s ? circle(s.x + ox, s.y + oy, s.r) : rect(s.x0 + ox, s.y0 + oy, s.x1 + ox, s.y1 + oy));
   }
   return out;
 }

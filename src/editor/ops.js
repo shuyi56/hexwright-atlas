@@ -1,4 +1,4 @@
-import { ASSET_BY_ID, footprint } from '../tiles/index.js';
+import { ASSET_BY_ID, HOLDS_FURNITURE, footprint } from '../tiles/index.js';
 import { MAX_ELEV, MAX_LEVEL, TI, fits, floorAt, levelOf, objAt } from './model.js';
 
 /* ================= tile editor: pure map operations =================
@@ -78,7 +78,9 @@ function whyNot(M, o) {
   if (L > MAX_LEVEL) return `there are only ${MAX_LEVEL} upper floors`;
   if (o.x < 0 || o.y < 0 || o.x + w > M.S || o.y + d > M.S) return `${a.label} (${w}×${d}) at ${o.x},${o.y} leaves the ${M.S}×${M.S} map`;
   for (let y = o.y; y < o.y + d; y++) for (let x = o.x; x < o.x + w; x++) {
-    const k = objAt(M, x, y, L); if (k >= 0) return `tile ${x},${y}${on} is already taken by ${ASSET_BY_ID[M.objs[k].id].label} #${k}`;
+    const k = objAt(M, x, y, L);
+    if (k >= 0 && a.wallside && HOLDS_FURNITURE(ASSET_BY_ID[M.objs[k].id]) && (o.face & 3) === 2) return `${a.label} can stand against the ${ASSET_BY_ID[M.objs[k].id].label.toLowerCase()} at ${x},${y}, but facing into the room, not north: turn it (R)`;
+    if (k >= 0) return `tile ${x},${y}${on} is already taken by ${ASSET_BY_ID[M.objs[k].id].label} #${k}`;
     if ((M.chars || []).some(c => c.x === x && c.y === y && levelOf(c) === L)) return `a character stands on tile ${x},${y}${on}`;
     if (L && !floorAt(M, L, y * M.S + x)) return `tile ${x},${y} has no floor on level ${L}; lay one first`;
   }

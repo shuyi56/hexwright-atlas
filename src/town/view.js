@@ -6,7 +6,7 @@ import { WALK, renderScaled } from '../characters/roster.js';
 import { unitFor } from '../data/units.js';
 import { ED, rootModel } from '../editor/editor.js';
 import { arrival, doorAcross, doorways } from '../editor/interiors.js';
-import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf, objAt } from '../editor/model.js';
+import { MAX_LEVEL, STOREY, cloneModel, floorAt, levelOf, objAt, piecesAt } from '../editor/model.js';
 import { FACE_DELTA, findPath, neighbours, stairsAt, walkGoal } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN, footprint, wallLinks } from '../tiles/index.js';
 import { $ } from '../ui/state.js';
@@ -326,10 +326,10 @@ function throughDoor(face) {
    room wall on either side (on the east if there is none or both); along it, its foot against a wall it rises from,
    else its top toward its landing. Room walls stand in the middle of their tiles, so a flight against one reaches into
    that tile's near half. The box is in its tile's pixels, [x0, y0, x1, y1], and may run past the tile's edges. */
-const ROOM_WALLS = new Set(['iwall', 'iwindow', 'hearth', 'post', 'wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar']);
+const ROOM_WALLS = new Set(['iwall', 'iwindow', 'hearth', 'post', 'wallshelf', 'wallantlers', 'wallshield', 'wallsconce', 'wallbar', 'walltools', 'wallpotions', 'wallherbs', 'wallchart']);
 function flightRect(M, o) {
   const f = o.face || 0, L = levelOf(o), [fx, fy] = FACE_DELTA[f], [A, B] = [FLIGHT_W, FLIGHT_L];
-  const wall = (dx, dy) => { const k = objAt(M, o.x + dx, o.y + dy, L); return k >= 0 && ROOM_WALLS.has(M.objs[k].id); };
+  const wall = (dx, dy) => piecesAt(M, o.x + dx, o.y + dy, L).some(k => ROOM_WALLS.has(M.objs[k].id));
   /* how far each side may go: flush against the wall there (its face, or for a wall in front the foot of its face), or
      to the tile's own edge */
   const E = wall(1, 0) ? T + T / 2 - 6 : T - 2, Wx = wall(-1, 0) ? -T / 2 + 10 : 2, N = wall(0, -1) ? -T / 2 + 5 : 2, Sy = wall(0, 1) ? T + T / 2 - 29 : T - 2;
@@ -374,7 +374,7 @@ function topSpot(o) {
 function footSpot(o) {
   const M = TW.M, L = levelOf(o), [fx, fy] = FACE_DELTA[o.face || 0], r = flightMap(o), cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
   const hl = fx ? (r[2] - r[0]) / 2 : (r[3] - r[1]) / 2, ha = fx ? (r[3] - r[1]) / 2 : (r[2] - r[0]) / 2;
-  const k = objAt(M, o.x + fx, o.y + fy, L), walled = k >= 0 && ROOM_WALLS.has(M.objs[k].id);
+  const walled = piecesAt(M, o.x + fx, o.y + fy, L).some(k => ROOM_WALLS.has(M.objs[k].id));
   const spots = walled ? [-1, 1].map(s => (fx ? [cx + fx * (hl - 12), cy + s * (ha + 10)] : [cx + s * (ha + 10), cy + fy * (hl - 12)])) : [[cx + fx * (hl + 10), cy + fy * (hl + 10)]];
   return spots.find(([x, y]) => { const h = heightOn(L, x, y); return h != null && standable(L, x, y, h); }) || null;
 }
@@ -532,8 +532,8 @@ function routeTo(x, y, L) {
       const o = M.objs[st.k], r = flightMap(o), cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
       if (nx[2] === l + 1) {
         /* (not when a wall stands at its foot: that ground is behind the wall's face) */
-        const [fx, fy] = FACE_DELTA[o.face || 0], hl = (fx ? r[2] - r[0] : r[3] - r[1]) / 2 + 10, px = cx + fx * hl, py = cy + fy * hl, h = heightOn(l, px, py), fk = objAt(M, a + fx, b + fy, l);
-        if (!(fk >= 0 && ROOM_WALLS.has(M.objs[fk].id)) && h != null && standable(l, px, py, h)) pts.push([px, py, l]);
+        const [fx, fy] = FACE_DELTA[o.face || 0], hl = (fx ? r[2] - r[0] : r[3] - r[1]) / 2 + 10, px = cx + fx * hl, py = cy + fy * hl, h = heightOn(l, px, py);
+        if (!piecesAt(M, a + fx, b + fy, l).some(k2 => ROOM_WALLS.has(M.objs[k2].id)) && h != null && standable(l, px, py, h)) pts.push([px, py, l]);
         pts.push([cx, cy, l]); continue;
       }
       if ((prev[2] || 0) === l + 1) { pts.push([cx, cy, l + 1]); continue; }
@@ -677,7 +677,10 @@ function paint() {
   for (const [i, p] of M.objs.entries()) {
     const L = levelOf(p); if (L !== TW.top) continue;
     const [w, d] = footprint(p);
-    items.push({ key: (p.y + d) * T - 1, L, o: 1, i, p, w, d });
+    /* a piece moved back against the wall behind it is drawn in turn where it now stands, but still after that wall (and
+       furniture on a wall's own tile just after that wall) */
+    const fit = TW.fit(p), nudge = fit.nudge;
+    items.push({ key: fit.onWall ? (p.y + d) * T : (p.y + d) * T - 1 + (nudge ? Math.max(1 - T, Math.min(0, nudge[1])) : 0), L, o: 1, i, p, w, d });
   }
   M.chars.forEach((c, k) => { const q = charPos(k); if (q.L !== TW.top) return; items.push({ key: q.gy, L: q.L, o: 2, k, q }); });
   items.sort((a, b) => a.key - b.key || a.L - b.L || a.o - b.o);

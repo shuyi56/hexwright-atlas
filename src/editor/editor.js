@@ -3,7 +3,7 @@ import { characterById, list as customList, onChange as onLibraryChange } from '
 import { makerOpen, openMaker } from '../characters/maker.js';
 import { ELVES, ENEMIES, JOBS, ROSTER, WALK } from '../characters/roster.js';
 import { TOWNSFOLK } from '../characters/townsfolk.js';
-import { ASSET_BY_ID, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
+import { ASSET_BY_ID, ASSET_CATEGORIES, ASSET_GROUPS, TERRAIN, drawAsset, footprint } from '../tiles/index.js';
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
 import { addInterior, canHaveInterior, makeInterior } from './interiors.js';
@@ -426,7 +426,7 @@ function setLevel(L) {
   req(); status();
 }
 function setTool(t) { ED.tool = t; for (const b of root.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === t)); cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; req(); }
-function setTab(t) { ED.tab = t; for (const b of root.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === t)); buildPalette(); }
+function setTab(t) { ED.tab = t; $('edFind').value = ''; buildPalette(); }
 function status() {
   const nc = (ED.M.chars || []).length, cname = c => (characterById(c.sprite) || { name: 'Unknown character' }).name;
   if (walkNote) { const n = walkNote; walkNote = ''; statusEl.textContent = n; return; }
@@ -437,24 +437,57 @@ function status() {
   statusEl.textContent = `${x}, ${y} · ${surface}${k >= 0 ? ' · ' + ASSET_BY_ID[ED.M.objs[k].id].label + (ED.M.objs[k].interior ? ' (has an interior)' : '') : ''}${ck >= 0 ? ' · ' + cname(ED.M.chars[ck]) : ''}`;
 }
 
-/* ---------- palette ---------- */
-const thumbs = new Map();
+/* ---------- palette ----------
+   Each tab lists its pieces under their categories: the ground by its kinds, buildings, props, plants and furnishings by
+   the categories in tiles/assets.js. A category's heading folds it away, and the folds are remembered in this browser.
+   Typing in the find box searches every tab at once (by name, category and id, every word to match) and lists what
+   it finds under "Tab · Category"; clicking a find arms it as clicking it in its tab would. A tab, or Esc in the box,
+   clears the search. */
+const thumbs = new Map(), FOLD_KEY = 'hexwright.palette.folded';
+const folded = (() => { try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]')); } catch { return new Set(); } })();
+const saveFolds = () => { try { localStorage.setItem(FOLD_KEY, JSON.stringify([...folded])); } catch { /* storage unavailable: folds last until reload */ } };
+const findText = () => $('edFind').value.trim().toLowerCase();
+/* the palette's sections, [tab, category, items, kind]: the open tab's, or with a search, every match */
+function paletteSections(q = findText()) {
+  const terrain = [...new Set(TERRAIN.map(t => t.group))].map(gn => ['Terrain', gn, TERRAIN.filter(t => t.group === gn), 'terrain']);
+  const assets = ASSET_GROUPS.flatMap(([grp]) => ASSET_CATEGORIES[grp].map(([cat, list]) => [grp, cat, list, 'asset']));
+  if (!q) return ED.tab === 'Terrain' ? terrain : assets.filter(sc => sc[0] === ED.tab);
+  const words = q.split(/\s+/), hit = (it, tab, cat) => { const hay = `${it.label} ${it.id} ${cat} ${tab}`.toLowerCase(); return words.every(w => hay.includes(w)); };
+  return [...terrain, ...assets].map(([tab, cat, list, kind]) => [tab, cat, list.filter(it => hit(it, tab, cat)), kind]).filter(sc => sc[2].length);
+}
+function syncTabs() { for (const b of root.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(!findText() && b.dataset.tab === ED.tab)); }
 function buildPalette() {
-  const box = $('edItems'); box.textContent = '';
-  if (ED.tab === 'Characters') { buildCharacters(box); return; }
-  const groups = ED.tab === 'Terrain' ? [...new Set(TERRAIN.map(t => t.group))].map(gn => [gn, TERRAIN.filter(t => t.group === gn), 'terrain']) : [[ED.tab, ASSET_GROUPS.find(a => a[0] === ED.tab)[1], 'asset']];
-  for (const [gn, items, kind] of groups) {
-    if (ED.tab === 'Terrain') { const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h); }
+  const box = $('edItems'), q = findText(); box.textContent = ''; syncTabs();
+  if (ED.tab === 'Characters' && !q) { buildCharacters(box); return; }
+  const sections = paletteSections(q);
+  /* a long tab gets a row of its categories at the top: a click opens that category and scrolls to it */
+  if (!q && sections.length > 3) {
+    const row = document.createElement('div'); row.className = 'ed-jump'; box.appendChild(row);
+    for (const [tab, cat] of sections) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = cat; row.appendChild(b);
+      b.addEventListener('click', () => { const key = `${tab}/${cat}`; if (folded.delete(key)) { saveFolds(); buildPalette(); } const h = [...box.querySelectorAll('.ed-group')].find(e => e.dataset.key === key); if (h) h.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+    }
+  }
+  for (const [tab, cat, items, kind] of sections) {
+    const key = `${tab}/${cat}`, shut = !q && folded.has(key);
+    const h = document.createElement('h3'); h.className = 'ed-group'; h.dataset.key = key; box.appendChild(h);
+    const fold = document.createElement('button'); fold.type = 'button'; fold.className = 'ed-fold'; fold.setAttribute('aria-expanded', String(!shut)); fold.disabled = !!q;
+    const name = document.createElement('span'); name.textContent = q ? `${tab} · ${cat}` : cat;
+    const n = document.createElement('span'); n.className = 'ed-count'; n.textContent = String(items.length);
+    fold.append(name, n); h.appendChild(fold);
+    fold.addEventListener('click', () => { if (folded.has(key)) folded.delete(key); else folded.add(key); saveFolds(); buildPalette(); });
+    if (shut) continue;
     const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
     for (const it of items) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-item'; b.dataset.kind = kind; b.dataset.id = it.id; b.title = it.label + (kind === 'asset' && (it.w > 1 || it.d > 1) ? ` (${it.w}×${it.d})` : '');
-      const key = kind + it.id; if (!thumbs.has(key)) thumbs.set(key, thumb(kind, it.id, 60));
-      const c = document.createElement('canvas'), src = thumbs.get(key); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); b.appendChild(c);
-      const s = document.createElement('span'); s.textContent = it.label; b.appendChild(s);
-      b.addEventListener('click', () => { if (kind === 'terrain') { ED.terrain = it.id; if (!['paint', 'fill'].includes(ED.tool)) setTool('paint'); } else { ED.asset = it.id; setTool('place'); } syncPalette(); });
+      const tk = kind + it.id; if (!thumbs.has(tk)) thumbs.set(tk, thumb(kind, it.id, 60));
+      const c = document.createElement('canvas'), src = thumbs.get(tk); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); b.appendChild(c);
+      const sp = document.createElement('span'); sp.textContent = it.label; b.appendChild(sp);
+      b.addEventListener('click', () => { ED.tab = tab; syncTabs(); if (kind === 'terrain') { ED.terrain = it.id; if (!['paint', 'fill'].includes(ED.tool)) setTool('paint'); } else { ED.asset = it.id; setTool('place'); } syncPalette(); });
       grid.appendChild(b);
     }
   }
+  if (!sections.length) { const p = document.createElement('p'); p.className = 'ed-none'; p.textContent = `Nothing called “${$('edFind').value.trim()}”.`; box.appendChild(p); }
   syncPalette();
 }
 /* The Characters tab lists everyone who can stand on the map, each on a grass block: the townsfolk, the jobs
@@ -554,6 +587,7 @@ root.addEventListener('keydown', e => {
   else if (k === '+' || k === '=') zoomAt(ED.cw / 2, ED.ch / 2, ED.z * 1.3);
   else if (k === '-' || k === '_') zoomAt(ED.cw / 2, ED.ch / 2, ED.z / 1.3);
   else if (k >= '1' && k <= '3') { ED.brush = +k; syncBrush(); }
+  else if (k === '/') $('edFind').focus();
   else if (k === 'PageUp') setLevel(ED.level + 1);
   else if (k === 'PageDown') setLevel(ED.level - 1);
   else if (k === 'Escape') { if (ED.sel >= 0) { ED.sel = -1; req(); } else if (ED.outer) leaveInterior(); else closeEditor(); }
@@ -569,6 +603,9 @@ function buildChrome() {
   for (const b of root.querySelectorAll('[data-brush]')) b.addEventListener('click', () => { ED.brush = +b.dataset.brush; syncBrush(); });
   const tabs = $('edTabs');
   for (const t of ['Terrain', ...ASSET_GROUPS.map(a => a[0]), 'Characters']) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.role = 'tab'; b.dataset.tab = t; b.textContent = t; b.addEventListener('click', () => setTab(t)); tabs.appendChild(b); }
+  const find = $('edFind');
+  find.addEventListener('input', buildPalette);
+  find.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); find.value = ''; buildPalette(); cv.focus({ preventScroll: true }); } });
   const bs = $('edBiome'); for (const [k, B] of Object.entries(BIOMES)) { const o = document.createElement('option'); o.value = k; o.textContent = B.label; bs.appendChild(o); }
   $('edBack').addEventListener('click', closeEditor);
   $('edUndo').addEventListener('click', undo); $('edRedo').addEventListener('click', redo);

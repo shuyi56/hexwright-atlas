@@ -1,5 +1,5 @@
 import { mulberry32 } from '../core/random.js';
-import { ASSETS, ASSET_BY_ID, ASSET_GROUPS } from './assets.js';
+import { ASSETS, ASSET_BY_ID, ASSET_CATEGORIES, ASSET_GROUPS } from './assets.js';
 import { makeKit } from './kit.js';
 import { TERRAIN, TERRAIN_BY_ID } from './terrain.js';
 
@@ -43,10 +43,27 @@ function wallLinks(objs) {
   return out;
 }
 function linkWalls(objs) { for (const [o, links] of wallLinks(objs)) o.links = links; return objs; }
+/* Furniture against a wall. A room's walls stand in the middle of their tiles, so half of a wall's tile is floor on the
+   room's side. A one-tile piece marked wallside (shelves, racks, chests, a trough, a grindstone...) may share the tile
+   of a plain or hung room wall (not a doorway, fireplace, post or back bar), standing in front of the wall on the side
+   it faces: into the room, so facing anything but north (facing north it would stand behind the wall from the
+   viewer). */
+const HOLDS_FURNITURE = a => !!a && a.joins === 'room' && !a.walk && !['hearth', 'post', 'wallbar'].includes(a.id);
+const canStandOnWall = inst => { const a = ASSET_BY_ID[inst.id]; return !!a && !!a.wallside && a.w === 1 && a.d === 1 && ((inst.face || 0) & 3) !== 2; };
+/* the pieces of objs that stand on a wall's tile so */
+function standsOnWall(objs) {
+  const walls = new Set(), out = new Set();
+  for (const o of objs) if (HOLDS_FURNITURE(ASSET_BY_ID[o.id])) walls.add(`${o.level || 0},${o.x},${o.y}`);
+  for (const o of objs) if (canStandOnWall(o) && walls.has(`${o.level || 0},${o.x},${o.y}`)) out.add(o);
+  return out;
+}
+/* how far (in tiles) a piece standing on a wall's tile is drawn off the wall's line, toward the way it faces */
+const FACE_STEP = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+const offWall = o => FACE_STEP[(o.face || 0) & 3].map(v => v * 0.4);
 /* decoration marks on a terrain tile top */
 function decorateTerrain(g, id, at, h, seed) {
   const t = TERRAIN_BY_ID[id]; if (!t || !t.deco) return;
   g.save(); t.deco(g, at, h, mulberry32(seed)); g.restore();
 }
 
-export { ASSETS, ASSET_BY_ID, ASSET_GROUPS, TERRAIN, TERRAIN_BY_ID, decorateTerrain, drawAsset, footprint, linkWalls, turnAsset, wallLinks };
+export { ASSETS, ASSET_BY_ID, ASSET_CATEGORIES, ASSET_GROUPS, HOLDS_FURNITURE, TERRAIN, TERRAIN_BY_ID, canStandOnWall, decorateTerrain, drawAsset, footprint, linkWalls, offWall, standsOnWall, turnAsset, wallLinks };
