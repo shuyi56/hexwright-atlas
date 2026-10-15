@@ -64,32 +64,33 @@ const BUILDINGS = [
     K.gable(x0, y0, x1, y1, z + 8, 7, o.axis, SLATE[0], STONE);
     const cx = x0 + 0.18, cy = y0 + 0.2; K.box(cx - 0.1, cy - 0.1, cx + 0.1, cy + 0.1, z + 6, z + 22, '#a99f8c'); const [px, py] = sx(K, cx, cy, z + 22); K.smoke(px, py); K.smoke(px + 2, py - 6);
   } },
-  /* the smithy: a stone workshop under slate, the forge's chimney breast up its west end with a glowing window beside it,
-     the door, and a stall board shop front: the upper shutter propped out as an awning, the lower let down as a counter */
-  { id: 'blacksmith', label: 'Smithy', w: 2, d: 1, h: 26, door: 0.32, draw(K, o) {
+  /* the smithy: a stone workshop, its door at the west end and the rest of its front an open forge bay glowing under a
+     timber lintel, an anvil in the opening and a broad stack over the forge */
+  { id: 'blacksmith', label: 'Smithy', w: 2, d: 1, h: 26, draw(K, o) {
     const [x0, y0, x1, y1] = inset(o, 0.1), z = o.z, g = K.g, dw = doorWall(o, x0, y0, x1, y1);
-    const fc = dw ? dw[0] : o.axis === 'x' ? 'y' : 'x', c = fc === 'y' ? y1 : x1, a0 = fc === 'y' ? x0 : y0, a1 = fc === 'y' ? x1 : y1, L = a1 - a0;
-    /* a box out from the front wall: a0..a1 along it, d deep, z0..z1 high */
-    const out = (b0, b1, d0, d1, z0, z1, col, opt) => K.box(...(fc === 'y' ? [b0, c + d0, b1, c + d1] : [c + d0, b0, c + d1, b1]), z + z0, z + z1, col, opt);
+    const fc = dw ? dw[0] : o.axis === 'x' ? 'y' : 'x', c = fc === 'y' ? y1 : x1, a0 = fc === 'y' ? x0 : y0, a1 = fc === 'y' ? x1 : y1, L = a1 - a0, b0 = a0 + L * 0.48, b1 = a1 - 0.1;
+    const on = (a, zz) => sx(K, ...(fc === 'y' ? [a, c, zz] : [c, a, zz]));
     K.box(x0, y0, x1, y1, z, z + 9, STONE, { noTop: true }); K.courses('y', y1, x0, x1, z, z + 9); K.courses('x', x1, y0, y1, z, z + 9);
     if (dw) {
-      const s0 = a0 + L * 0.46, s1 = a1 - 0.08;
-      K.door(fc, c, a0 + L * 0.32, z, '#5a3a28');
-      K.onWall(fc, c, a0 + L * 0.19, a0 + L * 0.25, z + 3.5, z + 5.5, '#f08a2a', 0.4);
-      K.onWall(fc, c, s0, s1, z + 2.6, z + 6.6, '#2e241c', 0.5);
-      for (let k = 1; k < 8; k++) { const a = s0 + (s1 - s0) * k / 8; K.onWall(fc, c, a - 0.01, a + 0.01, z + 3.6, z + 6.2, '#b4bac0', 0); }
-      out(s0 - 0.04, s1 + 0.04, 0, 0.16, z + 6.8 - z, z + 7.3 - z, PLANK_D, { lw: 0.4 });
-      out(s0 - 0.04, s1 + 0.04, 0, 0.2, 2.2, 2.6, PLANK, { lw: 0.4 });
-      for (let k = 0; k < 4; k++) { const a = s0 + 0.1 + (s1 - s0 - 0.2) * k / 3, [px, py] = sx(K, ...(fc === 'y' ? [a, c + 0.1, z + 2.6] : [c + 0.1, a, z + 2.6])); g.strokeStyle = '#8d939a'; g.lineWidth = 0.6; g.beginPath(); g.arc(px, py - 0.5, 1, Math.PI, 0); g.stroke(); }
+      K.door(fc, c, a0 + L * 0.2, z, '#5a3a28');
+      K.windows(fc, c, a0 + L * 0.3, a0 + L * 0.4, z + 4, 1);
+      K.onWall(fc, c, b0, b1, z, z + 6.5, '#2a2018', 0.5);
+      const [gx, gy] = on(b0 + (b1 - b0) * 0.3, z + 2), gl = g.createRadialGradient(gx, gy, 0, gx, gy, 14);
+      gl.addColorStop(0, 'rgba(255,170,60,0.95)'); gl.addColorStop(1, 'rgba(255,140,40,0)'); g.fillStyle = gl; g.beginPath(); g.arc(gx, gy, 14, 0, TAU); g.fill();
+      for (const a of [b0, (b0 + b1) / 2, b1]) K.onWall(fc, c, a - 0.025, a + 0.025, z, z + 6.5, PLANK_D, 0.3);
+      K.onWall(fc, c, b0 - 0.05, b1 + 0.05, z + 6.5, z + 7.4, PLANK_D, 0.4);
+      const ax = b0 + (b1 - b0) * 0.68, [px, py] = on(ax, z);
+      K.seg(fc === 'y' ? [ax, c + 0.1, z] : [c + 0.1, ax, z], fc === 'y' ? [ax, c + 0.1, z + 2] : [c + 0.1, ax, z + 2], '#7a5a3a', 2.2);
+      g.fillStyle = '#4e5054'; g.strokeStyle = INK; g.lineWidth = 0.4; g.beginPath(); g.moveTo(px - 3.5, py + 1.2 - 3.4); g.lineTo(px + 2.4, py + 1.2 - 3.4); g.lineTo(px + 2.4, py + 1.2 - 2.4); g.lineTo(px - 1.6, py + 1.2 - 2.4); g.lineTo(px - 3.5, py + 1.2 - 3); g.closePath(); g.fill(); g.stroke();
+      const sp = on(a0 + 0.05, z + 7); g.strokeStyle = INK; g.lineWidth = 0.6; g.beginPath(); g.moveTo(sp[0], sp[1]); g.lineTo(sp[0] - 5, sp[1] + 2.5); g.stroke(); g.fillStyle = '#4a3424'; g.fillRect(sp[0] - 7.4, sp[1] + 2.5, 4.8, 3.6); g.strokeRect(sp[0] - 7.4, sp[1] + 2.5, 4.8, 3.6); g.fillStyle = '#9aa0a6'; g.fillRect(sp[0] - 6.4, sp[1] + 3.8, 2.8, 0.9);
     }
     K.gable(x0, y0, x1, y1, z + 9, 7, o.axis, SLATE[0], STONE);
-    /* the chimney breast at the west end, built out from the front and over the ridge */
-    out(a0 + 0.02, a0 + L * 0.13, -0.18, 0.08, 0, 23, '#c4b9a4', { lw: 0.5 });
-    const [qx, qy] = sx(K, ...(fc === 'y' ? [a0 + L * 0.075, c - 0.05, z + 23] : [c - 0.05, a0 + L * 0.075, z + 23])); K.smoke(qx, qy); K.smoke(qx + 2, qy - 6);
+    const m = b0 + (b1 - b0) * 0.3, [cx, cy] = fc === 'y' ? [m, (y0 + y1) / 2] : [(x0 + x1) / 2, m];
+    K.box(cx - 0.13, cy - 0.11, cx + 0.13, cy + 0.11, z + 9, z + 22, '#a99f8c'); const [qx, qy] = sx(K, cx, cy, z + 22); K.smoke(qx, qy); K.smoke(qx + 2, qy - 6);
   } },
   /* the alchemist's shop: a tall timbered house of lilac plaster under indigo slate, a shop window of coloured bottles by
      its door, a round turret with a verdigris cone and a golden star at its far end, coloured fumes from its chimney */
-  { id: 'alchemist', label: 'Alchemist\'s shop', w: 2, d: 1, h: 36, door: 0.24, draw(K, o) {
+  { id: 'alchemist', label: 'Alchemist\'s shop', w: 2, d: 1, h: 36, draw(K, o) {
     const [x0, y0, x1, y1] = inset(o, 0.1), z = o.z, g = K.g, dw = doorWall(o, x0, y0, x1, y1), wall = '#e6dde6', h = 17;
     const fc = dw ? dw[0] : o.axis === 'x' ? 'y' : 'x', c = fc === 'y' ? y1 : x1, a0 = fc === 'y' ? x0 : y0, a1 = fc === 'y' ? x1 : y1, L = a1 - a0;
     K.box(x0, y0, x1, y1, z, z + h, wall, { noTop: true }); K.timber('y', y1, x0, x1, z, z + h, '#4a3424'); K.timber('x', x1, y0, y1, z, z + h, '#4a3424');
@@ -101,11 +102,6 @@ const BUILDINGS = [
       const COL = ['#6fbf6a', '#a46ac8', '#e0a23a', '#c4503e', '#4fb0b0'];
       for (let r = 0; r < 2; r++) for (let k = 0; k < 7; k++) { const a = s0 + (s1 - s0) * (k + 0.5) / 7, [px, py] = sx(K, ...(fc === 'y' ? [a, c, z + 2 + r * 2.4] : [c, a, z + 2 + r * 2.4])); g.fillStyle = COL[(k + r * 3) % COL.length]; g.fillRect(px - 0.6, py - 1.6, 1.2, 1.6); }
       K.onWall(fc, c, s0 - 0.03, s1 + 0.03, z + 1, z + 1.5, '#3e5470', 0.3);
-      /* a striped awning over the window and the counter let down below it */
-      const pt = (a, d, zz) => (fc === 'y' ? [a, c + d, zz] : [c + d, a, zz]);
-      for (let k = 0; k < 8; k++) { const a = s0 + (s1 - s0) * k / 8, b2 = s0 + (s1 - s0) * (k + 1) / 8; K.face([pt(a, 0, z + 7.6), pt(b2, 0, z + 7.6), pt(b2, 0.2, z + 6.4), pt(a, 0.2, z + 6.4)], k % 2 ? '#5f8a5a' : '#efe6cf', 0.3); }
-      K.box(...(fc === 'y' ? [s0, c, s1, c + 0.18] : [c, s0, c + 0.18, s1]), z + 1, z + 1.4, PLANK, { lw: 0.4 });
-      const [lx, ly] = sx(K, ...pt(a0 + L * 0.31, 0.03, z + 5)); g.fillStyle = '#9fe08a'; g.fillRect(lx - 0.8, ly - 1.6, 1.6, 2); g.strokeStyle = INK; g.lineWidth = 0.3; g.strokeRect(lx - 0.8, ly - 1.6, 1.6, 2);
     }
     K.gable(x0, y0, x1, y1, z + h, 8, o.axis, '#5e5c80', wall, { tex: 'tiles' });
     const [cx, cy] = fc === 'y' ? [x1 - 0.22, y1 - 0.2] : [x1 - 0.2, y1 - 0.22];
@@ -451,8 +447,8 @@ const CATEGORIES = {
     ['Tables and seats', ['table', 'tableset', 'longtable', 'feastset', 'chair', 'stool', 'bench', 'desk']],
     ['Beds and storage', ['bed', 'cot', 'chest', 'wardrobe', 'dresser', 'bookshelf']],
     ['Tavern', ['bar', 'backbar', 'casks', 'counter']],
-    ['Smithy', ['smithcounter', 'forge', 'anvil', 'quench', 'grindstone', 'toolrack', 'weaponrack', 'armorstand', 'ironstock']],
-    ['Alchemist', ['alchcounter', 'alchemybench', 'brewcauldron', 'potionshelf', 'apothecary', 'herbrack']],
+    ['Smithy', ['forge', 'anvil', 'quench', 'grindstone', 'toolrack', 'weaponrack', 'armorstand', 'ironstock']],
+    ['Alchemist', ['alchemybench', 'brewcauldron', 'potionshelf', 'apothecary', 'herbrack']],
     ['Household', ['cauldron', 'tub', 'spinwheel', 'sacks', 'firewood', 'coatrack', 'candelabra', 'plantpot', 'noticeboard']],
     ['Hall and chapel', ['throne', 'altar', 'pew']]
   ]

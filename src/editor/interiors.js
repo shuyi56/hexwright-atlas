@@ -78,10 +78,9 @@ function arrival(M, except = -1) {
   for (let y = 0; y < M.S; y++) for (let x = 0; x < M.S; x++) { if (blockedBy(M, x, y, except)) continue; const d = Math.hypot(x - (M.S - 1) / 2, (M.S - 1 - y) * 1.5); if (d < bd) { bd = d; best = [x, y, 2]; } }
   return best;
 }
-/* how far across its front (0..1) building o's door stands, as the town view draws it (a building can say, as the shops
-   do, with door in its asset) */
+/* how far across its front (0..1) building o's door stands, as the town view draws it */
 const DOOR_AT = { chapel: 0.62, church: 0.62 };
-const doorAcross = o => DOOR_AT[o.id] ?? (ASSET_BY_ID[o.id] && ASSET_BY_ID[o.id].door) ?? 0.5;
+const doorAcross = o => DOOR_AT[o.id] ?? 0.5;
 
 /* the piece covering tile (x, y) of the ground that can have an interior, with its index; null if none */
 function buildingAt(M, x, y) {

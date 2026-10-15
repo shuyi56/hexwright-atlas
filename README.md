@@ -39,19 +39,14 @@ the ground by its kinds (Ground, Water, Farm, Paved, Floors, Elven), and the pie
 | Nature | Trees · Bushes and cacti · Ground cover · Elven |
 | Interior | Walls and stairs · On the walls · Tables and seats · Beds and storage · Tavern · Smithy · Alchemist · Household · Hall and chapel |
 
-Under **Shops and trades** stand two shops of two tiles, drawn for the editor, the tactical view and the town view,
-each opening onto the street as medieval shops did, through a **stall board**: a wide opening whose upper shutter is
-propped out as an awning and whose lower shutter is let down on brackets as a counter, the wares set out along it.
-The **smithy** is a stone workshop under slate: the forge's chimney breast runs up its west end and over the ridge,
-smoke-stained and smoking, a small window beside it glowing with the fire; then the iron-strapped door with a horseshoe
-over it; then the stall board, racks of blades in the dark behind it lit by the forge, horseshoes, a sword, tongs and a
-helm on its counter. The **alchemist's shop** is two timbered storeys of lilac plaster under indigo slate, the upper
-jettied out over the street on a carved beam: a painted door with a lantern of green glass beside it, a shop window of
-glowing bottles under a striped awning with a counter of jars, bottles, scales and a mortar let down below it, herbs
-drying under the eave and in window boxes, the flask sign by the door, a round stone turret with a verdigris cone and
-a gold star at its far end, and fumes in pale greens and violets from its chimney. A building's asset can say where
-its door stands along its front (`door`), and the town view walks the hero in there. (The small one-tile smithy is now
-the **forge hut**.)
+Under **Shops and trades** stand two shops of two tiles, drawn for the editor, the tactical view and the town view:
+the **smithy**, a stone workshop under slate with its door at one end, a horseshoe over it and the anvil sign beside
+it, the rest of its front an open forge bay on timber posts where the forge glows under its hood, tongs and hammers
+hang on the sooty back wall and an anvil and a quenching barrel stand in the opening, a broad stack smoking over it;
+and the **alchemist's shop**, two timbered storeys of lilac plaster under indigo slate, a painted door and a shop
+window of glowing bottles on three shelves, herbs drying under the eave and in boxes under the upper windows, the flask
+sign by the door, a round stone turret with a verdigris cone and a gold star at its far end, and fumes in pale greens
+and violets from its chimney. (The small one-tile smithy is now the **forge hut**.)
 
 A row of chips at the top of a long tab jumps to a category, and a category's heading folds it away (the folds are
 remembered in the browser). The **find** box over the tabs (`/` to reach it, `Esc` to clear it) searches every tab
@@ -148,11 +143,7 @@ dark oak, stone, a chequered floor, red and blue carpet, strewn rushes).
   bookshelf, a dresser, a writing desk, a counter, a cooking pot, a wash tub, a candle stand, a potted plant, a
   throne, an altar, a pew, a weapon rack, a spinning wheel, a coat stand, grain sacks, firewood and a notice board;
   and for a tavern a bar counter, a table with chairs round it, a long table between benches, a back bar and a rack
-  of ale casks. A shop's counters join one another and the bar's the same way: a **smith's counter** of oak planks
-  under iron straps, its top scarred, with horseshoes, a sword, a box of nails, a hammer and a helm along it, and an
-  **apothecary counter** fronted with little labelled drawers with brass pulls, with bottles, brass scales, a mortar,
-  a ledger and quill and jars along it. Like the bar, a counter stands toward the back of its tiles, runs on to a wall
-  at a free end, and anyone standing across it from the hero can be talked to over it. For a smithy: a forge (a brick hearth of glowing coals under a stone hood and flue, bellows beside
+  of ale casks. For a smithy: a forge (a brick hearth of glowing coals under a stone hood and flue, bellows beside
   it), an anvil on its stump, a quenching trough, a grindstone, a rack of smith's tools, an armour stand and a bin of
   coal with bar iron. For an alchemist: a workbench of apparatus (an alembic over its furnace, a retort on a spirit
   lamp, phials, a mortar, a grimoire, a shelf of jars over it), a bubbling cauldron of green brew, shelves of potions,
@@ -620,18 +611,16 @@ tile, a three-level tower joined by two flights of stairs, a summit ringed by cl
   sacks and barrels stand by the door, antlers, a shelf of plates and a sconce hang on the walls, and the stairs stand
   in the corner. Upstairs a passage with sconces and a shield on its partition, and two guest rooms on their carpets.
   The innkeeper, a healer, a guard, a monk, a farmer, a villager and a noble guest are about, and the door leads out
-  to a cobbled lane, where two shops stand either side of the inn, each with its interior laid out round a
-  shopkeeper's counter as the inn is round its bar: a counter right across the room from wall to wall, standing toward
-  the back of its tiles, closing the keeper in behind it with the workshop; before it, by the door, the customers'
-  side, where the hero comes in facing the counter and talks to the keeper across it. West of the inn the
-  **alchemist's shop**: behind the apothecary counter two workbenches of apparatus between the apothecary's drawers
-  and a shelf of potions, a bubbling cauldron, a potion shelf and a herb rack on the west wall and the alchemist; before
-  it a blue rug, a herb rack and a potion shelf against the walls, a healer at the counter, and the stairs in the corner
-  up to a study with a star chart. East of it the **smithy**: behind the smith's counter the forge in the back corner
-  with coal and bar iron beside its bellows and a grindstone below them, the quenching trough under a rail of hammers
-  and tongs and a tool rack beside it, sacks of charcoal, the anvil drawn up before the fire and the smith beside it;
-  before it a weapon rack and an armour stand of finished work against the walls and a guard waiting on his sword. Its
-  map is built by `node tools/make-wayfarers-rest.mjs`.
+  to a cobbled lane, where two shops stand either side of the inn, each with its interior. West of it the
+  **alchemist's shop**: a timbered house of lilac plaster under indigo slate with a turret and its gold star, a window
+  of glowing bottles and coloured fumes from the chimney; inside, on a dark oak floor, two workbenches of apparatus and
+  shelves of potions against the back wall, apothecary drawers and a herb rack on the west wall, a bubbling cauldron,
+  the alchemist, and stairs up to a study with a star chart. East of it the **smithy**: a stone workshop whose forge
+  bay stands open to the lane, glowing; inside, a workshop two tiles across laid out as a smith works: the forge
+  and its bellows in the back corner with coal and bar iron beside them, the quenching trough at its side under a rail
+  of hammers and tongs, the anvil drawn up before the fire and the smith between them; the grindstone on the west
+  wall; and on the east wall by the door, where customers come in, a weapon rack and an armour stand of finished work.
+  (An anvil with a forge just north of it stands up close before the forge in the town view.) Its map is built by `node tools/make-wayfarers-rest.mjs`.
 
 ![Oakfield Lane: the alchemist's shop, the Wayfarer's Rest and the smithy](docs/images/oakfield-lane.png)
 

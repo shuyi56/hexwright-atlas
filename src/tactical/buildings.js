@@ -307,15 +307,21 @@ const DESIGNS = {
     }
     chimney(F, r.x0 + 0.18, r.y0 + 0.2, 6, 46, C.grey, 8, true);
   } },
-  /* the smithy: rubble walls under slate, the forge's chimney breast up its west end, the door, and a stall board shop
-     front, its upper shutter propped out and its lower let down as a counter */
-  blacksmith: { top: 80, draw(F, o) {
+  /* the smithy: rubble walls under slate, the front open on its forge bay with the fire's glow and an anvil before it, a
+     broad stack smoking over the forge */
+  blacksmith: { top: 76, draw(F, o) {
     const seen = o.face === 0 ? 'y' : o.face === 1 ? 'x' : null, L = (o.axis === 'x' ? o.w : o.d) - 0.24;
-    const r = house(F, o, { mat: MAT.rubble(C.rubble), h: 22, rh: 13, roof: ROOF.slate(C.slate), win: { w: 14, h: 8, every: 40, glass: '#2e241c', frame: C.timber }, door: { w: 7, h: 13, col: '#5a3a28', u: L * 16 * (seen === 'x' ? 0.68 : 0.32) }, plinth: 3, edge: '#4d5862' });
-    const along = (a0, a1, d0, d1, z0, z1, col, part) => F.box(...(seen === 'x' ? [r.x1 + d0, r.y1 - a1, r.x1 + d1, r.y1 - a0] : [r.x0 + a0, r.y1 + d0, r.x0 + a1, r.y1 + d1]), z0, z1, { y: flat(col), x: flat(col), top: flat(col) }, part);
-    if (seen) { along(L * 0.46, L - 0.06, 0, 0.16, 7, 8.5, C.plank, 21); along(L * 0.46, L - 0.06, -0.02, 0.12, 19, 20, C.plankD, 21); }
-    const [cx, cy] = seen === 'x' ? [r.x1 - 0.02, r.y1 - 0.12] : [r.x0 + 0.12, r.y1 - 0.02];
-    chimney(F, cx, cy, 0, 52, C.grey, 22, true);
+    const r = house(F, o, { mat: MAT.rubble(C.rubble), h: 22, rh: 13, roof: ROOF.slate(C.slate), win: { w: 4, h: 5, every: 18 }, door: { w: 26, h: 15, kind: 'open', u: L * 16 * (seen === 'x' ? 0.36 : 0.64) }, plinth: 3, edge: '#4d5862' });
+    const m = seen === 'x' ? r.y0 + (r.y1 - r.y0) * 0.64 : r.x0 + (r.x1 - r.x0) * 0.64;
+    if (seen) {
+      const [dx, dy] = seen === 'y' ? [m, r.y1] : [r.x1, r.y1 - (m - r.y0)], gl = R('#f4a040'), an = R(C.iron);
+      for (let k = -4; k <= 4; k++) for (let n = 1; n < 8; n++) if (hash(k, n, 4) < 0.55) F.dot(dx + (seen === 'y' ? k * 0.06 : 0), dy - (seen === 'x' ? k * 0.06 : 0), n, Object.assign(gl[n < 3 ? 0 : 1].slice(), { glow: 1 }), 20, 0.4);
+      const ax = dx + (seen === 'y' ? 0.2 : 0.14), ay = dy + (seen === 'y' ? 0.14 : 0.2);
+      F.box(ax - 0.05, ay - 0.04, ax + 0.05, ay + 0.04, 0, 4, { y: flat('#7a5a3a'), x: flat('#5a3f28') }, 21);
+      F.box(ax - 0.1, ay - 0.04, ax + 0.08, ay + 0.04, 4, 6, { y: () => an[2], x: () => an[3], top: () => an[1] }, 21);
+    }
+    const [cx, cy] = seen === 'x' ? [(r.x0 + r.x1) / 2, r.y1 - (m - r.y0) + 0.25] : [m - 0.25, (r.y0 + r.y1) / 2];
+    chimney(F, cx, cy, 20, 50, C.grey, 8, true);
   } },
   /* the alchemist's shop: two timbered storeys of lilac plaster jettied over the street under indigo slate, a painted door,
      a stone turret with a verdigris cone and a gold star at its far corner, fumes from the chimney */

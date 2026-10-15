@@ -40,24 +40,6 @@ const glow = (g, x, y, r, a = 0.55) => { const gl = g.createRadialGradient(x, y,
 const flame = (g, x, y, s = 1) => { g.beginPath(); g.moveTo(x, y - 3.2 * s); g.quadraticCurveTo(x + 1.6 * s, y - 0.8 * s, x, y); g.quadraticCurveTo(x - 1.6 * s, y - 0.8 * s, x, y - 3.2 * s); g.fillStyle = '#f4b545'; g.fill(); g.beginPath(); g.ellipse(x, y - 0.8 * s, 0.6 * s, 1 * s, 0, 0, TAU); g.fillStyle = '#fff1c4'; g.fill(); };
 const candle = (K, x, y, z) => { const [px, py] = K.P(x, y, z), g = K.g; g.fillStyle = '#f4eede'; g.fillRect(px - 0.7, py - 3, 1.4, 3); g.strokeStyle = INK; g.lineWidth = 0.35; g.strokeRect(px - 0.7, py - 3, 1.4, 3); glow(g, px, py - 4.5, 7, 0.45); flame(g, px, py - 3, 0.6); };
 
-/* ---------- a counter: a run of counter pieces joined as walls are, the bar's and the shops' ----------
-   body and top colours, something standing on it (fn(x, y, z)), and the colour of a band along its front */
-function counterIso(K, o, body, top, thing, band = null) {
-  const L = o.links && o.links.some(Boolean) ? o.links : null, cx = (o.x0 + o.x1) / 2, cy = (o.y0 + o.y1) / 2, t = 0.2, z = o.z;
-  const [px, py, nx, ny] = L || (o.face % 2 === 0 ? [1, 0, 1, 0] : [0, 1, 0, 1]), e = L ? 0.5 : 0.4;
-  const part = r => {
-    K.box(...r, z, z + 5.4, body, { lw: 0.45 });
-    if (band) { K.onWall('y', r[3], r[0], r[2], z + 3.6, z + 4.2, band, 0); K.onWall('x', r[2], r[1], r[3], z + 3.6, z + 4.2, band, 0); }
-    K.box(r[0] - 0.02, r[1] - 0.02, r[2] + 0.02, r[3] + 0.02, z + 5.4, z + 6.2, top, { lw: 0.4 });
-  };
-  if (nx) part([cx - e, cy - t, cx + t, cy + t]);
-  if (ny) part([cx - t, cy - e, cx + t, cy + t]);
-  part([cx - t, cy - t, cx + t, cy + t]);
-  if (px) part([cx - t, cy - t, cx + e, cy + t]);
-  if (py) part([cx - t, cy - t, cx + t, cy + e]);
-  thing(cx + 0.05, cy - 0.02, z + 6.2);
-}
-
 /* ---------- interior walls: low cutaway walls that join the room pieces beside them ---------- */
 /* links = [+x, +y, -x, -y] from tiles/index.js; with none, the wall runs across the tile along its facing */
 function armsOf(o) {
@@ -301,10 +283,17 @@ const FURNITURE = [
   } },
   /* the tavern's: a bar counter that joins the bar pieces beside it into one counter, a table with chairs round it,
      a long table between benches, a back bar of shelves, a rack of casks, and odds and ends */
-  { id: 'bar', label: 'Bar counter', w: 1, d: 1, h: 7, joins: 'bar', draw(K, o) { counterIso(K, o, WOOD_D, WOOD_L, (x, y, z) => K.cyl(x, y, 0.05, z, z + 1.4, '#8c6d4b', { lw: 0.35, top: '#e6d6a0' })); } },
-  /* a shop's counters, joining one another and the bar pieces as a run of counter does */
-  { id: 'smithcounter', label: 'Smith\'s counter', w: 1, d: 1, h: 7, joins: 'bar', draw(K, o) { counterIso(K, o, '#6e5034', '#9a7650', (x, y, z) => { const [px, py] = K.P(x, y, z), g = K.g; g.strokeStyle = '#8d939a'; g.lineWidth = 0.7; g.beginPath(); g.arc(px, py - 0.6, 1.3, Math.PI, 0); g.stroke(); }, IRON); } },
-  { id: 'alchcounter', label: 'Apothecary counter', w: 1, d: 1, h: 7, joins: 'bar', draw(K, o) { counterIso(K, o, '#5e4034', '#7a5a4a', (x, y, z) => { const [px, py] = K.P(x, y, z), g = K.g; g.fillStyle = '#6fbf6a'; g.fillRect(px - 0.7, py - 2, 1.4, 2); g.fillStyle = '#a46ac8'; g.fillRect(px + 1.2, py - 1.6, 1.2, 1.6); }, GOLD); } },
+  { id: 'bar', label: 'Bar counter', w: 1, d: 1, h: 7, joins: 'bar', draw(K, o) {
+    const L = o.links && o.links.some(Boolean) ? o.links : null, cx = (o.x0 + o.x1) / 2, cy = (o.y0 + o.y1) / 2, t = 0.2, z = o.z;
+    const [px, py, nx, ny] = L || (o.face % 2 === 0 ? [1, 0, 1, 0] : [0, 1, 0, 1]), e = L ? 0.5 : 0.4;
+    const part = r => { K.box(...r, z, z + 5.4, WOOD_D, { lw: 0.45 }); K.box(r[0] - 0.02, r[1] - 0.02, r[2] + 0.02, r[3] + 0.02, z + 5.4, z + 6.2, WOOD_L, { lw: 0.4 }); };
+    if (nx) part([cx - e, cy - t, cx + t, cy + t]);
+    if (ny) part([cx - t, cy - e, cx + t, cy + t]);
+    part([cx - t, cy - t, cx + t, cy + t]);
+    if (px) part([cx - t, cy - t, cx + e, cy + t]);
+    if (py) part([cx - t, cy - t, cx + t, cy + e]);
+    K.cyl(cx + 0.05, cy - 0.02, 0.05, z + 6.2, z + 7.6, '#8c6d4b', { lw: 0.35, top: '#e6d6a0' });
+  } },
   { id: 'tableset', label: 'Table and chairs', w: 1, d: 1, h: 8, draw(K, o) {
     const F = frame(K, o), k = Math.floor(o.v * 997), d1 = o.v < 0.3 ? -1 : k % 6, d2 = o.v < 0.65 ? -1 : (k >> 3) % 6;
     [[0.38, 0.2, 'n'], [0.62, 0.2, 'n'], [0.38, 0.82, 's'], [0.62, 0.82, 's'], [0.12, 0.5, 'w'], [0.88, 0.5, 'e']].forEach(([a, b, back], i) => {

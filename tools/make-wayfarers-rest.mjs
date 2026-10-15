@@ -19,9 +19,14 @@
    - The people: the innkeeper behind the bar (talked to across the counter), a healer and a guard at it, a monk at the fire, a farmer and a
      villager at the tables, and a noble guest upstairs.
    Two shops stand on the lane either side of the inn, each furnished inside:
-   - The smithy, east of the inn, and the alchemist's shop, west of it, each four tiles across and laid out round a
-     shopkeeper's counter as the inn is round its bar: the workshop and the keeper behind it, the customers' side by
-     the door (see below).
+   - The smithy, east of the inn, a stone-floored workshop two tiles across: the forge in the back corner with its
+     bellows, coal and bar iron beside it and a quenching trough under a rail of hammers and tongs, the anvil before it
+     and the smith at its side; a grindstone on the west wall, and a weapon rack and an armour stand of finished work
+     on the east wall by the door.
+   - The alchemist's shop, west of the inn, three tiles across on a dark oak floor with a blue runner: two workbenches
+     of apparatus against the back wall beside shelves of potions, herbs drying on the wall, a cabinet of apothecary
+     drawers and a herb rack on the west wall, a bubbling cauldron, the alchemist before the benches, and stairs in
+     the corner up to a study: a bed, a chest under the star chart, a bookshelf, a desk and more potions.
    Outside, cottages and a townhouse stand on the lane with the shops and the inn, with a well, lamp posts, a
    signpost, barrels, crates and a log pile, a garden with oaks, a bush and flowers to the south, and the hero on the
    lane. Deterministic: the same map every time. */
@@ -96,51 +101,41 @@ stand(I, 'noble', 4, 6, 0, 1);   /* a guest upstairs */
 /* the outer walls of room R (side S) on floor L: the special pieces by 'x,y', interior wall elsewhere */
 const shell = (R, S, special, L = 0) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (!x || !y || x === S - 1 || y === S - 1) put(R, special[x + ',' + y] || 'iwall', x, y, 0, L); };
 
-/* The two shops are laid out as the inn's bar is: a counter of joined pieces right across the room from wall to wall,
-   standing toward the back of its tiles, closing the keeper in behind it as the innkeeper's lane is. Behind it the
-   workshop and the keeper; before it, by the door, the customers' side, where the hero comes in facing the counter
-   and talks to the keeper across it. Pieces against the walls stand on the walls' own tiles (tiles/index.js
-   standsOnWall). */
+/* the smithy: 4 tiles square (two of stone floor inside the walls, a workshop about six paces across), the door at the
+   east end of the south wall. The hot work round the forge in the west, the finished work by the door in the east:
+   - the forge in the back corner, coal and bar iron against the west wall beside its bellows, the quenching trough
+     against the back wall at its side under a rail of hammers and tongs, and the anvil before it, the smith between
+     the anvil and the trough;
+   - the grindstone against the west wall by the anvil, for the edges;
+   - against the east wall, by the door where customers come in, a weapon rack and an armour stand of finished work.
+   The pieces against the walls stand on the walls' own tiles, in front of them (tiles/index.js standsOnWall). */
+const SM = 4, H = blankModel(SM, 'stonefloor', 'The Smithy');
+shell(H, SM, { '2,0': 'walltools', '1,3': 'iwindow', '2,3': 'idoor' });
+put(H, 'forge', 1, 1, 0); put(H, 'anvil', 1, 2);
+put(H, 'ironstock', 0, 1, 1); put(H, 'quench', 2, 0, 0); put(H, 'grindstone', 0, 2, 1);
+put(H, 'weaponrack', 3, 1, 3); put(H, 'armorstand', 3, 2, 3);
+stand(H, 'smith', 2, 1, 0);
 
-/* the smithy: 6 tiles square (four of stone floor inside the walls), the door in the south wall east of the middle.
-   Behind the counter the hot work: the forge in the north-west corner with coal and bar iron against the west wall by
-   its bellows, a grindstone below them, the quenching trough against the back wall at the forge's side under a rail of
-   hammers and tongs, a rack of the smith's tools beside it, sacks of charcoal in the north-east corner, and the anvil
-   drawn up before the fire with the smith beside it. Before the counter the finished work: a weapon rack against the
-   west wall and an armour stand against the east, and a guard waiting on his sword. */
-const SM = 6, H = blankModel(SM, 'stonefloor', 'The Smithy');
-shell(H, SM, { '2,0': 'walltools', '4,0': 'iwindow', '5,1': 'iwindow', '1,5': 'iwindow', '4,5': 'iwindow', '3,5': 'idoor' });
-put(H, 'forge', 1, 1, 0); put(H, 'anvil', 1, 2); put(H, 'sacks', 4, 1);
-put(H, 'ironstock', 0, 1, 1); put(H, 'grindstone', 0, 2, 1); put(H, 'quench', 2, 0, 0); put(H, 'toolrack', 3, 0, 0);
-for (const x of [1, 2, 3, 4]) put(H, 'smithcounter', x, 3, 0);
-put(H, 'weaponrack', 0, 4, 1); put(H, 'armorstand', 5, 4, 3);
-stand(H, 'smith', 2, 2, 0);     /* behind the counter, beside the anvil */
-stand(H, 'guard', 1, 4, 2);     /* at the counter, waiting on his sword */
-
-/* the alchemist's shop: 6 tiles square on a dark oak floor, a blue rug on the customers' side and the stairs in its
-   south-east corner up to a study, as the inn's stand on the customers' side of its bar. Behind the counter: two
-   workbenches of apparatus against the back wall between the apothecary's drawers and a shelf of potions, shelves of
-   bottles over them, a bubbling cauldron, a shelf of potions and a herb rack against the west wall, a candle stand,
-   and the alchemist. Before it: more potions on shelves against the east wall, herbs drying on a rack against the
-   west, and a healer at the counter buying salves. */
-const AS = 6, A = blankModel(AS, 'oakfloor', 'The Alchemist\'s Shop');
-paintTiles(A, rectTiles(A, 1, 4, 4, 1), 'carpetblue');
-shell(A, AS, { '1,0': 'wallpotions', '0,3': 'iwindow', '5,2': 'iwindow', '1,5': 'iwindow', '4,5': 'iwindow', '3,5': 'idoor' });
-put(A, 'apothecary', 1, 1, 0); put(A, 'alchemybench', 2, 1, 0); put(A, 'alchemybench', 3, 1, 0); put(A, 'potionshelf', 4, 1, 0); put(A, 'candelabra', 4, 2);
-put(A, 'brewcauldron', 1, 2); put(A, 'potionshelf', 0, 2, 1); put(A, 'herbrack', 0, 1, 1);
-for (const x of [1, 2, 3, 4]) put(A, 'alchcounter', x, 3, 0);
-put(A, 'herbrack', 0, 4, 1); put(A, 'potionshelf', 5, 4, 3);
-/* the stairs in the south-east corner, stepped onto from the doorway and climbing west */
-put(A, 'stairs', 4, 4, 1);
+/* the alchemist's shop: 5 tiles square on a dark oak floor with a blue runner, the stairs in the south-east corner up to
+   a study */
+const AS = 5, A = blankModel(AS, 'oakfloor', 'The Alchemist\'s Shop');
+paintTiles(A, rectTiles(A, 2, 2, 1, 2), 'carpetblue');
+/* herbs drying on the back wall, plain wall behind the benches, windows in the side walls and by the door */
+shell(A, AS, { '1,0': 'wallherbs', '0,2': 'iwindow', '4,2': 'iwindow', '1,4': 'iwindow', '2,4': 'idoor' });
+/* along the back: shelves of potions and two workbenches of apparatus */
+put(A, 'potionshelf', 1, 1, 0); put(A, 'alchemybench', 2, 1, 0); put(A, 'alchemybench', 3, 1, 0);
+/* the apothecary's drawers and a herb rack against the west wall, the cauldron bubbling on the east side, and the stairs
+   in the corner, stepped onto from the doorway and climbing west */
+put(A, 'apothecary', 1, 2, 1); put(A, 'herbrack', 1, 3, 1); put(A, 'brewcauldron', 3, 2);
+put(A, 'stairs', 3, 3, 1);
 /* upstairs, the alchemist's study: floor out to the walls but the stairwell, the walls again with a star chart */
 paintTiles(A, rectTiles(A, 0, 0, AS, AS), 'floorboards', 1);
-removeFloor(A, [[4, 4]], 1);
-shell(A, AS, { '2,0': 'wallchart', '0,2': 'iwindow', '5,3': 'iwindow', '1,5': 'iwindow', '3,5': 'iwindow' }, 1);
-paintTiles(A, rectTiles(A, 2, 2, 2, 2), 'carpetblue', 1);
-put(A, 'bed', 1, 1, 0, 1); put(A, 'chest', 2, 1, 0, 1); put(A, 'bookshelf', 5, 2, 3, 1); put(A, 'desk', 4, 3, 3, 1);
-put(A, 'potionshelf', 0, 4, 1, 1); put(A, 'candelabra', 1, 4, 0, 1); put(A, 'plantpot', 4, 1, 0, 1);
-stand(A, 'alchemist', 3, 2, 0); /* behind the counter, facing the shop */
-stand(A, 'healer', 1, 4, 0);    /* at the counter, buying salves */
+removeFloor(A, [[3, 3]], 1);
+shell(A, AS, { '2,0': 'wallchart', '3,0': 'iwindow', '0,2': 'iwindow', '4,2': 'iwindow', '1,4': 'iwindow' }, 1);
+paintTiles(A, rectTiles(A, 2, 2, 1, 2), 'carpetblue', 1);
+put(A, 'bed', 1, 1, 0, 1); put(A, 'chest', 2, 1, 0, 1); put(A, 'bookshelf', 3, 1, 0, 1);
+put(A, 'desk', 3, 2, 3, 1); put(A, 'potionshelf', 1, 3, 1, 1);
+stand(A, 'alchemist', 2, 2, 0); /* before the benches, facing the shop */
 
 /* ---------- the lane outside ---------- */
 const N = 16, M = blankModel(N, 'grass', 'Oakfield Lane');

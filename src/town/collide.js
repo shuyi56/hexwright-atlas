@@ -58,9 +58,9 @@ function local(o, FW, FD) {
       const L = o.links || [0, 0, 0, 0], across = L[0] || L[2] || !(L[1] || L[3]), c0 = FW / 2 - 5, c1 = FW / 2 + 5, h = 21;
       return across ? [rect(0, c0, FW / 2 - h, c1), rect(FW / 2 + h, c0, FW, c1)] : [rect(c0, 0, c1, FD / 2 - h), rect(c0, FD / 2 + h, c1, FD)];
     }
-    case 'bar': case 'smithcounter': case 'alchcounter': {
-      /* the counter's runs (joined like a wall), a little wider than drawn, and a tavern bar's stools */
-      return [...barRuns(o).map(([a0, a1, b0, b1]) => rect(a0 - 2, b0 - 2, a1 + 2, b1 + 2)), ...(id === 'bar' ? barStools(o) : []).map(([x, y]) => circle(x, y - 2, 4))];
+    case 'bar': {
+      /* the counter's runs (joined like a wall), a little wider than drawn, and its stools */
+      return [...barRuns(o).map(([a0, a1, b0, b1]) => rect(a0 - 2, b0 - 2, a1 + 2, b1 + 2)), ...barStools(o).map(([x, y]) => circle(x, y - 2, 4))];
     }
     case 'tableset': {
       /* the table, and a round seat for each chair pulled up to it */
