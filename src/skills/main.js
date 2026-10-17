@@ -123,7 +123,7 @@ function effectsSection(e) {
   return `<section class="sk-effects${changed ? ' changed' : ''}" aria-label="Special effects">
     <h3 class="ub-section">Special effects${changed ? ' <span class="ub-tag">changed</span>' : ''}</h3>
     <div class="sk-presets">${list.map(f => `<button role="switch" aria-checked="${d.effects.includes(f.id)}" data-effect="${f.id}" title="${esc(cap(f.note))}"><span>${esc(f.label)}</span><span class="sk-hint">${esc(f.note)}</span></button>`).join('')}</div>
-    <p class="ub-dim">Worked out from the battle as it stands when the skill is used; the tactical view's preview counts them.</p>
+    <p class="ub-dim">Worked out from the battle as it stands: some when the skill is used, others all battle long for every unit carrying it, as it moves, strikes, is struck or its phase begins. The tactical view's preview counts them.</p>
   </section>`;
 }
 /* the effect: one to pick, its colour (or its own), its size and how many particles */

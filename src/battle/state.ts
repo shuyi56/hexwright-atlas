@@ -22,7 +22,7 @@
    view share it. */
 import { ATTACK, MP_REGEN, abilityOf } from './abilities.ts';
 import type { Action, Blow } from './actions.ts';
-import type { EffectContext } from './effects.ts';
+import type { EffectContext, SpecialEffect, StrikeContext } from './effects.ts';
 import type { CombatStats, Side } from '../data/units.ts';
 
 type Outcome = 'victory' | 'defeat';
@@ -30,8 +30,9 @@ type Mark = 'moved' | 'acted';
 /* a unit as the view hands it in: its side and full hit points, and any of the rest of its numbers */
 interface UnitEntry extends Partial<CombatStats> { side: Side; hp: number; mp?: number; ability?: string | null }
 /* a unit in the battle: its hit points and MP against its full ones, the numbers it fights with, its ability, and
-   whether it has moved and acted this phase; readyOn the turn its ability can be used again */
-interface BattleUnit { side: Side; hp: number; max: number; mp: number; mpMax: number; stats: CombatStats; ability: string | null; readyOn: number; moved: boolean; acted: boolean }
+   whether it has moved and acted this phase; readyOn the turn its ability can be used again, and marks what its
+   special effects keep between their hooks (battle/effects.ts) */
+interface BattleUnit { side: Side; hp: number; max: number; mp: number; mpMax: number; stats: CombatStats; ability: string | null; readyOn: number; marks: Record<string, number>; moved: boolean; acted: boolean }
 interface Battle { turn: number; phase: Side; outcome: Outcome | null; units: BattleUnit[]; sides: Side[] }
 /* what a blow would come to (see forecast) */
 interface Forecast extends Blow { act: string; heal: boolean; critTo: number; cost: number; from: number; to: number; max: number; fell: boolean }
@@ -51,11 +52,38 @@ const statsOf = (u: UnitEntry): CombatStats => ({ attack: u.attack ?? 0, defense
    ability }] with hp and mp their full hit points and MP (the unit data's stats; any left out count as none,
    Accuracy as 100 and Crit Damage as 150) */
 function createBattle(units: UnitEntry[]): Battle {
-  const B: Battle = { turn: 1, phase: SIDES[0], outcome: null, units: units.map(u => ({ side: u.side, hp: Math.max(0, u.hp), max: Math.max(1, u.hp), mp: Math.max(0, u.mp ?? 0), mpMax: Math.max(0, u.mp ?? 0), stats: statsOf(u), ability: u.ability || null, readyOn: 0, moved: false, acted: false })), sides: [] };
+  const B: Battle = { turn: 1, phase: SIDES[0], outcome: null, units: units.map(u => ({ side: u.side, hp: Math.max(0, u.hp), max: Math.max(1, u.hp), mp: Math.max(0, u.mp ?? 0), mpMax: Math.max(0, u.mp ?? 0), stats: statsOf(u), ability: u.ability || null, readyOn: 0, marks: {}, moved: false, acted: false })), sides: [] };
   /* the sides that took the field, in turn order */
   B.sides = SIDES.filter(s => B.units.some(u => u.side === s));
   if (B.sides.length) B.phase = B.sides[0];
+  if (B.sides.length) {
+    settle(B, () => {
+      everyone(B, (e, self) => e.onBattleStart?.({ battle: B, self }));
+      everyone(B, (e, self) => e.onTurnStart?.({ battle: B, self, side: B.phase, turn: B.turn }));
+      everyone(B, (e, self) => e.onPhaseStart?.({ battle: B, self, side: B.phase, turn: B.turn }), B.phase);
+    });
+  }
   return B;
+}
+
+/* ---------- the special effects' hooks (battle/effects.ts) ---------- */
+/* the effects unit k carries: its ability's */
+const carried = (B: Battle, k: number): readonly SpecialEffect[] => (B.units[k] && abilityOf(B.units[k].ability)?.effects) || [];
+/* run f over every effect unit k carries, if it stands */
+function each(B: Battle, k: number, f: (e: SpecialEffect, self: number) => void): void {
+  if (alive(B, k)) for (const e of carried(B, k)) f(e, k);
+}
+/* over every standing unit's effects, or one side's */
+function everyone(B: Battle, f: (e: SpecialEffect, self: number) => void, side?: Side): void {
+  B.units.forEach((u, k) => { if (!side || u.side === side) each(B, k, f); });
+}
+/* run some hooks, then settle what they did: anyone they felled falls (onFall), and the battle may be over
+   (onBattleEnd, to every unit, standing or not) */
+function settle(B: Battle, hooks: () => void, before = B.units.map(u => u.hp)): void {
+  hooks();
+  B.units.forEach((u, k) => { if (before[k] > 0 && u.hp <= 0) for (const e of carried(B, k)) e.onFall?.({ battle: B, self: k }); });
+  const was = B.outcome; B.outcome = outcomeOf(B);
+  if (B.outcome && !was) { const outcome = B.outcome; B.units.forEach((u, k) => { for (const e of carried(B, k)) e.onBattleEnd?.({ battle: B, self: k, outcome }); }); }
 }
 
 /* ---------- asking about a unit ---------- */
@@ -84,23 +112,34 @@ const canUse = (B: Battle, a: number, id = 'attack'): boolean => canAfford(B, a,
 const phaseOver = (B: Battle): boolean => !B.outcome && standing(B, B.phase).every(k => done(B, k));
 
 /* ---------- what units do ---------- */
-/* mark unit k as having moved or acted ('moved' / 'acted'); false (and nothing changed) if it could not */
-function spend(B: Battle, k: number, what: Mark): boolean {
+/* mark unit k as having moved or acted ('moved' / 'acted'); false (and nothing changed) if it could not. A move
+   fires onMove with the path walked (the tiles, as the view routes them). */
+function spend(B: Battle, k: number, what: Mark, path: readonly unknown[] = []): boolean {
   if (!(what === 'moved' ? canMove : canAct)(B, k)) return false;
-  B.units[k][what] = true; return true;
+  B.units[k][what] = true;
+  if (what === 'moved') settle(B, () => each(B, k, e => e.onMove?.({ battle: B, self: k, path })));
+  return true;
 }
 /* take a move back (the view's undo of a walk before acting) */
-function unspend(B: Battle, k: number, what: Mark): void { if (B.units[k] && alive(B, k) && B.units[k].side === B.phase) B.units[k][what] = false; }
+function unspend(B: Battle, k: number, what: Mark): void {
+  if (!(B.units[k] && alive(B, k) && B.units[k].side === B.phase)) return;
+  const was = B.units[k][what]; B.units[k][what] = false;
+  if (what === 'moved' && was) each(B, k, e => e.onMoveUndone?.({ battle: B, self: k }));
+}
 /* unit k stays where it is and ends its part in the phase */
 function wait(B: Battle, k: number): boolean {
   if (!ready(B, k)) return false;
-  B.units[k].moved = B.units[k].acted = true; return true;
+  B.units[k].moved = B.units[k].acted = true;
+  settle(B, () => each(B, k, e => e.onWait?.({ battle: B, self: k })));
+  return true;
 }
 /* unit a uses action `act` ('attack' or its ability's id) on unit d: a's action for the phase, and the ability's MP.
    roll() gives a number from 0 up to 1, called once for whether the blow lands (it does when the number falls under
    the hit chance; a sure blow spends no roll on it) and, if it does, once for whether it is critical (under the Crit chance). Returns the forecast
    with landed and critical (what came of the rolls), and amount, to and fell as it came out (a miss leaves d's hit
-   points as they were), or null if a cannot act, has not the MP, its ability is cooling down, or d is not one it can aim at. */
+   points as they were), or null if a cannot act, has not the MP, its ability is cooling down, or d is not one it can aim at.
+   After the blow come its action's effects (apply), then the hooks of the units' own: onAbility, onHit or onMiss and
+   onCrit for a; onHurt, onHealed or onDodge for d; onKill for a if d fell; then onFall for anyone who did. */
 function strike(B: Battle, a: number, d: number, act = 'attack', roll: () => number = Math.random): StrikeResult | null {
   if (!canAct(B, a)) return null;
   const r = forecast(B, a, d, act); if (!r) return null;
@@ -108,11 +147,22 @@ function strike(B: Battle, a: number, d: number, act = 'attack', roll: () => num
   B.units[a].mp -= r.cost; B.units[a].acted = true;
   const A = actionOf(B, a, act) as Action; if (A.cooldown > 0) B.units[a].readyOn = B.turn + A.cooldown + 1;
   const to = !landed ? r.from : critical ? r.critTo : r.to;
+  const before = B.units.map(u => u.hp);
   B.units[d].hp = to;
   const result = { ...r, landed, critical, amount: critical ? r.critAmount : r.amount, to, fell: landed && to === 0 };
-  /* its special effects, on the battle as the blow left it */
-  for (const e of A.effects) e.apply?.(result, { battle: B, user: a, target: d });
-  B.outcome = outcomeOf(B);
+  const ctx = (self: number): StrikeContext => ({ battle: B, self, attacker: a, target: d, action: A, result });
+  settle(B, () => {
+    /* its special effects, on the battle as the blow left it */
+    for (const e of A.effects) e.apply?.(result, { battle: B, user: a, target: d });
+    each(B, a, e => {
+      if (act !== 'attack') e.onAbility?.(ctx(a));
+      if (landed) e.onHit?.(ctx(a)); else e.onMiss?.(ctx(a));
+      if (critical) e.onCrit?.(ctx(a));
+    });
+    /* the target's hooks run even as it falls, so it can answer the blow that felled it */
+    for (const e of carried(B, d)) { if (!landed) e.onDodge?.(ctx(d)); else if (A.heal) e.onHealed?.(ctx(d)); else e.onHurt?.(ctx(d)); }
+    if (result.fell) each(B, a, e => e.onKill?.(ctx(a)));
+  }, before);
   return result;
 }
 /* what unit a using action `act` on unit d would come to, without doing it: { act, heal, amount, chance, crit,
@@ -124,7 +174,11 @@ function strike(B: Battle, a: number, d: number, act = 'attack', roll: () => num
 function forecast(B: Battle, a: number, d: number, act = 'attack'): Forecast | null {
   const A = actionOf(B, a, act); if (!A || !canTarget(B, a, d, act) || !canUse(B, a, act)) return null;
   const ctx: EffectContext = { battle: B, user: a, target: d };
-  const t = B.units[d], from = t.hp, { amount, chance, crit, critAmount } = A.effects.reduce((b: Blow, e) => (e.modify ? e.modify(b, ctx) : b), A.blow(B.units[a].stats, t.stats));
+  const blow = { battle: B, attacker: a, target: d, action: A };
+  let b = A.effects.reduce((b: Blow, e) => (e.modify ? e.modify(b, ctx) : b), A.blow(B.units[a].stats, B.units[d].stats));
+  b = carried(B, a).reduce((b: Blow, e) => (e.onAttack ? e.onAttack(b, { ...blow, self: a }) : b), b);
+  b = carried(B, d).reduce((b: Blow, e) => (e.onDefend ? e.onDefend(b, { ...blow, self: d }) : b), b);
+  const t = B.units[d], from = t.hp, { amount, chance, crit, critAmount } = b;
   const to = A.heal ? Math.min(t.max, from + amount) : Math.max(0, from - amount), critTo = A.heal ? to : Math.max(0, from - critAmount);
   return { act, heal: A.heal, amount: A.heal ? to - from : amount, chance, crit, critAmount: A.heal ? to - from : critAmount, critTo, cost: A.cost, from, to, max: t.max, fell: to === 0 };
 }
@@ -137,16 +191,26 @@ function outcomeOf(B: Battle): Outcome | null {
 
 /* ---------- the phases ---------- */
 /* pass play to the next side with units standing, its units fresh; past the last side a new turn begins. Returns
-   { turn, phase, newTurn }, or null once the battle is over. */
+   { turn, phase, newTurn }, or null once the battle is over. Fires onPhaseEnd for the side whose phase it was, then
+   onTurnEnd and onTurnStart for everyone if a new turn begins, then onPhaseStart for the side whose phase it is now;
+   an effect that ends the battle on the way stops it there. */
 function endPhase(B: Battle): PhaseChange | null {
   if (B.outcome) return null;
-  const i = SIDES.indexOf(B.phase); let newTurn = false;
-  for (let s = 1; s <= SIDES.length; s++) {
-    if (i + s >= SIDES.length && !newTurn) { newTurn = true; B.turn++; }
+  const i = SIDES.indexOf(B.phase), turn = (side: Side) => ({ battle: B, side, turn: B.turn }); let newTurn = false;
+  settle(B, () => everyone(B, (e, self) => e.onPhaseEnd?.({ ...turn(B.phase), self }), B.phase));
+  for (let s = 1; s <= SIDES.length && !B.outcome; s++) {
     const side = SIDES[(i + s) % SIDES.length];
+    if (i + s >= SIDES.length && !newTurn) {
+      newTurn = true;
+      settle(B, () => everyone(B, (e, self) => e.onTurnEnd?.({ ...turn(B.phase), self })));
+      B.turn++;
+      settle(B, () => everyone(B, (e, self) => e.onTurnStart?.({ ...turn(B.phase), self })));
+      if (B.outcome) break;
+    }
     if (!standing(B, side).length) continue;
     B.phase = side;
     for (const u of B.units) if (u.side === side) { u.moved = u.acted = false; if (u.hp > 0) u.mp = Math.min(u.mpMax, u.mp + MP_REGEN); }
+    settle(B, () => everyone(B, (e, self) => e.onPhaseStart?.({ ...turn(side), self }), side));
     return { turn: B.turn, phase: side, newTurn };
   }
   return { turn: B.turn, phase: B.phase, newTurn };

@@ -406,9 +406,21 @@ says so.
 `Skill`: each kind says in a few words what it does and makes its own action for the battle. A file keeps the
 other kind's numbers too, so a skill switched between kinds keeps them.
 
-Every action carries `effects`, its special effects: each can `modify` the blow from the battle's state before it is
-rolled (so the tactical view's preview shows it) and `apply` changes to the battle after it is struck. A new effect is
-one entry in `EFFECTS` in `src/battle/effects.ts`, and the skill editor lists it at once.
+Every action carries `effects`, its special effects, and so does every unit whose ability it is. An effect is a set
+of optional hooks, each reading and changing the battle as it stands:
+
+| When | Hooks |
+| --- | --- |
+| Its own action is used | `modify` the blow before it is rolled, `apply` changes after it is struck |
+| The battle and its turns | `onBattleStart`, `onTurnStart`, `onTurnEnd`, `onPhaseStart`, `onPhaseEnd`, `onBattleEnd` |
+| Its carrier acts | `onMove` (with the path), `onMoveUndone`, `onWait`, `onAttack` (reshapes the blow going out), `onAbility`, `onHit`, `onMiss`, `onCrit`, `onKill` |
+| Its carrier is struck | `onDefend` (reshapes the blow coming in), `onHurt`, `onHealed`, `onDodge`, `onFall` |
+
+The hooks that reshape a blow are counted by the forecast, so the tactical view's preview is what happens; after every
+hook the battle settles who has fallen and whether it is won or lost. Each unit has `marks` for its effects to keep
+counts between hooks. Beside the five above come Regenerate (3 HP back each phase), Momentum (harder for each tile
+walked this phase), Thorns (2 damage back to whoever hits it) and Bloodlust (4 MP back for each foe felled). A new
+effect is one entry in `EFFECTS` in `src/battle/effects.ts`, and the skill editor lists it at once.
 
 ![The skill editor](docs/images/skill-editor.png)
 

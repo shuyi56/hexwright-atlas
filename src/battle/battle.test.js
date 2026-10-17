@@ -186,3 +186,26 @@ test('special effects work from the state of the battle: the forecast counts the
     assert.ok(validateSkill({ id: 'x', effects: ['meteor'] }).length, 'an unknown effect is named');
   } finally { setSkills(DEFAULT_SKILLS); }
 });
+
+test('the lifecycle hooks fire as the battle goes: phases, moves, waits, blows, falls and the end', () => {
+  try {
+    setSkills([...DEFAULT_SKILLS,
+      { id: 'surge', label: 'Surge', cost: 0, effects: ['momentum', 'bloodlust'] },
+      { id: 'bark', label: 'Bark', cost: 0, effects: ['thorns', 'regen'] }]);
+    const B = createBattle([{ side: P, hp: 30, mp: 10, attack: 10, accuracy: 100, ability: 'surge' }, { side: E, hp: 30, ability: 'bark' }, { side: E, hp: 5 }]);
+    B.units[0].mp = 0;
+    assert.ok(spend(B, 0, 'moved', [[1, 0], [2, 0], [3, 0], [4, 0]])); assert.equal(B.units[0].marks.momentum, 4, 'onMove counts the walk');
+    unspend(B, 0, 'moved'); assert.equal(B.units[0].marks.momentum, undefined, 'onMoveUndone takes it back');
+    spend(B, 0, 'moved', [[1, 0], [2, 0], [3, 0], [4, 0]]);
+    assert.equal(forecast(B, 0, 1).amount, 12, 'onAttack: a fifth harder after four tiles, and the forecast shows it');
+    strike(B, 0, 1, 'attack', () => 0);
+    assert.equal(B.units[1].hp, 18); assert.equal(B.units[0].hp, 28, 'onHurt: thorns strike back');
+    endPhase(B); assert.equal(B.units[1].hp, 21, 'onPhaseStart: regenerate on its own phase');
+    wait(B, 1); wait(B, 2); endPhase(B);
+    assert.equal(B.units[0].marks.momentum, undefined, 'a new phase clears the walk');
+    strike(B, 0, 2, 'attack', () => 0); assert.equal(B.units[0].mp, 6, 'onKill: bloodlust gives 4 on top of the phase\'s 2');
+    const C = createBattle([{ side: P, hp: 1, attack: 10, accuracy: 100 }, { side: E, hp: 30, ability: 'bark' }]);
+    const r = strike(C, 0, 1, 'attack', () => 0); assert.ok(r.landed && !r.fell);
+    assert.equal(C.units[0].hp, 0, 'thorns fell the attacker'); assert.equal(C.outcome, 'defeat', 'and the battle settles after the hooks');
+  } finally { setSkills(DEFAULT_SKILLS); }
+});

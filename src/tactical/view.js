@@ -347,7 +347,7 @@ function aiStep(dt) {
   A.t -= dt * (TC.fast ? 2 : 1); if (A.t > 0) return;
   const B = TC.battle, k = A.k;
   if (A.step === 'pick') {
-    setMode(null); battle.spend(B, k, 'moved');
+    setMode(null); battle.spend(B, k, 'moved', A.plan.path);
     if (A.plan.path.length) startWalk(k, A.plan.path);
     TC.from = null; A.step = 'arrive'; A.t = 0; return;
   }
@@ -388,7 +388,7 @@ function act(x, y, L) {
   if (TC.mode === 'move') {
     if (u === k) { openMenu(); return; }
     const path = routeTo(TC.range, placeId(ED.M, x, y, L));
-    if (path && path.length) { if (startWalk(k, path)) battle.spend(TC.battle, k, 'moved'); } else select(-1);
+    if (path && path.length) { if (startWalk(k, path)) battle.spend(TC.battle, k, 'moved', path); } else select(-1);
   }
   /* off the red tiles, back to the actions window; with the window open a stray click leaves it be */
   else if (aiming()) openMenu();
