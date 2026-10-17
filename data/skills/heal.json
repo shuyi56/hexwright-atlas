@@ -3,6 +3,7 @@
   "label": "Heal",
   "kind": "heal",
   "cost": 6,
+  "cooldown": 1,
   "power": 100,
   "pierce": 0,
   "sure": false,

@@ -136,7 +136,7 @@ function abilitySection(e) {
   return `<section class="ub-ability${changed ? ' changed' : ''}" aria-label="Ability">
     <h3 class="ub-section">Ability${changed ? ` <span class="ub-tag" title="saved: ${abilityLabel(saved)}">changed</span>` : ''}</h3>
     <div class="ub-ability-body">
-      <label class="ub-ability-pick"><select id="ability" aria-label="Ability">${abilityOptions(v)}</select>${a ? `<span class="ub-cost">${a.cost} MP</span><a class="ub-link" href="./skills.html?skill=${encodeURIComponent(a.id)}">Edit skill</a>` : ''}</label>
+      <label class="ub-ability-pick"><select id="ability" aria-label="Ability">${abilityOptions(v)}</select>${a ? `<span class="ub-cost">${a.cost} MP${a.cooldown ? ` · ${a.cooldown}-turn cooldown` : ''}</span><a class="ub-link" href="./skills.html?skill=${encodeURIComponent(a.id)}">Edit skill</a>` : ''}</label>
       <p>${esc(what)}${a ? ` ${uses ? `${uses} use${uses === 1 ? '' : 's'} from full MP` : '<b class="ub-warn">Not enough MP to use it</b>'}, and ${MP_REGEN} MP back each turn.` : ''}</p>
       ${others.length ? `<p class="ub-dim">Against the ${e.group === 'enemies' ? 'characters' : 'enemies'} on average: deals ${dmg} a hit, lands ${hit}% of the time; takes ${taken} a hit, dodges ${dodge}%. Every ${DEF_SCALE} Defense halves the damage taken.</p>` : ''}
     </div>

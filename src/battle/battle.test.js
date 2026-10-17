@@ -4,7 +4,7 @@ import { blankModel } from '../editor/model.ts';
 import { placeChar } from '../editor/walk.js';
 import { planTurn } from './ai.js';
 import { MP_REGEN, critOf, damageOf, hitChance } from './abilities.ts';
-import { actionOf, canAct, canAfford, canMove, canTarget, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.ts';
+import { actionOf, canAct, canAfford, canMove, canTarget, canUse, cooldownLeft, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.ts';
 
 const P = 'player', E = 'enemy';
 
@@ -74,6 +74,18 @@ test('a blow that lands may be critical, for the attacker\'s Crit Damage percent
   const plain = [0.25], p = strike(B, 2, 1, 'attack', () => plain.shift());
   assert.deepEqual([p.critical, p.amount, B.units[1].hp], [false, 10, 0]); assert.ok(p.fell);
   assert.equal(forecast(B, 3, 0, 'heal').crit, 0, 'a heal is never critical');
+});
+
+test('an ability rests for its cooldown after it is used, and the plain attack never does', () => {
+  /* Spell has a cooldown of 2: used on turn 1, it is back on turn 4 */
+  const B = createBattle([{ side: P, hp: 30, mp: 40, attack: 10, accuracy: 100, ability: 'spell' }, { side: E, hp: 999 }]);
+  const round = () => { endPhase(B); wait(B, 1); endPhase(B); };
+  assert.ok(canUse(B, 0, 'spell')); assert.ok(strike(B, 0, 1, 'spell', () => 0)); assert.equal(cooldownLeft(B, 0), 3, 'back on turn 4');
+  round(); assert.equal(B.turn, 2); assert.equal(cooldownLeft(B, 0), 2);
+  assert.ok(!canUse(B, 0, 'spell') && canAfford(B, 0, 'spell'), 'it has the MP but is resting'); assert.equal(forecast(B, 0, 1, 'spell'), null); assert.equal(strike(B, 0, 1, 'spell'), null);
+  assert.ok(canUse(B, 0) && forecast(B, 0, 1), 'the attack is always there'); wait(B, 0);
+  round(); assert.equal(B.turn, 3); assert.equal(cooldownLeft(B, 0), 1); wait(B, 0);
+  round(); assert.equal(B.turn, 4); assert.equal(cooldownLeft(B, 0), 0); assert.ok(canUse(B, 0, 'spell'));
 });
 
 test('abilities spend MP, which comes back a little each phase', () => {

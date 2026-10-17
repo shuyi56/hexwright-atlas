@@ -1,7 +1,7 @@
 /* ================= battle: what a blow does =================
    An action is what a unit does to another when it acts: the plain Attack every unit has (battle/abilities.ts), or
    the ability its unit data names, which is a skill in data/skills/ taken as the battle plays it (data/skills.ts).
-   Every action has an id, a label, an MP cost, the particles it plays (fx) and a few words on it (note); a strike
+   Every action has an id, a label, an MP cost, a cooldown, the particles it plays (fx) and a few words on it (note); a strike
    falls on a foe and a heal on an ally, and each works out its own blow.
 
    The numbers, for a strike of power P (Attack × the strike's power) against a foe:
@@ -24,7 +24,7 @@ const DEF_SCALE = 20, MIN_HIT = 5, MAX_HIT = 100;
    lands, crit the percent of hits that are critical and critAmount what a critical hit takes */
 interface Blow { amount: number; chance: number; crit: number; critAmount: number }
 /* what every action is made from */
-interface ActionSpec { id: string; label: string; cost: number; fx: Readonly<SkillFx>; note: string }
+interface ActionSpec { id: string; label: string; cost: number; cooldown: number; fx: Readonly<SkillFx>; note: string }
 /* a strike's power is × Attack and its pierce the share of Defense it ignores, both as fractions */
 interface StrikeSpec extends ActionSpec { power: number; pierce: number; sure: boolean }
 /* a heal restores healBase + healScale × Attack */
@@ -42,12 +42,14 @@ abstract class Action {
   readonly id: string;
   readonly label: string;
   readonly cost: number;
+  /* the turns its user waits after using it before it can again */
+  readonly cooldown: number;
   readonly fx: Readonly<SkillFx>;
   readonly note: string;
   /* aimed at an ally's hit points instead of a foe's */
   abstract readonly heal: boolean;
-  constructor({ id, label, cost, fx, note }: ActionSpec) {
-    this.id = id; this.label = label; this.cost = cost; this.fx = fx; this.note = note;
+  constructor({ id, label, cost, cooldown, fx, note }: ActionSpec) {
+    this.id = id; this.label = label; this.cost = cost; this.cooldown = cooldown; this.fx = fx; this.note = note;
   }
   /* what this action by a unit with stats `a` does to one with stats `d` */
   abstract blow(a: CombatStats, d: CombatStats): Blow;

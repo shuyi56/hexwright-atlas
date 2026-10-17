@@ -372,7 +372,7 @@ ability, a file in `data/skills/` (or **New skill…** in the skill editor).
 Each ability is one JSON file in `data/skills/`, named by its id, which is what a unit's `stats.ability` names:
 
 ```json
-{ "id": "spell", "label": "Spell", "kind": "damage", "cost": 8, "power": 200, "pierce": 50, "sure": false,
+{ "id": "spell", "label": "Spell", "kind": "damage", "cost": 8, "cooldown": 2, "power": 200, "pierce": 50, "sure": false,
   "healBase": 8, "healScale": 200, "fx": { "preset": "spell", "tint": "", "scale": 100, "density": 100 } }
 ```
 
@@ -380,6 +380,7 @@ Each ability is one JSON file in `data/skills/`, named by its id, which is what 
 | --- | --- |
 | Kind | `damage` strikes a foe; `heal` restores an ally's HP, never misses and is never critical. |
 | MP cost | What it spends. |
+| Cooldown | The turns its user waits after using it before it can again: 1 is every other turn, 0 every turn. The stock skills rest 1 turn, Spell 2 and True Strike none. |
 | Power % | A blow's power as a percent of the user's Attack (150: half as hard again). |
 | Ignores Def % | How much of the target's Defense a blow goes through (100: all of it). |
 | Never misses | A blow that always lands, whatever the target's Evasion. |

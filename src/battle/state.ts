@@ -11,7 +11,8 @@
 
    A blow (battle/actions.ts) is an Attack or the unit's ability: it may miss (Accuracy against the target's
    Evasion), the target's Defense cuts its damage, one that lands may be critical (the attacker's Crit) for more
-   (its Crit Damage), and an ability spends MP, which comes back a little each phase. The chances are rolled when the
+   (its Crit Damage), and an ability spends MP, which comes back a little each phase, and then rests for its
+   cooldown: a cooldown of 1 means not next turn but the one after. The chances are rolled when the
    blow is struck; a forecast shows the odds and what a hit and a critical hit would do.
 
    The battle is won when the last enemy falls and lost when the last of the player's units does; after that no one
@@ -28,8 +29,8 @@ type Mark = 'moved' | 'acted';
 /* a unit as the view hands it in: its side and full hit points, and any of the rest of its numbers */
 interface UnitEntry extends Partial<CombatStats> { side: Side; hp: number; mp?: number; ability?: string | null }
 /* a unit in the battle: its hit points and MP against its full ones, the numbers it fights with, its ability, and
-   whether it has moved and acted this phase */
-interface BattleUnit { side: Side; hp: number; max: number; mp: number; mpMax: number; stats: CombatStats; ability: string | null; moved: boolean; acted: boolean }
+   whether it has moved and acted this phase; readyOn the turn its ability can be used again */
+interface BattleUnit { side: Side; hp: number; max: number; mp: number; mpMax: number; stats: CombatStats; ability: string | null; readyOn: number; moved: boolean; acted: boolean }
 interface Battle { turn: number; phase: Side; outcome: Outcome | null; units: BattleUnit[]; sides: Side[] }
 /* what a blow would come to (see forecast) */
 interface Forecast extends Blow { act: string; heal: boolean; critTo: number; cost: number; from: number; to: number; max: number; fell: boolean }
@@ -49,7 +50,7 @@ const statsOf = (u: UnitEntry): CombatStats => ({ attack: u.attack ?? 0, defense
    ability }] with hp and mp their full hit points and MP (the unit data's stats; any left out count as none,
    Accuracy as 100 and Crit Damage as 150) */
 function createBattle(units: UnitEntry[]): Battle {
-  const B: Battle = { turn: 1, phase: SIDES[0], outcome: null, units: units.map(u => ({ side: u.side, hp: Math.max(0, u.hp), max: Math.max(1, u.hp), mp: Math.max(0, u.mp ?? 0), mpMax: Math.max(0, u.mp ?? 0), stats: statsOf(u), ability: u.ability || null, moved: false, acted: false })), sides: [] };
+  const B: Battle = { turn: 1, phase: SIDES[0], outcome: null, units: units.map(u => ({ side: u.side, hp: Math.max(0, u.hp), max: Math.max(1, u.hp), mp: Math.max(0, u.mp ?? 0), mpMax: Math.max(0, u.mp ?? 0), stats: statsOf(u), ability: u.ability || null, readyOn: 0, moved: false, acted: false })), sides: [] };
   /* the sides that took the field, in turn order */
   B.sides = SIDES.filter(s => B.units.some(u => u.side === s));
   if (B.sides.length) B.phase = B.sides[0];
@@ -74,6 +75,10 @@ const actionOf = (B: Battle, a: number, id = 'attack'): Action | null => (id ===
 const canTarget = (B: Battle, a: number, d: number, id = 'attack'): boolean => { const act = actionOf(B, a, id); return !!act && (act.heal ? allies(B, a, d) : foes(B, a, d)); };
 /* unit a has the MP for its ability */
 const canAfford = (B: Battle, a: number, id: string): boolean => { const act = actionOf(B, a, id); return !!act && B.units[a].mp >= act.cost; };
+/* the turns until unit k's ability is off its cooldown; 0 when it is ready */
+const cooldownLeft = (B: Battle, k: number): number => (B.units[k] ? Math.max(0, B.units[k].readyOn - B.turn) : 0);
+/* unit a can use this action now: it has the MP, and an ability is off its cooldown */
+const canUse = (B: Battle, a: number, id = 'attack'): boolean => canAfford(B, a, id) && (id === 'attack' || !cooldownLeft(B, a));
 /* every unit of the side in play has done all it can */
 const phaseOver = (B: Battle): boolean => !B.outcome && standing(B, B.phase).every(k => done(B, k));
 
@@ -94,12 +99,13 @@ function wait(B: Battle, k: number): boolean {
    roll() gives a number from 0 up to 1, called once for whether the blow lands (it does when the number falls under
    the hit chance; a sure blow spends no roll on it) and, if it does, once for whether it is critical (under the Crit chance). Returns the forecast
    with landed and critical (what came of the rolls), and amount, to and fell as it came out (a miss leaves d's hit
-   points as they were), or null if a cannot act, has not the MP, or d is not one it can aim at. */
+   points as they were), or null if a cannot act, has not the MP, its ability is cooling down, or d is not one it can aim at. */
 function strike(B: Battle, a: number, d: number, act = 'attack', roll: () => number = Math.random): StrikeResult | null {
   if (!canAct(B, a)) return null;
   const r = forecast(B, a, d, act); if (!r) return null;
   const landed = r.chance >= 100 || roll() * 100 < r.chance, critical = landed && r.crit > 0 && roll() * 100 < r.crit;
   B.units[a].mp -= r.cost; B.units[a].acted = true;
+  const cd = actionOf(B, a, act)?.cooldown ?? 0; if (cd > 0) B.units[a].readyOn = B.turn + cd + 1;
   const to = !landed ? r.from : critical ? r.critTo : r.to;
   B.units[d].hp = to;
   B.outcome = outcomeOf(B);
@@ -109,10 +115,10 @@ function strike(B: Battle, a: number, d: number, act = 'attack', roll: () => num
    critAmount, critTo, cost, from, to, max, fell }, amount the hit points it takes (or restores) if it lands, chance
    the percent it does, crit the percent of hits that are critical and critAmount and critTo what one takes and
    leaves, cost its MP, from and to d's hit points before and after a plain hit, fell whether a plain hit fells it;
-   or null if a has no such action or not the MP, or d is not one it can aim at. The view's preview shows it before
+   or null if a has no such action, not the MP or an ability still cooling down, or d is not one it can aim at. The view's preview shows it before
    the blow is struck. */
 function forecast(B: Battle, a: number, d: number, act = 'attack'): Forecast | null {
-  const A = actionOf(B, a, act); if (!A || !canTarget(B, a, d, act) || B.units[a].mp < A.cost) return null;
+  const A = actionOf(B, a, act); if (!A || !canTarget(B, a, d, act) || !canUse(B, a, act)) return null;
   const t = B.units[d], from = t.hp, { amount, chance, crit, critAmount } = A.blow(B.units[a].stats, t.stats);
   const to = A.heal ? Math.min(t.max, from + amount) : Math.max(0, from - amount), critTo = A.heal ? to : Math.max(0, from - critAmount);
   return { act, heal: A.heal, amount: A.heal ? to - from : amount, chance, crit, critAmount: A.heal ? to - from : critAmount, critTo, cost: A.cost, from, to, max: t.max, fell: to === 0 };
@@ -155,5 +161,5 @@ function refresh(B: Battle, units: UnitEntry[]): void {
   B.outcome = outcomeOf(B);
 }
 
-export { OUTCOME_LABEL, SIDES, SIDE_LABEL, actionOf, alive, allies, canAct, canAfford, canMove, canTarget, createBattle, done, endPhase, foes, forecast, outcomeOf, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait };
+export { OUTCOME_LABEL, SIDES, SIDE_LABEL, actionOf, alive, allies, canAct, canAfford, canMove, canTarget, canUse, cooldownLeft, createBattle, done, endPhase, foes, forecast, outcomeOf, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait };
 export type { Battle, BattleUnit, Forecast, Mark, Outcome, PhaseChange, StrikeResult, UnitEntry };

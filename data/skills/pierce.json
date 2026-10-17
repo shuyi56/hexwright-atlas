@@ -3,6 +3,7 @@
   "label": "Pierce",
   "kind": "damage",
   "cost": 5,
+  "cooldown": 1,
   "power": 100,
   "pierce": 100,
   "sure": false,

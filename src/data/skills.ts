@@ -4,13 +4,14 @@
    data/skills/, named by its id:
 
      data/skills/power.json
-     { "id": "power", "label": "Power Strike", "kind": "damage", "cost": 6, "power": 150, "pierce": 0,
+     { "id": "power", "label": "Power Strike", "kind": "damage", "cost": 6, "cooldown": 1, "power": 150, "pierce": 0,
        "sure": false, "healBase": 8, "healScale": 200,
        "fx": { "preset": "power", "tint": "", "scale": 100, "density": 100 } }
 
    kind        damage (strikes a foe) or heal (restores an ally's hit points, and never misses); each kind is a
                subclass of Skill, DamageSkill or HealSkill, which says what the skill does and makes its action
    cost        the MP it spends
+   cooldown    the turns its user must wait after using it before it can again (0: none; 1: every other turn)
    power       a damage skill's blow, in percent of the user's Attack (150: half as hard again)
    pierce      the percent of the target's Defense a damage skill counts as not there (100: all of it)
    sure        a damage skill that never misses
@@ -36,10 +37,10 @@ type FxPreset = 'power' | 'true' | 'pierce' | 'spell' | 'heal' | 'none';
 interface SkillFx { preset: FxPreset; tint: string; scale: number; density: number }
 /* a skill as its file holds it, in canonical form */
 interface SkillData {
-  id: string; label: string; kind: SkillKind; cost: number; power: number; pierce: number; sure: boolean;
+  id: string; label: string; kind: SkillKind; cost: number; cooldown: number; power: number; pierce: number; sure: boolean;
   healBase: number; healScale: number; fx: SkillFx;
 }
-type SkillNumber = 'cost' | 'power' | 'pierce' | 'healBase' | 'healScale';
+type SkillNumber = 'cost' | 'cooldown' | 'power' | 'pierce' | 'healBase' | 'healScale';
 type FxNumber = 'scale' | 'density';
 
 const NO_SKILL = 'none';
@@ -49,6 +50,7 @@ const KIND_IDS: readonly string[] = KINDS.map(([id]) => id);
 /* every number a skill has: [key, label, min, max, default, the kind it matters for (null for both)] */
 const FIELDS: readonly (readonly [SkillNumber, string, number, number, number, SkillKind | null])[] = [
   ['cost', 'MP cost', 0, 99, 6, null],
+  ['cooldown', 'Cooldown', 0, 9, 0, null],
   ['power', 'Power %', 10, 500, 100, 'damage'],
   ['pierce', 'Ignores Def %', 0, 100, 0, 'damage'],
   ['healBase', 'Heal base', 0, 999, 8, 'heal'],
@@ -80,6 +82,7 @@ abstract class Skill {
   readonly id: string;
   readonly label: string;
   readonly cost: number;
+  readonly cooldown: number;
   readonly fx: Readonly<SkillFx>;
   abstract readonly kind: SkillKind;
   /* the whole record, the other kind's numbers too */
@@ -87,7 +90,7 @@ abstract class Skill {
   #action: Action | null = null;
   constructor(data: Readonly<SkillData>) {
     this.#data = data;
-    this.id = data.id; this.label = data.label; this.cost = data.cost; this.fx = data.fx;
+    this.id = data.id; this.label = data.label; this.cost = data.cost; this.cooldown = data.cooldown; this.fx = data.fx;
   }
   /* a few words on what it does, made from its numbers: "2× damage, half Defense" */
   abstract describe(): string;
@@ -115,7 +118,7 @@ class DamageSkill extends Skill {
     return parts.join(', ') || 'a plain blow';
   }
   protected createAction(): StrikeAction {
-    return new StrikeAction({ id: this.id, label: this.label, cost: this.cost, fx: this.fx, note: this.describe(), power: this.power / 100, pierce: this.pierce / 100, sure: this.sure });
+    return new StrikeAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), power: this.power / 100, pierce: this.pierce / 100, sure: this.sure });
   }
 }
 
@@ -130,7 +133,7 @@ class HealSkill extends Skill {
   }
   describe(): string { return 'restores HP to an ally'; }
   protected createAction(): HealAction {
-    return new HealAction({ id: this.id, label: this.label, cost: this.cost, fx: this.fx, note: this.describe(), healBase: this.healBase, healScale: this.healScale / 100 });
+    return new HealAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), healBase: this.healBase, healScale: this.healScale / 100 });
   }
 }
 
@@ -146,7 +149,7 @@ function normalizeSkill(raw: unknown): SkillData {
   const n = numbers(FIELDS, J);
   return {
     id, label: String(J.label ?? '').trim().slice(0, 32) || id, kind,
-    cost: n.cost, power: n.power, pierce: n.pierce, sure: J.sure === true, healBase: n.healBase, healScale: n.healScale,
+    cost: n.cost, cooldown: n.cooldown, power: n.power, pierce: n.pierce, sure: J.sure === true, healBase: n.healBase, healScale: n.healScale,
     fx: { preset: (FX_IDS.includes(preset) ? preset : DEFAULT_SKILL.fx.preset) as FxPreset, tint: TINT_RE.test(tint) ? tint : '', ...numbers(FX_FIELDS, f) } };
 }
 /* a raw skill, normalized, as a Skill of its kind */
@@ -185,11 +188,11 @@ const skillText = (skill: unknown): string => JSON.stringify(normalizeSkill(skil
 
 /* the stock skills, as data/skills/ ships them */
 const DEFAULT_SKILLS: readonly Readonly<SkillData>[] = [
-  { id: 'power', label: 'Power Strike', cost: 6, power: 150, fx: { preset: 'power' } },
+  { id: 'power', label: 'Power Strike', cost: 6, cooldown: 1, power: 150, fx: { preset: 'power' } },
   { id: 'true', label: 'True Strike', cost: 4, sure: true, fx: { preset: 'true' } },
-  { id: 'pierce', label: 'Pierce', cost: 5, pierce: 100, fx: { preset: 'pierce' } },
-  { id: 'spell', label: 'Spell', cost: 8, power: 200, pierce: 50, fx: { preset: 'spell' } },
-  { id: 'heal', label: 'Heal', kind: 'heal', cost: 6, fx: { preset: 'heal' } }
+  { id: 'pierce', label: 'Pierce', cost: 5, cooldown: 1, pierce: 100, fx: { preset: 'pierce' } },
+  { id: 'spell', label: 'Spell', cost: 8, cooldown: 2, power: 200, pierce: 50, fx: { preset: 'spell' } },
+  { id: 'heal', label: 'Heal', kind: 'heal', cost: 6, cooldown: 1, fx: { preset: 'heal' } }
 ].map(s => Object.freeze(normalizeSkill(s)));
 const STOCK_ORDER = DEFAULT_SKILLS.map(s => s.id);
 

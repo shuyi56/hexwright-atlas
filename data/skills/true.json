@@ -3,6 +3,7 @@
   "label": "True Strike",
   "kind": "damage",
   "cost": 4,
+  "cooldown": 0,
   "power": 100,
   "pierce": 0,
   "sure": true,

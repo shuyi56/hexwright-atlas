@@ -77,7 +77,7 @@ function renderList() {
   const vis = visible();
   for (const { id, e } of vis) {
     const d = e.draft, b = document.createElement('button'); b.className = 'ub-row sk-row'; b.dataset.id = id; b.setAttribute('aria-current', String(id === V.sel));
-    b.innerHTML = `<span class="sk-swatch" style="--c:${colourOf(d)}" aria-hidden="true"></span><span class="ub-row-text"><b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>${d.cost} MP · ${esc(describe(d))}</span></span>`;
+    b.innerHTML = `<span class="sk-swatch" style="--c:${colourOf(d)}" aria-hidden="true"></span><span class="ub-row-text"><b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>${d.cost} MP${d.cooldown ? ` · ${d.cooldown}t cooldown` : ''} · ${esc(describe(d))}</span></span>`;
     b.addEventListener('click', () => { V.sel = id; renderAll(); });
     box.append(b);
   }
@@ -97,6 +97,7 @@ function tile(path, [k, label, lo, hi], value, saved, hint) {
 /* a few words under each number on what it comes to */
 function hintOf(k, d) {
   if (k === 'cost') return d.cost ? `${MP_REGEN} MP back each turn` : 'free';
+  if (k === 'cooldown') return d.cooldown ? `then rests ${d.cooldown} turn${d.cooldown === 1 ? '' : 's'}` : 'every turn';
   if (k === 'power') return `${+(d.power / 100).toFixed(2)}× the user's Attack`;
   if (k === 'pierce') return d.pierce >= 100 ? 'all of the Defense' : d.pierce ? `${d.pierce}% of the Defense` : 'none of it';
   if (k === 'healBase') return 'HP before Attack counts';

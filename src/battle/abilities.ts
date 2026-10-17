@@ -14,7 +14,7 @@ const MP_REGEN = 2;
 /* what a unit's data names for no ability */
 const NO_ABILITY = NO_SKILL;
 /* the plain attack every unit has */
-const ATTACK: StrikeAction = Object.freeze(new StrikeAction({ id: 'attack', label: 'Attack', cost: 0, power: 1, pierce: 0, sure: false, fx: Object.freeze({ preset: 'none', tint: '', scale: 100, density: 100 }), note: '' }));
+const ATTACK: StrikeAction = Object.freeze(new StrikeAction({ id: 'attack', label: 'Attack', cost: 0, cooldown: 0, power: 1, pierce: 0, sure: false, fx: Object.freeze({ preset: 'none', tint: '', scale: 100, density: 100 }), note: '' }));
 /* a few words on what a skill does, made from its numbers: "2× damage, half Defense" */
 const describe = (s: unknown): string => skillFrom(s).describe();
 /* every ability there is, in the skill list's order */

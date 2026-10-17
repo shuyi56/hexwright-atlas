@@ -175,7 +175,7 @@ function select(k) {
 function setMode(m) {
   const k = TC.sel;
   if (k < 0 || (m === 'move' && !battle.canMove(TC.battle, k)) || (m === 'attack' && !battle.canAct(TC.battle, k))
-    || (m === 'ability' && !(battle.canAct(TC.battle, k) && abilityIdOf(k) && battle.canAfford(TC.battle, k, abilityIdOf(k))))) m = null;
+    || (m === 'ability' && !(battle.canAct(TC.battle, k) && abilityIdOf(k) && battle.canUse(TC.battle, k, abilityIdOf(k))))) m = null;
   if (m) TC.menu = false;
   TC.mode = m; TC.aim = -1; TC.range = m === 'move' ? rangeOf(k) : null; TC.reach = m === 'attack' || m === 'ability' ? reachOf(k, actIdOf(k)) : null; TC.dirty = true;
   panels();
@@ -356,7 +356,7 @@ function aiStep(dt) {
     const targets = reachOf(k).targets, d = targets.includes(A.plan.target) ? A.plan.target : targets.length ? targets[0] : -1;
     if (d < 0) { battle.wait(B, k); TC.note = `${nameOf(k)} waits`; select(-1); A.step = null; A.t = AI_PAUSE.stay; panels(); return; }
     /* its ability when it does harm and it has the MP for it, else a plain attack */
-    const ab = abilityOf(abilityIdOf(k)); A.act = ab && !ab.heal && battle.canAfford(B, k, ab.id) ? ab.id : 'attack';
+    const ab = abilityOf(abilityIdOf(k)); A.act = ab && !ab.heal && battle.canUse(B, k, ab.id) ? ab.id : 'attack';
     setMode(A.act === 'attack' ? 'attack' : 'ability'); TC.aim = d; const c = ED.M.chars[d]; setCursor(c.x, c.y, levelOf(c));
     A.target = d; A.step = 'aim'; A.t = AI_PAUSE.aim; return;
   }
@@ -441,15 +441,15 @@ function panels() {
   menu.hidden = !t || !TC.menu || busy();
   if (t) {
     const canMove = battle.canMove(TC.battle, TC.sel), canAct = battle.canAct(TC.battle, TC.sel), c = M.chars[TC.sel], s = characterById(c.sprite), u = unitFor(c.sprite), st = u.stats, mv = u.movement;
-    const abId = abilityIdOf(TC.sel), ab = abilityOf(abId), afford = !!ab && battle.canAfford(TC.battle, TC.sel, abId);
+    const abId = abilityIdOf(TC.sel), ab = abilityOf(abId), afford = !!ab && battle.canAfford(TC.battle, TC.sel, abId), rest = ab ? battle.cooldownLeft(TC.battle, TC.sel) : 0;
     $('tcActMove').disabled = !canMove; $('tcActAttack').disabled = !canAct;
-    $('tcActAbility').hidden = !ab; $('tcActAbility').disabled = !canAct || !afford;
+    $('tcActAbility').hidden = !ab; $('tcActAbility').disabled = !canAct || !afford || rest > 0;
     $('tcMenuWho').textContent = s ? s.name : c.sprite;
     $('tcActMoveInfo').textContent = canMove ? `Up to ${mv.move} tiles · jump ${mv.jump}` : 'Already moved';
     $('tcActAttackInfo').textContent = canAct ? `${st.attack} power · ${reachText(st)}` : 'Already acted';
     if (ab) {
       $('tcActAbilityName').textContent = ab.label;
-      $('tcActAbilityInfo').textContent = !canAct ? 'Already acted' : !afford ? `Needs ${ab.cost} MP · has ${TC.battle.units[TC.sel].mp}` : `${ab.cost} MP · ${ab.note}`;
+      $('tcActAbilityInfo').textContent = !canAct ? 'Already acted' : !afford ? `Needs ${ab.cost} MP · has ${TC.battle.units[TC.sel].mp}` : rest ? `Ready in ${rest} turn${rest === 1 ? '' : 's'}` : `${ab.cost} MP${ab.cooldown ? ` · ${ab.cooldown}-turn cooldown` : ''} · ${ab.note}`;
       $('tcActAbility').dataset.kind = ab.heal ? 'heal' : 'harm';
     }
     $('tcActWaitInfo').textContent = 'End this unit\'s turn';
