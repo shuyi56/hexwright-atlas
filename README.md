@@ -343,9 +343,11 @@ orc have Power Strike and the dark elf Pierce; goblins, wolves, skeletons and sl
 (knight, orc, slime) stand on Defense, quick ones (thief, wolf, dark elf, goblin) on Evasion. The thief, rangers,
 archers, monk, wolves and dark elf crit most often (12 to 20%), the thief and the orc hardest (175%).
 
-`src/data/units.js` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
-with no file, such as a custom character from the maker, plays with the defaults. `src/battle/abilities.js` holds
-the formulas and turns each skill into the blow it plays. Adding a number means adding a line to `FIELDS`; adding an
+`src/data/units.ts` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
+with no file, such as a custom character from the maker, plays with the defaults. The registry holds each unit as
+a `Character` or an `Enemy`, both a `Unit`, so it knows its group and the side it fights on. `src/battle/actions.ts`
+holds the formulas and the two kinds of action, `StrikeAction` and `HealAction`; `src/battle/abilities.ts` has the
+plain Attack and turns each skill into the action it plays. Adding a number means adding a line to `FIELDS`; adding an
 ability, a file in `data/skills/` (or **New skill…** in the skill editor).
 
 **Unit data** in the module rail opens `units.html`, an editor for these files:
@@ -397,6 +399,10 @@ copy of another, and the unit data page offers it at once. Saving works as on th
 `PUT` and `DELETE /__hexwright/skills/<id>` and `GET /__hexwright/skills`; a tactical view open in another tab plays the
 new numbers and particles from the next blow. A unit naming a skill that is not there only attacks, and its card
 says so.
+
+`src/data/skills.ts` reads each file as `SkillData` and holds it as a `DamageSkill` or a `HealSkill`, both a
+`Skill`: each kind says in a few words what it does and makes its own action for the battle. A file keeps the
+other kind's numbers too, so a skill switched between kinds keeps them.
 
 ![The skill editor](docs/images/skill-editor.png)
 
@@ -796,6 +802,7 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run build`   | Production build into `dist/`   |
 | `npm run preview` | Serve the production build      |
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
+| `npm run typecheck` | Type-check the TypeScript in `src/` |
 | `npm run scene -- <map.json>` | Build a self-contained HTML test page for a scene into `scenes/` |
 | `npm run sheet`   | Draw the character sprite sheet and walk into `docs/images/` |
 | `npm run tactical-sheet` | Draw the tactical tile sheet (and with `--atlas` the tile atlas) into `docs/images/` |
@@ -804,11 +811,11 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run perf`    | Editor latency budget (Chromium)|
 | `npm run mcp`     | Run the MCP server on stdio     |
 
-Requires Node 18+.
+Requires Node 22.18+, which runs the TypeScript data models in Node tools and tests without a build step.
 
 ## CI and hosting
 
-`.github/workflows/ci.yml` lints and builds every pull request and every push to `main`. Pushes to
+`.github/workflows/ci.yml` lints, type-checks, tests and builds every pull request and every push to `main`. Pushes to
 `main` also publish `dist/` to GitHub Pages at <https://shuyi56.github.io/hexwright-atlas/>. Pages
 must be set to **Source: GitHub Actions** once, under the repository's Settings → Pages.
 
@@ -833,7 +840,8 @@ src/
   units/              The unit data page (units.html)
   skills/             The skill editor (skills.html)
   battle/             The battle in the tactical view: sides, hit points and MP, blows and abilities, turns and the player and enemy phases
-                      (state.js), and how the computer plays an enemy (ai.js); pure, no DOM
+                      (state.ts), the actions and what a blow does (actions.ts), and how the computer plays an
+                      enemy (ai.js); pure, no DOM
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen
   town/               Town view: the painted height surface with its slopes, cliffs and depth buffer, the

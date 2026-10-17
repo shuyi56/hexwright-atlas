@@ -9,7 +9,7 @@
    in from the western wood. Deterministic: the same map every time. */
 import { writeFileSync } from 'node:fs';
 import { placePiece } from '../src/editor/ops.js';
-import { blankModel, TI, toJSON } from '../src/editor/model.js';
+import { blankModel, TI, toJSON } from '../src/editor/model.ts';
 import { placeChar } from '../src/editor/walk.js';
 
 const S = 24, M = blankModel(S, 'elvenmoss', 'Silverleaf Hollow'), out = process.argv[2] || 'scenes/town/silverleaf-hollow.json';

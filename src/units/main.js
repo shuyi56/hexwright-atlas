@@ -2,10 +2,10 @@ import '../styles/main.css';
 import './units.css';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
-import { onSkillsChange } from '../data/skills.js';
-import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, PATTERNS, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.js';
+import { onSkillsChange } from '../data/skills.ts';
+import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, PATTERNS, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.ts';
 import { patternOffsets } from '../tactical/attack.js';
-import { DEF_SCALE, MP_REGEN, abilityOf, damageOf, healOf, hitChance, listAbilities } from '../battle/abilities.js';
+import { DEF_SCALE, MP_REGEN, abilityOf, damageOf, healOf, hitChance, listAbilities } from '../battle/abilities.ts';
 import { characterById, list as customCharacters } from '../characters/library.js';
 import { ROSTER, WALK, render } from '../characters/roster.js';
 import { figureThumb } from '../characters/draw.js';
@@ -14,7 +14,7 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 import { mountRail } from '../ui/rail.js';
 
 /* ================= the unit data page =================
-   Every unit in data/units/ (src/data/units.js) to read and change: a list down the side, a card per unit with its
+   Every unit in data/units/ (src/data/units.ts) to read and change: a list down the side, a card per unit with its
    sprite walking, its HP, MP, Attack, Defense, Accuracy, Evasion, Range, Move and Jump, a picture of its attack
    pattern, its ability and what its blows come to against the roster, and a table of everyone for balancing numbers side by
    side. Changes are drafts until saved. On the dev server Save writes the files through the Hexwright bridge

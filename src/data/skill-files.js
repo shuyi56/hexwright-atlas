@@ -1,4 +1,4 @@
-import { setSkills } from './skills.js';
+import { setSkills } from './skills.ts';
 
 /* ================= skill data: the files, in the browser =================
    Every data/skills/<id>.json, bundled by Vite and handed to the registry. On the dev server a change to any of

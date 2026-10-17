@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GROUPS, ID_RE, normalizeUnit, unitPath, unitText, validateUnit } from '../src/data/units.js';
+import { GROUPS, ID_RE, normalizeUnit, unitPath, unitText, validateUnit } from '../src/data/units.ts';
 
 /* ================= unit data: the files, on disk =================
    Reads and writes data/units/<group>/<id>.json for Node: the dev server's bridge (tools/vite-hexwright.js), which
-   the unit data page saves through, and the tests. Every write is normalized (src/data/units.js), so the files
+   the unit data page saves through, and the tests. Every write is normalized (src/data/units.ts), so the files
    stay in one canonical shape however they were edited. A unit lives in exactly one group: saving it under one
    removes it from the other. */
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');

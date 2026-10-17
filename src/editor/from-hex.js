@@ -1,9 +1,9 @@
 import { CX, CY, NB, hexNo } from '../core/geometry.js';
 import { fbm, makeNoise, mulberry32 } from '../core/random.js';
 import { climate } from '../render/palette.js';
-import { BIOME } from '../world/data.js';
+import { BIOME } from '../world/data.ts';
 import { TERRAIN, footprint } from '../tiles/index.js';
-import { MAX_ELEV, TI, blankModel, fits } from './model.js';
+import { MAX_ELEV, TI, blankModel, fits } from './model.ts';
 
 /* ================= tile editor: walk into one hex of the realm map =================
    Builds a tile map of a single hex from what the atlas knows about it: its biome and those of its

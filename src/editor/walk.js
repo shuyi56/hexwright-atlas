@@ -1,6 +1,6 @@
 import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
 import { inb } from './ops.js';
-import { MAX_LEVEL, floorAt, levelOf, objAt } from './model.js';
+import { MAX_LEVEL, floorAt, levelOf, objAt } from './model.ts';
 
 /* ================= tile editor: where characters can stand and walk =================
    A tile on level L is free when it is on the map, has ground (dry, not lava) or, above the ground, a floor,

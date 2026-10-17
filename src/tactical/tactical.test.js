@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TI, blankModel } from '../editor/model.js';
+import { TI, blankModel } from '../editor/model.ts';
 import { FACE_DELTA, placeChar } from '../editor/walk.js';
 import { STRIKE, WINDUP } from '../characters/body.js';
 import { ARROW_SPEED, GHOST, LUNGE, blowAt, blowPlan, faceToward } from './blow.js';
 import { abilityFx, createFx, emit, lookOf, seeded, stepFx, tintRamp } from './particles.js';
-import { listAbilities } from '../battle/abilities.js';
+import { listAbilities } from '../battle/abilities.ts';
 import { TERRAIN } from '../tiles/terrain.js';
 import { MOVE, moveRange, placeId, routeTo } from './move.js';
 import { P, buildScene, liftOf, pickTile, withFigures } from './scene.js';

@@ -2,7 +2,7 @@ import { ED, closeEditor, openCharacterMaker, openEditor } from '../editor/edito
 import { closeTactical, openTactical } from '../tactical/view.js';
 import { closeTown, openTown } from '../town/view.js';
 import { makerOpen } from '../characters/maker.js';
-import { fromJSON } from '../editor/model.js';
+import { fromJSON } from '../editor/model.ts';
 import { layout, renderTiles } from '../editor/render.js';
 import { MODULE_IDS, mountRail } from './rail.js';
 import { $ } from './state.js';

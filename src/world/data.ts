@@ -1,5 +1,9 @@
 /* ================= world data ================= */
-const BIOME = {
+type BiomeId = 'deep' | 'sea' | 'shallow' | 'lake' | 'grass' | 'forest' | 'deepwood' | 'taiga' | 'hills' | 'mountain' | 'peak' | 'desert' | 'swamp' | 'tundra';
+type LandBiome = Exclude<BiomeId, 'deep' | 'sea' | 'shallow' | 'lake'>;
+/* a biome's name and map colour; water for the seas and lakes, hrs the hours it takes to cross on foot */
+interface Biome { name: string; col: string; water?: true; hrs?: number }
+const BIOME: Readonly<Record<BiomeId, Biome>> = {
   deep:{name:'Deep ocean', col:'#86a1a0', water:true}, sea:{name:'Open sea', col:'#9db5ab', water:true},
   shallow:{name:'Shallows', col:'#b9c9b0', water:true}, lake:{name:'Lake', col:'#a2bcb0', water:true},
   grass:{name:'Grassland', col:'#d2c891', hrs:2}, forest:{name:'Forest', col:'#a8b273', hrs:3},
@@ -8,8 +12,9 @@ const BIOME = {
   peak:{name:'Snow peaks', col:'#e0d9c8', hrs:10}, desert:{name:'Desert', col:'#e6cf95', hrs:4},
   swamp:{name:'Marsh', col:'#aaab7f', hrs:5}, tundra:{name:'Tundra', col:'#d4d4c0', hrs:3}
 };
-const MOVE = { grass:1, forest:2, deepwood:3, taiga:2, hills:2.4, mountain:9, peak:40, desert:2.6, swamp:4, tundra:2 };
-const FLAVOUR = {
+/* the cost of crossing a tile of each land, grassland being 1 */
+const MOVE: Readonly<Record<LandBiome, number>> = { grass:1, forest:2, deepwood:3, taiga:2, hills:2.4, mountain:9, peak:40, desert:2.6, swamp:4, tundra:2 };
+const FLAVOUR: Readonly<Record<BiomeId | 'farm', readonly string[]>> = {
   farm:['Strip fields and hedgerows, worked by tenants of the nearest manor.','Barley, beans and a scarecrow wearing a bishop\'s hat.','A patchwork of fields; harvest carts creak along the lanes.'],
   grass:['Rolling meadows dotted with sheep and old boundary stones.','Tall grass hissing in the wind; a drover\'s track cuts through it.','Farmsteads and hedgerows, the fields ripening gold.','A standing stone leans in the middle of a barley field.'],
   forest:['Oak and beech, with deer trails underfoot.','A charcoal-burners\' clearing, long abandoned.','Thick canopy. Woodsmen notch the bark to mark the safe paths.','Bluebells under the beeches, and a hermit\'s smoke rising somewhere.'],
@@ -26,6 +31,7 @@ const FLAVOUR = {
   shallow:['Shoals and sandbars. Pilots charge double here.','Kelp beds and fishing skiffs.','A wreck shows its ribs at low tide.'],
   lake:['Still, cold water. The far shore is lost in mist.','Fishermen will not cast nets after dark.','Reed beds and a ferryman\'s jetty.']
 };
-const KIND = { capital:'Royal capital', city:'City', town:'Market town', village:'Village', keep:'Keep', tower:'Tower', ruin:'Ruin', cave:'Cave', temple:'Temple', lighthouse:'Lighthouse', windmill:'Windmill', mine:'Mine', stones:'Standing stones', lair:'Dragon lair', volcano:'Volcano', wreck:'Shipwreck', outpost:'Forest outpost', hillfort:'Hill fort', waterfall:'Waterfall' };
+const KIND: Readonly<Record<string, string>> = { capital:'Royal capital', city:'City', town:'Market town', village:'Village', keep:'Keep', tower:'Tower', ruin:'Ruin', cave:'Cave', temple:'Temple', lighthouse:'Lighthouse', windmill:'Windmill', mine:'Mine', stones:'Standing stones', lair:'Dragon lair', volcano:'Volcano', wreck:'Shipwreck', outpost:'Forest outpost', hillfort:'Hill fort', waterfall:'Waterfall' };
 
 export { BIOME, FLAVOUR, KIND, MOVE };
+export type { Biome, BiomeId, LandBiome };

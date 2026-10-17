@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { blankModel } from '../editor/model.js';
+import { blankModel } from '../editor/model.ts';
 import { placeChar } from '../editor/walk.js';
 import { planTurn } from './ai.js';
-import { MP_REGEN, critOf, damageOf, hitChance } from './abilities.js';
-import { actionOf, canAct, canAfford, canMove, canTarget, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.js';
+import { MP_REGEN, critOf, damageOf, hitChance } from './abilities.ts';
+import { actionOf, canAct, canAfford, canMove, canTarget, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.ts';
 
 const P = 'player', E = 'enemy';
 

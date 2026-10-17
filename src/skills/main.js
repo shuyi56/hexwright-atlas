@@ -3,9 +3,9 @@ import '../units/units.css';
 import './skills.css';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
-import { DEFAULT_SKILL, FIELDS, FX_FIELDS, FX_PRESETS, ID_RE, KINDS, listSkills, normalizeSkill, onSkillsChange, skillPath, skillText, validateSkill } from '../data/skills.js';
-import { listUnits, onUnitsChange } from '../data/units.js';
-import { ATTACK, DEF_SCALE, MP_REGEN, blowOf, describe, healOf } from '../battle/abilities.js';
+import { DEFAULT_SKILL, FIELDS, FX_FIELDS, FX_PRESETS, ID_RE, KINDS, listSkills, normalizeSkill, onSkillsChange, skillFrom, skillPath, skillText, validateSkill } from '../data/skills.ts';
+import { listUnits, onUnitsChange } from '../data/units.ts';
+import { ATTACK, DEF_SCALE, MP_REGEN, blowOf, describe, healOf } from '../battle/abilities.ts';
 import { abilityFx, createFx, drawFx, emit, stepFx, tintRamp } from '../tactical/particles.js';
 import { characterById } from '../characters/library.js';
 import { attackOf, render } from '../characters/roster.js';
@@ -13,7 +13,7 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 import { mountRail } from '../ui/rail.js';
 
 /* ================= the skill editor =================
-   Every skill in data/skills/ (src/data/skills.js) to read and change: a list down the side, and a card per skill
+   Every skill in data/skills/ (src/data/skills.ts) to read and change: a list down the side, and a card per skill
    with its name and kind, its MP cost and numbers (power and how much Defense it ignores for a blow, the base and
    the share of Attack for a heal, whether it never misses), its particles (the effect, its colour, size and count)
    playing between two figures, and who in the unit data has it with what it comes to for them. Changes are drafts
@@ -51,7 +51,7 @@ const ordered = () => { const order = listSkills().map(s => s.id), at = id => { 
 const nameOf = e => e.draft.label || e.draft.id;
 const visible = () => { const f = V.filter.trim().toLowerCase(); return ordered().filter(({ id, e }) => !f || id.includes(f) || nameOf(e).toLowerCase().includes(f)); };
 /* the skill as the battle would play it, draft numbers and all */
-const asAbility = d => ({ ...ATTACK, id: d.id, label: d.label, cost: d.cost, power: d.kind === 'heal' ? 0 : d.power / 100, pierce: d.kind === 'heal' ? 0 : d.pierce / 100, sure: d.kind !== 'heal' && d.sure, heal: d.kind === 'heal', healBase: d.healBase, healScale: d.healScale / 100, fx: d.fx, note: describe(d) });
+const asAbility = d => skillFrom(d).toAction();
 /* the units whose data names this skill */
 const usersOf = id => listUnits().filter(u => u.stats.ability === id);
 /* the colour a skill shows as in the list: its tint, or the middle of its effect's own colours */

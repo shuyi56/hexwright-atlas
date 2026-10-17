@@ -1,5 +1,5 @@
 import { ASSET_BY_ID, HOLDS_FURNITURE, footprint } from '../tiles/index.js';
-import { MAX_ELEV, MAX_LEVEL, TI, fits, floorAt, levelOf, objAt } from './model.js';
+import { MAX_ELEV, MAX_LEVEL, TI, fits, floorAt, levelOf, objAt } from './model.ts';
 
 /* ================= tile editor: pure map operations =================
    Every tool the editor offers, as functions on a model with no DOM in sight. The pointer tools in

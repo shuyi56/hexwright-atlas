@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blankModel, TI } from '../editor/model.js';
+import { blankModel, TI } from '../editor/model.ts';
 import { ASSETS } from '../tiles/index.js';
 import { CHUNK, LIFT, TILE, classify, fieldOf, heightAt, renderChunk, texel } from './ground.js';
 import { DESIGNED, pieceSprite } from './pieces.js';

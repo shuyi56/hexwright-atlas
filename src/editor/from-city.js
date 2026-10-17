@@ -1,6 +1,6 @@
 import { CT, FH } from '../city/generate.js';
 import { ASSET_BY_ID, TERRAIN, footprint } from '../tiles/index.js';
-import { MAX_ELEV, TI, blankModel } from './model.js';
+import { MAX_ELEV, TI, blankModel } from './model.ts';
 
 /* ================= tile editor: open a generated city for editing =================
    Ground, height, trees and catalogue assets come across as they are. Houses become the nearest

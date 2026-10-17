@@ -1,10 +1,10 @@
 import { mulberry32 } from '../core/random.js';
 import { ASSET_BY_ID, footprint } from '../tiles/index.js';
-import { blankModel, cloneModel, levelOf, objAt } from './model.js';
+import { blankModel, cloneModel, levelOf, objAt } from './model.ts';
 import { FACE_DELTA, blockedBy } from './walk.js';
 
 /* ================= tile editor: building interiors =================
-   A building can be given an interior: a map of its own (the same model as any other, see editor/model.js) kept on
+   A building can be given an interior: a map of its own (the same model as any other, see editor/model.ts) kept on
    the piece as `interior`. The editor opens it in place of the map to furnish it, and the town view walks the hero
    into it through the building's front door and out again through a doorway in the room's outer wall.
    A new interior is one room filling a square map sized to the building, walled all round with interior walls,

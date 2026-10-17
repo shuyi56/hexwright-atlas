@@ -4,7 +4,7 @@ import { byId } from './roster.js';
 /* ================= character sprites: the custom character library =================
    The characters made in the character maker, kept in the browser as specs (custom.js) and shared by the maker,
    the tile editor and the automation API. A map carries the specs of the custom characters standing on it
-   (editor/model.js), so a saved map opens anywhere. Without storage (Node, or storage blocked) the library lives
+   (editor/model.ts), so a saved map opens anywhere. Without storage (Node, or storage blocked) the library lives
    in memory. Custom ids always start with 'custom-', so they never shadow anyone in the roster. */
 const KEY = 'hexwright.characters.v1', LIB = new Map(), listeners = new Set();
 let ready = false;

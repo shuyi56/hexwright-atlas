@@ -13,7 +13,7 @@ import { hexToModel } from '../editor/from-hex.js';
 import { cityToModel } from '../editor/from-city.js';
 import { generateCity } from '../city/generate.js';
 import { veil } from './state.js';
-import { BIOME, FLAVOUR, KIND } from '../world/data.js';
+import { BIOME, FLAVOUR, KIND } from '../world/data.ts';
 import { INK } from '../render/palette.js';
 import { drawTree } from '../render/trees.js';
 import { drawFarm, tuft } from '../render/ground.js';

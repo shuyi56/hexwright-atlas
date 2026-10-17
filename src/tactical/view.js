@@ -2,21 +2,21 @@ import { characterById } from '../characters/library.js';
 import { FACES } from '../characters/draw.js';
 import { WALK, attackOf } from '../characters/roster.js';
 import { ED, LEVEL_NAME, mutate, undo } from '../editor/editor.js';
-import { MAX_LEVEL, levelOf } from '../editor/model.js';
+import { MAX_LEVEL, levelOf } from '../editor/model.ts';
 import { walkChar } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
 import { $, state } from '../ui/state.js';
 import { moveRange, placeId, routeTo } from './move.js';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
-import { onSkillsChange } from '../data/skills.js';
-import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
+import { onSkillsChange } from '../data/skills.ts';
+import { PATTERNS, onUnitsChange, unitFor } from '../data/units.ts';
 import { attackReach } from './attack.js';
 import { blowAt, blowPlan, faceToward } from './blow.js';
 import { abilityFx, createFx, drawFx, emit, stepFx } from './particles.js';
 import { planTurn } from '../battle/ai.js';
-import { abilityOf } from '../battle/abilities.js';
-import * as battle from '../battle/state.js';
+import { abilityOf } from '../battle/abilities.ts';
+import * as battle from '../battle/state.ts';
 import { drawScene, figureHeight, figureHit, portrait } from './render.js';
 import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 
@@ -29,7 +29,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    top of its portrait, as in the tactics games: Move, Attack (its pattern and range light up in red; pick a unit of
    the other side there for an attack preview, its portrait, the chance the blow lands and the hit points it would
    take flashing on its health bar, then pick it again, press Enter or Strike to strike it), its ability if it has
-   one (battle/abilities.js: spending MP, aimed as an attack is, or at one of its own side in green for a heal) and
+   one (battle/abilities.ts: spending MP, aimed as an attack is, or at one of its own side in green for a heal) and
    Wait. The portrait window shows only the unit's name, its HP and MP bars and the six numbers it fights with; the
    preview, the target's HP bar as the blow would leave it, the numbers that bear on the blow, and tags for the
    damage, the chance to hit and the chance of a critical hit. Esc or a right-click
@@ -41,7 +41,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    reels when it lands, then shows its health bar over its head for a moment, draining; a unit felled fades to a
    ghost; a blow that misses shows Miss, and the target sways out of its way; a critical hit's damage rises larger,
    in gold. An ability brings its own particles (tactical/particles.js): they gather on the user as it winds up and
-   burst over the target as the blow lands. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.js: a turn is
+   burst over the target as the blow lands. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.ts: a turn is
    the player's phase and then the enemy's, each unit of the side in play moves once and acts once, and the phase
    passes when every one of them is done or End turn (T) is pressed, with a banner for each new phase. In the enemy
    phase the computer plays each enemy in turn (battle/ai.js), showing its range, walking and striking, while the
@@ -218,14 +218,14 @@ onUnitsChange(retune);
 onSkillsChange(retune);
 const unitAt = (x, y, L) => (ED.M.chars || []).findIndex(c => c.x === x && c.y === y && levelOf(c) === L);
 
-/* ---------- the battle (battle/state.js): sides, hit points, the turn and whose phase it is ---------- */
+/* ---------- the battle (battle/state.ts): sides, hit points, the turn and whose phase it is ---------- */
 const statsOf = k => unitFor(ED.M.chars[k].sprite).stats;
 const nameOf = k => { const c = ED.M.chars[k]; return characterById(c.sprite)?.name || c.sprite; };
 /* every unit as the battle takes it: the side its group in the unit data fights on (characters against enemies),
    its full hit points and MP, the numbers it fights with and its ability */
 const rosterOf = () => (ED.M.chars || []).map(c => {
   const u = unitFor(c.sprite), { hp, mp, attack, defense, accuracy, evasion, crit, critDamage, ability } = u.stats;
-  return { side: battle.sideOfGroup(u.group), hp, mp, attack, defense, accuracy, evasion, crit, critDamage, ability: abilityOf(ability) ? ability : null };
+  return { side: u.side, hp, mp, attack, defense, accuracy, evasion, crit, critDamage, ability: abilityOf(ability) ? ability : null };
 });
 /* unit k's ability id, null for none */
 const abilityIdOf = k => (TC.battle.units[k] && TC.battle.units[k].ability) || null;

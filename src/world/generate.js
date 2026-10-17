@@ -1,7 +1,7 @@
 import { COLS, CX, CY, HW, M, N, NB, R, ROWS, hexDist, worldH, worldW } from '../core/geometry.js';
 import { fbm, hashStr, makeNoise, mulberry32 } from '../core/random.js';
 import { ADJ, ADJ2, NOUNS, PSUF, TSUF, makeNamer } from '../core/names.js';
-import { BIOME, MOVE } from './data.js';
+import { BIOME, MOVE } from './data.ts';
 
 function generate(seedStr) {
   const seedHash = hashStr(seedStr);

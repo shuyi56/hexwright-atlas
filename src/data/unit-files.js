@@ -1,4 +1,4 @@
-import { setUnits } from './units.js';
+import { setUnits } from './units.ts';
 
 /* ================= unit data: the files, in the browser =================
    Every data/units/<group>/<id>.json, bundled by Vite and handed to the registry. On the dev server a change to

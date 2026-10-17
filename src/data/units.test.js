@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { ROSTER } from '../characters/roster.js';
-import { blankModel } from '../editor/model.js';
+import { blankModel } from '../editor/model.ts';
 import { placeChar, walkChar } from '../editor/walk.js';
 import { attackReach } from '../tactical/attack.js';
 import { moveRange, placeId } from '../tactical/move.js';
 import { ROOT, deleteUnit, readUnits, writeUnit } from '../../tools/units-store.mjs';
-import { DEFAULT_UNIT, getUnit, normalizeUnit, setUnits, unitFor, unitText, validateUnit } from './units.js';
+import { Character, DEFAULT_UNIT, Enemy, Unit, getUnit, normalizeUnit, setUnits, unitFor, unitText, validateUnit } from './units.ts';
 
 test('every roster sprite has a unit file in its group, and every file plays as a roster sprite', () => {
   const files = readUnits(), byId = new Map(files.map(f => [f.unit.id, f]));
@@ -52,6 +52,9 @@ test('the registry looks units up by sprite and falls back to the defaults', () 
   setUnits([{ group: 'enemies', unit: { id: 'wolf', name: 'Wolf', movement: { move: 7, jump: 2 } } }]);
   assert.equal(getUnit('wolf').group, 'enemies'); assert.equal(unitFor('wolf').movement.move, 7);
   const f = unitFor('custom-abc'); assert.ok(f.fallback); assert.deepEqual(f.movement, DEFAULT_UNIT.movement);
+  assert.ok(getUnit('wolf') instanceof Enemy && getUnit('wolf') instanceof Unit); assert.equal(getUnit('wolf').side, 'enemy');
+  assert.ok(f instanceof Character); assert.equal(f.side, 'player'); assert.equal(f.group, 'characters');
+  assert.equal(unitText(getUnit('wolf')), unitText(getUnit('wolf').toJSON()), 'a Unit writes as its record');
   setUnits([]);
 });
 

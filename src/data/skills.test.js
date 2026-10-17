@@ -3,11 +3,12 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { ATTACK, abilityOf, blowOf, describe, healOf, listAbilities } from '../battle/abilities.js';
-import { createBattle, strike } from '../battle/state.js';
+import { ATTACK, abilityOf, blowOf, describe, healOf, listAbilities } from '../battle/abilities.ts';
+import { createBattle, strike } from '../battle/state.ts';
 import { ROOT, readUnits } from '../../tools/units-store.mjs';
 import { deleteSkill, readSkills, writeSkill } from '../../tools/skills-store.mjs';
-import { DEFAULT_SKILLS, getSkill, listSkills, normalizeSkill, setSkills, skillText, validateSkill } from './skills.js';
+import { HealAction, StrikeAction } from '../battle/actions.ts';
+import { DEFAULT_SKILLS, DamageSkill, HealSkill, Skill, getSkill, listSkills, normalizeSkill, setSkills, skillFrom, skillText, validateSkill } from './skills.ts';
 
 test('the skill files are canonical, are the stock five, and every unit names one of them or none', () => {
   const files = readSkills(ROOT);
@@ -46,6 +47,18 @@ test('the battle plays the skills in the registry, so new numbers change the nex
   } finally { setSkills(DEFAULT_SKILLS); }
   assert.equal(healOf(3), 14, 'the plain heal numbers: 8 + 2 × Attack'); assert.equal(ATTACK.fx.preset, 'none');
   assert.equal(describe({ kind: 'damage', power: 100, pierce: 25, sure: false }), 'ignores 25% of Defense');
+});
+
+test('each kind of skill is its own class, keeps its whole record, and plays as its own kind of action', () => {
+  const power = getSkill('power'), heal = getSkill('heal');
+  assert.ok(power instanceof DamageSkill && power instanceof Skill); assert.ok(heal instanceof HealSkill && heal instanceof Skill);
+  assert.ok(power.toAction() instanceof StrikeAction); assert.ok(heal.toAction() instanceof HealAction);
+  assert.equal(power.toAction(), power.toAction(), 'made once for each version of the skill');
+  assert.deepEqual(power.toJSON(), DEFAULT_SKILLS[0]); assert.equal(skillText(heal), skillText(DEFAULT_SKILLS[4]), 'a heal still writes the damage numbers');
+  assert.deepEqual(normalizeSkill(heal), DEFAULT_SKILLS[4], 'a Skill normalizes as its record');
+  const flipped = skillFrom({ ...DEFAULT_SKILLS[3], kind: 'heal' });
+  assert.ok(flipped instanceof HealSkill); assert.equal(skillFrom({ ...flipped.toJSON(), kind: 'damage' }).power, 200, 'switched back, it keeps its power');
+  assert.ok(Object.isFrozen(power));
 });
 
 test('the store writes canonical skill files and deletes them', () => {

@@ -1,5 +1,5 @@
 /* ================= tactical view: particles for the abilities =================
-   A small particle system and an effect for each ability (battle/abilities.js), played over the scene in art pixels
+   A small particle system and an effect for each ability (battle/abilities.ts), played over the scene in art pixels
    so every mote is a whole pixel square like the sprites around it.
 
    A particle has a place and a speed (art pixels, and art pixels a second), a pull (gravity, ay; negative rises) and a
@@ -124,7 +124,7 @@ function tintRamp(tint, n) {
   const c = hex(tint), W = [255, 255, 255], K = [0, 0, 0];
   return Array.from({ length: n }, (_, i) => { const q = n > 1 ? i / (n - 1) : 0.5; return q < 0.5 ? mix(W, c, q * 2) : mix(c, K, (q - 0.5) * 1.2); });
 }
-/* the particles for ability effect `fx` ({ preset, tint, scale, density }, data/skills.js; or just a preset's id) at
+/* the particles for ability effect `fx` ({ preset, tint, scale, density }, data/skills.ts; or just a preset's id) at
    beat `beat` ('charge', 'impact' or 'fizzle'), from the user's chest `from` toward the target's chest `to` (art
    pixels, [x, y]). tint, the caster's colour, for an arcane burst whose skill names none; rnd, a random source.
    Size spreads the effect out from where it plays (the user's chest for the charge, the target's for the rest) and

@@ -1,10 +1,10 @@
-import { MAX_LEVEL, STOREY, levelOf } from '../editor/model.js';
+import { MAX_LEVEL, STOREY, levelOf } from '../editor/model.ts';
 import { ASSET_BY_ID, TERRAIN, footprint, linkWalls, offWall, standsOnWall, turnAsset } from '../tiles/index.js';
 import { designTop, hasDesign } from './pieces.js';
 import { ANIMATED, DIRECTIONAL, PAD, STEP, TH, inDiamond, tileUV } from './tiles.js';
 
 /* ================= tactical view: the scene =================
-   A tile map (editor/model.js) as the tactical camera draws it: every tile, upper floor and piece as an item in
+   A tile map (editor/model.ts) as the tactical camera draws it: every tile, upper floor and piece as an item in
    one back-to-front list, each item a few sprites from the tile sheet at art-pixel positions. The projection is
    the editor's own (render.js), one unit to one art pixel, with view tile (0, 0)'s top point at the origin:
    P(X, Y, z) = [(X - Y) * 16, (X + Y) * 8 - z]. No DOM; the browser draws the list (tactical/render.js) and Node
