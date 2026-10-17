@@ -8,6 +8,8 @@
     "defense": 2,
     "accuracy": 92,
     "evasion": 6,
+    "crit": 3,
+    "critDamage": 150,
     "range": 3,
     "pattern": "ranged",
     "ability": "heal"

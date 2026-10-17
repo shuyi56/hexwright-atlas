@@ -3,7 +3,7 @@ import test from 'node:test';
 import { blankModel } from '../editor/model.js';
 import { placeChar } from '../editor/walk.js';
 import { planTurn } from './ai.js';
-import { MP_REGEN, damageOf, hitChance } from './abilities.js';
+import { MP_REGEN, critOf, damageOf, hitChance } from './abilities.js';
 import { actionOf, canAct, canAfford, canMove, canTarget, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.js';
 
 const P = 'player', E = 'enemy';
@@ -44,11 +44,11 @@ test('a side with no units has its phase skipped', () => {
 
 test('a forecast shows what a strike would do without striking', () => {
   const B = createBattle([{ side: P, hp: 30, attack: 8 }, { side: E, hp: 12 }, { side: P, hp: 30 }, { side: P, hp: 30, attack: 20 }]);
-  assert.deepEqual(forecast(B, 0, 1), { act: 'attack', heal: false, amount: 8, chance: 100, cost: 0, from: 12, to: 4, max: 12, fell: false });
+  assert.deepEqual(forecast(B, 0, 1), { act: 'attack', heal: false, amount: 8, chance: 100, crit: 0, critAmount: 12, critTo: 0, cost: 0, from: 12, to: 4, max: 12, fell: false });
   assert.equal(B.units[1].hp, 12, 'nothing is struck'); assert.ok(canAct(B, 0), 'nor is the action spent');
   assert.deepEqual([forecast(B, 3, 1).to, forecast(B, 3, 1).fell], [0, true]);
   assert.equal(forecast(B, 0, 2), null, 'not one\'s own side');
-  assert.deepEqual(strike(B, 0, 1), { ...forecast(createBattle([{ side: P, hp: 30, attack: 8 }, { side: E, hp: 12 }]), 0, 1), landed: true }, 'the strike lands as forecast');
+  assert.deepEqual(strike(B, 0, 1), { ...forecast(createBattle([{ side: P, hp: 30, attack: 8 }, { side: E, hp: 12 }]), 0, 1), landed: true, critical: false }, 'the strike lands as forecast');
 });
 
 test('Defense cuts the damage, and Accuracy against Evasion decides whether a blow lands', () => {
@@ -62,6 +62,18 @@ test('Defense cuts the damage, and Accuracy against Evasion decides whether a bl
   assert.deepEqual([miss.landed, miss.to, miss.fell, B.units[1].hp], [false, 30, false, 30]); assert.ok(!canAct(B, 0), 'a miss spends the action');
   const hit = strike(B, 2, 1, 'attack', () => 0.74);
   assert.deepEqual([hit.landed, hit.to, B.units[1].hp], [true, 24, 24]);
+});
+
+test('a blow that lands may be critical, for the attacker\'s Crit Damage percent of the damage', () => {
+  assert.equal(critOf(10, 150), 15); assert.equal(critOf(7, 175), 12); assert.equal(critOf(1, 100), 1);
+  const B = createBattle([{ side: P, hp: 30, attack: 10, crit: 25, critDamage: 200 }, { side: E, hp: 30 }, { side: P, hp: 30, attack: 10, crit: 25, critDamage: 200 }, { side: P, hp: 20, mp: 6, attack: 3, crit: 100, ability: 'heal' }]);
+  const f = forecast(B, 0, 1); assert.deepEqual([f.amount, f.crit, f.critAmount, f.critTo], [10, 25, 20, 10]);
+  /* a sure hit spends no roll on landing: the one roll, under the Crit chance, makes it critical */
+  const rolls = [0.2], c = strike(B, 0, 1, 'attack', () => rolls.shift());
+  assert.deepEqual([c.landed, c.critical, c.amount, c.to, B.units[1].hp], [true, true, 20, 10, 10]);
+  const plain = [0.25], p = strike(B, 2, 1, 'attack', () => plain.shift());
+  assert.deepEqual([p.critical, p.amount, B.units[1].hp], [false, 10, 0]); assert.ok(p.fell);
+  assert.equal(forecast(B, 3, 0, 'heal').crit, 0, 'a heal is never critical');
 });
 
 test('abilities spend MP, which comes back a little each phase', () => {
@@ -92,7 +104,7 @@ test('abilities spend MP, which comes back a little each phase', () => {
 test('strikes take hit points, the fallen are out, and the last to fall decides the battle', () => {
   const B = createBattle([{ side: P, hp: 30, attack: 8 }, { side: E, hp: 12, attack: 30 }, { side: E, hp: 12 }, { side: P, hp: 30, attack: 12 }]);
   assert.equal(strike(B, 0, 3), null, 'not one\'s own side');
-  assert.deepEqual(strike(B, 0, 1), { act: 'attack', heal: false, amount: 8, chance: 100, cost: 0, from: 12, to: 4, max: 12, fell: false, landed: true });
+  assert.deepEqual(strike(B, 0, 1), { act: 'attack', heal: false, amount: 8, chance: 100, crit: 0, critAmount: 12, critTo: 0, cost: 0, from: 12, to: 4, max: 12, fell: false, landed: true, critical: false });
   assert.ok(!canAct(B, 0) && canMove(B, 0), 'struck: it can still move');
   assert.equal(strike(B, 0, 1), null, 'one action a phase');
   assert.deepEqual([strike(B, 3, 1).to, B.units[1].hp, B.units[1].hp > 0], [0, 0, false]);

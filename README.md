@@ -320,6 +320,8 @@ movement (Move: tiles a turn; Jump: height levels a step can climb or drop). The
 | Attack | The power of its blows. |
 | Defense | Cuts the damage it takes: damage = power × 20 / (20 + Defense), rounded, at least 1. Every 20 Defense halves it. |
 | Accuracy, Evasion | The chance a blow lands is the attacker's Accuracy minus the target's Evasion, in percent, kept between 5 and 100. |
+| Crit % | The chance, in percent, that a blow which lands is a critical hit. Heals are never critical. |
+| Crit Damage % | What a critical hit deals, as a percent of a plain hit (150: half as much again), rounded. |
 | Range, Pattern | How far away and which tiles it can strike (melee, line or ranged). |
 | Ability | What it can spend MP on, if anything (below). |
 
@@ -335,7 +337,8 @@ An ability reaches the same tiles as the unit's attack. Knights, squires, guards
 Strike; dragoons, valkyries and elven wardens Pierce; archers, rangers and the thief True Strike; the black mage,
 summoner and elven sage Spell; the white mage, healer, alchemist and elven lady Heal. Of the enemies, bandits and the
 orc have Power Strike and the dark elf Pierce; goblins, wolves, skeletons and slimes have none. Armoured units
-(knight, orc, slime) stand on Defense, quick ones (thief, wolf, dark elf, goblin) on Evasion.
+(knight, orc, slime) stand on Defense, quick ones (thief, wolf, dark elf, goblin) on Evasion. The thief, rangers,
+archers, monk, wolves and dark elf crit most often (12 to 20%), the thief and the orc hardest (175%).
 
 `src/data/units.js` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
 with no file, such as a custom character from the maker, plays with the defaults. `src/battle/abilities.js` holds
@@ -382,16 +385,18 @@ with the camera gliding after the cursor and the unit on the move.
   asks first: the chip turns to **Restart?** for three seconds and a second press restarts. The actions window opens large, stacked
   on top of the unit's portrait in the bottom corner: a command list naming the unit, each action with an icon and
   what it does (move range, attack power and pattern, the ability's MP cost and effect) or why it is spent (already
-  acted, not enough MP). Both windows share a stone-and-gold frame. The portrait window shows the unit's HP and MP
-  bars and a row of its Attack, Defense, Accuracy and Evasion. **Attack** lights the
+  acted, not enough MP). Both windows share a stone-and-gold frame. The portrait window carries no lines of text:
+  just the unit's name, its HP and MP bars and two rows of its Attack, Defense, Accuracy, Evasion, Crit and Crit
+  Damage. **Attack** lights the
   red tiles it reaches; picking a foe there opens an **attack preview** in the same row as the unit's portrait: the
-  target's own portrait window, the damage on a tag at its corner and the chance to hit on another (green, amber or
-  rust with the odds), the target's Defense and Evasion, and its health bar as the blow would leave it,
+  target's own portrait window, the damage on a tag at its corner (KO if a hit fells it), the chance to hit on
+  another (green, amber or rust with the odds) and the chance of a critical hit on a gold one, the target's Defense
+  and Evasion, and its health bar as the blow would leave it,
   with the hit points it would lose flashing. A crossed-swords clash between the two windows is the **Strike**
   button; picking the target again or `Enter` strikes too, and `Esc` goes back to choosing. The ability (`3`) is
   aimed the same way, the button taking its name; a heal lights its reach in green, aims at your own units, and
   previews the HP it would restore. The enemy's attacks show the same preview while it aims, and an enemy spends its
-  ability whenever it has the MP. Whether a blow lands is rolled when it is struck. The battle is won when the last enemy falls
+  ability whenever it has the MP. Whether a blow lands, and whether it is critical, is rolled when it is struck. The battle is won when the last enemy falls
   and lost when the last of yours does. A side with no units on the map has its phase skipped, and on a map of
   enemies only they are yours to move.
 - **Attacks:** an attack plays out in the attacker's own frames, and the controls wait until it has.
@@ -402,7 +407,7 @@ with the camera gliding after the cursor and the unit on the move.
     the summoner.
   - **The target:** when the blow lands it flashes white twice and reels back. Only then does the damage rise over
     its head and its health bar drain, and a unit felled fades to a ghost. A blow that misses shows **Miss** and
-    the target sways out of its way; a heal bursts in green over its ally and the healing rises in green as the bar
+    the target sways out of its way, a critical hit's damage rises larger and in gold with a "!"; a heal bursts in green over its ally and the healing rises in green as the bar
     fills.
 
   Units keep facing the way they last struck until they walk again. The ▶▶ 2× chip plays attacks at double speed.

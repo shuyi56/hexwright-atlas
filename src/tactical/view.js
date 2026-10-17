@@ -27,14 +27,17 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    the other side there for an attack preview, its portrait, the chance the blow lands and the hit points it would
    take flashing on its health bar, then pick it again, press Enter or Strike to strike it), its ability if it has
    one (battle/abilities.js: spending MP, aimed as an attack is, or at one of its own side in green for a heal) and
-   Wait. The portrait window shows the unit's HP and MP bars and the numbers it fights with. Esc or a right-click
+   Wait. The portrait window shows only the unit's name, its HP and MP bars and the six numbers it fights with; the
+   preview, the target's HP bar as the blow would leave it, the numbers that bear on the blow, and tags for the
+   damage, the chance to hit and the chance of a critical hit. Esc or a right-click
    steps back: from a target picked to the red tiles, from the red tiles to the window, from the window to the move
    (taking the move back if it walked), from the move to no unit, and with no
    unit picked it takes back the last Wait, until anything else is done. Esc never leaves the view (← Editor does). An
    attack plays out (tactical/blow.js): the attacker turns to its target, winds up and strikes in its own frames
    (characters/roster.js), lunging in for a blow, loosing an arrow or casting a spell, and the target flashes and
    reels when it lands, then shows its health bar over its head for a moment, draining; a unit felled fades to a
-   ghost; a blow that misses shows Miss, and the target sways out of its way. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.js: a turn is
+   ghost; a blow that misses shows Miss, and the target sways out of its way; a critical hit's damage rises larger,
+   in gold. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.js: a turn is
    the player's phase and then the enemy's, each unit of the side in play moves once and acts once, and the phase
    passes when every one of them is done or End turn (T) is pressed, with a banner for each new phase. In the enemy
    phase the computer plays each enemy in turn (battle/ai.js), showing its range, walking and striking, while the
@@ -48,8 +51,8 @@ const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
-/* the colour of the number over a struck unit: damage, healing, a miss */
-const POP_INK = { hurt: '#ffd2c4', heal: '#c8f5cf', miss: '#e8e2d0' };
+/* the colour of the number over a struck unit: damage, healing, a miss, a critical hit (drawn larger) */
+const POP_INK = { hurt: '#ffd2c4', heal: '#c8f5cf', miss: '#e8e2d0', crit: '#ffe27a' };
 /* how long a phase's banner shows, and the computer's pauses between showing an enemy's range, walking, aiming and
    striking (all halved by the 2× chip); after a strike it pauses once the blow has played out, while the damage still
    shows */
@@ -214,8 +217,8 @@ const nameOf = k => { const c = ED.M.chars[k]; return characterById(c.sprite)?.n
 /* every unit as the battle takes it: the side its group in the unit data fights on (characters against enemies),
    its full hit points and MP, the numbers it fights with and its ability */
 const rosterOf = () => (ED.M.chars || []).map(c => {
-  const u = unitFor(c.sprite), { hp, mp, attack, defense, accuracy, evasion, ability } = u.stats;
-  return { side: battle.sideOfGroup(u.group), hp, mp, attack, defense, accuracy, evasion, ability: abilityOf(ability) ? ability : null };
+  const u = unitFor(c.sprite), { hp, mp, attack, defense, accuracy, evasion, crit, critDamage, ability } = u.stats;
+  return { side: battle.sideOfGroup(u.group), hp, mp, attack, defense, accuracy, evasion, crit, critDamage, ability: abilityOf(ability) ? ability : null };
 });
 /* unit k's ability id, null for none */
 const abilityIdOf = k => (TC.battle.units[k] && TC.battle.units[k].ability) || null;
@@ -289,9 +292,9 @@ function attack(a, d, act = 'attack') {
    bar fills, or Miss rises and the bar stays */
 function land(b) {
   const { a, d, r } = b; b.hit = true;
-  TC.pop = { k: d, text: !r.landed ? 'Miss' : r.heal ? `+${r.amount}` : String(r.amount), kind: !r.landed ? 'miss' : r.heal ? 'heal' : 'hurt', t: 0, from: r.from / r.max, to: r.to / r.max };
+  TC.pop = { k: d, text: !r.landed ? 'Miss' : r.heal ? `+${r.amount}` : r.critical ? `${r.amount}!` : String(r.amount), kind: !r.landed ? 'miss' : r.heal ? 'heal' : r.critical ? 'crit' : 'hurt', t: 0, from: r.from / r.max, to: r.to / r.max };
   TC.note = !r.landed ? `${nameOf(a)} misses ${nameOf(d)}` : r.heal ? `${nameOf(a)} heals ${nameOf(d)} for ${r.amount}`
-    : `${nameOf(a)} hits ${nameOf(d)} for ${r.amount}${r.fell ? `. ${nameOf(d)} falls` : ''}`;
+    : `${r.critical ? 'Critical! ' : ''}${nameOf(a)} hits ${nameOf(d)} for ${r.amount}${r.fell ? `. ${nameOf(d)} falls` : ''}`;
   panels();
 }
 /* the attack has played out: the battle's end, or play goes on */
@@ -384,8 +387,9 @@ function meter(el, v, max, hp) {
   const frac = max > 0 ? Math.max(0, Math.min(1, v / max)) : 0, bar = el.firstElementChild;
   bar.style.width = (100 * frac).toFixed(1) + '%'; bar.className = !hp || frac > 0.5 ? '' : frac > 0.25 ? 'mid' : 'low';
 }
-/* the numbers a unit fights with, as labelled cells (all four, or just those in keys) */
-const STAT_CELLS = [['attack', 'Atk', 'Attack: the damage its blows deal'], ['defense', 'Def', 'Defense: every 20 halves the damage it takes'], ['accuracy', 'Acc', 'Accuracy: its chance to hit, less the target\'s Evasion'], ['evasion', 'Eva', 'Evasion: taken off the attacker\'s Accuracy']];
+/* the numbers a unit fights with, as labelled cells (all six, or just those in keys) */
+const STAT_CELLS = [['attack', 'Atk', 'Attack: the damage its blows deal'], ['defense', 'Def', 'Defense: every 20 halves the damage it takes'], ['accuracy', 'Acc', 'Accuracy: its chance to hit, less the target\'s Evasion'],
+  ['evasion', 'Eva', 'Evasion: taken off the attacker\'s Accuracy'], ['crit', 'Crt', 'Crit: the percent of its hits that are critical'], ['critDamage', 'C.Dmg', 'Crit Damage: what a critical hit deals, as a percent of a plain one']];
 function statCells(el, st, keys) {
   el.innerHTML = STAT_CELLS.filter(([key]) => !keys || keys.includes(key)).map(([key, label, tip]) => `<div title="${esc(tip)}"><dt>${label}</dt><dd>${st[key]}</dd></div>`).join('');
 }
@@ -403,7 +407,7 @@ function panels() {
   const k = TC.sel >= 0 ? TC.sel : cur ? unitAt(cur.x, cur.y, cur.L) : -1, box = $('tcUnit');
   box.hidden = k < 0;
   if (k >= 0) {
-    const c = M.chars[k], s = characterById(c.sprite), u = unitFor(c.sprite), st = u.stats, mv = u.movement, t = turnOf(k), bu = TC.battle.units[k];
+    const c = M.chars[k], s = characterById(c.sprite), st = unitFor(c.sprite).stats, t = turnOf(k), bu = TC.battle.units[k];
     drawFace($('tcFace'), s);
     $('tcUnitName').textContent = s ? s.name : c.sprite;
     const hp = shownHp(k), max = bu ? bu.max : st.hp, mp = bu ? bu.mp : st.mp, mpMax = bu ? bu.mpMax : st.mp;
@@ -411,10 +415,6 @@ function panels() {
     meter($('tcUnitMp'), mp, mpMax); $('tcUnitMpText').textContent = `${mp}/${mpMax}`;
     $('tcUnitMp').parentElement.classList.toggle('none', !mpMax);
     statCells($('tcUnitStats'), st);
-    const ab = abilityOf(st.ability);
-    $('tcUnitInfo').textContent = `${reachText(st)}${ab ? ` · ${ab.label}` : ''}`;
-    const off = t.side !== TC.battle.phase;
-    $('tcUnitMove').textContent = `Move ${mv.move} · Jump ${mv.jump}${!hp ? ' · fallen' : off ? '' : done(k) ? ' · done' : t.moved ? ' · moved' : t.acted ? ' · acted' : TC.sel === k ? ' · ready' : ''}`;
     box.dataset.side = t.side;
   }
   /* the actions window for the picked unit */
@@ -444,15 +444,16 @@ function panels() {
   if (r) {
     drawFace($('tcAimFace'), characterById(M.chars[d].sprite));
     $('tcAimName').textContent = nameOf(d); aim.dataset.side = turnOf(d).side; aim.dataset.kind = r.heal ? 'heal' : 'harm';
-    $('tcAimDmg').textContent = r.heal ? `+${r.amount}` : `−${r.amount}`;
+    $('tcAimDmg').textContent = r.heal ? `+${r.amount}` : `−${r.amount}${r.fell ? ' KO' : ''}`; $('tcAimDmg').title = r.fell ? 'A hit fells it' : '';
     $('tcAimHit').textContent = r.heal ? 'sure' : `${r.chance}%`; $('tcAimHit').title = r.heal ? 'A heal always lands' : `${r.chance}% chance to hit`;
     $('tcAimHit').dataset.odds = r.chance >= 80 ? 'good' : r.chance >= 50 ? 'fair' : 'poor';
+    $('tcAimCrit').hidden = !r.crit; $('tcAimCrit').textContent = `✦ ${r.crit}%`;
+    $('tcAimCrit').title = `${r.crit}% chance of a critical hit for ${r.critAmount}${r.critTo === 0 && !r.fell ? ', which fells it' : ''}`;
     const bar = $('tcAimHp'), lo = Math.min(r.from, r.to) / r.max, hi = Math.max(r.from, r.to) / r.max, ds = statsOf(d);
     bar.firstElementChild.style.width = (100 * lo).toFixed(1) + '%'; bar.firstElementChild.className = (r.heal ? r.to / r.max : lo) > 0.5 ? '' : (r.heal ? r.to / r.max : lo) > 0.25 ? 'mid' : 'low';
     bar.lastElementChild.style.left = (100 * lo).toFixed(1) + '%'; bar.lastElementChild.style.width = (100 * (hi - lo)).toFixed(1) + '%';
-    $('tcAimHpText').innerHTML = `HP ${r.from}/${r.max} <i>→</i> <strong>${r.to}</strong>`;
+    $('tcAimHpText').innerHTML = `<strong>${r.to}</strong>/${r.max}`;
     statCells($('tcAimStats'), ds, r.heal ? ['attack', 'defense'] : ['defense', 'evasion']);
-    $('tcAimInfo').innerHTML = r.fell ? '<strong>Defeated if it lands</strong>' : r.cost ? `${esc(battle.actionOf(TC.battle, TC.sel, act).label)} · ${r.cost} MP` : '';
     $('tcAimGoLabel').textContent = act === 'attack' ? 'Strike' : battle.actionOf(TC.battle, TC.sel, act).label;
     $('tcAimGo').disabled = !!TC.ai;
   }
@@ -554,7 +555,7 @@ function paint() {
     g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, k);
     if (frac > 0) { g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, k); }
     const sx = Math.round(x * k + tx), sy = Math.round((head - 7 - 10 * Math.min(1, t)) * k + ty);
-    g.globalAlpha = Math.max(0, Math.min(1, 3 * (1 - t))); g.font = `700 ${Math.round(9 * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
+    g.globalAlpha = Math.max(0, Math.min(1, 3 * (1 - t))); g.font = `700 ${Math.round((TC.pop.kind === 'crit' ? 12 : 9) * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
     g.lineWidth = Math.max(2, Math.round(1.5 * k)); g.strokeStyle = '#0b1011'; g.strokeText(TC.pop.text, sx, sy); g.fillStyle = POP_INK[TC.pop.kind] || POP_INK.hurt; g.fillText(TC.pop.text, sx, sy);
     g.globalAlpha = 1; g.textAlign = 'start';
   }

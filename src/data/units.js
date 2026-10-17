@@ -1,12 +1,13 @@
 /* ================= unit data: what a character or enemy can do =================
    The roster (characters/) says how everyone looks; this says how they play: how much damage they take and deal,
-   how much of it their Defense turns aside, how surely they hit (Accuracy) and dodge (Evasion), the MP their ability
+   how much of it their Defense turns aside, how surely they hit (Accuracy) and dodge (Evasion), how often their blows
+   are critical (Crit, in percent) and for how much (Crit Damage, a percent of the damage), the MP their ability
    spends, how many tiles away they can strike, how far they move and how high they jump. Each unit is one JSON file
    under data/units/, in characters/ or enemies/, named by its id, which is the id of the sprite it plays as:
 
      data/units/enemies/goblin.json
      { "id": "goblin", "name": "Goblin",
-       "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "range": 1, "pattern": "melee", "ability": "none" },
+       "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "ability": "none" },
        "movement": { "move": 5, "jump": 2 } }
 
    How the numbers play in a fight, and what each ability does, is in src/battle/abilities.js.
@@ -32,6 +33,8 @@ const FIELDS = {
     ['defense', 'Defense', 0, 99, 2],
     ['accuracy', 'Accuracy', 0, 200, 90],
     ['evasion', 'Evasion', 0, 99, 5],
+    ['crit', 'Crit %', 0, 100, 5],
+    ['critDamage', 'Crit Damage %', 100, 400, 150],
     ['range', 'Range', 1, 8, 1]],
   movement: [
     ['move', 'Move', 1, 12, 5],

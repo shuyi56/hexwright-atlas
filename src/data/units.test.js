@@ -33,7 +33,7 @@ test('the unit files are valid and in canonical form', () => {
 test('a unit is clamped and filled out, and its faults are named', () => {
   const u = normalizeUnit({ id: 'Imp', level: 400, stats: { hp: -3, attack: 7.6, mp: 9 }, movement: { jump: 9 }, extra: 1 });
   assert.equal(u.id, 'imp'); assert.equal(u.name, 'Imp');
-  assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'mp', 'attack', 'defense', 'accuracy', 'evasion', 'range', 'pattern', 'ability']); assert.equal(u.stats.mp, 9); assert.equal(u.stats.ability, 'none'); assert.equal(u.stats.range, 1); assert.equal(u.stats.pattern, 'melee');
+  assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'mp', 'attack', 'defense', 'accuracy', 'evasion', 'crit', 'critDamage', 'range', 'pattern', 'ability']); assert.equal(u.stats.mp, 9); assert.equal(u.stats.ability, 'none'); assert.equal(u.stats.range, 1); assert.equal(u.stats.pattern, 'melee');
   assert.equal(normalizeUnit({ id: 'imp', stats: { pattern: 'Line' } }).stats.pattern, 'line');
   assert.equal(u.movement.jump, 6); assert.equal(u.movement.move, DEFAULT_UNIT.movement.move);
   assert.equal(u.level, undefined); assert.equal(u.extra, undefined);

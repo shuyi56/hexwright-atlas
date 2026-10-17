@@ -8,6 +8,8 @@
     "defense": 1,
     "accuracy": 80,
     "evasion": 5,
+    "crit": 2,
+    "critDamage": 150,
     "range": 1,
     "pattern": "melee",
     "ability": "none"

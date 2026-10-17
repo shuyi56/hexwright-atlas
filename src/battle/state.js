@@ -10,8 +10,9 @@
    villagers only, say) has its phase skipped.
 
    A blow (battle/abilities.js) is an Attack or the unit's ability: it may miss (Accuracy against the target's
-   Evasion), the target's Defense cuts its damage, and an ability spends MP, which comes back a little each phase.
-   The chance is rolled when the blow is struck; a forecast shows the odds and what a hit would do.
+   Evasion), the target's Defense cuts its damage, one that lands may be critical (the attacker's Crit) for more
+   (its Crit Damage), and an ability spends MP, which comes back a little each phase. The chances are rolled when the
+   blow is struck; a forecast shows the odds and what a hit and a critical hit would do.
 
    The battle is won when the last enemy falls and lost when the last of the player's units does; after that no one
    moves or acts. Hit points and MP belong to the battle, not the map: a new battle starts everyone full.
@@ -27,9 +28,10 @@ const OUTCOME_LABEL = { victory: 'Victory', defeat: 'Defeat' };
 const sideOfGroup = group => (group === 'enemies' ? 'enemy' : 'player');
 
 /* the numbers a unit fights with, from what the view hands in, filled where it leaves them out */
-const statsOf = u => ({ attack: u.attack ?? 0, defense: u.defense ?? 0, accuracy: u.accuracy ?? 100, evasion: u.evasion ?? 0 });
-/* a new battle for these units, by index: [{ side, hp, mp, attack, defense, accuracy, evasion, ability }] with hp
-   and mp their full hit points and MP (the unit data's stats; any left out count as none, Accuracy as 100) */
+const statsOf = u => ({ attack: u.attack ?? 0, defense: u.defense ?? 0, accuracy: u.accuracy ?? 100, evasion: u.evasion ?? 0, crit: u.crit ?? 0, critDamage: u.critDamage ?? 150 });
+/* a new battle for these units, by index: [{ side, hp, mp, attack, defense, accuracy, evasion, crit, critDamage,
+   ability }] with hp and mp their full hit points and MP (the unit data's stats; any left out count as none,
+   Accuracy as 100 and Crit Damage as 150) */
 function createBattle(units) {
   const B = { turn: 1, phase: SIDES[0], outcome: null, units: units.map(u => ({ side: u.side, hp: Math.max(0, u.hp), max: Math.max(1, u.hp), mp: Math.max(0, u.mp ?? 0), mpMax: Math.max(0, u.mp ?? 0), stats: statsOf(u), ability: u.ability || null, moved: false, acted: false })) };
   /* the sides that took the field, in turn order */
@@ -73,27 +75,31 @@ function wait(B, k) {
   B.units[k].moved = B.units[k].acted = true; return true;
 }
 /* unit a uses action `act` ('attack' or its ability's id) on unit d: a's action for the phase, and the ability's MP.
-   roll() gives a number from 0 up to 1; the blow lands when it falls under the hit chance. Returns the forecast with
-   landed (whether it hit), and to and fell as it came out (a miss leaves d's hit points as they were), or null if a
-   cannot act, has not the MP, or d is not one it can aim at. */
+   roll() gives a number from 0 up to 1, called once for whether the blow lands (it does when the number falls under
+   the hit chance; a sure blow spends no roll on it) and, if it does, once for whether it is critical (under the Crit chance). Returns the forecast
+   with landed and critical (what came of the rolls), and amount, to and fell as it came out (a miss leaves d's hit
+   points as they were), or null if a cannot act, has not the MP, or d is not one it can aim at. */
 function strike(B, a, d, act = 'attack', roll = Math.random) {
   if (!canAct(B, a)) return null;
   const r = forecast(B, a, d, act); if (!r) return null;
-  const landed = r.chance >= 100 || roll() * 100 < r.chance;
+  const landed = r.chance >= 100 || roll() * 100 < r.chance, critical = landed && r.crit > 0 && roll() * 100 < r.crit;
   B.units[a].mp -= r.cost; B.units[a].acted = true;
-  if (landed) B.units[d].hp = r.to;
+  const to = !landed ? r.from : critical ? r.critTo : r.to;
+  B.units[d].hp = to;
   B.outcome = outcomeOf(B);
-  return { ...r, landed, to: landed ? r.to : r.from, fell: landed && r.fell };
+  return { ...r, landed, critical, amount: critical ? r.critAmount : r.amount, to, fell: landed && to === 0 };
 }
-/* what unit a using action `act` on unit d would come to, without doing it: { act, heal, amount, chance, cost, from,
-   to, max, fell }, amount the hit points it takes (or restores) if it lands, chance the percent it does, cost its MP,
-   from and to d's hit points before and after a hit; or null if a has no such action or not the MP, or d is not
-   one it can aim at. The view's preview shows it before the blow is struck. */
+/* what unit a using action `act` on unit d would come to, without doing it: { act, heal, amount, chance, crit,
+   critAmount, critTo, cost, from, to, max, fell }, amount the hit points it takes (or restores) if it lands, chance
+   the percent it does, crit the percent of hits that are critical and critAmount and critTo what one takes and
+   leaves, cost its MP, from and to d's hit points before and after a plain hit, fell whether a plain hit fells it;
+   or null if a has no such action or not the MP, or d is not one it can aim at. The view's preview shows it before
+   the blow is struck. */
 function forecast(B, a, d, act = 'attack') {
   const A = actionOf(B, a, act); if (!A || !canTarget(B, a, d, act) || B.units[a].mp < A.cost) return null;
-  const t = B.units[d], from = t.hp, { amount, chance } = blowOf(A, B.units[a].stats, t.stats);
-  const to = A.heal ? Math.min(t.max, from + amount) : Math.max(0, from - amount);
-  return { act, heal: A.heal, amount: A.heal ? to - from : amount, chance, cost: A.cost, from, to, max: t.max, fell: to === 0 };
+  const t = B.units[d], from = t.hp, { amount, chance, crit, critAmount } = blowOf(A, B.units[a].stats, t.stats);
+  const to = A.heal ? Math.min(t.max, from + amount) : Math.max(0, from - amount), critTo = A.heal ? to : Math.max(0, from - critAmount);
+  return { act, heal: A.heal, amount: A.heal ? to - from : amount, chance, crit, critAmount: A.heal ? to - from : critAmount, critTo, cost: A.cost, from, to, max: t.max, fell: to === 0 };
 }
 /* 'victory' once every enemy that took the field has fallen, 'defeat' once every unit of the player's has, else null */
 function outcomeOf(B) {
