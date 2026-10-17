@@ -51,8 +51,8 @@ const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
-/* the colour of the number over a struck unit: damage, healing, a miss, a critical hit (drawn larger) */
-const POP_INK = { hurt: '#ffd2c4', heal: '#c8f5cf', miss: '#e8e2d0', crit: '#ffe27a' };
+/* the colours of the number over a struck unit, top and bottom: damage, healing, a miss, a critical hit */
+const POP_INK = { hurt: ['#fff1e8', '#ff7a52'], heal: ['#f0fff0', '#4fcf6e'], miss: ['#f0ece0', '#9c9686'], crit: ['#fffbe0', '#ffaa1c'] };
 /* how long a phase's banner shows, and the computer's pauses between showing an enemy's range, walking, aiming and
    striking (all halved by the 2× chip); after a strike it pauses once the blow has played out, while the damage still
    shows */
@@ -292,7 +292,7 @@ function attack(a, d, act = 'attack') {
    bar fills, or Miss rises and the bar stays */
 function land(b) {
   const { a, d, r } = b; b.hit = true;
-  TC.pop = { k: d, text: !r.landed ? 'Miss' : r.heal ? `+${r.amount}` : r.critical ? `${r.amount}!` : String(r.amount), kind: !r.landed ? 'miss' : r.heal ? 'heal' : r.critical ? 'crit' : 'hurt', t: 0, from: r.from / r.max, to: r.to / r.max };
+  TC.pop = { k: d, text: !r.landed ? 'Miss' : r.heal ? `+${r.amount}` : r.critical ? `${r.amount}!` : String(r.amount), kind: !r.landed ? 'miss' : r.heal ? 'heal' : r.critical ? 'crit' : 'hurt', share: r.landed ? r.amount / r.max : 0, t: 0, from: r.from / r.max, to: r.to / r.max };
   TC.note = !r.landed ? `${nameOf(a)} misses ${nameOf(d)}` : r.heal ? `${nameOf(a)} heals ${nameOf(d)} for ${r.amount}`
     : `${r.critical ? 'Critical! ' : ''}${nameOf(a)} hits ${nameOf(d)} for ${r.amount}${r.fell ? `. ${nameOf(d)} falls` : ''}`;
   panels();
@@ -439,7 +439,7 @@ function panels() {
   /* the preview: the target's portrait, the chance the blow lands, and what it would take off (or put back on) its hit
      points, flashing on its bar */
   const aim = $('tcAim'), d = TC.aim, act = TC.sel >= 0 ? actIdOf(TC.sel) : 'attack', r = d >= 0 && TC.sel >= 0 && !TC.walk && !TC.blow ? battle.forecast(TC.battle, TC.sel, d, act) : null;
-  aim.hidden = !r;
+  aim.hidden = !r; $('tcDock').classList.toggle('clash', !!r);
   $('tcAimGo').hidden = !r;
   if (r) {
     drawFace($('tcAimFace'), characterById(M.chars[d].sprite));
@@ -554,11 +554,56 @@ function paint() {
     g.fillStyle = '#0b1011'; g.fillRect(bx - k, by - k, (w + 2) * k, 3 * k);
     g.fillStyle = '#3a2a24'; g.fillRect(bx, by, w * k, k);
     if (frac > 0) { g.fillStyle = frac > 0.5 ? '#7fc35a' : frac > 0.25 ? '#e4c24a' : '#d9553f'; g.fillRect(bx, by, Math.max(1, Math.round(w * frac)) * k, k); }
-    const sx = Math.round(x * k + tx), sy = Math.round((head - 7 - 10 * Math.min(1, t)) * k + ty);
-    g.globalAlpha = Math.max(0, Math.min(1, 3 * (1 - t))); g.font = `700 ${Math.round((TC.pop.kind === 'crit' ? 12 : 9) * k)}px "Alegreya Sans", sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round';
-    g.lineWidth = Math.max(2, Math.round(1.5 * k)); g.strokeStyle = '#0b1011'; g.strokeText(TC.pop.text, sx, sy); g.fillStyle = POP_INK[TC.pop.kind] || POP_INK.hurt; g.fillText(TC.pop.text, sx, sy);
-    g.globalAlpha = 1; g.textAlign = 'start';
+    g.globalAlpha = 1; drawPop(TC.pop, x, head - 7, k, tx, ty);
   }
+}
+/* The number over a struck unit, in art pixels above its head, as the tactics games bounce theirs: each digit drops
+   in a beat after the one before, overshooting large and hopping twice as it settles, filled top to bottom in its
+   colour under a heavy ink rim, then the whole number drifts up and fades. The harder the hit against the unit's full
+   HP, the larger it is drawn. A critical hit comes larger still, in gold, shaking as it lands, with CRITICAL over it
+   and a ring of sparks flying out; healing floats up gently in green with sparkles rising round it; a miss is small
+   and grey and slides aside as it fades. */
+function drawPop(pop, x, head, k, tx, ty) {
+  const { t, kind } = pop, chars = [...pop.text], [top, bottom] = POP_INK[kind] || POP_INK.hurt;
+  const size = kind === 'miss' ? 8 : kind === 'crit' ? 13 + Math.min(3, 6 * pop.share) : 9 + Math.min(4, 8 * pop.share);
+  const out = Math.max(0, Math.min(1, (POP_TIME - t) / 0.45));
+  const rise = kind === 'heal' ? 12 * ease(Math.min(1, t / 1.3)) : 3 + 5 * Math.max(0, t - 0.5);
+  const slide = kind === 'miss' ? 7 * ease(Math.min(1, t / 1.2)) : 0;
+  g.save(); g.font = `800 ${Math.round(size * k)}px "Alegreya Sans", sans-serif`; g.textBaseline = 'alphabetic'; g.lineJoin = 'round';
+  const widths = chars.map(c => g.measureText(c).width), gap = -0.5 * k, total = widths.reduce((a, b) => a + b, 0) + gap * (chars.length - 1);
+  const baseY = (head - rise) * k + ty;
+  let cx = (x + slide) * k + tx - total / 2;
+  chars.forEach((c, i) => {
+    const ti = t - i * 0.05, w = widths[i]; if (ti < 0) { cx += w + gap; return; }
+    /* dropped in from above with two hops, and swollen at first */
+    const hop = kind === 'miss' ? 0 : -9 * Math.abs(Math.cos(ti * 8)) * Math.exp(-ti * 7) - 7 * Math.exp(-ti * 22);
+    const swell = 1 + (kind === 'crit' ? 0.9 : 0.55) * Math.exp(-ti * 10);
+    const shake = kind === 'crit' && ti < 0.4 ? Math.sin(ti * 90) * 1.6 * (1 - ti / 0.4) : 0;
+    const px = cx + w / 2 + shake * k, py = baseY + hop * k;
+    g.save(); g.translate(px, py); g.scale(swell, swell); g.globalAlpha = out * Math.min(1, ti / 0.06);
+    const fill = g.createLinearGradient(0, -size * 0.8 * k, 0, 0); fill.addColorStop(0, top); fill.addColorStop(1, bottom);
+    g.lineWidth = Math.max(3, Math.round(2.2 * k)); g.strokeStyle = '#0b1011'; g.strokeText(c, -w / 2, 0);
+    g.fillStyle = fill; g.fillText(c, -w / 2, 0);
+    g.restore();
+    cx += w + gap;
+  });
+  const dot = (ax, ay, col, a) => { g.globalAlpha = a; g.fillStyle = col; g.fillRect(Math.round(ax) * k + tx, Math.round(ay) * k + ty, k, k); };
+  if (kind === 'crit') {
+    /* CRITICAL over the number, and sparks bursting out from it */
+    const lt = Math.min(1, t / 0.12);
+    g.globalAlpha = out * lt; g.font = `800 ${Math.round(5.5 * k)}px "Alegreya Sans SC", "Alegreya Sans", sans-serif`; g.textAlign = 'center';
+    g.lineWidth = Math.max(2, Math.round(1.4 * k)); g.strokeStyle = '#0b1011'; g.strokeText('CRITICAL', (x + 0.5) * k + tx, baseY - (size + 2) * k);
+    g.fillStyle = '#ffe9a0'; g.fillText('CRITICAL', (x + 0.5) * k + tx, baseY - (size + 2) * k);
+    if (t < 0.5) for (let n = 0; n < 10; n++) {
+      const ang = (n / 10) * Math.PI * 2 + 0.3, r = 4 + 16 * ease(t / 0.5), q = 1 - t / 0.5;
+      dot(x + Math.cos(ang) * r, head - rise - size * 0.4 + Math.sin(ang) * r * 0.7, n % 2 ? '#fff4d0' : '#ffb020', q);
+    }
+  }
+  if (kind === 'heal') for (let n = 0; n < 6; n++) {
+    const q = (t * 0.9 + n / 6) % 1, sx = x - 9 + (n * 37 % 19), sy = head + 10 - 22 * q;
+    dot(sx, sy, n % 2 ? '#e6ffd8' : '#5fd77a', out * Math.sin(Math.PI * q));
+  }
+  g.restore();
 }
 /* What an attack sends through the air, drawn over the scene in art pixels: an arrow on its arc from the archer to the
    target, turned along its flight; a spell bursting over the target in the caster's colour, a flash and a ring of

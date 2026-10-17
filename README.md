@@ -392,7 +392,8 @@ with the camera gliding after the cursor and the unit on the move.
   target's own portrait window, the damage on a tag at its corner (KO if a hit fells it), the chance to hit on
   another (green, amber or rust with the odds) and the chance of a critical hit on a gold one, the target's Defense
   and Evasion, and its health bar as the blow would leave it,
-  with the hit points it would lose flashing. A crossed-swords clash between the two windows is the **Strike**
+  with the hit points it would lose flashing. While a target is picked the two windows and the clash between them move to the middle of the bottom edge, the
+  clash dead centre, and their stat cells shrink. A crossed-swords clash between the two windows is the **Strike**
   button; picking the target again or `Enter` strikes too, and `Esc` goes back to choosing. The ability (`3`) is
   aimed the same way, the button taking its name; a heal lights its reach in green, aims at your own units, and
   previews the HP it would restore. The enemy's attacks show the same preview while it aims, and an enemy spends its
@@ -405,9 +406,11 @@ with the camera gliding after the cursor and the unit on the move.
   - **Arrows and spells:** the archer looses an arrow that flies to the target on an arc. A staff sends a burst of
     sparks over the target in the caster's colour: fire for the black mage, pale light for the white mage, teal for
     the summoner.
-  - **The target:** when the blow lands it flashes white twice and reels back. Only then does the damage rise over
-    its head and its health bar drain, and a unit felled fades to a ghost. A blow that misses shows **Miss** and
-    the target sways out of its way, a critical hit's damage rises larger and in gold with a "!"; a heal bursts in green over its ally and the healing rises in green as the bar
+  - **The target:** when the blow lands it flashes white twice and reels back. Only then does the damage pop up over
+    its head, each digit dropping in a beat after the last, overshooting and hopping as it settles (larger the harder
+    the hit against its full HP), and its health bar drain, and a unit felled fades to a ghost. A blow that misses shows **Miss** and
+    the target sways out of its way, a critical hit's damage comes larger and in gold with a "!",
+    shaking as it lands under a CRITICAL label with a ring of sparks; a heal bursts in green over its ally and the healing rises in green as the bar
     fills.
 
   Units keep facing the way they last struck until they walk again. The ▶▶ 2× chip plays attacks at double speed.

@@ -269,6 +269,17 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-stats dt{font:600 10px var(--ui-sc,var(--ui));letter-spacing:.1em;text-transform:uppercase;color:var(--tc-gold)}
 .tc-stats dd{margin:0;font:700 15px/1.1 var(--ui);color:var(--tc-mark);font-variant-numeric:tabular-nums;text-shadow:0 1px 0 #000}
 .tc-menu button[hidden]{display:none}
+/* Squaring up for a blow, the two portrait windows and the clash between them stand centred along the bottom, the
+   clash in the very middle, and their stat cells shrink to stay out of the way of the field. */
+.tc-dock.clash{left:14px;align-items:stretch}
+.tc-dock.clash .tc-dock-row{display:grid;grid-template-columns:1fr auto 1fr;gap:14px}
+.tc-dock.clash #tcAim{justify-self:end}
+.tc-dock.clash #tcUnit{justify-self:start}
+.tc-dock.clash .tc-stats{grid-template-columns:repeat(3,minmax(30px,1fr));gap:2px}
+.tc-dock.clash .tc-aim .tc-stats{grid-template-columns:repeat(2,minmax(30px,1fr));max-width:70px}
+.tc-dock.clash .tc-stats div{padding:1px 2px}
+.tc-dock.clash .tc-stats dt{font-size:8px;letter-spacing:.06em}
+.tc-dock.clash .tc-stats dd{font-size:11.5px}
 #tcActAbility[data-kind=heal] .tc-ico{color:#8fe39a}
 .tc-dock .tc-unit b.tc-hit{position:absolute;top:-11px;left:14px;padding:2px 7px 3px;font:700 15px/1 var(--ui);color:#fff4d0;background:linear-gradient(#5b7d3e,#34501f);border:1px solid #e2c06e;border-radius:2px;box-shadow:0 0 0 1px #0b1011;text-shadow:0 1px 0 #000;font-variant-numeric:tabular-nums}
 .tc-dock .tc-unit b.tc-hit[data-odds=fair]{background:linear-gradient(#9a7a2c,#5e4714)}
@@ -324,7 +335,7 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 @keyframes tc-menu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes tc-phase{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.tc-win.tc-phase,.tc-menu,.tc-aim,.tc-clash,.tc-clash svg,.tc-spark{animation:none}.tc-hp-aim em{animation-duration:1.6s}}
-@media (max-width:640px){.tc-dock-row{flex-direction:column;align-items:flex-end;gap:6px}.tc-clash{flex-direction:row;align-self:flex-end;margin-right:14px}.tc-clash svg{width:46px;height:46px;padding:3px}}
+@media (max-width:640px){.tc-dock.clash .tc-dock-row{display:flex}.tc-dock-row{flex-direction:column;align-items:flex-end;gap:6px}.tc-clash{flex-direction:row;align-self:flex-end;margin-right:14px}.tc-clash svg{width:46px;height:46px;padding:3px}}
 @media (max-width:760px){.tc-keys{display:none}.tc-dock{bottom:110px}.tc-menu{font-size:18px}.tc-menu button{min-height:46px}}
 /* the town view: the tactical view's frame, a place banner on entering, and a speech window in the same slate and
    gold as the tactical view's windows, with the speaker's portrait framed like the unit's */
