@@ -3,9 +3,14 @@
   "name": "Archer",
   "stats": {
     "hp": 40,
+    "mp": 10,
     "attack": 12,
+    "defense": 3,
+    "accuracy": 100,
+    "evasion": 10,
     "range": 4,
-    "pattern": "ranged"
+    "pattern": "ranged",
+    "ability": "true"
   },
   "movement": {
     "move": 4,

@@ -3,9 +3,14 @@
   "name": "Dragoon",
   "stats": {
     "hp": 50,
+    "mp": 10,
     "attack": 14,
+    "defense": 6,
+    "accuracy": 92,
+    "evasion": 8,
     "range": 2,
-    "pattern": "line"
+    "pattern": "line",
+    "ability": "pierce"
   },
   "movement": {
     "move": 4,

@@ -3,9 +3,14 @@
   "name": "Valkyrie",
   "stats": {
     "hp": 48,
+    "mp": 12,
     "attack": 13,
+    "defense": 6,
+    "accuracy": 95,
+    "evasion": 10,
     "range": 2,
-    "pattern": "line"
+    "pattern": "line",
+    "ability": "pierce"
   },
   "movement": {
     "move": 4,

@@ -249,6 +249,33 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4v
 .tc-hp i{display:block;height:100%;background:#7fc35a}
 .tc-hp i.mid{background:#e4c24a}
 .tc-hp i.low{background:#d9553f}
+/* The portrait window's numbers: an HP and an MP bar, each labelled with what is left of the full amount (the MP bar
+   dim for a unit with none), then the four numbers a blow is worked out from in a row of cells (Attack, Defense,
+   Accuracy, Evasion), the attack's reach and ability, and the move. The attack preview shows the target's cells that
+   bear on the blow (Defense and Evasion), and the chance to hit on a tag at its top left, green, amber or rust with
+   the odds; a heal shows its tag and flashing gain in green. */
+.tc-unit-body{min-width:0}
+.tc-meters{display:flex;flex-direction:column;gap:3px;margin:5px 0 6px}
+.tc-meter{display:flex;align-items:center;gap:7px}
+.tc-meter em{flex:none;width:20px;font:600 11px var(--ui-sc,var(--ui));font-style:normal;letter-spacing:.08em;color:var(--tc-gold);text-shadow:0 1px 0 #000}
+.tc-win .tc-meter .tc-hp{width:120px;margin:0;flex:none}
+.tc-meter small{min-width:44px;font:600 12px var(--ui);color:var(--tc-text);font-variant-numeric:tabular-nums;text-shadow:0 1px 0 #000}
+.tc-meter.none{opacity:.4}
+.tc-hp.tc-mp i{background:#5d8fd0}
+.tc-stats{display:grid;grid-template-columns:repeat(4,minmax(34px,1fr));gap:3px;margin:0 0 6px}
+.tc-aim .tc-stats{grid-template-columns:repeat(2,minmax(34px,1fr));max-width:96px;margin-top:4px}
+.tc-stats div{display:flex;flex-direction:column;align-items:center;padding:2px 3px 3px;background:rgba(11,16,17,.35);border:1px solid rgba(226,192,110,.28);border-radius:2px}
+.tc-stats dt{font:600 10px var(--ui-sc,var(--ui));letter-spacing:.1em;text-transform:uppercase;color:var(--tc-gold)}
+.tc-stats dd{margin:0;font:700 15px/1.1 var(--ui);color:var(--tc-mark);font-variant-numeric:tabular-nums;text-shadow:0 1px 0 #000}
+.tc-menu button[hidden]{display:none}
+#tcActAbility[data-kind=heal] .tc-ico{color:#8fe39a}
+.tc-dock .tc-unit b.tc-hit{position:absolute;top:-11px;left:14px;padding:2px 7px 3px;font:700 15px/1 var(--ui);color:#fff4d0;background:linear-gradient(#5b7d3e,#34501f);border:1px solid #e2c06e;border-radius:2px;box-shadow:0 0 0 1px #0b1011;text-shadow:0 1px 0 #000;font-variant-numeric:tabular-nums}
+.tc-dock .tc-unit b.tc-hit[data-odds=fair]{background:linear-gradient(#9a7a2c,#5e4714)}
+.tc-dock .tc-unit b.tc-hit[data-odds=poor]{background:linear-gradient(#a64632,#6a261b)}
+.tc-dock .tc-aim[data-kind=heal] b.tc-dmg{background:linear-gradient(#4f9a5a,#25562d);box-shadow:0 0 0 1px #0b1011,0 0 12px rgba(127,195,90,.55)}
+.tc-aim[data-kind=heal] .tc-hp-aim em{animation-name:tc-flash-heal}
+.tc-aim[data-kind=heal] #tcAimHpText strong{color:#a6e88f}
+@keyframes tc-flash-heal{from{background:#4f9a5a;box-shadow:none}to{background:#e6ffd8;box-shadow:0 0 6px rgba(200,245,207,.8)}}
 #tcFace,#tcAimFace{width:72px;height:72px;image-rendering:pixelated;background:#1a1815;border:1px solid #e2c06e;box-shadow:0 0 0 1px #0b1011,inset 0 0 0 1px rgba(0,0,0,.4)}
 /* The attack preview is a second portrait window, built as the attacker's is, standing just left of it with a clash
    between them: the target's portrait and name, the damage on a tag at its corner, and its health bar as the blow

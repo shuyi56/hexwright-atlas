@@ -3,9 +3,14 @@
   "name": "Black Mage",
   "stats": {
     "hp": 30,
+    "mp": 30,
     "attack": 4,
+    "defense": 1,
+    "accuracy": 95,
+    "evasion": 4,
     "range": 3,
-    "pattern": "ranged"
+    "pattern": "ranged",
+    "ability": "spell"
   },
   "movement": {
     "move": 3,

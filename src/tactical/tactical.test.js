@@ -235,6 +235,12 @@ test('the target flashes twice and reels when the blow lands, and fades to a gho
     assert.ok(Math.abs(blowAt(p, p.end).alpha - (fell ? GHOST : 1)) < 1e-9, `fell ${fell}`);
   }
 });
+test('a miss neither flashes nor sparks: the target sways out of the way and stands again', () => {
+  const p = blowPlan({ kind: 'swing', ranged: null }, 1, true, true);
+  assert.ok(p.missed && !p.fell, 'a miss fells no one');
+  assert.ok(sample(p, s => !s.flash && s.spark === null && s.alpha === 1).every(([, v]) => v));
+  assert.ok(blowAt(p, p.impact).knock > 0, 'swaying back as the blow arrives'); assert.equal(blowAt(p, p.end).knock, 0);
+});
 test('a unit turns to face its target the way a walk would face it', () => {
   FACE_DELTA.forEach((d, f) => { assert.equal(faceToward([5, 5], [5 + d[0], 5 + d[1]]), f); assert.equal(faceToward([5, 5], [5 + 3 * d[0], 5 + 3 * d[1] + (d[0] ? 1 : 0)]), f); });
 });

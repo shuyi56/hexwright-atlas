@@ -3,9 +3,14 @@
   "name": "Thief",
   "stats": {
     "hp": 36,
+    "mp": 8,
     "attack": 9,
+    "defense": 3,
+    "accuracy": 100,
+    "evasion": 22,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "true"
   },
   "movement": {
     "move": 5,

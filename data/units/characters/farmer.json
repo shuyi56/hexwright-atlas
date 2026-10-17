@@ -3,9 +3,14 @@
   "name": "Farmer",
   "stats": {
     "hp": 28,
+    "mp": 0,
     "attack": 6,
+    "defense": 2,
+    "accuracy": 85,
+    "evasion": 5,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "none"
   },
   "movement": {
     "move": 4,

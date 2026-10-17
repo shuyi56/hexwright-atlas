@@ -3,9 +3,14 @@
   "name": "Wolf",
   "stats": {
     "hp": 32,
+    "mp": 0,
     "attack": 11,
+    "defense": 2,
+    "accuracy": 92,
+    "evasion": 20,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "none"
   },
   "movement": {
     "move": 7,

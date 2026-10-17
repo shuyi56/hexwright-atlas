@@ -3,9 +3,14 @@
   "name": "Slime",
   "stats": {
     "hp": 44,
+    "mp": 0,
     "attack": 6,
+    "defense": 10,
+    "accuracy": 80,
+    "evasion": 0,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "none"
   },
   "movement": {
     "move": 3,

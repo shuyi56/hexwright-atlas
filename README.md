@@ -310,17 +310,45 @@ data/units/
   enemies/     bandit.json  goblin.json  orc.json  skeleton.json  slime.json  wolf.json
 ```
 
-A file is named by the unit's id, which is the id of the sprite it plays as, and holds its name, HP, Attack, Range
-(how many tiles away it can strike), movement (Move: tiles a turn; Jump: height levels a step can climb or drop). `src/data/units.js`
-defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite with no file, such
-as a custom character from the maker, plays with the defaults. The tactical view moves units by their Move and
-Jump and shows their HP, Attack and Range; adding a field means adding a line to `FIELDS` there.
+A file is named by the unit's id, which is the id of the sprite it plays as, and holds its name, its stats and its
+movement (Move: tiles a turn; Jump: height levels a step can climb or drop). The stats:
+
+| Stat | What it does |
+| --- | --- |
+| HP | Hit points; at 0 the unit falls. |
+| MP | Mana, spent by the unit's ability. Every unit gets 2 MP back as its side's phase begins, up to its full MP. |
+| Attack | The power of its blows. |
+| Defense | Cuts the damage it takes: damage = power × 20 / (20 + Defense), rounded, at least 1. Every 20 Defense halves it. |
+| Accuracy, Evasion | The chance a blow lands is the attacker's Accuracy minus the target's Evasion, in percent, kept between 5 and 100. |
+| Range, Pattern | How far away and which tiles it can strike (melee, line or ranged). |
+| Ability | What it can spend MP on, if anything (below). |
+
+| Ability | MP | What it does |
+| --- | --- | --- |
+| Power Strike | 6 | 1.5× the Attack. |
+| True Strike | 4 | A plain blow that never misses. |
+| Pierce | 5 | Ignores the target's Defense. |
+| Spell | 8 | 2× the Attack, through half the target's Defense. |
+| Heal | 6 | Restores 8 + 2 × Attack HP to an ally in reach, up to its full HP; never misses. |
+
+An ability reaches the same tiles as the unit's attack. Knights, squires, guards, monks and the smith carry Power
+Strike; dragoons, valkyries and elven wardens Pierce; archers, rangers and the thief True Strike; the black mage,
+summoner and elven sage Spell; the white mage, healer, alchemist and elven lady Heal. Of the enemies, bandits and the
+orc have Power Strike and the dark elf Pierce; goblins, wolves, skeletons and slimes have none. Armoured units
+(knight, orc, slime) stand on Defense, quick ones (thief, wolf, dark elf, goblin) on Evasion.
+
+`src/data/units.js` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
+with no file, such as a custom character from the maker, plays with the defaults. `src/battle/abilities.js` holds
+the formulas and the abilities. Adding a number means adding a line to `FIELDS`; adding an ability, a line to
+`ABILITIES`.
 
 **Unit data** in the module rail opens `units.html`, an editor for these files:
 
 - **Cards:** the list of units down the side, filterable, and a card for the picked one: its sprite walking (turn
-  it with ⟲ ⟳), name and group, and HP, Attack, Range, Move and Jump listed on the right, each with a bar against the strongest unit.
-  Changed values are outlined in brass.
+  it with ⟲ ⟳), name and group, and every number listed on the right, each with a bar against the strongest unit.
+  Below them the attack pattern, and the ability: pick one, see its MP cost, what it does, how many uses the unit's
+  MP holds, and how the unit's blows fare against the other side on average (damage dealt and taken, chance to hit
+  and to dodge). Changed values are outlined in brass.
 - **Table:** everyone in one sortable grid for balancing numbers side by side, every cell editable.
 - **Saving:** changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes the
   files through the Hexwright bridge: `PUT` and `DELETE /__hexwright/units/<group>/<id>`, `GET /__hexwright/units`.
@@ -345,7 +373,7 @@ with the camera gliding after the cursor and the unit on the move.
   walker still on screen while the ground scrolls under it. Moves are map edits, on the editor's undo stack.
 - **Turns:** a battle runs in turns, each a **player phase** and then an **enemy phase**. The player's side is the
   [unit data](#unit-data)'s characters, the enemy's its enemies. In a phase each unit of that side still standing
-  moves once and acts once (Attack, or Wait to give up both); the phase passes on when every one of them is done, or
+  moves once and acts once (Attack, its ability, or Wait to give up both); the phase passes on when every one of them is done, or
   at once with **End turn** (`T`). A banner names each new phase and the turn and phase stay in the top bar. In the
   enemy phase the computer plays each enemy in turn: it shows the enemy's range, walks it to where it can strike the
   weakest foe in reach (or as close to the nearest one as it can get, round anything it cannot climb), and strikes;
@@ -353,12 +381,17 @@ with the camera gliding after the cursor and the unit on the move.
   when the view opened, at full HP, on the player's turn 1 (one map edit, undoable in the editor). Mid-battle it
   asks first: the chip turns to **Restart?** for three seconds and a second press restarts. The actions window opens large, stacked
   on top of the unit's portrait in the bottom corner: a command list naming the unit, each action with an icon and
-  what it does (move range, attack power and pattern) or why it is spent. Both windows share a stone-and-gold frame. **Attack** lights the
+  what it does (move range, attack power and pattern, the ability's MP cost and effect) or why it is spent (already
+  acted, not enough MP). Both windows share a stone-and-gold frame. The portrait window shows the unit's HP and MP
+  bars and a row of its Attack, Defense, Accuracy and Evasion. **Attack** lights the
   red tiles it reaches; picking a foe there opens an **attack preview** in the same row as the unit's portrait: the
-  target's own portrait window, the damage on a tag at its corner, and its health bar as the blow would leave it,
+  target's own portrait window, the damage on a tag at its corner and the chance to hit on another (green, amber or
+  rust with the odds), the target's Defense and Evasion, and its health bar as the blow would leave it,
   with the hit points it would lose flashing. A crossed-swords clash between the two windows is the **Strike**
-  button; picking the target again or `Enter` strikes too, and `Esc` goes back to choosing. The enemy's attacks show
-  the same preview while it aims. The battle is won when the last enemy falls
+  button; picking the target again or `Enter` strikes too, and `Esc` goes back to choosing. The ability (`3`) is
+  aimed the same way, the button taking its name; a heal lights its reach in green, aims at your own units, and
+  previews the HP it would restore. The enemy's attacks show the same preview while it aims, and an enemy spends its
+  ability whenever it has the MP. Whether a blow lands is rolled when it is struck. The battle is won when the last enemy falls
   and lost when the last of yours does. A side with no units on the map has its phase skipped, and on a map of
   enemies only they are yours to move.
 - **Attacks:** an attack plays out in the attacker's own frames, and the controls wait until it has.
@@ -368,7 +401,9 @@ with the camera gliding after the cursor and the unit on the move.
     sparks over the target in the caster's colour: fire for the black mage, pale light for the white mage, teal for
     the summoner.
   - **The target:** when the blow lands it flashes white twice and reels back. Only then does the damage rise over
-    its head and its health bar drain, and a unit felled fades to a ghost.
+    its head and its health bar drain, and a unit felled fades to a ghost. A blow that misses shows **Miss** and
+    the target sways out of its way; a heal bursts in green over its ally and the healing rises in green as the bar
+    fills.
 
   Units keep facing the way they last struck until they walk again. The ▶▶ 2× chip plays attacks at double speed.
 - **Camera:** the arrow keys or `WASD` step the cursor along the grid and the camera keeps it in view. Drag to
@@ -430,6 +465,8 @@ frames of an animated ground, then a left and right face two levels deep), with 
 `docs/images/tactical-tiles.json`. The sheet also shows every designed building, tree and plant.
 
 ![The tactical view](docs/images/tactical-view.png)
+
+![A Power Strike preview: the orc's chance to be hit and the damage, beside the squire's HP, MP and stats](docs/images/tactical-battle.png)
 
 ![Attacks in the tactical view: a wind-up, a blow landing, an arrow in flight and a spell](docs/images/tactical-attack.png)
 
@@ -736,7 +773,7 @@ src/
                       them on the map, the sprite sheet layout and its pixel font
   data/               Unit data: the fields and ranges of a unit's stats, and the registry the game reads
   units/              The unit data page (units.html)
-  battle/             The battle in the tactical view: sides, hit points, turns and the player and enemy phases
+  battle/             The battle in the tactical view: sides, hit points and MP, blows and abilities, turns and the player and enemy phases
                       (state.js), and how the computer plays an enemy (ai.js); pure, no DOM
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen

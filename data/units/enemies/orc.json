@@ -3,9 +3,14 @@
   "name": "Orc",
   "stats": {
     "hp": 66,
+    "mp": 8,
     "attack": 15,
+    "defense": 7,
+    "accuracy": 82,
+    "evasion": 2,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "power"
   },
   "movement": {
     "move": 4,

@@ -118,3 +118,15 @@
 .ub-grid rect.me,.ub-grid-sm rect.me{fill:#2c3a3c}
 .ub-grid circle,.ub-grid-sm circle{fill:#e4c684}
 .ub-pattern.changed .ub-section{color:var(--brass-2)}
+/* the ability section: the ability to pick with its MP cost, what it does, and how the unit's blows play against the
+   other side on average */
+.ub-ability{display:flex;flex-direction:column;gap:8px}
+.ub-ability.changed .ub-section{color:var(--brass-2)}
+.ub-ability-body{display:flex;flex-direction:column;gap:6px}
+.ub-ability-body p{margin:0;font:500 14px/1.4 var(--ui);color:var(--vellum)}
+.ub-ability-body p.ub-dim{font-size:13px}
+.ub-ability-pick{display:flex;align-items:center;gap:10px}
+.ub-ability-pick select{background:var(--table);border:1px solid var(--line);border-radius:3px;color:var(--vellum);font:500 14px var(--ui);padding:5px 8px}
+.ub-ability.changed select{border-color:var(--brass);color:var(--brass-2)}
+.ub-cost{font:600 13px var(--ui);color:#9cc0f0}
+.ub-warn{color:#e6a08e;font-weight:600}

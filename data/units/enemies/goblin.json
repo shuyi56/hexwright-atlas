@@ -3,9 +3,14 @@
   "name": "Goblin",
   "stats": {
     "hp": 22,
+    "mp": 0,
     "attack": 7,
+    "defense": 2,
+    "accuracy": 85,
+    "evasion": 15,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "none"
   },
   "movement": {
     "move": 5,

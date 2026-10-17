@@ -3,9 +3,14 @@
   "name": "Elf Sage",
   "stats": {
     "hp": 32,
+    "mp": 28,
     "attack": 5,
+    "defense": 2,
+    "accuracy": 95,
+    "evasion": 6,
     "range": 3,
-    "pattern": "ranged"
+    "pattern": "ranged",
+    "ability": "spell"
   },
   "movement": {
     "move": 3,
