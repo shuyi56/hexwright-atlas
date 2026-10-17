@@ -7,7 +7,7 @@ import { TOWNSFOLK } from '../characters/townsfolk.js';
 import { ED, LEVEL_NAME, characterBoxes, closeEditor, doWalk, enterInterior, ensureModel, fitView, leaveInterior, mutate, openEditor, pick, rebuild, redo, replaceModel, req, runStroke, setRot, setTab, setTool, setLevel, syncBrush, syncPalette, toView, undo, zoomAt } from './editor.js';
 import { BIOMES, generateScene } from './generate.js';
 import { addInterior, canHaveInterior, doorways } from './interiors.js';
-import { MAX_ELEV, MAX_LEVEL, STOREY, TI, blankModel, floorAt, fromJSON, levelOf, objAt, toJSON } from './model.js';
+import { MAX_ELEV, MAX_LEVEL, STOREY, TI, blankModel, floorAt, fromJSON, levelOf, objAt, toJSON } from './model.ts';
 import { brushTiles, eraseAt, floodFill, inb, paintTiles, placePiece, rectTiles, removeFloor, setElev, shiftElev } from './ops.js';
 import { SZ, renderTiles } from './render.js';
 import { charAt, findPath, placeChar } from './walk.js';

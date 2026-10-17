@@ -39,3 +39,6 @@
   #stage{max-width:100%}
   .sk-stage{position:static}
 }
+.sk-effects{display:grid;gap:8px}
+.sk-effects .sk-presets{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.sk-effects .sk-presets button .sk-hint{font-size:12px;opacity:.75}

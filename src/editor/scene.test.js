@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { fromJSON } from './model.js';
+import { fromJSON } from './model.ts';
 import { setElev } from './ops.js';
 import { findPath, stairsAt, walkChar } from './walk.js';
 

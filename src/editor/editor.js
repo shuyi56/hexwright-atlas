@@ -7,7 +7,7 @@ import { ASSET_BY_ID, ASSET_CATEGORIES, ASSET_GROUPS, TERRAIN, drawAsset, footpr
 import { $, coarse, state } from '../ui/state.js';
 import { BIOMES, generateScene } from './generate.js';
 import { addInterior, canHaveInterior, makeInterior } from './interiors.js';
-import { MAX_ELEV, MAX_LEVEL, blankModel, floorAt, levelOf, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
+import { MAX_ELEV, MAX_LEVEL, blankModel, floorAt, levelOf, cloneModel, fits, fromJSON, objAt, toJSON } from './model.ts';
 import { brushTiles as brushAt, eraseAt, floodFill, paintTiles, placePiece, removeFloor, setElev, shiftElev } from './ops.js';
 import { EL, SZ, THH, TWH, frontMask, renderTiles, rotInst, thumb, updateTiles } from './render.js';
 import { blockedBy, charAt, eraseCharAt, findPath, placeChar, reachable, stairsAt, walkChar, walkGoal } from './walk.js';

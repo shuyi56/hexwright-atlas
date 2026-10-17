@@ -1,6 +1,6 @@
 import { fbm, hashStr, makeNoise, mulberry32 } from '../core/random.js';
 import { TERRAIN, footprint } from '../tiles/index.js';
-import { MAX_ELEV, TI, blankModel, fits } from './model.js';
+import { MAX_ELEV, TI, blankModel, fits } from './model.ts';
 
 /* ================= tile editor: procedural scenes =================
    Builds a starting map from the shared tile set: terrain from layered noise, a settlement

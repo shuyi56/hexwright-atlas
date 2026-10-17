@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { wallLinks } from '../tiles/index.js';
-import { blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.js';
+import { blankModel, cloneModel, fits, fromJSON, objAt, toJSON } from './model.ts';
 import { eraseAt, floodFill, paintTiles, placePiece, rectTiles, removeFloor } from './ops.js';
 import { findPath, placeChar, walkChar, walkGoal } from './walk.js';
 

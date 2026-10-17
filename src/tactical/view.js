@@ -2,21 +2,21 @@ import { characterById } from '../characters/library.js';
 import { FACES } from '../characters/draw.js';
 import { WALK, attackOf } from '../characters/roster.js';
 import { ED, LEVEL_NAME, mutate, undo } from '../editor/editor.js';
-import { MAX_LEVEL, levelOf } from '../editor/model.js';
+import { MAX_LEVEL, levelOf } from '../editor/model.ts';
 import { walkChar } from '../editor/walk.js';
 import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
 import { $, state } from '../ui/state.js';
 import { moveRange, placeId, routeTo } from './move.js';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
-import { onSkillsChange } from '../data/skills.js';
-import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
+import { onSkillsChange } from '../data/skills.ts';
+import { PATTERNS, onUnitsChange, unitFor } from '../data/units.ts';
 import { attackReach } from './attack.js';
 import { blowAt, blowPlan, faceToward } from './blow.js';
 import { abilityFx, createFx, drawFx, emit, stepFx } from './particles.js';
 import { planTurn } from '../battle/ai.js';
-import { abilityOf } from '../battle/abilities.js';
-import * as battle from '../battle/state.js';
+import { abilityOf } from '../battle/abilities.ts';
+import * as battle from '../battle/state.ts';
 import { drawScene, figureHeight, figureHit, portrait } from './render.js';
 import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 
@@ -29,7 +29,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    top of its portrait, as in the tactics games: Move, Attack (its pattern and range light up in red; pick a unit of
    the other side there for an attack preview, its portrait, the chance the blow lands and the hit points it would
    take flashing on its health bar, then pick it again, press Enter or Strike to strike it), its ability if it has
-   one (battle/abilities.js: spending MP, aimed as an attack is, or at one of its own side in green for a heal) and
+   one (battle/abilities.ts: spending MP, aimed as an attack is, or at one of its own side in green for a heal) and
    Wait. The portrait window shows only the unit's name, its HP and MP bars and the six numbers it fights with; the
    preview, the target's HP bar as the blow would leave it, the numbers that bear on the blow, and tags for the
    damage, the chance to hit and the chance of a critical hit. Esc or a right-click
@@ -41,7 +41,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    reels when it lands, then shows its health bar over its head for a moment, draining; a unit felled fades to a
    ghost; a blow that misses shows Miss, and the target sways out of its way; a critical hit's damage rises larger,
    in gold. An ability brings its own particles (tactical/particles.js): they gather on the user as it winds up and
-   burst over the target as the blow lands. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.js: a turn is
+   burst over the target as the blow lands. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.ts: a turn is
    the player's phase and then the enemy's, each unit of the side in play moves once and acts once, and the phase
    passes when every one of them is done or End turn (T) is pressed, with a banner for each new phase. In the enemy
    phase the computer plays each enemy in turn (battle/ai.js), showing its range, walking and striking, while the
@@ -51,7 +51,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 /* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
    what an overlay changes */
-const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, aim: -1, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, fx: createFx(), note: '', walk: null, blow: null, turned: new Map(), fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, skill: null, aim: -1, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, fx: createFx(), note: '', walk: null, blow: null, turned: new Map(), fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
@@ -170,22 +170,42 @@ function select(k) {
   }
   panels();
 }
-/* the picked unit's action: 'move' lights its move range, 'attack' what its attack reaches, 'ability' what its
-   ability reaches (if it has one and the MP for it), null none; choosing one shuts the actions window */
-function setMode(m) {
+/* the picked unit's action: 'move' lights its move range, 'attack' what its attack reaches, 'ability' what the
+   ability `id` reaches (one of its own, off its cooldown, with the MP for it), null none; choosing one shuts the
+   actions window */
+function setMode(m, id = m === 'ability' ? TC.skill : null) {
   const k = TC.sel;
   if (k < 0 || (m === 'move' && !battle.canMove(TC.battle, k)) || (m === 'attack' && !battle.canAct(TC.battle, k))
-    || (m === 'ability' && !(battle.canAct(TC.battle, k) && abilityIdOf(k) && battle.canAfford(TC.battle, k, abilityIdOf(k))))) m = null;
+    || (m === 'ability' && !(battle.canAct(TC.battle, k) && id && battle.actionOf(TC.battle, k, id) && battle.canUse(TC.battle, k, id)))) m = null;
   if (m) TC.menu = false;
+  TC.skill = m === 'ability' ? id : null;
   TC.mode = m; TC.aim = -1; TC.range = m === 'move' ? rangeOf(k) : null; TC.reach = m === 'attack' || m === 'ability' ? reachOf(k, actIdOf(k)) : null; TC.dirty = true;
   panels();
 }
-/* the action the picked unit is aiming: its ability in the 'ability' mode, else its attack */
-const actIdOf = k => (TC.mode === 'ability' && k === TC.sel && abilityIdOf(k)) || 'attack';
+/* the action the picked unit is aiming: the ability picked in the 'ability' mode, else its attack */
+const actIdOf = k => (TC.mode === 'ability' && k === TC.sel && TC.skill) || 'attack';
 const actOf = k => battle.actionOf(TC.battle, k, actIdOf(k)) || battle.actionOf(TC.battle, k);
 const aiming = () => TC.mode === 'attack' || TC.mode === 'ability';
-/* open the picked unit's actions window, with nothing lit until an action is chosen */
-function openMenu() { if (TC.sel < 0 || !battle.ready(TC.battle, TC.sel)) return; TC.menu = true; setMode(null); }
+/* open the picked unit's actions window, with nothing lit until an action is chosen: 'main' (Move, Actions,
+   Spells, Wait), or one of its submenus, 'actions' (the attack and the techniques) or 'spells' (the magic) */
+function openMenu(sub = 'main') {
+  if (TC.sel < 0 || !battle.ready(TC.battle, TC.sel)) return;
+  if (sub !== 'main' && !(battle.canAct(TC.battle, TC.sel) && menuItems(TC.sel, sub).length)) return;
+  setMode(null); TC.menu = sub; panels();
+}
+/* what a submenu lists for unit k: its attack (in Actions) and each of its abilities filed under that menu, with
+   whether it can be used now and a line on it */
+function menuItems(k, sub) {
+  const B = TC.battle, st = statsOf(k), canAct = battle.canAct(B, k);
+  return battle.actionsOf(B, k).filter(a => a.menu === sub).map(a => {
+    if (a.id === 'attack') return { id: a.id, label: a.label, kind: 'harm', ok: canAct, info: canAct ? `${st.attack} power · ${reachText(st)}` : 'Already acted' };
+    const rest = battle.cooldownLeft(B, k, a.id), afford = battle.canAfford(B, k, a.id);
+    return { id: a.id, label: a.label, kind: a.heal ? 'heal' : 'harm', ok: canAct && afford && !rest,
+      info: !canAct ? 'Already acted' : !afford ? `Needs ${a.cost} MP · has ${B.units[k].mp}` : rest ? `Ready in ${rest} turn${rest === 1 ? '' : 's'}` : `${a.cost} MP${a.cooldown ? ` · ${a.cooldown}-turn cooldown` : ''} · ${a.note}` };
+  });
+}
+/* pick an item of the open submenu: the attack, or an ability */
+function pickItem(id) { if (busy()) return; if (id === 'attack') setMode('attack'); else setMode('ability', id); }
 /* the walk unit k just made can still be taken back: nothing else has been done to the map since */
 const canUndoMove = k => !!TC.from && TC.from.k === k && turnOf(k).moved && !turnOf(k).acted && ED.undo[ED.undo.length - 1] === TC.from.snap;
 /* put the picked unit back where it stood before its walk, ready to move again */
@@ -199,7 +219,8 @@ function back() {
   if (busy()) return true;
   const k = TC.sel; if (k < 0) return rewindWait();
   if (aiming() && TC.aim >= 0) { TC.aim = -1; panels(); }
-  else if (aiming()) openMenu();
+  else if (aiming()) openMenu(TC.mode === 'ability' ? actOf(k).menu : 'actions');
+  else if (TC.menu && TC.menu !== 'main') openMenu();
   else if (TC.menu && !turnOf(k).moved) { TC.menu = false; setMode('move'); }
   else if (!(TC.menu && undoMove())) select(-1);
   return true;
@@ -218,17 +239,15 @@ onUnitsChange(retune);
 onSkillsChange(retune);
 const unitAt = (x, y, L) => (ED.M.chars || []).findIndex(c => c.x === x && c.y === y && levelOf(c) === L);
 
-/* ---------- the battle (battle/state.js): sides, hit points, the turn and whose phase it is ---------- */
+/* ---------- the battle (battle/state.ts): sides, hit points, the turn and whose phase it is ---------- */
 const statsOf = k => unitFor(ED.M.chars[k].sprite).stats;
 const nameOf = k => { const c = ED.M.chars[k]; return characterById(c.sprite)?.name || c.sprite; };
 /* every unit as the battle takes it: the side its group in the unit data fights on (characters against enemies),
    its full hit points and MP, the numbers it fights with and its ability */
 const rosterOf = () => (ED.M.chars || []).map(c => {
-  const u = unitFor(c.sprite), { hp, mp, attack, defense, accuracy, evasion, crit, critDamage, ability } = u.stats;
-  return { side: battle.sideOfGroup(u.group), hp, mp, attack, defense, accuracy, evasion, crit, critDamage, ability: abilityOf(ability) ? ability : null };
+  const u = unitFor(c.sprite), { hp, mp, attack, defense, accuracy, evasion, crit, critDamage, abilities } = u.stats;
+  return { side: u.side, hp, mp, attack, defense, accuracy, evasion, crit, critDamage, abilities: abilities.filter(id => abilityOf(id)) };
 });
-/* unit k's ability id, null for none */
-const abilityIdOf = k => (TC.battle.units[k] && TC.battle.units[k].ability) || null;
 const hpOf = k => TC.battle.units[k].hp;
 /* the hit points a unit shows: the battle has them already lowered by a blow still on its way */
 const shownHp = k => (TC.blow && !TC.blow.hit && TC.blow.d === k ? TC.blow.r.from : hpOf(k));
@@ -347,7 +366,7 @@ function aiStep(dt) {
   A.t -= dt * (TC.fast ? 2 : 1); if (A.t > 0) return;
   const B = TC.battle, k = A.k;
   if (A.step === 'pick') {
-    setMode(null); battle.spend(B, k, 'moved');
+    setMode(null); battle.spend(B, k, 'moved', A.plan.path);
     if (A.plan.path.length) startWalk(k, A.plan.path);
     TC.from = null; A.step = 'arrive'; A.t = 0; return;
   }
@@ -355,9 +374,10 @@ function aiStep(dt) {
     /* strike the foe it planned for, or any other its attack now reaches */
     const targets = reachOf(k).targets, d = targets.includes(A.plan.target) ? A.plan.target : targets.length ? targets[0] : -1;
     if (d < 0) { battle.wait(B, k); TC.note = `${nameOf(k)} waits`; select(-1); A.step = null; A.t = AI_PAUSE.stay; panels(); return; }
-    /* its ability when it does harm and it has the MP for it, else a plain attack */
-    const ab = abilityOf(abilityIdOf(k)); A.act = ab && !ab.heal && battle.canAfford(B, k, ab.id) ? ab.id : 'attack';
-    setMode(A.act === 'attack' ? 'attack' : 'ability'); TC.aim = d; const c = ED.M.chars[d]; setCursor(c.x, c.y, levelOf(c));
+    /* of the blows it can strike now, the one that does the most harm on average, a plain attack when none beats it */
+    const worth = id => { const f = battle.forecast(B, k, d, id); return f && !f.heal ? f.amount * f.chance : -1; };
+    A.act = battle.actionsOf(B, k).filter(a => !a.heal && battle.canUse(B, k, a.id)).reduce((best, a) => (worth(a.id) > worth(best) ? a.id : best), 'attack');
+    setMode(A.act === 'attack' ? 'attack' : 'ability', A.act); TC.aim = d; const c = ED.M.chars[d]; setCursor(c.x, c.y, levelOf(c));
     A.target = d; A.step = 'aim'; A.t = AI_PAUSE.aim; return;
   }
   if (A.step === 'aim') { const a = k, d = A.target; A.step = null; A.t = AI_PAUSE.after; select(-1); attack(a, d, A.act); return; }
@@ -388,7 +408,7 @@ function act(x, y, L) {
   if (TC.mode === 'move') {
     if (u === k) { openMenu(); return; }
     const path = routeTo(TC.range, placeId(ED.M, x, y, L));
-    if (path && path.length) { if (startWalk(k, path)) battle.spend(TC.battle, k, 'moved'); } else select(-1);
+    if (path && path.length) { if (startWalk(k, path)) battle.spend(TC.battle, k, 'moved', path); } else select(-1);
   }
   /* off the red tiles, back to the actions window; with the window open a stray click leaves it be */
   else if (aiming()) openMenu();
@@ -412,6 +432,8 @@ const STAT_CELLS = [['attack', 'Atk', 'Attack: the damage its blows deal'], ['de
 function statCells(el, st, keys) {
   el.innerHTML = STAT_CELLS.filter(([key]) => !keys || keys.includes(key)).map(([key, label, tip]) => `<div title="${esc(tip)}"><dt>${label}</dt><dd>${st[key]}</dd></div>`).join('');
 }
+/* the icons of the submenu items: the sword for the attack, the star for a skill */
+const SWORD = $('tcActActions').querySelector('svg').outerHTML, STAR = $('tcActSpells').querySelector('svg').outerHTML;
 const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 /* a unit's attack pattern and range in words: Melee, Line 2, Ranged 4 */
 const reachText = st => { const pat = (PATTERNS.find(([id]) => id === st.pattern) || PATTERNS[0])[1]; return st.pattern === 'melee' ? pat : `${pat} ${st.range}`; };
@@ -441,19 +463,24 @@ function panels() {
   menu.hidden = !t || !TC.menu || busy();
   if (t) {
     const canMove = battle.canMove(TC.battle, TC.sel), canAct = battle.canAct(TC.battle, TC.sel), c = M.chars[TC.sel], s = characterById(c.sprite), u = unitFor(c.sprite), st = u.stats, mv = u.movement;
-    const abId = abilityIdOf(TC.sel), ab = abilityOf(abId), afford = !!ab && battle.canAfford(TC.battle, TC.sel, abId);
-    $('tcActMove').disabled = !canMove; $('tcActAttack').disabled = !canAct;
-    $('tcActAbility').hidden = !ab; $('tcActAbility').disabled = !canAct || !afford;
-    $('tcMenuWho').textContent = s ? s.name : c.sprite;
+    const acts = menuItems(TC.sel, 'actions'), spells = menuItems(TC.sel, 'spells'), sub = TC.menu === 'actions' || TC.menu === 'spells' ? TC.menu : null;
+    $('tcMenuWho').textContent = s ? s.name : c.sprite; $('tcMenuHead').textContent = sub === 'actions' ? 'Actions' : sub === 'spells' ? 'Spells' : 'Command';
+    for (const id of ['tcActMove', 'tcActActions', 'tcActSpells', 'tcActWait']) $(id).hidden = !!sub;
+    $('tcActSpells').hidden = !!sub || !spells.length;
+    $('tcActMove').disabled = !canMove; $('tcActActions').disabled = !canAct; $('tcActSpells').disabled = !canAct;
     $('tcActMoveInfo').textContent = canMove ? `Up to ${mv.move} tiles · jump ${mv.jump}` : 'Already moved';
-    $('tcActAttackInfo').textContent = canAct ? `${st.attack} power · ${reachText(st)}` : 'Already acted';
-    if (ab) {
-      $('tcActAbilityName').textContent = ab.label;
-      $('tcActAbilityInfo').textContent = !canAct ? 'Already acted' : !afford ? `Needs ${ab.cost} MP · has ${TC.battle.units[TC.sel].mp}` : `${ab.cost} MP · ${ab.note}`;
-      $('tcActAbility').dataset.kind = ab.heal ? 'heal' : 'harm';
-    }
+    const count = (list, one, many) => `${list.length} ${list.length === 1 ? one : many}${list.some(i => i.ok) ? '' : ', none ready'}`;
+    $('tcActActionsInfo').textContent = canAct ? (acts.length > 1 ? `Attack and ${count(acts.slice(1), 'technique', 'techniques')}` : `Attack · ${st.attack} power`) : 'Already acted';
+    $('tcActSpellsInfo').textContent = canAct ? count(spells, 'spell', 'spells') : 'Already acted';
     $('tcActWaitInfo').textContent = 'End this unit\'s turn';
-    $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move')); $('tcActAttack').setAttribute('aria-pressed', String(TC.mode === 'attack')); $('tcActAbility').setAttribute('aria-pressed', String(TC.mode === 'ability'));
+    $('tcActMove').setAttribute('aria-pressed', String(TC.mode === 'move'));
+    $('tcActActions').setAttribute('aria-pressed', String(TC.mode === 'attack' || (TC.mode === 'ability' && actOf(TC.sel).menu === 'actions')));
+    $('tcActSpells').setAttribute('aria-pressed', String(TC.mode === 'ability' && actOf(TC.sel).menu === 'spells'));
+    /* the open submenu, one button for each of its items, numbered for the keys */
+    const box = $('tcSub'), items = sub ? (sub === 'actions' ? acts : spells) : [];
+    box.hidden = !sub;
+    const html = items.map((it, i) => `<button data-item="${it.id}" data-kind="${it.kind}"${it.ok ? '' : ' disabled'}>${it.id === 'attack' ? SWORD : STAR}<span class="tc-act"><b>${esc(it.label)}</b><small>${esc(it.info)}</small></span><kbd>${i + 1}</kbd></button>`).join('');
+    if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
   }
   /* the preview: the target's portrait, the chance the blow lands, and what it would take off (or put back on) its hit
      points, flashing on its bar */
@@ -492,7 +519,8 @@ function panels() {
     : TC.mode === 'attack' ? (TC.reach.targets.length ? 'Pick a unit on a red tile to preview the attack · Esc to go back' : 'No one in reach · Esc to go back')
     : TC.mode === 'ability' && TC.aim >= 0 ? `Pick ${nameOf(TC.aim)} again or press Enter to use ${actOf(TC.sel).label} · Esc to choose another`
     : TC.mode === 'ability' ? (TC.reach.targets.length ? `Pick a unit on a ${actOf(TC.sel).heal ? 'green' : 'red'} tile for ${actOf(TC.sel).label} · Esc to go back` : `No one in reach of ${actOf(TC.sel).label} · Esc to go back`)
-    : TC.menu ? (canUndoMove(TC.sel) ? 'Choose an action · Esc to take the move back' : 'Choose an action · Esc to go back')
+    : TC.menu && TC.menu !== 'main' ? `Choose ${TC.menu === 'spells' ? 'a spell' : 'an action'} · 1–9 to pick · Esc for the commands`
+    : TC.menu ? (canUndoMove(TC.sel) ? 'Choose a command · Esc to take the move back' : 'Choose a command · Esc to go back')
     : sel >= 0 && alive(sel) && side !== B.phase ? (side === 'enemy' ? 'An enemy: it moves in the enemy phase' : 'One of yours: it moves in your phase')
     : sel >= 0 && done(sel) ? 'This unit is done for the turn · T to end the turn'
     : TC.note ? TC.note
@@ -702,9 +730,10 @@ root.addEventListener('keydown', e => {
     const n = (ED.M.chars || []).length;
     if (!busy()) for (let i = 1; i <= n; i++) { const j = (TC.sel + (e.shiftKey ? n * 2 - i : i) + n) % n; if (battle.ready(TC.battle, j)) { select(j); break; } }
   }
+  else if (/^[1-9]$/.test(k) && (TC.menu === 'actions' || TC.menu === 'spells')) { const it = menuItems(TC.sel, TC.menu)[+k - 1]; if (it && it.ok) pickItem(it.id); }
   else if (k === '1') { if (TC.sel >= 0 && !busy()) setMode('move'); }
-  else if (k === '2') { if (TC.sel >= 0 && !busy()) setMode('attack'); }
-  else if (k === '3') { if (TC.sel >= 0 && !busy()) setMode('ability'); }
+  else if (k === '2') { if (TC.sel >= 0 && !busy()) openMenu('actions'); }
+  else if (k === '3') { if (TC.sel >= 0 && !busy()) openMenu('spells'); }
   else if (k === '4') wait();
   else if (k === 't') endTurn();
   else if (k === 'r') restart();
@@ -745,8 +774,9 @@ $('tcRotL').addEventListener('click', () => { turn(-1); req(); }); $('tcRotR').a
 $('tcFast').addEventListener('click', () => setFast(!TC.fast));
 $('tcIn').addEventListener('click', () => { setZoom(TC.zoom + 1); req(); }); $('tcOut').addEventListener('click', () => { setZoom(TC.zoom - 1); req(); });
 $('tcActMove').addEventListener('click', () => { setMode('move'); req(); root.focus({ preventScroll: true }); });
-$('tcActAttack').addEventListener('click', () => { setMode('attack'); req(); root.focus({ preventScroll: true }); });
-$('tcActAbility').addEventListener('click', () => { setMode('ability'); req(); root.focus({ preventScroll: true }); });
+$('tcActActions').addEventListener('click', () => { openMenu('actions'); req(); root.focus({ preventScroll: true }); });
+$('tcActSpells').addEventListener('click', () => { openMenu('spells'); req(); root.focus({ preventScroll: true }); });
+$('tcSub').addEventListener('click', e => { const b = e.target.closest('[data-item]'); if (b && !b.disabled) { pickItem(b.dataset.item); req(); root.focus({ preventScroll: true }); } });
 $('tcAimGo').addEventListener('click', () => { if (TC.aim >= 0 && !busy()) attack(TC.sel, TC.aim, actIdOf(TC.sel)); req(); root.focus({ preventScroll: true }); });
 $('tcActWait').addEventListener('click', () => { wait(); req(); root.focus({ preventScroll: true }); });
 $('tcEnd').addEventListener('click', () => { endTurn(); req(); root.focus({ preventScroll: true }); });
@@ -754,6 +784,6 @@ $('tcRestart').addEventListener('click', () => { restart(); req(); root.focus({ 
 $('editor').addEventListener('keydown', e => { if (ED.open && !TC.open && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') { e.preventDefault(); openTactical(); } });
 new ResizeObserver(() => { if (TC.open) { size(); req(); } }).observe(root);
 /* test hook: the camera, cursor and units as the view has them */
-window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, back, endTurn, restart, select, setCursor, setMode, turn, undoMove, wait };
+window.__tactical = { state: TC, setFast, open: openTactical, close: closeTactical, isOpen: () => TC.open, act, back, endTurn, restart, select, setCursor, setMode, openMenu, pickItem, turn, undoMove, wait };
 
 export { closeTactical, openTactical };

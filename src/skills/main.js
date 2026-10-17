@@ -3,9 +3,10 @@ import '../units/units.css';
 import './skills.css';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
-import { DEFAULT_SKILL, FIELDS, FX_FIELDS, FX_PRESETS, ID_RE, KINDS, listSkills, normalizeSkill, onSkillsChange, skillPath, skillText, validateSkill } from '../data/skills.js';
-import { listUnits, onUnitsChange } from '../data/units.js';
-import { ATTACK, DEF_SCALE, MP_REGEN, blowOf, describe, healOf } from '../battle/abilities.js';
+import { DEFAULT_SKILL, FIELDS, FX_FIELDS, FX_PRESETS, ID_RE, KINDS, MENUS, listSkills, normalizeSkill, onSkillsChange, skillFrom, skillPath, skillText, validateSkill } from '../data/skills.ts';
+import { listUnits, onUnitsChange } from '../data/units.ts';
+import { ATTACK, DEF_SCALE, MP_REGEN, blowOf, describe, healOf } from '../battle/abilities.ts';
+import { EFFECTS } from '../battle/effects.ts';
 import { abilityFx, createFx, drawFx, emit, stepFx, tintRamp } from '../tactical/particles.js';
 import { characterById } from '../characters/library.js';
 import { attackOf, render } from '../characters/roster.js';
@@ -13,7 +14,7 @@ import { H as FH, W as FW } from '../characters/pixels.js';
 import { mountRail } from '../ui/rail.js';
 
 /* ================= the skill editor =================
-   Every skill in data/skills/ (src/data/skills.js) to read and change: a list down the side, and a card per skill
+   Every skill in data/skills/ (src/data/skills.ts) to read and change: a list down the side, and a card per skill
    with its name and kind, its MP cost and numbers (power and how much Defense it ignores for a blow, the base and
    the share of Attack for a heal, whether it never misses), its particles (the effect, its colour, size and count)
    playing between two figures, and who in the unit data has it with what it comes to for them. Changes are drafts
@@ -51,9 +52,9 @@ const ordered = () => { const order = listSkills().map(s => s.id), at = id => { 
 const nameOf = e => e.draft.label || e.draft.id;
 const visible = () => { const f = V.filter.trim().toLowerCase(); return ordered().filter(({ id, e }) => !f || id.includes(f) || nameOf(e).toLowerCase().includes(f)); };
 /* the skill as the battle would play it, draft numbers and all */
-const asAbility = d => ({ ...ATTACK, id: d.id, label: d.label, cost: d.cost, power: d.kind === 'heal' ? 0 : d.power / 100, pierce: d.kind === 'heal' ? 0 : d.pierce / 100, sure: d.kind !== 'heal' && d.sure, heal: d.kind === 'heal', healBase: d.healBase, healScale: d.healScale / 100, fx: d.fx, note: describe(d) });
+const asAbility = d => skillFrom(d).toAction();
 /* the units whose data names this skill */
-const usersOf = id => listUnits().filter(u => u.stats.ability === id);
+const usersOf = id => listUnits().filter(u => u.stats.abilities.includes(id));
 /* the colour a skill shows as in the list: its tint, or the middle of its effect's own colours */
 const PRESET_COLOUR = { power: '#ff9a3c', true: '#ffe27a', pierce: '#9fd2f0', spell: '#b896f0', heal: '#8fe39a', none: '#6d7676' };
 const colourOf = d => d.fx.tint || PRESET_COLOUR[d.fx.preset];
@@ -77,7 +78,7 @@ function renderList() {
   const vis = visible();
   for (const { id, e } of vis) {
     const d = e.draft, b = document.createElement('button'); b.className = 'ub-row sk-row'; b.dataset.id = id; b.setAttribute('aria-current', String(id === V.sel));
-    b.innerHTML = `<span class="sk-swatch" style="--c:${colourOf(d)}" aria-hidden="true"></span><span class="ub-row-text"><b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>${d.cost} MP · ${esc(describe(d))}</span></span>`;
+    b.innerHTML = `<span class="sk-swatch" style="--c:${colourOf(d)}" aria-hidden="true"></span><span class="ub-row-text"><b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>${d.cost} MP${d.cooldown ? ` · ${d.cooldown}t cooldown` : ''} · ${esc(describe(d))}</span></span>`;
     b.addEventListener('click', () => { V.sel = id; renderAll(); });
     box.append(b);
   }
@@ -97,6 +98,7 @@ function tile(path, [k, label, lo, hi], value, saved, hint) {
 /* a few words under each number on what it comes to */
 function hintOf(k, d) {
   if (k === 'cost') return d.cost ? `${MP_REGEN} MP back each turn` : 'free';
+  if (k === 'cooldown') return d.cooldown ? `then rests ${d.cooldown} turn${d.cooldown === 1 ? '' : 's'}` : 'every turn';
   if (k === 'power') return `${+(d.power / 100).toFixed(2)}× the user's Attack`;
   if (k === 'pierce') return d.pierce >= 100 ? 'all of the Defense' : d.pierce ? `${d.pierce}% of the Defense` : 'none of it';
   if (k === 'healBase') return 'HP before Attack counts';
@@ -114,6 +116,15 @@ function valuesSection(e) {
     <button class="chip" id="sure" role="switch" aria-checked="${d.sure}" aria-pressed="${d.sure}">${d.sure ? 'On' : 'Off'}</button>
     <span class="sk-hint">${d.sure ? 'always lands, whatever the Evasion' : 'rolls the attack\'s chance to hit'}</span></div>` : '';
   return `<div class="ub-values">${rows}${sure}</div>`;
+}
+/* its special effects: the ones for its kind, each on or off */
+function effectsSection(e) {
+  const d = e.draft, s = e.saved, list = EFFECTS.filter(f => f.kinds.includes(d.kind)), changed = s && !same(s.effects, d.effects);
+  return `<section class="sk-effects${changed ? ' changed' : ''}" aria-label="Special effects">
+    <h3 class="ub-section">Special effects${changed ? ' <span class="ub-tag">changed</span>' : ''}</h3>
+    <div class="sk-presets">${list.map(f => `<button role="switch" aria-checked="${d.effects.includes(f.id)}" data-effect="${f.id}" title="${esc(cap(f.note))}"><span>${esc(f.label)}</span><span class="sk-hint">${esc(f.note)}</span></button>`).join('')}</div>
+    <p class="ub-dim">Worked out from the battle as it stands: some when the skill is used, others all battle long for every unit carrying it, as it moves, strikes, is struck or its phase begins. The tactical view's preview counts them.</p>
+  </section>`;
 }
 /* the effect: one to pick, its colour (or its own), its size and how many particles */
 function fxSection(e) {
@@ -154,17 +165,19 @@ function renderDetail() {
   const box = $('detail'); stopPreview();
   const e = E.get(V.sel);
   if (!e) { box.innerHTML = '<p class="ub-dim ub-empty">No skills yet. Make one with New skill.</p>'; return; }
-  const d = e.draft, errs = validateSkill(d), kindChanged = e.saved && e.saved.kind !== d.kind;
+  const d = e.draft, errs = validateSkill(d), kindChanged = e.saved && e.saved.kind !== d.kind, menuChanged = e.saved && e.saved.menu !== d.menu;
   box.innerHTML = `
     <div class="ub-card">
       <div class="ub-body">
         <div class="ub-head">
           <input class="ub-name" id="label" value="${esc(d.label)}" maxlength="32" spellcheck="false" aria-label="Name">
           <select id="kind" aria-label="Kind"${kindChanged ? ' class="changed"' : ''}>${KINDS.map(([k, l]) => `<option value="${k}"${k === d.kind ? ' selected' : ''}>${l}</option>`).join('')}</select>
+          <select id="menu" aria-label="Battle menu" title="The battle menu it is listed in"${menuChanged ? ' class="changed"' : ''}>${MENUS.map(([k, l]) => `<option value="${k}"${k === d.menu ? ' selected' : ''}>In ${l}</option>`).join('')}</select>
         </div>
         <p class="ub-file"><code>${esc(skillPath(d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}<span class="sk-note">${esc(cap(describe(d)))}</span></p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
         ${valuesSection(e)}
+        ${effectsSection(e)}
         ${fxSection(e)}
         ${usersSection(e)}
         <div class="ub-card-actions">
@@ -186,12 +199,14 @@ function renderDetail() {
   }));
   box.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { e.draft.fx.preset = b.dataset.preset; commit(e); }));
   $('sure')?.addEventListener('click', () => { e.draft.sure = !e.draft.sure; commit(e); });
+  box.querySelectorAll('[data-effect]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.effect, on = e.draft.effects.includes(id); e.draft.effects = on ? e.draft.effects.filter(x => x !== id) : [...e.draft.effects, id]; commit(e); }));
   /* the colour follows the picker live, and is kept on change */
   $('tint').addEventListener('input', () => { e.draft.fx.tint = $('tint').value; $('ownTint').checked = false; restartPreview(e); });
   $('tint').addEventListener('change', () => { e.draft.fx.tint = $('tint').value; commit(e); });
   $('ownTint').addEventListener('change', () => { e.draft.fx.tint = $('ownTint').checked ? '' : $('tint').value; commit(e); });
   $('label').addEventListener('change', () => { e.draft.label = $('label').value; commit(e); });
   $('kind').addEventListener('change', () => { e.draft.kind = $('kind').value; commit(e); });
+  $('menu').addEventListener('change', () => { e.draft.menu = $('menu').value; commit(e); });
   $('replay').addEventListener('click', () => restartPreview(e));
   $('missed').addEventListener('click', () => { V.missed = !V.missed; $('missed').setAttribute('aria-pressed', String(V.missed)); restartPreview(e); });
   $('revertOne').addEventListener('click', () => revert(e));

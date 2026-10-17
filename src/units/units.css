@@ -132,3 +132,7 @@
 .ub-warn{color:#e6a08e;font-weight:600}
 .ub-link{font:500 13px var(--ui);color:var(--brass-2);text-decoration:none;margin-left:auto}
 .ub-link:hover{text-decoration:underline}
+.ub-ability-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ub-ability-row{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--table)}
+.ub-ability-row .ub-ability-pick b{font:600 14px var(--ui);color:var(--vellum)}
+.ub-ability-row .chip{margin-left:auto}

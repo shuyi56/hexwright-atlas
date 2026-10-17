@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blankModel, fromJSON, objAt, toJSON } from './model.js';
+import { blankModel, fromJSON, objAt, toJSON } from './model.ts';
 import { brushTiles, eraseAt, floodFill, paintTiles, placePiece, rectTiles, setElev, shiftElev, whyNot } from './ops.js';
 
 /* the pure map operations behind both the mouse tools and the automation API; no browser needed */

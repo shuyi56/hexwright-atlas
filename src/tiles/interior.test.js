@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blankModel } from '../editor/model.js';
+import { blankModel } from '../editor/model.ts';
 import { eraseAt, placePiece } from '../editor/ops.js';
 import { findPath, placeChar } from '../editor/walk.js';
 import { ASSETS, ASSET_BY_ID, ASSET_GROUPS, drawAsset, wallLinks } from './index.js';

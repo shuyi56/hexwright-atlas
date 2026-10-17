@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { ID_RE, normalizeSkill, skillPath, skillText, validateSkill } from '../src/data/skills.js';
+import { ID_RE, normalizeSkill, skillPath, skillText, validateSkill } from '../src/data/skills.ts';
 import { ROOT } from './units-store.mjs';
 
 /* ================= skill data: the files, on disk =================
    Reads and writes data/skills/<id>.json for Node: the dev server's bridge (tools/vite-hexwright.js), which the skill
-   editor saves through, and the tests. Every write is normalized (src/data/skills.js), so the files stay in one
+   editor saves through, and the tests. Every write is normalized (src/data/skills.ts), so the files stay in one
    canonical shape however they were edited. */
 function readSkills(root = ROOT) {
   const dir = join(root, 'data/skills'); if (!existsSync(dir)) return [];

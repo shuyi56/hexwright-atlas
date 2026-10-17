@@ -7,7 +7,7 @@ const { generate } = await import('../world/generate.js');
 const { generateCity } = await import('../city/generate.js');
 const { HEX_TILES, hexToModel } = await import('./from-hex.js');
 const { cityToModel, districtToModel } = await import('./from-city.js');
-const { MAX_ELEV, toJSON } = await import('./model.js');
+const { MAX_ELEV, toJSON } = await import('./model.ts');
 const { ASSET_BY_ID, TERRAIN, footprint } = await import('../tiles/index.js');
 
 const map = generate('ember-1147');

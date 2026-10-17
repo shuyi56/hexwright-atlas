@@ -1,4 +1,4 @@
-import { MAX_LEVEL, levelOf } from '../editor/model.js';
+import { MAX_LEVEL, levelOf } from '../editor/model.ts';
 import { neighbours } from '../editor/walk.js';
 
 /* ================= tactical view: how far a unit moves =================

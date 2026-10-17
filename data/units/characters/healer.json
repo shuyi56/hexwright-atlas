@@ -12,7 +12,9 @@
     "critDamage": 150,
     "range": 2,
     "pattern": "ranged",
-    "ability": "heal"
+    "abilities": [
+      "heal"
+    ]
   },
   "movement": {
     "move": 4,

@@ -31,7 +31,7 @@
    signpost, barrels, crates and a log pile, a garden with oaks, a bush and flowers to the south, and the hero on the
    lane. Deterministic: the same map every time. */
 import { writeFileSync } from 'node:fs';
-import { blankModel, TI, toJSON } from '../src/editor/model.js';
+import { blankModel, TI, toJSON } from '../src/editor/model.ts';
 import { paintTiles, placePiece, rectTiles, removeFloor } from '../src/editor/ops.js';
 import { placeChar } from '../src/editor/walk.js';
 

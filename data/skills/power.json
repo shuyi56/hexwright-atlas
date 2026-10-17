@@ -1,13 +1,16 @@
 {
   "id": "power",
   "label": "Power Strike",
+  "menu": "actions",
   "kind": "damage",
   "cost": 6,
+  "cooldown": 1,
   "power": 150,
   "pierce": 0,
   "sure": false,
   "healBase": 8,
   "healScale": 200,
+  "effects": [],
   "fx": {
     "preset": "power",
     "tint": "",

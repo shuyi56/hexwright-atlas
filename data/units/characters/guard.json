@@ -12,7 +12,9 @@
     "critDamage": 150,
     "range": 2,
     "pattern": "line",
-    "ability": "power"
+    "abilities": [
+      "power"
+    ]
   },
   "movement": {
     "move": 4,

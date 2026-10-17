@@ -1,13 +1,16 @@
 {
   "id": "spell",
   "label": "Spell",
+  "menu": "spells",
   "kind": "damage",
   "cost": 8,
+  "cooldown": 2,
   "power": 200,
   "pierce": 50,
   "sure": false,
   "healBase": 8,
   "healScale": 200,
+  "effects": [],
   "fx": {
     "preset": "spell",
     "tint": "",

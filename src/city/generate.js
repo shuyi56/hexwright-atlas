@@ -2,7 +2,7 @@ import { NB, TAU } from '../core/geometry.js';
 import { makeNoise, mulberry32 } from '../core/random.js';
 import { buildCathedral, buildMonastery, cathedralDims, makeBuilder, monasteryDims } from './architecture.js';
 import { ADJ2, makeNamer } from '../core/names.js';
-import { BIOME } from '../world/data.js';
+import { BIOME } from '../world/data.ts';
 import { ROOFS, climate, hexRgb, lerp } from '../render/palette.js';
 import { footprint } from '../tiles/index.js';
 

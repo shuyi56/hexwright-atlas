@@ -12,7 +12,9 @@
     "critDamage": 150,
     "range": 3,
     "pattern": "ranged",
-    "ability": "spell"
+    "abilities": [
+      "spell"
+    ]
   },
   "movement": {
     "move": 3,

@@ -1,6 +1,6 @@
 import { CX, CY, N, R, TAU, hexAt, hexDist } from '../core/geometry.js';
 import { mulberry32 } from '../core/random.js';
-import { BIOME } from '../world/data.js';
+import { BIOME } from '../world/data.ts';
 import { INK, hexRgb } from './palette.js';
 
 /* ---- realm roads: surface follows the terrain, paved near towns, bridges at river crossings ---- */

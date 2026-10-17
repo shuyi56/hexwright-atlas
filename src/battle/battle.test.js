@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { blankModel } from '../editor/model.js';
+import { blankModel } from '../editor/model.ts';
 import { placeChar } from '../editor/walk.js';
 import { planTurn } from './ai.js';
-import { MP_REGEN, critOf, damageOf, hitChance } from './abilities.js';
-import { actionOf, canAct, canAfford, canMove, canTarget, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.js';
+import { MP_REGEN, abilityOf, critOf, damageOf, hitChance } from './abilities.ts';
+import { DEFAULT_SKILLS, setSkills, validateSkill } from '../data/skills.ts';
+import { actionOf, actionsOf, canAct, canAfford, canMove, canTarget, canUse, cooldownLeft, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.ts';
 
 const P = 'player', E = 'enemy';
 
@@ -76,6 +77,18 @@ test('a blow that lands may be critical, for the attacker\'s Crit Damage percent
   assert.equal(forecast(B, 3, 0, 'heal').crit, 0, 'a heal is never critical');
 });
 
+test('an ability rests for its cooldown after it is used, and the plain attack never does', () => {
+  /* Spell has a cooldown of 2: used on turn 1, it is back on turn 4 */
+  const B = createBattle([{ side: P, hp: 30, mp: 40, attack: 10, accuracy: 100, ability: 'spell' }, { side: E, hp: 999 }]);
+  const round = () => { endPhase(B); wait(B, 1); endPhase(B); };
+  assert.ok(canUse(B, 0, 'spell')); assert.ok(strike(B, 0, 1, 'spell', () => 0)); assert.equal(cooldownLeft(B, 0, 'spell'), 3, 'back on turn 4');
+  round(); assert.equal(B.turn, 2); assert.equal(cooldownLeft(B, 0, 'spell'), 2);
+  assert.ok(!canUse(B, 0, 'spell') && canAfford(B, 0, 'spell'), 'it has the MP but is resting'); assert.equal(forecast(B, 0, 1, 'spell'), null); assert.equal(strike(B, 0, 1, 'spell'), null);
+  assert.ok(canUse(B, 0) && forecast(B, 0, 1), 'the attack is always there'); wait(B, 0);
+  round(); assert.equal(B.turn, 3); assert.equal(cooldownLeft(B, 0, 'spell'), 1); wait(B, 0);
+  round(); assert.equal(B.turn, 4); assert.equal(cooldownLeft(B, 0, 'spell'), 0); assert.ok(canUse(B, 0, 'spell'));
+});
+
 test('abilities spend MP, which comes back a little each phase', () => {
   const B = createBattle([
     { side: P, hp: 30, mp: 10, attack: 10, accuracy: 50, ability: 'power' },
@@ -125,7 +138,7 @@ test('new unit data keeps the damage taken and the MP spent, against the new ful
   strike(B, 0, 1);
   assert.equal(B.units[1].hp, 15); B.units[0].mp = 4;
   refresh(B, [{ side: P, hp: 40, mp: 20, attack: 9, defense: 3, ability: 'spell' }, { side: E, hp: 10 }]);
-  assert.deepEqual([B.units[0].hp, B.units[0].max, B.units[0].mp, B.units[0].mpMax, B.units[0].stats.attack, B.units[0].stats.defense, B.units[0].ability], [40, 40, 14, 20, 9, 3, 'spell']);
+  assert.deepEqual([B.units[0].hp, B.units[0].max, B.units[0].mp, B.units[0].mpMax, B.units[0].stats.attack, B.units[0].stats.defense, B.units[0].abilities], [40, 40, 14, 20, 9, 3, ['spell']]);
   assert.deepEqual([B.units[1].hp, B.units[1].max], [5, 10]);
   assert.equal(sideOfGroup('enemies'), E); assert.equal(sideOfGroup('characters'), P);
 });
@@ -154,4 +167,55 @@ test('the computer strikes what it can reach, the weakest first, and otherwise c
   assert.equal(fy, 6, `heads down to the end of the wall, not along it (${fx}, ${fy})`);
   /* no one to fight: it stays */
   assert.deepEqual(planTurn(W, 0, { ...opts, isFoe: () => false }), { path: [], target: -1 });
+});
+
+test('special effects work from the state of the battle: the forecast counts them and the strike applies them', () => {
+  try {
+    setSkills([...DEFAULT_SKILLS,
+      { id: 'reap', label: 'Reap', cost: 0, effects: ['execute', 'drain'] },
+      { id: 'stand', label: 'Stand', cost: 0, effects: ['last-stand'] },
+      { id: 'mend', label: 'Mend', kind: 'heal', cost: 0, effects: ['refresh', 'execute'] }]);
+    assert.equal(abilityOf('reap').note, 'execute, drain'); assert.equal(abilityOf('mend').effects.length, 1, 'a damage effect does nothing on a heal');
+    const B = createBattle([{ side: P, hp: 40, attack: 10, accuracy: 100, ability: 'reap' }, { side: E, hp: 40 }, { side: P, hp: 40, mp: 6, attack: 10, accuracy: 100, ability: 'stand' }, { side: P, hp: 20, mp: 10, attack: 1, ability: 'mend' }]);
+    assert.equal(forecast(B, 0, 1, 'reap').amount, 10, 'a healthy foe takes the plain blow');
+    B.units[1].hp = 19; assert.equal(forecast(B, 0, 1, 'reap').amount, 15, 'below half its HP it takes half as much again');
+    B.units[0].hp = 20; const r = strike(B, 0, 1, 'reap', () => 0);
+    assert.equal(r.to, 4); assert.equal(B.units[0].hp, 27, 'drain gives back half the 15 dealt');
+    assert.equal(forecast(B, 2, 1, 'stand').amount, 10); B.units[2].hp = 10; assert.equal(forecast(B, 2, 1, 'stand').amount, 18, 'three quarters of its HP lost: 1.75 times');
+    B.units[2].mp = 1; strike(B, 3, 2, 'mend'); assert.equal(B.units[2].mp, 5, 'refresh gives the ally 4 MP'); assert.equal(B.units[3].mp, 10, 'and not the healer');
+    assert.ok(validateSkill({ id: 'x', effects: ['meteor'] }).length, 'an unknown effect is named');
+  } finally { setSkills(DEFAULT_SKILLS); }
+});
+
+test('the lifecycle hooks fire as the battle goes: phases, moves, waits, blows, falls and the end', () => {
+  try {
+    setSkills([...DEFAULT_SKILLS,
+      { id: 'surge', label: 'Surge', cost: 0, effects: ['momentum', 'bloodlust'] },
+      { id: 'bark', label: 'Bark', cost: 0, effects: ['thorns', 'regen'] }]);
+    const B = createBattle([{ side: P, hp: 30, mp: 10, attack: 10, accuracy: 100, ability: 'surge' }, { side: E, hp: 30, ability: 'bark' }, { side: E, hp: 5 }]);
+    B.units[0].mp = 0;
+    assert.ok(spend(B, 0, 'moved', [[1, 0], [2, 0], [3, 0], [4, 0]])); assert.equal(B.units[0].marks.momentum, 4, 'onMove counts the walk');
+    unspend(B, 0, 'moved'); assert.equal(B.units[0].marks.momentum, undefined, 'onMoveUndone takes it back');
+    spend(B, 0, 'moved', [[1, 0], [2, 0], [3, 0], [4, 0]]);
+    assert.equal(forecast(B, 0, 1).amount, 12, 'onAttack: a fifth harder after four tiles, and the forecast shows it');
+    strike(B, 0, 1, 'attack', () => 0);
+    assert.equal(B.units[1].hp, 18); assert.equal(B.units[0].hp, 28, 'onHurt: thorns strike back');
+    endPhase(B); assert.equal(B.units[1].hp, 21, 'onPhaseStart: regenerate on its own phase');
+    wait(B, 1); wait(B, 2); endPhase(B);
+    assert.equal(B.units[0].marks.momentum, undefined, 'a new phase clears the walk');
+    strike(B, 0, 2, 'attack', () => 0); assert.equal(B.units[0].mp, 6, 'onKill: bloodlust gives 4 on top of the phase\'s 2');
+    const C = createBattle([{ side: P, hp: 1, attack: 10, accuracy: 100 }, { side: E, hp: 30, ability: 'bark' }]);
+    const r = strike(C, 0, 1, 'attack', () => 0); assert.ok(r.landed && !r.fell);
+    assert.equal(C.units[0].hp, 0, 'thorns fell the attacker'); assert.equal(C.outcome, 'defeat', 'and the battle settles after the hooks');
+  } finally { setSkills(DEFAULT_SKILLS); }
+});
+
+test('a unit can carry several abilities, each with its own cooldown, listed under Actions or Spells', () => {
+  const B = createBattle([{ side: P, hp: 30, mp: 40, attack: 10, accuracy: 100, abilities: ['power', 'spell', 'heal'] }, { side: E, hp: 999 }, { side: P, hp: 10 }]);
+  assert.deepEqual(actionsOf(B, 0).map(a => [a.id, a.menu]), [['attack', 'actions'], ['power', 'actions'], ['spell', 'spells'], ['heal', 'spells']]);
+  assert.ok(strike(B, 0, 1, 'power', () => 0));
+  assert.equal(cooldownLeft(B, 0, 'power'), 2); assert.equal(cooldownLeft(B, 0, 'spell'), 0, 'the others are not resting');
+  endPhase(B); wait(B, 1); endPhase(B);
+  assert.ok(!canUse(B, 0, 'power') && canUse(B, 0, 'spell') && canUse(B, 0, 'heal'));
+  assert.equal(forecast(B, 0, 2, 'heal').to, 10, 'a heal of its own reaches its allies'); assert.equal(actionOf(B, 0, 'pierce'), null, 'not one it lacks');
 });

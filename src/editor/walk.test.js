@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { save as saveCustom } from '../characters/library.js';
-import { blankModel, cloneModel, fits, fromJSON, toJSON } from './model.js';
+import { blankModel, cloneModel, fits, fromJSON, toJSON } from './model.ts';
 import { findPath, isFree, placeChar, reachable, walkChar } from './walk.js';
 import { placePiece } from './ops.js';
 import { TERRAIN } from '../tiles/index.js';

@@ -1,13 +1,16 @@
 {
   "id": "true",
   "label": "True Strike",
+  "menu": "actions",
   "kind": "damage",
   "cost": 4,
+  "cooldown": 0,
   "power": 100,
   "pierce": 0,
   "sure": true,
   "healBase": 8,
   "healScale": 200,
+  "effects": [],
   "fx": {
     "preset": "true",
     "tint": "",

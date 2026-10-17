@@ -5,7 +5,7 @@ import { renderCity } from '../city/render.js';
 import { $, canvas, coarse, reduceMotion } from './state.js';
 import { FONT_FELL, FONT_SC } from './draw.js';
 import { esc, showTab, survey } from './ledger.js';
-import { KIND } from '../world/data.js';
+import { KIND } from '../world/data.ts';
 import { openEditor } from '../editor/editor.js';
 import { districtToModel } from '../editor/from-city.js';
 

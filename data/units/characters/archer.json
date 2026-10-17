@@ -12,7 +12,9 @@
     "critDamage": 160,
     "range": 4,
     "pattern": "ranged",
-    "ability": "true"
+    "abilities": [
+      "true"
+    ]
   },
   "movement": {
     "move": 4,

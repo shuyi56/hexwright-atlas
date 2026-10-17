@@ -4,7 +4,7 @@ import { hits, shapesOf } from '../town/collide.js';
 import { TILE } from '../town/ground.js';
 import { addInterior, arrival, buildingAt, canHaveInterior, doorAcross, doorways, interiorSize, makeInterior } from './interiors.js';
 import { TERRAIN } from '../tiles/index.js';
-import { blankModel, cloneModel, fromJSON, objAt, toJSON } from './model.js';
+import { blankModel, cloneModel, fromJSON, objAt, toJSON } from './model.ts';
 import { placePiece } from './ops.js';
 import { findPath, placeChar } from './walk.js';
 

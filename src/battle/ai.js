@@ -1,4 +1,4 @@
-import { MAX_LEVEL, levelOf } from '../editor/model.js';
+import { MAX_LEVEL, levelOf } from '../editor/model.ts';
 import { neighbours } from '../editor/walk.js';
 import { attackReach } from '../tactical/attack.js';
 import { moveRange, placeId, routeTo } from '../tactical/move.js';

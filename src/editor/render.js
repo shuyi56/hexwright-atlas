@@ -1,7 +1,7 @@
 import { mulberry32 } from '../core/random.js';
 import { INK, hexRgb, rgbStr } from '../render/palette.js';
 import { ASSET_BY_ID, TERRAIN, decorateTerrain, drawAsset, footprint, linkWalls, offWall, standsOnWall, turnAsset, wallLinks } from '../tiles/index.js';
-import { MAX_LEVEL, STOREY, levelOf } from './model.js';
+import { MAX_LEVEL, STOREY, levelOf } from './model.ts';
 
 /* ================= tile editor: rendering =================
    Same projection as the city districts (TWH x THH tiles, EL px per height level) so assets

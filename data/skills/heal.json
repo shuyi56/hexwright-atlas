@@ -1,13 +1,16 @@
 {
   "id": "heal",
   "label": "Heal",
+  "menu": "spells",
   "kind": "heal",
   "cost": 6,
+  "cooldown": 1,
   "power": 100,
   "pierce": 0,
   "sure": false,
   "healBase": 8,
   "healScale": 200,
+  "effects": [],
   "fx": {
     "preset": "heal",
     "tint": "",

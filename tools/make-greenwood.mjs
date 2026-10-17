@@ -9,7 +9,7 @@
    every time. */
 import { writeFileSync } from 'node:fs';
 import { placePiece } from '../src/editor/ops.js';
-import { blankModel, TI, toJSON } from '../src/editor/model.js';
+import { blankModel, TI, toJSON } from '../src/editor/model.ts';
 import { placeChar } from '../src/editor/walk.js';
 
 const S = 24, M = blankModel(S, 'grass', 'Greenwood glade'), out = process.argv[2] || 'scenes/town/greenwood-glade.json';

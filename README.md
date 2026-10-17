@@ -316,14 +316,14 @@ movement (Move: tiles a turn; Jump: height levels a step can climb or drop). The
 | Stat | What it does |
 | --- | --- |
 | HP | Hit points; at 0 the unit falls. |
-| MP | Mana, spent by the unit's ability. Every unit gets 2 MP back as its side's phase begins, up to its full MP. |
+| MP | Mana, spent by the unit's abilities. Every unit gets 2 MP back as its side's phase begins, up to its full MP. |
 | Attack | The power of its blows. |
 | Defense | Cuts the damage it takes: damage = power × 20 / (20 + Defense), rounded, at least 1. Every 20 Defense halves it. |
 | Accuracy, Evasion | The chance a blow lands is the attacker's Accuracy minus the target's Evasion, in percent, kept between 5 and 100. |
 | Crit % | The chance, in percent, that a blow which lands is a critical hit. Heals are never critical. |
 | Crit Damage % | What a critical hit deals, as a percent of a plain hit (150: half as much again), rounded. |
 | Range, Pattern | How far away and which tiles it can strike (melee, line or ranged). |
-| Ability | What it can spend MP on, if anything (below). |
+| Abilities | The skills it can spend MP on, up to eight (`"abilities": ["power", "heal"]`); each is listed in battle under Actions or Spells, as its skill says. A file with the older single `"ability"` still reads. |
 
 | Ability | MP | What it does |
 | --- | --- | --- |
@@ -343,9 +343,11 @@ orc have Power Strike and the dark elf Pierce; goblins, wolves, skeletons and sl
 (knight, orc, slime) stand on Defense, quick ones (thief, wolf, dark elf, goblin) on Evasion. The thief, rangers,
 archers, monk, wolves and dark elf crit most often (12 to 20%), the thief and the orc hardest (175%).
 
-`src/data/units.js` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
-with no file, such as a custom character from the maker, plays with the defaults. `src/battle/abilities.js` holds
-the formulas and turns each skill into the blow it plays. Adding a number means adding a line to `FIELDS`; adding an
+`src/data/units.ts` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
+with no file, such as a custom character from the maker, plays with the defaults. The registry holds each unit as
+a `Character` or an `Enemy`, both a `Unit`, so it knows its group and the side it fights on. `src/battle/actions.ts`
+holds the formulas and the two kinds of action, `StrikeAction` and `HealAction`; `src/battle/abilities.ts` has the
+plain Attack and turns each skill into the action it plays. Adding a number means adding a line to `FIELDS`; adding an
 ability, a file in `data/skills/` (or **New skill…** in the skill editor).
 
 **Unit data** in the module rail opens `units.html`, an editor for these files:
@@ -367,21 +369,24 @@ ability, a file in `data/skills/` (or **New skill…** in the skill editor).
 
 ### Skills
 
-Each ability is one JSON file in `data/skills/`, named by its id, which is what a unit's `stats.ability` names:
+Each ability is one JSON file in `data/skills/`, named by its id, which is what a unit's `stats.abilities` name:
 
 ```json
-{ "id": "spell", "label": "Spell", "kind": "damage", "cost": 8, "power": 200, "pierce": 50, "sure": false,
-  "healBase": 8, "healScale": 200, "fx": { "preset": "spell", "tint": "", "scale": 100, "density": 100 } }
+{ "id": "spell", "label": "Spell", "menu": "spells", "kind": "damage", "cost": 8, "cooldown": 2, "power": 200, "pierce": 50, "sure": false,
+  "healBase": 8, "healScale": 200, "effects": [], "fx": { "preset": "spell", "tint": "", "scale": 100, "density": 100 } }
 ```
 
 | Field | What it does |
 | --- | --- |
+| Menu | The battle menu it is listed in: `actions` (a technique) or `spells` (magic). Heals go to Spells unless the file says otherwise. |
 | Kind | `damage` strikes a foe; `heal` restores an ally's HP, never misses and is never critical. |
 | MP cost | What it spends. |
+| Cooldown | The turns its user waits after using it before it can again: 1 is every other turn, 0 every turn. The stock skills rest 1 turn, Spell 2 and True Strike none. |
 | Power % | A blow's power as a percent of the user's Attack (150: half as hard again). |
 | Ignores Def % | How much of the target's Defense a blow goes through (100: all of it). |
 | Never misses | A blow that always lands, whatever the target's Evasion. |
 | Heal base, Heal / Atk % | A heal restores the base plus this percent of the healer's Attack (8 and 200: 8 + 2 × Attack). |
+| Special effects | What it does beyond its numbers, worked out from the battle as it stands (`src/battle/effects.ts`): Execute (half as hard again on a foe below half its HP), Last stand (harder the more HP the user has lost), Rally (a tenth harder per other ally standing), Drain (the user gets back half the damage dealt) for damage skills; Refresh (the ally gets 4 MP back too) for heals. |
 | Effect | The particles it plays: Embers, Glints, Shards, Arcane, Spiral or None. |
 | Colour | Its own colour in place of the effect's (empty keeps the effect's, or for Arcane the caster's). |
 | Size %, Particles % | Spreads the effect wider and faster or tighter and slower, and thins it out or fills it in. |
@@ -397,6 +402,26 @@ copy of another, and the unit data page offers it at once. Saving works as on th
 `PUT` and `DELETE /__hexwright/skills/<id>` and `GET /__hexwright/skills`; a tactical view open in another tab plays the
 new numbers and particles from the next blow. A unit naming a skill that is not there only attacks, and its card
 says so.
+
+`src/data/skills.ts` reads each file as `SkillData` and holds it as a `DamageSkill` or a `HealSkill`, both a
+`Skill`: each kind says in a few words what it does and makes its own action for the battle. A file keeps the
+other kind's numbers too, so a skill switched between kinds keeps them.
+
+Every action carries `effects`, its special effects, and so does every unit whose ability it is. An effect is a set
+of optional hooks, each reading and changing the battle as it stands:
+
+| When | Hooks |
+| --- | --- |
+| Its own action is used | `modify` the blow before it is rolled, `apply` changes after it is struck |
+| The battle and its turns | `onBattleStart`, `onTurnStart`, `onTurnEnd`, `onPhaseStart`, `onPhaseEnd`, `onBattleEnd` |
+| Its carrier acts | `onMove` (with the path), `onMoveUndone`, `onWait`, `onAttack` (reshapes the blow going out), `onAbility`, `onHit`, `onMiss`, `onCrit`, `onKill` |
+| Its carrier is struck | `onDefend` (reshapes the blow coming in), `onHurt`, `onHealed`, `onDodge`, `onFall` |
+
+The hooks that reshape a blow are counted by the forecast, so the tactical view's preview is what happens; after every
+hook the battle settles who has fallen and whether it is won or lost. Each unit has `marks` for its effects to keep
+counts between hooks. Beside the five above come Regenerate (3 HP back each phase), Momentum (harder for each tile
+walked this phase), Thorns (2 damage back to whoever hits it) and Bloodlust (4 MP back for each foe felled). A new
+effect is one entry in `EFFECTS` in `src/battle/effects.ts`, and the skill editor lists it at once.
 
 ![The skill editor](docs/images/skill-editor.png)
 
@@ -414,16 +439,18 @@ with the camera gliding after the cursor and the unit on the move.
   walker still on screen while the ground scrolls under it. Moves are map edits, on the editor's undo stack.
 - **Turns:** a battle runs in turns, each a **player phase** and then an **enemy phase**. The player's side is the
   [unit data](#unit-data)'s characters, the enemy's its enemies. In a phase each unit of that side still standing
-  moves once and acts once (Attack, its ability, or Wait to give up both); the phase passes on when every one of them is done, or
+  moves once and acts once (Attack, one of its abilities, or Wait to give up both); the phase passes on when every one of them is done, or
   at once with **End turn** (`T`). A banner names each new phase and the turn and phase stay in the top bar. In the
   enemy phase the computer plays each enemy in turn: it shows the enemy's range, walks it to where it can strike the
   weakest foe in reach (or as close to the nearest one as it can get, round anything it cannot climb), and strikes;
   the controls wait until it is done, and the ▶▶ 2× chip speeds it up. **Restart** (`R`) starts the battle over: every unit back where it stood
   when the view opened, at full HP, on the player's turn 1 (one map edit, undoable in the editor). Mid-battle it
   asks first: the chip turns to **Restart?** for three seconds and a second press restarts. The actions window opens large, stacked
-  on top of the unit's portrait in the bottom corner: a command list naming the unit, each action with an icon and
-  what it does (move range, attack power and pattern, the ability's MP cost and effect) or why it is spent (already
-  acted, not enough MP). Both windows share a stone-and-gold frame. The portrait window carries no lines of text:
+  on top of the unit's portrait in the bottom corner: a command list naming the unit: **Move** (`1`), **Actions** (`2`), **Spells** (`3`, only for a unit with spells)
+  and **Wait** (`4`). Actions and Spells open submenus in the same window: Actions lists the attack and the unit's
+  techniques, Spells its magic, each with an icon and what it does (attack power and pattern, an ability's MP cost,
+  cooldown and effect) or why it cannot be used now (already acted, not enough MP, still cooling down); `1`–`9` pick
+  from the open submenu and `Esc` goes back to the commands. Which menu a skill is in is its `menu`. Both windows share a stone-and-gold frame. The portrait window carries no lines of text:
   just the unit's name, its HP and MP bars and two rows of its Attack, Defense, Accuracy, Evasion, Crit and Crit
   Damage. **Attack** lights the
   red tiles it reaches; picking a foe there opens an **attack preview** in the same row as the unit's portrait: the
@@ -432,10 +459,10 @@ with the camera gliding after the cursor and the unit on the move.
   and Evasion, and its health bar as the blow would leave it,
   with the hit points it would lose flashing. While a target is picked the two windows and the clash between them move to the middle of the bottom edge, the
   clash dead centre, and their stat cells shrink. A crossed-swords clash between the two windows is the **Strike**
-  button; picking the target again or `Enter` strikes too, and `Esc` goes back to choosing. The ability (`3`) is
-  aimed the same way, the button taking its name; a heal lights its reach in green, aims at your own units, and
-  previews the HP it would restore. The enemy's attacks show the same preview while it aims, and an enemy spends its
-  ability whenever it has the MP. Whether a blow lands, and whether it is critical, is rolled when it is struck. The battle is won when the last enemy falls
+  button; picking the target again or `Enter` strikes too, and `Esc` goes back to choosing. Each ability is
+  aimed the same way, the button taking its name, and `Esc` goes back to the submenu it was picked from; a heal lights its reach in green, aims at your own units, and
+  previews the HP it would restore. The enemy's attacks show the same preview while it aims, and an enemy strikes with whichever of
+  its blows does the most harm on average. Whether a blow lands, and whether it is critical, is rolled when it is struck. The battle is won when the last enemy falls
   and lost when the last of yours does. A side with no units on the map has its phase skipped, and on a map of
   enemies only they are yours to move.
 - **Attacks:** an attack plays out in the attacker's own frames, and the controls wait until it has.
@@ -796,6 +823,7 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run build`   | Production build into `dist/`   |
 | `npm run preview` | Serve the production build      |
 | `npm run lint`    | Lint `src/`, `tools/`, `mcp/`   |
+| `npm run typecheck` | Type-check the TypeScript in `src/` |
 | `npm run scene -- <map.json>` | Build a self-contained HTML test page for a scene into `scenes/` |
 | `npm run sheet`   | Draw the character sprite sheet and walk into `docs/images/` |
 | `npm run tactical-sheet` | Draw the tactical tile sheet (and with `--atlas` the tile atlas) into `docs/images/` |
@@ -804,11 +832,11 @@ every pull request. `PERF_BUDGET_MS`, `PERF_SIZE` and `PERF_CPU_THROTTLE` adjust
 | `npm run perf`    | Editor latency budget (Chromium)|
 | `npm run mcp`     | Run the MCP server on stdio     |
 
-Requires Node 18+.
+Requires Node 22.18+, which runs the TypeScript data models in Node tools and tests without a build step.
 
 ## CI and hosting
 
-`.github/workflows/ci.yml` lints and builds every pull request and every push to `main`. Pushes to
+`.github/workflows/ci.yml` lints, type-checks, tests and builds every pull request and every push to `main`. Pushes to
 `main` also publish `dist/` to GitHub Pages at <https://shuyi56.github.io/hexwright-atlas/>. Pages
 must be set to **Source: GitHub Actions** once, under the repository's Settings → Pages.
 
@@ -833,7 +861,8 @@ src/
   units/              The unit data page (units.html)
   skills/             The skill editor (skills.html)
   battle/             The battle in the tactical view: sides, hit points and MP, blows and abilities, turns and the player and enemy phases
-                      (state.js), and how the computer plays an enemy (ai.js); pure, no DOM
+                      (state.ts), the actions and what a blow does (actions.ts), and how the computer plays an
+                      enemy (ai.js); pure, no DOM
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
                       whole-pixel renderer, move ranges and the close-up camera screen
   town/               Town view: the painted height surface with its slopes, cliffs and depth buffer, the

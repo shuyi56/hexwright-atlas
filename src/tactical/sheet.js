@@ -4,7 +4,7 @@ import { BASE } from '../characters/body.js';
 import { H, W } from '../characters/pixels.js';
 import { byId, renderScaled } from '../characters/roster.js';
 import { TERRAIN } from '../tiles/terrain.js';
-import { TI, blankModel } from '../editor/model.js';
+import { TI, blankModel } from '../editor/model.ts';
 import { ASSET_BY_ID } from '../tiles/index.js';
 import { DESIGNS as BUILT } from './buildings.js';
 import { DESIGNS as GROWN } from './foliage.js';

@@ -4,7 +4,7 @@ import { drawSerpent, drawShip } from './sea.js';
 import { drawSettlement } from './settlements.js';
 import { drawCartouche, drawCompass, drawFrame } from './chrome.js';
 import { setCorridor, setRivDrawn, buildCorridor, buildRivers, buildRoads, drawRivers, drawRoads } from './rivers-roads.js';
-import { BIOME } from '../world/data.js';
+import { BIOME } from '../world/data.ts';
 import { INK, hexRgb, rgbStr } from './palette.js';
 import { drawSprawl, drawTerrainIcon } from './terrain.js';
 
