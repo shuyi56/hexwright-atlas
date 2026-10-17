@@ -1,0 +1,41 @@
+/* ================= the skill editor =================
+   The unit data page's layout and parts (units/units.css), and what only skills have: a swatch of each skill's
+   colour in the list, the effect picker with each effect's colours, the Never misses switch, the colour picker and the
+   table of who has the skill. */
+.sk-row{padding:7px 8px}
+.sk-swatch{width:26px;height:26px;flex:none;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fffaf0 0 18%,var(--c) 45%,transparent 72%);box-shadow:0 0 10px -2px var(--c)}
+.sk-note{font:italic 14px var(--ui);color:var(--muted)}
+.ub select.changed{border-color:var(--brass);color:var(--brass-2)}
+.sk .ub-value{grid-template-columns:120px 96px minmax(0,1fr)}
+.sk-hint{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12.5px;color:var(--muted)}
+.sk-toggle .chip{justify-self:start;min-width:64px}
+.sk-toggle .chip[aria-checked=true]{border-color:var(--brass-2);color:var(--brass-2);background:rgba(201,164,90,.14)}
+.sk-toggle.changed .chip{border-color:var(--brass)}
+.sk-fx{display:flex;flex-direction:column;gap:10px}
+.sk-fx.changed .ub-section{color:var(--brass-2)}
+.sk-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.sk-presets button{display:flex;flex-direction:column;align-items:stretch;gap:6px;background:var(--table);border:1px solid var(--line);border-radius:3px;color:var(--vellum);font:500 14px var(--ui);padding:7px 8px;cursor:pointer;text-align:left}
+.sk-presets button:hover{border-color:var(--brass)}
+.sk-presets button[aria-checked=true]{border-color:var(--brass-2);background:rgba(201,164,90,.14);color:var(--brass-2)}
+.sk-presets button:focus-visible,.sk-toggle .chip:focus-visible,.sk-tint input:focus-visible{outline:2px solid var(--brass-2);outline-offset:1px}
+.sk-ramp{display:flex;height:8px;border-radius:2px;overflow:hidden;background:#141c1d}
+.sk-ramp i{flex:1}
+.sk-tint input[type=color]{width:96px;height:36px;padding:2px;background:var(--table);border:1px solid var(--line);border-radius:3px;cursor:pointer}
+.sk-tint input[type=color]:disabled{opacity:.35;cursor:default}
+.sk-own{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--muted);cursor:pointer}
+.sk-users{display:flex;flex-direction:column;gap:8px}
+.sk-table{border-collapse:collapse;font-variant-numeric:tabular-nums;width:100%}
+.sk-table th,.sk-table td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:right;white-space:nowrap}
+.sk-table thead th{font:500 12.5px var(--ui-sc);letter-spacing:.06em;color:var(--muted)}
+.sk-table th:first-child{text-align:left}
+.sk-table tbody th a{color:var(--vellum);text-decoration:none;font-weight:500}
+.sk-table tbody th a:hover{color:var(--brass-2);text-decoration:underline}
+.sk-table td.ub-warn{color:#e6a08e}
+.sk .ub-card{align-items:start}
+.sk-stage{position:sticky;top:0;padding:24px 12px 14px}
+#stage{display:block;width:100%;max-width:448px;height:auto;image-rendering:pixelated}
+@media (max-width:760px){
+  .sk .ub-value{grid-template-columns:100px 84px minmax(0,1fr)}
+  #stage{max-width:100%}
+  .sk-stage{position:static}
+}

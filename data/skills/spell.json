@@ -1,0 +1,17 @@
+{
+  "id": "spell",
+  "label": "Spell",
+  "kind": "damage",
+  "cost": 8,
+  "power": 200,
+  "pierce": 50,
+  "sure": false,
+  "healBase": 8,
+  "healScale": 200,
+  "fx": {
+    "preset": "spell",
+    "tint": "",
+    "scale": 100,
+    "density": 100
+  }
+}

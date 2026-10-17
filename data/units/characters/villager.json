@@ -3,9 +3,16 @@
   "name": "Villager",
   "stats": {
     "hp": 24,
+    "mp": 0,
     "attack": 4,
+    "defense": 1,
+    "accuracy": 80,
+    "evasion": 5,
+    "crit": 2,
+    "critDamage": 150,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "none"
   },
   "movement": {
     "move": 4,

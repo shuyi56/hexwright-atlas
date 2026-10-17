@@ -3,9 +3,16 @@
   "name": "Knight",
   "stats": {
     "hp": 58,
+    "mp": 8,
     "attack": 13,
+    "defense": 9,
+    "accuracy": 90,
+    "evasion": 3,
+    "crit": 5,
+    "critDamage": 150,
     "range": 1,
-    "pattern": "melee"
+    "pattern": "melee",
+    "ability": "power"
   },
   "movement": {
     "move": 3,

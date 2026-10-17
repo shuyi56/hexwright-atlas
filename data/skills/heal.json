@@ -1,0 +1,17 @@
+{
+  "id": "heal",
+  "label": "Heal",
+  "kind": "heal",
+  "cost": 6,
+  "power": 100,
+  "pierce": 0,
+  "sure": false,
+  "healBase": 8,
+  "healScale": 200,
+  "fx": {
+    "preset": "heal",
+    "tint": "",
+    "scale": 100,
+    "density": 100
+  }
+}

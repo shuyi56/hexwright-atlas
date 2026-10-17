@@ -1,0 +1,17 @@
+{
+  "id": "power",
+  "label": "Power Strike",
+  "kind": "damage",
+  "cost": 6,
+  "power": 150,
+  "pierce": 0,
+  "sure": false,
+  "healBase": 8,
+  "healScale": 200,
+  "fx": {
+    "preset": "power",
+    "tint": "",
+    "scale": 100,
+    "density": 100
+  }
+}

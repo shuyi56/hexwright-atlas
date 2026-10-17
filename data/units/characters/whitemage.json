@@ -3,9 +3,16 @@
   "name": "White Mage",
   "stats": {
     "hp": 32,
+    "mp": 30,
     "attack": 4,
+    "defense": 2,
+    "accuracy": 92,
+    "evasion": 5,
+    "crit": 3,
+    "critDamage": 150,
     "range": 3,
-    "pattern": "ranged"
+    "pattern": "ranged",
+    "ability": "heal"
   },
   "movement": {
     "move": 3,

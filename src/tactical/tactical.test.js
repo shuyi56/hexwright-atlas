@@ -4,6 +4,8 @@ import { TI, blankModel } from '../editor/model.js';
 import { FACE_DELTA, placeChar } from '../editor/walk.js';
 import { STRIKE, WINDUP } from '../characters/body.js';
 import { ARROW_SPEED, GHOST, LUNGE, blowAt, blowPlan, faceToward } from './blow.js';
+import { abilityFx, createFx, emit, lookOf, seeded, stepFx, tintRamp } from './particles.js';
+import { listAbilities } from '../battle/abilities.js';
 import { TERRAIN } from '../tiles/terrain.js';
 import { MOVE, moveRange, placeId, routeTo } from './move.js';
 import { P, buildScene, liftOf, pickTile, withFigures } from './scene.js';
@@ -235,6 +237,50 @@ test('the target flashes twice and reels when the blow lands, and fades to a gho
     assert.ok(Math.abs(blowAt(p, p.end).alpha - (fell ? GHOST : 1)) < 1e-9, `fell ${fell}`);
   }
 });
+test('a miss neither flashes nor sparks: the target sways out of the way and stands again', () => {
+  const p = blowPlan({ kind: 'swing', ranged: null }, 1, true, true);
+  assert.ok(p.missed && !p.fell, 'a miss fells no one');
+  assert.ok(sample(p, s => !s.flash && s.spark === null && s.alpha === 1).every(([, v]) => v));
+  assert.ok(blowAt(p, p.impact).knock > 0, 'swaying back as the blow arrives'); assert.equal(blowAt(p, p.end).knock, 0);
+});
 test('a unit turns to face its target the way a walk would face it', () => {
   FACE_DELTA.forEach((d, f) => { assert.equal(faceToward([5, 5], [5 + d[0], 5 + d[1]]), f); assert.equal(faceToward([5, 5], [5 + 3 * d[0], 5 + 3 * d[1] + (d[0] ? 1 : 0)]), f); });
+});
+
+/* ---------- the abilities' particles (particles.js) ---------- */
+test('every ability charges up on its user and bursts where it lands, and its particles die away', () => {
+  for (const { id, fx: effect } of listAbilities()) {
+    const rnd = seeded(3), charge = abilityFx(effect, 'charge', [0, 0], [40, 10], { rnd }), impact = abilityFx(effect, 'impact', [0, 0], [40, 10], { rnd });
+    assert.ok(charge.length >= 8 && impact.length >= 8, `${id} has both beats`);
+    const fx = emit(createFx(), [...charge, ...impact]);
+    for (let i = 0; i < 40; i++) stepFx(fx, 0.05);
+    assert.equal(fx.parts.length, 0, `${id}'s particles are gone within two seconds`);
+  }
+  assert.ok(abilityFx('power', 'fizzle', [0, 0], [40, 10], { rnd: seeded(1) }).length, 'a miss fizzles');
+  assert.deepEqual(abilityFx('attack', 'impact', [0, 0], [1, 1]), [], 'a plain attack has none');
+  assert.deepEqual(abilityFx({ preset: 'none' }, 'impact', [0, 0], [1, 1]), [], 'nor does the None effect');
+});
+test('a skill\'s effect takes its colour, size and particle count', () => {
+  const base = abilityFx({ preset: 'power' }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  const more = abilityFx({ preset: 'power', density: 200 }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  const fewer = abilityFx({ preset: 'power', density: 50 }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  assert.deepEqual([more.length, fewer.length], [base.length * 2, Math.round(base.length / 2)]);
+  assert.equal(abilityFx({ preset: 'power', density: 0 }, 'impact', [0, 0], [40, 10]).length, 0);
+  const big = abilityFx({ preset: 'power', scale: 200 }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  assert.equal(big[0].vx, base[0].vx * 2, 'twice the size flies twice as fast'); assert.deepEqual([big[0].x, big[0].y], [40, 10], 'from the same place');
+  const blue = abilityFx({ preset: 'pierce', tint: '#3060ff' }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  assert.deepEqual(blue[0].colors, tintRamp('#3060ff', 4)); assert.equal(tintRamp('#3060ff', 5)[0], '#ffffff');
+  const own = abilityFx({ preset: 'spell' }, 'impact', [0, 0], [40, 10], { tint: '#ff00ff', rnd: seeded(5) });
+  assert.ok(own[0].colors.includes('#ff00ff'), 'an arcane burst with no colour of its own takes the caster\'s');
+});
+test('a particle waits out its delay, moves under its pull and drag, and fades over its last third', () => {
+  const fx = emit(createFx(), [{ x: 0, y: 0, vx: 10, vy: 0, ay: 20, drag: 1, life: 1, delay: 0.5 }, { x: 0, y: 0, life: 1 }]);
+  assert.equal(lookOf(fx.parts[0]), null, 'not shown while waiting');
+  stepFx(fx, 0.25); assert.deepEqual([fx.parts[0].x, fx.parts[0].delay], [0, 0.25], 'still waiting');
+  stepFx(fx, 0.5);
+  const [p, q] = fx.parts;
+  assert.ok(Math.abs(p.age - 0.25) < 1e-9 && Math.abs(p.x - 2.5) < 1e-9 && p.vy > 0, 'the leftover quarter second moves it, falling');
+  assert.ok(Math.abs(q.age - 0.75) < 1e-9, 'its delay does not hold up the next particle');
+  assert.equal(lookOf(p).alpha, 1); assert.ok(lookOf(q).alpha < 1);
+  const a = seeded(9), b = seeded(9); assert.deepEqual([a(), a()], [b(), b()], 'the same seed gives the same effect');
 });

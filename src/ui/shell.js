@@ -41,7 +41,7 @@ function ensureEditor() {
 }
 
 function go(id) {
-  if (id === 'units') { location.href = './units.html'; return; }
+  if (id === 'units' || id === 'skills') { location.href = `./${id}.html`; return; }
   if (!MODULE_IDS.includes(id) || id === showing()) return;
   if (id === 'atlas') { closeAbove(false); scenesEl.hidden = true; $('map').focus({ preventScroll: true }); }
   else if (id === 'scenes') { closeAbove(false); showScenes(); }
@@ -53,7 +53,7 @@ function go(id) {
   }
 }
 
-const setActive = mountRail(go, 'atlas', { skip: ON_SCENE_PAGE ? ['units'] : [] });
+const setActive = mountRail(go, 'atlas', { skip: ON_SCENE_PAGE ? ['units', 'skills'] : [] });
 function sync() {
   const id = showing(); setActive(id);
   if (ON_SCENE_PAGE) return;

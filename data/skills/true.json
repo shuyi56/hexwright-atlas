@@ -1,0 +1,17 @@
+{
+  "id": "true",
+  "label": "True Strike",
+  "kind": "damage",
+  "cost": 4,
+  "power": 100,
+  "pierce": 0,
+  "sure": true,
+  "healBase": 8,
+  "healScale": 200,
+  "fx": {
+    "preset": "true",
+    "tint": "",
+    "scale": 100,
+    "density": 100
+  }
+}

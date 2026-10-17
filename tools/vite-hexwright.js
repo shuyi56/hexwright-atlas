@@ -1,4 +1,5 @@
 import { METHODS } from '../src/editor/api-spec.js';
+import { deleteSkill, readSkills, writeSkill } from './skills-store.mjs';
 import { deleteUnit, readUnits, writeUnit } from './units-store.mjs';
 
 /* ================= Hexwright bridge: Vite plugin (server side) =================
@@ -11,11 +12,15 @@ import { deleteUnit, readUnits, writeUnit } from './units-store.mjs';
      GET    /__hexwright/units                every unit data file (data/units/), normalized
      PUT    /__hexwright/units/<group>/<id>   body = the unit; writes data/units/<group>/<id>.json
      DELETE /__hexwright/units/<group>/<id>   removes that file
+     GET    /__hexwright/skills               every skill data file (data/skills/), normalized
+     PUT    /__hexwright/skills/<id>          body = the skill; writes data/skills/<id>.json
+     DELETE /__hexwright/skills/<id>          removes that file
 
    Calls travel over Vite's HMR websocket to src/editor/bridge.js in the page, which runs them on
    window.hexwright. The MCP server in mcp/ is a thin client of these endpoints. The units endpoints are how the
-   unit data page (units.html) saves; they touch only files under data/units/ (tools/units-store.mjs). Dev
-   server only. */
+   unit data page (units.html) saves; they touch only files under data/units/ (tools/units-store.mjs). The skills
+   endpoints are the same for the skill editor (skills.html) and data/skills/ (tools/skills-store.mjs). Dev server
+   only. */
 export default function hexwrightBridge() {
   return {
     name: 'hexwright-bridge', apply: 'serve',
@@ -55,6 +60,13 @@ export default function hexwrightBridge() {
             try { return send(res, 200, { ok: true, ...writeUnit(um[1], raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
           }
           if (um && req.method === 'DELETE') return send(res, 200, { ok: true, deleted: deleteUnit(um[1], um[2], server.config.root) });
+          if (path === '/skills' && req.method === 'GET') return send(res, 200, { ok: true, skills: readSkills(server.config.root).map(({ file, skill }) => ({ file, skill })) });
+          const sm = path.match(/^\/skills\/([a-z0-9-]+)$/);
+          if (sm && req.method === 'PUT') {
+            const raw = await body(req); if (raw.id !== sm[1]) return send(res, 400, { ok: false, error: { message: `the body's id "${raw.id}" does not match the path's "${sm[1]}"` } });
+            try { return send(res, 200, { ok: true, ...writeSkill(raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
+          }
+          if (sm && req.method === 'DELETE') return send(res, 200, { ok: true, deleted: deleteSkill(sm[1], server.config.root) });
           let method, params, page, timeoutMs;
           if (path.startsWith('/api/') && (req.method === 'POST' || req.method === 'GET')) { method = decodeURIComponent(path.slice(5)); params = req.method === 'POST' ? await body(req) : {}; page = new URL(req.url, 'http://x').searchParams.get('page') || undefined; }
           else if (path === '/call' && req.method === 'POST') ({ method, params, page, timeoutMs } = await body(req));

@@ -3,9 +3,16 @@
   "name": "Alchemist",
   "stats": {
     "hp": 22,
+    "mp": 20,
     "attack": 5,
+    "defense": 2,
+    "accuracy": 92,
+    "evasion": 6,
+    "crit": 3,
+    "critDamage": 150,
     "range": 3,
-    "pattern": "ranged"
+    "pattern": "ranged",
+    "ability": "heal"
   },
   "movement": {
     "move": 3,

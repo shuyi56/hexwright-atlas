@@ -1,0 +1,17 @@
+{
+  "id": "pierce",
+  "label": "Pierce",
+  "kind": "damage",
+  "cost": 5,
+  "power": 100,
+  "pierce": 100,
+  "sure": false,
+  "healBase": 8,
+  "healScale": 200,
+  "fx": {
+    "preset": "pierce",
+    "tint": "",
+    "scale": 100,
+    "density": 100
+  }
+}
