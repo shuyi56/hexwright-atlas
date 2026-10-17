@@ -1,23 +1,5 @@
 {
   "id": "bandit",
   "name": "Bandit",
-  "stats": {
-    "hp": 38,
-    "mp": 6,
-    "attack": 10,
-    "defense": 4,
-    "accuracy": 90,
-    "evasion": 12,
-    "crit": 10,
-    "critDamage": 160,
-    "range": 1,
-    "pattern": "melee",
-    "abilities": [
-      "power"
-    ]
-  },
-  "movement": {
-    "move": 5,
-    "jump": 2
-  }
+  "class": "bandit"
 }

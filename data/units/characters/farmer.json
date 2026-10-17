@@ -1,21 +1,5 @@
 {
   "id": "farmer",
   "name": "Farmer",
-  "stats": {
-    "hp": 28,
-    "mp": 0,
-    "attack": 6,
-    "defense": 2,
-    "accuracy": 85,
-    "evasion": 5,
-    "crit": 3,
-    "critDamage": 150,
-    "range": 1,
-    "pattern": "melee",
-    "abilities": []
-  },
-  "movement": {
-    "move": 4,
-    "jump": 1
-  }
+  "class": "farmer"
 }

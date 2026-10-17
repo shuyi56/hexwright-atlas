@@ -1,0 +1,148 @@
+/* ================= class data: how a kind of fighter plays =================
+   A class is a job, such as Knight, Archer or Goblin: how much damage it takes and deals, how much of it its
+   Defense turns aside, how surely it hits (Accuracy) and dodges (Evasion), how often its blows are critical (Crit,
+   in percent) and for how much (Crit Damage, a percent of the damage), the MP its abilities spend, how many tiles
+   away it can strike and in what pattern, the abilities it has, how far it moves and how high it jumps, and the
+   sprite it looks like in the class editor. Characters and enemies (data/units.ts) are people: each names the class
+   it plays as and may change a few of its numbers. Each class is one JSON file under data/classes/, named by its id:
+
+     data/classes/goblin.json
+     { "id": "goblin", "name": "Goblin", "sprite": "goblin",
+       "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "abilities": [] },
+       "movement": { "move": 5, "jump": 2 } }
+
+   How the numbers play in a fight is in src/battle/actions.ts; what each ability does is in data/skills/
+   (src/data/skills.ts).
+
+   The attack pattern says which tiles an attack reaches (src/tactical/attack.js): melee, the four tiles beside the
+   unit and not the diagonals, whatever its range; line, straight out along the grid in the four directions up to
+   its range; ranged, every tile within its range in steps along the grid.
+
+   Pure (no DOM, no Vite), so Node tools, tests and the browser share it. In the browser data/class-files.js loads
+   the files into the registry below; on the dev server the class editor (classes.html) writes them back through
+   the Hexwright bridge (tools/classes-store.mjs). */
+import { NO_SKILL } from './skills.ts';
+
+type AttackPattern = 'melee' | 'line' | 'ranged';
+/* the numbers a unit fights with, as a blow (battle/actions.ts) reads them */
+interface CombatStats { attack: number; defense: number; accuracy: number; evasion: number; crit: number; critDamage: number }
+interface UnitStats extends CombatStats { hp: number; mp: number; range: number; pattern: AttackPattern; abilities: string[] }
+interface UnitMovement { move: number; jump: number }
+/* a class as its file holds it, in canonical form: sprite is the roster or library sprite it looks like, or '' */
+interface ClassData { id: string; name: string; sprite: string; stats: UnitStats; movement: UnitMovement }
+type Section = 'stats' | 'movement';
+type NumberKey = Exclude<keyof UnitStats, 'pattern' | 'abilities'> | keyof UnitMovement;
+type Field<K> = readonly [key: K, label: string, min: number, max: number, def: number];
+
+/* every number a class has, by section: [key, label, min, max, default] */
+const FIELDS: { readonly stats: readonly Field<Exclude<keyof UnitStats, 'pattern' | 'abilities'>>[]; readonly movement: readonly Field<keyof UnitMovement>[] } = {
+  stats: [
+    ['hp', 'HP', 1, 999, 30],
+    ['mp', 'MP', 0, 999, 0],
+    ['attack', 'Attack', 0, 99, 8],
+    ['defense', 'Defense', 0, 99, 2],
+    ['accuracy', 'Accuracy', 0, 200, 90],
+    ['evasion', 'Evasion', 0, 99, 5],
+    ['crit', 'Crit %', 0, 100, 5],
+    ['critDamage', 'Crit Damage %', 100, 400, 150],
+    ['range', 'Range', 1, 8, 1]],
+  movement: [
+    ['move', 'Move', 1, 12, 5],
+    ['jump', 'Jump', 0, 6, 1]] };
+const SECTIONS = Object.keys(FIELDS) as Section[];
+/* the attack pattern, kept in stats after range: [id, label] */
+const PATTERNS: readonly (readonly [AttackPattern, string])[] = [['melee', 'Melee'], ['line', 'Line'], ['ranged', 'Ranged']];
+const PATTERN_IDS: readonly string[] = PATTERNS.map(([id]) => id), DEFAULT_PATTERN: AttackPattern = 'melee';
+const ID_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
+/* the abilities that spend MP, kept in stats after the pattern: the ids of skills in data/skills/ (data/skills.ts),
+   up to MAX_ABILITIES, in the order its menus list them. One that names no skill there is left out of its menus; the
+   class editor says so. A file from before units had several holds one as "ability" (or "none"). */
+const MAX_ABILITIES = 8;
+const abilitiesOf = (stats: Record<string, unknown>): string[] => {
+  const raw = Array.isArray(stats.abilities) ? stats.abilities : stats.ability != null ? [stats.ability] : [];
+  return [...new Set(raw.map(a => String(a ?? '').trim().toLowerCase()).filter(a => ID_RE.test(a) && a !== NO_SKILL))].slice(0, MAX_ABILITIES);
+};
+const patternOf = (v: unknown): AttackPattern | null => { const p = String(v ?? '').trim().toLowerCase(); return PATTERN_IDS.includes(p) ? p as AttackPattern : null; };
+
+const clampInt = (v: unknown, lo: number, hi: number, def: number): number => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
+const numbers = (sec: Section, src: Record<string, unknown>) => Object.fromEntries((FIELDS[sec] as readonly Field<string>[]).map(([k, , lo, hi, d]) => [k, clampInt(src[k], lo, hi, d)]));
+/* the field of a number by its key, in whichever section it is */
+const fieldOf = (sec: Section, k: string): Field<string> | undefined => (FIELDS[sec] as readonly Field<string>[]).find(f => f[0] === k);
+const objectOf = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v : {}) as Record<string, unknown>;
+const DEFAULT_STATS: Readonly<UnitStats> = Object.freeze({ ...numbers('stats', {}), pattern: DEFAULT_PATTERN, abilities: Object.freeze([]) as unknown as string[] } as UnitStats);
+const DEFAULT_MOVEMENT: Readonly<UnitMovement> = Object.freeze(numbers('movement', {}) as unknown as UnitMovement);
+const DEFAULT_CLASS: Readonly<ClassData> = Object.freeze({ id: '', name: '', sprite: '', stats: DEFAULT_STATS, movement: DEFAULT_MOVEMENT });
+
+/* a class's stats and movement in canonical form, from raw sections: shared with the per-character changes
+   (data/units.ts), which are checked number by number the same way */
+const statsOf = (stats: Record<string, unknown>): UnitStats => ({ ...numbers('stats', stats), pattern: patternOf(stats.pattern) || DEFAULT_PATTERN, abilities: abilitiesOf(stats) } as UnitStats);
+const movementOf = (mv: Record<string, unknown>): UnitMovement => numbers('movement', mv) as unknown as UnitMovement;
+
+/* ---------- a class ---------- */
+class UnitClass implements ClassData {
+  id: string;
+  name: string;
+  sprite: string;
+  stats: UnitStats;
+  movement: UnitMovement;
+  constructor({ id, name, sprite, stats, movement }: ClassData) { this.id = id; this.name = name; this.sprite = sprite; this.stats = stats; this.movement = movement; }
+  toJSON(): ClassData { return { id: this.id, name: this.name, sprite: this.sprite, stats: { ...this.stats, abilities: [...this.stats.abilities] }, movement: { ...this.movement } }; }
+}
+
+/* a class in canonical form: known fields only, in a fixed order, every number a whole number within its range and
+   anything missing filled from the defaults. A unit file from before classes (stats and movement, no class) reads
+   as a class of the same id that looks like its sprite. */
+function normalizeClass(raw: unknown): ClassData {
+  const J = objectOf(raw), id = String(J.id ?? '').trim().toLowerCase();
+  const sprite = J.sprite == null ? id : String(J.sprite).trim().toLowerCase();
+  return { id, name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''), sprite: ID_RE.test(sprite) ? sprite : '',
+    stats: statsOf(objectOf(J.stats)), movement: movementOf(objectOf(J.movement)) };
+}
+/* what is wrong with one number, or with the pattern or abilities, of a stats or movement section, as sentences */
+function sectionErrors(sec: Section, src: Record<string, unknown>): string[] {
+  const errs: string[] = [];
+  for (const [k, v] of Object.entries(src)) {
+    const f = fieldOf(sec, k); if (!f || v == null) continue;
+    const [, label, lo, hi] = f;
+    if (typeof v !== 'number' || !Number.isInteger(v)) errs.push(`${label} must be a whole number`); else if (v < lo || v > hi) errs.push(`${label} must be between ${lo} and ${hi}`);
+  }
+  if (sec !== 'stats') return errs;
+  if (src.pattern != null && !patternOf(src.pattern)) errs.push(`Pattern must be one of ${PATTERN_IDS.join(', ')}`);
+  if (src.ability != null && (typeof src.ability !== 'string' || !ID_RE.test(src.ability))) errs.push('Ability must be "none" or a skill id');
+  const abs = src.abilities;
+  if (abs != null) {
+    if (!Array.isArray(abs)) errs.push('Abilities must be a list of skill ids');
+    else { if (abs.some(a => typeof a !== 'string' || !ID_RE.test(a) || a === NO_SKILL)) errs.push('Abilities must be skill ids'); if (abs.length > MAX_ABILITIES) errs.push(`A unit has up to ${MAX_ABILITIES} abilities`); }
+  }
+  return errs;
+}
+/* what is wrong with a raw class, as sentences; empty when it is fine. Values out of range are reported here,
+   though normalizeClass would clamp them, so an editor can say why a number changed. */
+function validateClass(raw: unknown): string[] {
+  if (!raw || typeof raw !== 'object') return ['a class must be an object'];
+  const J = raw as Record<string, unknown>, errs: string[] = [];
+  if (typeof J.id !== 'string' || !ID_RE.test(J.id)) errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit');
+  if (J.name != null && typeof J.name !== 'string') errs.push('name must be text');
+  if (J.sprite != null && J.sprite !== '' && (typeof J.sprite !== 'string' || !ID_RE.test(J.sprite))) errs.push('sprite must be a sprite id');
+  for (const s of SECTIONS) errs.push(...sectionErrors(s, objectOf(J[s])));
+  return errs;
+}
+/* the file a class lives in, relative to the project root, and its text: two-space JSON with a final newline */
+const classPath = (id: string): string => `data/classes/${id}.json`;
+const classText = (cls: unknown): string => JSON.stringify(normalizeClass(cls), null, 2) + '\n';
+
+/* ---------- the registry: the classes the game plays with ---------- */
+const CLASSES = new Map<string, UnitClass>(), listeners = new Set<() => void>();
+/* replace every class with these raw classes */
+function setClasses(list: Iterable<unknown>): void {
+  CLASSES.clear();
+  for (const raw of list) { const c = new UnitClass(normalizeClass(raw)); if (c.id) CLASSES.set(c.id, c); }
+  for (const f of listeners) f();
+}
+const onClassesChange = (f: () => void): (() => boolean) => { listeners.add(f); return () => listeners.delete(f); };
+/* every class, in name order */
+const listClasses = (): UnitClass[] => [...CLASSES.values()].sort((a, b) => a.name.localeCompare(b.name));
+const getClass = (id: string): UnitClass | null => CLASSES.get(id) || null;
+
+export { DEFAULT_CLASS, DEFAULT_MOVEMENT, DEFAULT_PATTERN, DEFAULT_STATS, FIELDS, ID_RE, MAX_ABILITIES, PATTERNS, SECTIONS, UnitClass, classPath, classText, clampInt, fieldOf, getClass, listClasses, movementOf, normalizeClass, objectOf, onClassesChange, patternOf, abilitiesOf, sectionErrors, setClasses, statsOf, validateClass };
+export type { AttackPattern, ClassData, CombatStats, NumberKey, Section, UnitMovement, UnitStats };

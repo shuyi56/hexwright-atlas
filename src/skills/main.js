@@ -11,7 +11,7 @@ import { abilityFx, createFx, drawFx, emit, stepFx, tintRamp } from '../tactical
 import { characterById } from '../characters/library.js';
 import { attackOf, render } from '../characters/roster.js';
 import { H as FH, W as FW } from '../characters/pixels.js';
-import { mountRail } from '../ui/rail.js';
+import { goFromDataPage, mountRail } from '../ui/rail.js';
 
 /* ================= the skill editor =================
    Every skill in data/skills/ (src/data/skills.ts) to read and change: a list down the side, and a card per skill
@@ -24,7 +24,7 @@ import { mountRail } from '../ui/rail.js';
 const $ = id => document.getElementById(id);
 const WRITABLE = import.meta.env.DEV;
 /* the module rail: the unit data page is a page of its own, every other module lives on the atlas page */
-mountRail(id => { if (id === 'units') location.href = './units.html'; else if (id !== 'skills') location.href = id === 'atlas' ? './index.html' : `./index.html#${id}`; }, 'skills');
+mountRail(goFromDataPage('skills'), 'skills');
 const SAVE_URL = id => `/__hexwright/skills/${id}`;
 
 /* id -> { draft, saved }: saved is null for a skill not yet written */
@@ -148,7 +148,7 @@ const rampOf = (id, tint) => (id === 'none' ? [] : tint ? tintRamp(tint, OWN_RAM
 /* who has it, and what it comes to for each against the other side on average next to a plain attack */
 function usersSection(e) {
   const d = e.draft, a = asAbility(d), users = usersOf(d.id);
-  if (!users.length) return `<section class="sk-users"><h3 class="ub-section">Who has it</h3><p class="ub-dim">No unit has it yet. Give it to one on the <a class="ub-link" href="./units.html">unit data page</a>.</p></section>`;
+  if (!users.length) return `<section class="sk-users"><h3 class="ub-section">Who has it</h3><p class="ub-dim">No unit has it yet. Give it to a class in the <a class="ub-link" href="./classes.html">class editor</a>.</p></section>`;
   const all = listUnits(), avg = (list, f) => (list.length ? Math.round(list.reduce((n, o) => n + f(o), 0) / list.length) : 0);
   const rows = users.map(u => {
     const st = u.stats, foes = all.filter(o => o.group !== u.group).map(o => o.stats), uses = d.cost ? Math.floor(st.mp / d.cost) : null;

@@ -1,0 +1,22 @@
+{
+  "id": "noble",
+  "name": "Noble Lady",
+  "sprite": "noble",
+  "stats": {
+    "hp": 26,
+    "mp": 0,
+    "attack": 3,
+    "defense": 2,
+    "accuracy": 82,
+    "evasion": 6,
+    "crit": 2,
+    "critDamage": 150,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": []
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

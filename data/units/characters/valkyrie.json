@@ -1,23 +1,5 @@
 {
   "id": "valkyrie",
   "name": "Valkyrie",
-  "stats": {
-    "hp": 48,
-    "mp": 12,
-    "attack": 13,
-    "defense": 6,
-    "accuracy": 95,
-    "evasion": 10,
-    "crit": 10,
-    "critDamage": 160,
-    "range": 2,
-    "pattern": "line",
-    "abilities": [
-      "pierce"
-    ]
-  },
-  "movement": {
-    "move": 4,
-    "jump": 2
-  }
+  "class": "valkyrie"
 }

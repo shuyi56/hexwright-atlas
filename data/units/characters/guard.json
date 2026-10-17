@@ -1,23 +1,5 @@
 {
   "id": "guard",
   "name": "Guard",
-  "stats": {
-    "hp": 48,
-    "mp": 6,
-    "attack": 11,
-    "defense": 7,
-    "accuracy": 90,
-    "evasion": 5,
-    "crit": 5,
-    "critDamage": 150,
-    "range": 2,
-    "pattern": "line",
-    "abilities": [
-      "power"
-    ]
-  },
-  "movement": {
-    "move": 4,
-    "jump": 1
-  }
+  "class": "guard"
 }

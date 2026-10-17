@@ -1,0 +1,24 @@
+{
+  "id": "healer",
+  "name": "Healer",
+  "sprite": "healer",
+  "stats": {
+    "hp": 30,
+    "mp": 26,
+    "attack": 3,
+    "defense": 2,
+    "accuracy": 90,
+    "evasion": 6,
+    "crit": 3,
+    "critDamage": 150,
+    "range": 2,
+    "pattern": "ranged",
+    "abilities": [
+      "heal"
+    ]
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  }
+}

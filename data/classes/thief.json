@@ -1,0 +1,24 @@
+{
+  "id": "thief",
+  "name": "Thief",
+  "sprite": "thief",
+  "stats": {
+    "hp": 36,
+    "mp": 8,
+    "attack": 9,
+    "defense": 3,
+    "accuracy": 100,
+    "evasion": 22,
+    "crit": 20,
+    "critDamage": 175,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": [
+      "true"
+    ]
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  }
+}

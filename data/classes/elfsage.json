@@ -1,0 +1,24 @@
+{
+  "id": "elfsage",
+  "name": "Elf Sage",
+  "sprite": "elfsage",
+  "stats": {
+    "hp": 32,
+    "mp": 28,
+    "attack": 5,
+    "defense": 2,
+    "accuracy": 95,
+    "evasion": 6,
+    "crit": 5,
+    "critDamage": 150,
+    "range": 3,
+    "pattern": "ranged",
+    "abilities": [
+      "spell"
+    ]
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

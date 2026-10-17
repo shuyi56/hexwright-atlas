@@ -1,94 +1,117 @@
-/* ================= unit data: what a character or enemy can do =================
-   The roster (characters/) says how everyone looks; this says how they play: how much damage they take and deal,
-   how much of it their Defense turns aside, how surely they hit (Accuracy) and dodge (Evasion), how often their blows
-   are critical (Crit, in percent) and for how much (Crit Damage, a percent of the damage), the MP their abilities
-   spend, how many tiles away they can strike, how far they move and how high they jump. Each unit is one JSON file
-   under data/units/, in characters/ or enemies/, named by its id, which is the id of the sprite it plays as:
+/* ================= unit data: the characters and enemies =================
+   The roster (characters/) says how everyone looks; the classes (data/classes.ts) say how each kind of fighter
+   plays. A unit is one person on a map: its own name, the class it plays as, and any numbers of its own that it
+   has in place of its class's (a tougher captain of the guard, say). Each unit is one JSON file under data/units/,
+   in characters/ or enemies/, named by its id, which is the id of the sprite it plays as:
 
      data/units/enemies/goblin.json
-     { "id": "goblin", "name": "Goblin",
-       "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "abilities": [] },
-       "movement": { "move": 5, "jump": 2 } }
+     { "id": "goblin", "name": "Goblin", "class": "goblin" }
 
-   How the numbers play in a fight is in src/battle/actions.ts; what each ability does is in data/skills/
-   (src/data/skills.ts).
+     data/units/characters/captain.json
+     { "id": "captain", "name": "Captain Hale", "class": "knight",
+       "overrides": { "stats": { "hp": 70, "range": 2, "pattern": "line" }, "movement": { "move": 4 } } }
 
-   The attack pattern says which tiles an attack reaches (src/tactical/attack.js): melee, the four tiles beside the
-   unit and not the diagonals, whatever its range; line, straight out along the grid in the four directions up to
-   its range; ranged, every tile within its range in steps along the grid.
+   Overrides hold only the numbers that differ, in the class's own sections and ranges; the pattern and the
+   abilities (a whole list) can be overridden too. Everything else follows the class, so a change in the class
+   editor reaches every unit of that class.
 
    A file is read as UnitData (normalizeUnit puts it in canonical form). Characters and enemies have the same fields,
    so both are a Unit; the registry holds each as a Character or an Enemy by its group, which also says the side it
-   fights on.
+   fights on. A Unit carries its class's numbers with its overrides laid over them, so the battle reads stats and
+   movement from it without knowing about classes.
 
    Pure (no DOM, no Vite), so Node tools, tests and the browser share it. In the browser data/unit-files.js loads
-   the files into the registry below; on the dev server the unit data page (units.html) writes them back through
-   the Hexwright bridge (tools/units-store.mjs). A sprite with no file (a custom character, say) plays with
-   DEFAULT_UNIT. */
-import { NO_SKILL } from './skills.ts';
+   the files into the registry below; on the dev server the unit page (units.html) writes them back through the
+   Hexwright bridge (tools/units-store.mjs). A sprite with no file (a custom character, say) plays with
+   DEFAULT_UNIT, and so does a unit whose class has no file. */
+import { DEFAULT_MOVEMENT, DEFAULT_STATS, FIELDS, ID_RE, SECTIONS, abilitiesOf, clampInt, getClass, objectOf, onClassesChange, patternOf, sectionErrors } from './classes.ts';
+import type { AttackPattern, CombatStats, Section, UnitMovement, UnitStats } from './classes.ts';
+import type { UnitClass } from './classes.ts';
 
 type UnitGroup = 'characters' | 'enemies';
 type Side = 'player' | 'enemy';
-type AttackPattern = 'melee' | 'line' | 'ranged';
-/* the numbers a unit fights with, as a blow (battle/actions.ts) reads them */
-interface CombatStats { attack: number; defense: number; accuracy: number; evasion: number; crit: number; critDamage: number }
-interface UnitStats extends CombatStats { hp: number; mp: number; range: number; pattern: AttackPattern; abilities: string[] }
-interface UnitMovement { move: number; jump: number }
-/* a unit as its file holds it, in canonical form */
-interface UnitData { id: string; name: string; stats: UnitStats; movement: UnitMovement }
-type Section = keyof Pick<UnitData, 'stats' | 'movement'>;
-type Field<K> = readonly [key: K, label: string, min: number, max: number, def: number];
+/* the numbers a unit has in place of its class's: any of them, none required */
+interface UnitOverrides { stats?: Partial<UnitStats>; movement?: Partial<UnitMovement> }
+/* a unit as its file holds it, in canonical form; overrides is left out when it has none */
+interface UnitData { id: string; name: string; class: string; overrides?: UnitOverrides }
 
 const GROUPS: readonly UnitGroup[] = ['characters', 'enemies'];
 const GROUP_LABEL: Readonly<Record<UnitGroup, string>> = { characters: 'Characters', enemies: 'Enemies' };
-/* every number a unit has, by section: [key, label, min, max, default] */
-const FIELDS: { readonly stats: readonly Field<Exclude<keyof UnitStats, 'pattern' | 'abilities'>>[]; readonly movement: readonly Field<keyof UnitMovement>[] } = {
-  stats: [
-    ['hp', 'HP', 1, 999, 30],
-    ['mp', 'MP', 0, 999, 0],
-    ['attack', 'Attack', 0, 99, 8],
-    ['defense', 'Defense', 0, 99, 2],
-    ['accuracy', 'Accuracy', 0, 200, 90],
-    ['evasion', 'Evasion', 0, 99, 5],
-    ['crit', 'Crit %', 0, 100, 5],
-    ['critDamage', 'Crit Damage %', 100, 400, 150],
-    ['range', 'Range', 1, 8, 1]],
-  movement: [
-    ['move', 'Move', 1, 12, 5],
-    ['jump', 'Jump', 0, 6, 1]] };
-const SECTIONS = Object.keys(FIELDS) as Section[];
-/* the attack pattern, kept in stats after range: [id, label] */
-const PATTERNS: readonly (readonly [AttackPattern, string])[] = [['melee', 'Melee'], ['line', 'Line'], ['ranged', 'Ranged']];
-const PATTERN_IDS: readonly string[] = PATTERNS.map(([id]) => id), DEFAULT_PATTERN: AttackPattern = 'melee';
-/* the abilities that spend MP, kept in stats after the pattern: the ids of skills in data/skills/ (data/skills.ts),
-   up to MAX_ABILITIES, in the order its menus list them. One that names no skill there is left out of its menus; the
-   unit data page says so. A file from before units had several holds one as "ability" (or "none"). */
-const MAX_ABILITIES = 8;
-const abilitiesOf = (stats: Record<string, unknown>): string[] => {
-  const raw = Array.isArray(stats.abilities) ? stats.abilities : stats.ability != null ? [stats.ability] : [];
-  return [...new Set(raw.map(a => String(a ?? '').trim().toLowerCase()).filter(a => ID_RE.test(a) && a !== NO_SKILL))].slice(0, MAX_ABILITIES);
-};
-const ID_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
+const DEFAULT_UNIT: Readonly<{ stats: UnitStats; movement: UnitMovement }> = Object.freeze({ stats: DEFAULT_STATS, movement: DEFAULT_MOVEMENT });
 
-const clampInt = (v: unknown, lo: number, hi: number, def: number): number => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
-const numbers = (sec: Section, src: Record<string, unknown>) => Object.fromEntries((FIELDS[sec] as readonly Field<string>[]).map(([k, , lo, hi, d]) => [k, clampInt(src[k], lo, hi, d)]));
-const DEFAULT_UNIT: Readonly<UnitData> = Object.freeze({ id: '', name: '', stats: Object.freeze({ ...numbers('stats', {}), pattern: DEFAULT_PATTERN, abilities: Object.freeze([]) as unknown as string[] } as UnitStats), movement: Object.freeze(numbers('movement', {}) as unknown as UnitMovement) });
+/* overrides in canonical form: known numbers clamped into range, in the class's order, then the pattern and the
+   abilities; a section with nothing in it is dropped, and so are overrides with nothing in them */
+function normalizeOverrides(raw: unknown): UnitOverrides | undefined {
+  const J = objectOf(raw), out: UnitOverrides = {};
+  for (const sec of SECTIONS) {
+    const src = objectOf(J[sec]), o: Record<string, unknown> = {};
+    for (const [k, , lo, hi, d] of FIELDS[sec] as readonly (readonly [string, string, number, number, number])[]) if (src[k] != null) o[k] = clampInt(src[k], lo, hi, d);
+    if (sec === 'stats') {
+      const p = patternOf(src.pattern); if (p) o.pattern = p;
+      if (Array.isArray(src.abilities)) o.abilities = abilitiesOf(src);
+    }
+    if (Object.keys(o).length) (out as Record<string, unknown>)[sec] = o;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+/* a unit in canonical form: id, name, class and any overrides. A file from before classes (stats and movement of
+   its own, no class) names the class of its own id, which the conversion to classes gave the same numbers. */
+function normalizeUnit(raw: unknown): UnitData {
+  const J = objectOf(raw), id = String(J.id ?? '').trim().toLowerCase();
+  const cls = String(J.class ?? '').trim().toLowerCase() || id;
+  const out: UnitData = { id, name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''), class: cls };
+  const overrides = J.class == null ? undefined : normalizeOverrides(J.overrides);
+  if (overrides) out.overrides = overrides;
+  return out;
+}
+/* what is wrong with a raw unit, as sentences; empty when it is fine */
+function validateUnit(raw: unknown, group: string = 'characters'): string[] {
+  if (!raw || typeof raw !== 'object') return ['a unit must be an object'];
+  const J = raw as Record<string, unknown>, errs: string[] = [];
+  if (!(GROUPS as readonly string[]).includes(group)) errs.push(`group must be one of ${GROUPS.join(', ')}`);
+  if (typeof J.id !== 'string' || !ID_RE.test(J.id)) errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit');
+  if (J.name != null && typeof J.name !== 'string') errs.push('name must be text');
+  if (typeof J.class !== 'string' || !ID_RE.test(J.class)) errs.push('class must be a class id');
+  if (J.overrides != null) {
+    if (typeof J.overrides !== 'object' || Array.isArray(J.overrides)) errs.push('overrides must be an object');
+    else for (const s of SECTIONS) errs.push(...sectionErrors(s, objectOf((J.overrides as Record<string, unknown>)[s])));
+  }
+  return errs;
+}
+/* the file a unit lives in, relative to the project root, and its text: two-space JSON with a final newline */
+const unitPath = (group: string, id: string): string => `data/units/${group}/${id}.json`;
+const unitText = (unit: unknown): string => JSON.stringify(normalizeUnit(unit), null, 2) + '\n';
+/* whether one number (or the pattern, or the abilities) of a unit is its own rather than its class's */
+const overrides = (u: UnitData, sec: Section, k: string): boolean => (u.overrides?.[sec] as Record<string, unknown> | undefined)?.[k] !== undefined;
+/* the stats and movement a unit plays with: its class's, or the defaults when there is none, with its overrides on top */
+function resolve(u: UnitData, cls: UnitClass | null): { stats: UnitStats; movement: UnitMovement } {
+  const base = cls || DEFAULT_UNIT, o = u.overrides || {};
+  return { stats: { ...base.stats, ...o.stats, abilities: [...(o.stats?.abilities ?? base.stats.abilities)] }, movement: { ...base.movement, ...o.movement } };
+}
 
 /* ---------- the units, by group ---------- */
 abstract class Unit implements UnitData {
   id: string;
   name: string;
+  /* the id of the class it plays as */
+  class: string;
+  overrides?: UnitOverrides;
+  /* its class's numbers with its overrides laid over them */
   stats: UnitStats;
   movement: UnitMovement;
   /* a sprite with no unit file, playing with the defaults */
   readonly fallback: boolean;
+  /* the class it names has no file, so it plays with the defaults under its overrides */
+  readonly classMissing: boolean;
   abstract readonly group: UnitGroup;
   /* the side it fights on in a battle (battle/state.ts) */
   abstract readonly side: Side;
-  constructor({ id, name, stats, movement }: UnitData, fallback = false) {
-    this.id = id; this.name = name; this.stats = stats; this.movement = movement; this.fallback = fallback;
+  constructor(data: UnitData, fallback = false) {
+    const cls = getClass(data.class), { stats, movement } = resolve(data, cls);
+    this.id = data.id; this.name = data.name; this.class = data.class; if (data.overrides) this.overrides = data.overrides;
+    this.stats = stats; this.movement = movement; this.fallback = fallback; this.classMissing = !fallback && !cls;
   }
-  toJSON(): UnitData { return { id: this.id, name: this.name, stats: { ...this.stats, abilities: [...this.stats.abilities] }, movement: { ...this.movement } }; }
+  toJSON(): UnitData { return normalizeUnit({ id: this.id, name: this.name, class: this.class, overrides: this.overrides && structuredClone(this.overrides) }); }
 }
 /* one of the player's people, from data/units/characters/ */
 class Character extends Unit {
@@ -102,58 +125,29 @@ class Enemy extends Unit {
 }
 const UNIT_CLASS: Record<UnitGroup, new (data: UnitData, fallback?: boolean) => Unit> = { characters: Character, enemies: Enemy };
 
-/* a unit in canonical form: known fields only, in a fixed order, every number a whole number within its range
-   and anything missing filled from the defaults. Characters and enemies have the same fields. */
-function normalizeUnit(raw: unknown): UnitData {
-  const J = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const section = (sec: Section) => (J[sec] && typeof J[sec] === 'object' ? J[sec] : {}) as Record<string, unknown>;
-  const stats = section('stats');
-  const pat = String(stats.pattern ?? '').trim().toLowerCase();
-  return {
-    id: String(J.id ?? '').trim().toLowerCase(), name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''),
-    stats: { ...numbers('stats', stats), pattern: (PATTERN_IDS.includes(pat) ? pat : DEFAULT_PATTERN) as AttackPattern, abilities: abilitiesOf(stats) } as UnitStats,
-    movement: numbers('movement', section('movement')) as unknown as UnitMovement };
-}
-/* a raw unit of this group, normalized, as a Character or an Enemy */
+/* a raw unit of this group, normalized, as a Character or an Enemy playing its class as it stands now */
 const unitFrom = (group: UnitGroup, raw: unknown): Unit => new UNIT_CLASS[group](normalizeUnit(raw));
-/* what is wrong with a raw unit, as sentences; empty when it is fine. Values out of range are reported here,
-   though normalizeUnit would clamp them, so an editor can say why a number changed. */
-function validateUnit(raw: unknown, group: string = 'characters'): string[] {
-  const errs: string[] = [];
-  if (!raw || typeof raw !== 'object') return ['a unit must be an object'];
-  const J = raw as Record<string, unknown>, sec = (s: Section) => (J[s] ?? {}) as Record<string, unknown>;
-  if (!(GROUPS as readonly string[]).includes(group)) errs.push(`group must be one of ${GROUPS.join(', ')}`);
-  if (typeof J.id !== 'string' || !ID_RE.test(J.id)) errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit');
-  if (J.name != null && typeof J.name !== 'string') errs.push('name must be text');
-  const check = (v: unknown, label: string, lo: number, hi: number) => { if (v == null) return; if (typeof v !== 'number' || !Number.isInteger(v)) errs.push(`${label} must be a whole number`); else if (v < lo || v > hi) errs.push(`${label} must be between ${lo} and ${hi}`); };
-  for (const s of SECTIONS) for (const [k, label, lo, hi] of FIELDS[s] as readonly Field<string>[]) check(sec(s)[k], label, lo, hi);
-  const pat = sec('stats').pattern; if (pat != null && !PATTERN_IDS.includes(pat as string)) errs.push(`Pattern must be one of ${PATTERN_IDS.join(', ')}`);
-  const ab = sec('stats').ability; if (ab != null && (typeof ab !== 'string' || !ID_RE.test(ab))) errs.push('Ability must be "none" or a skill id');
-  const abs = sec('stats').abilities;
-  if (abs != null) {
-    if (!Array.isArray(abs)) errs.push('Abilities must be a list of skill ids');
-    else { if (abs.some(a => typeof a !== 'string' || !ID_RE.test(a) || a === NO_SKILL)) errs.push('Abilities must be skill ids'); if (abs.length > MAX_ABILITIES) errs.push(`A unit has up to ${MAX_ABILITIES} abilities`); }
-  }
-  return errs;
-}
-/* the file a unit lives in, relative to the project root, and its text: two-space JSON with a final newline */
-const unitPath = (group: string, id: string): string => `data/units/${group}/${id}.json`;
-const unitText = (unit: unknown): string => JSON.stringify(normalizeUnit(unit), null, 2) + '\n';
 
 /* ---------- the registry: the units the game plays with ---------- */
-const UNITS = new Map<string, Unit>(), listeners = new Set<() => void>();
+/* id -> its file, by group; each lookup builds the Unit afresh so it plays the class as it is now */
+const UNITS = new Map<string, { group: UnitGroup; data: UnitData }>(), listeners = new Set<() => void>();
+const notify = () => { for (const f of listeners) f(); };
 /* replace every unit with these: [{ group, unit }] */
 function setUnits(entries: Iterable<{ group: UnitGroup; unit: unknown }>): void {
   UNITS.clear();
-  for (const { group, unit } of entries) { const u = unitFrom(group, unit); if (u.id) UNITS.set(u.id, u); }
-  for (const f of listeners) f();
+  for (const { group, unit } of entries) { const data = normalizeUnit(unit); if (data.id && UNIT_CLASS[group]) UNITS.set(data.id, { group, data }); }
+  notify();
 }
+/* a change to a unit file or to any class: either can change how a unit plays */
 const onUnitsChange = (f: () => void): (() => boolean) => { listeners.add(f); return () => listeners.delete(f); };
+onClassesChange(notify);
+const build = (e: { group: UnitGroup; data: UnitData }): Unit => new UNIT_CLASS[e.group](e.data);
 /* every unit, characters first, each group in name order */
-const listUnits = (): Unit[] => [...UNITS.values()].sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.name.localeCompare(b.name));
-const getUnit = (id: string): Unit | null => UNITS.get(id) || null;
+const listUnits = (): Unit[] => [...UNITS.values()].map(build).sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.name.localeCompare(b.name));
+const getUnit = (id: string): Unit | null => { const e = UNITS.get(id); return e ? build(e) : null; };
 /* how the figure with this sprite plays: its own unit, or the defaults under its sprite id */
-const unitFor = (sprite: string): Unit => UNITS.get(sprite) || new Character({ ...DEFAULT_UNIT, id: sprite, name: sprite }, true);
+const unitFor = (sprite: string): Unit => getUnit(sprite) || new Character({ id: sprite, name: sprite, class: '' }, true);
 
-export { Character, DEFAULT_PATTERN, MAX_ABILITIES, DEFAULT_UNIT, Enemy, FIELDS, PATTERNS, GROUPS, GROUP_LABEL, ID_RE, SECTIONS, Unit, getUnit, listUnits, normalizeUnit, onUnitsChange, setUnits, unitFor, unitFrom, unitPath, unitText, validateUnit };
-export type { AttackPattern, CombatStats, Side, UnitData, UnitGroup, UnitMovement, UnitStats };
+export { PATTERNS, FIELDS, SECTIONS, MAX_ABILITIES, DEFAULT_PATTERN, ID_RE } from './classes.ts';
+export { Character, DEFAULT_UNIT, Enemy, GROUPS, GROUP_LABEL, Unit, getUnit, listUnits, normalizeOverrides, normalizeUnit, onUnitsChange, overrides, resolve, setUnits, unitFor, unitFrom, unitPath, unitText, validateUnit };
+export type { AttackPattern, CombatStats, Side, UnitData, UnitGroup, UnitMovement, UnitOverrides, UnitStats };

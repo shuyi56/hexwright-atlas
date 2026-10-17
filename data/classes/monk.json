@@ -1,0 +1,24 @@
+{
+  "id": "monk",
+  "name": "Monk",
+  "sprite": "monk",
+  "stats": {
+    "hp": 34,
+    "mp": 10,
+    "attack": 7,
+    "defense": 4,
+    "accuracy": 95,
+    "evasion": 15,
+    "crit": 12,
+    "critDamage": 160,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": [
+      "power"
+    ]
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  }
+}

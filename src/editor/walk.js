@@ -7,7 +7,7 @@ import { MAX_LEVEL, floorAt, levelOf, objAt } from './model.ts';
    and holds neither a piece (other than one made to be walked through, such as a doorway or stairs) nor
    another character on that level.
    A step goes to one of the four edge-neighbours on the same level and may climb or drop at most one height
-   level (a unit's jump, from its data in data/units/, can widen that for the tactical view); an upper floor
+   level (a unit's jump, from its class in data/classes/ or its own data, can widen that for the tactical view); an upper floor
    follows the ground under it, so the rule holds there too. Stairs join two levels:
    from a stairs piece on level L a step towards its high end (its back) lands on the tile behind it on level
    L + 1, and the same step back comes down, provided the flight's top and that floor are within one height

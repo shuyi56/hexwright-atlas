@@ -1,0 +1,22 @@
+{
+  "id": "goblin",
+  "name": "Goblin",
+  "sprite": "goblin",
+  "stats": {
+    "hp": 22,
+    "mp": 0,
+    "attack": 7,
+    "defense": 2,
+    "accuracy": 85,
+    "evasion": 15,
+    "crit": 8,
+    "critDamage": 150,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": []
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  }
+}

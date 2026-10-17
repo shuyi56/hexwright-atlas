@@ -11,7 +11,7 @@ A rail down the left edge (along the bottom on phones) holds every part of the a
 - **View:** **Atlas** (the realm map and its cities), **Scenes** (the bundled maps, each ready to open), **Tactical**
   and **Town** (the two play views, on the map editor's current map).
 - **Make:** **Map editor** (the tile editor) and **Characters** (the character maker).
-- **Data:** **Unit data** (`units.html`) and **Skills** (`skills.html`).
+- **Data:** **Classes** (`classes.html`), **Units** (`units.html`) and **Skills** (`skills.html`).
 
 `Alt+1` to `Alt+8` jump straight to each. The module showing is kept in the address (`index.html#editor`,
 `#tactical`, `#town`, `#characters`, `#scenes`), so a reload or a bookmark lands on it, and the rail on the two
@@ -300,18 +300,40 @@ wind-up, strike).
 
 ![The character roster attacking](docs/images/character-attack.png)
 
-### Unit data
+### Classes and units
 
-How each character and enemy plays lives in data files, one per unit, kept apart from how they look:
+How everyone plays is kept apart from how they look, and in two layers. A **class** is a kind of fighter, such as
+Knight, Archer or Goblin: its stats, abilities and movement. A **unit** is one person on a map, a character or an
+enemy: its own name, the class it plays as, and any numbers of its own in place of the class's.
 
 ```
+data/classes/  alchemist.json  archer.json  bandit.json  ...  knight.json  ...  wolf.json   (one per class)
 data/units/
   characters/  archer.json  blackmage.json  dragoon.json  ...  (the townsfolk and the jobs)
   enemies/     bandit.json  goblin.json  orc.json  skeleton.json  slime.json  wolf.json
 ```
 
-A file is named by the unit's id, which is the id of the sprite it plays as, and holds its name, its stats and its
-movement (Move: tiles a turn; Jump: height levels a step can climb or drop). The stats:
+A class file is named by the class's id and holds its name, the sprite it looks like in the class editor, its stats
+and its movement (Move: tiles a turn; Jump: height levels a step can climb or drop):
+
+```json
+{ "id": "knight", "name": "Knight", "sprite": "knight",
+  "stats": { "hp": 58, "mp": 8, "attack": 13, "defense": 9, "accuracy": 90, "evasion": 3, "crit": 5, "critDamage": 150,
+             "range": 1, "pattern": "melee", "abilities": ["power"] },
+  "movement": { "move": 3, "jump": 1 } }
+```
+
+A unit file is named by the unit's id, which is the id of the sprite it plays as on a map, and names its class. Any
+number, the pattern or the whole list of abilities can be its own under `overrides`; everything else follows the
+class, so a change to a class reaches every unit of it:
+
+```json
+{ "id": "guard", "name": "Guard", "class": "guard" }
+{ "id": "captain", "name": "Captain Hale", "class": "knight", "overrides": { "stats": { "hp": 70 }, "movement": { "move": 4 } } }
+```
+
+Every unit started with a class of its own id holding the numbers it had before classes, so every map plays as it
+did; classes can be shared by pointing several units at one. The stats:
 
 | Stat | What it does |
 | --- | --- |
@@ -343,29 +365,43 @@ orc have Power Strike and the dark elf Pierce; goblins, wolves, skeletons and sl
 (knight, orc, slime) stand on Defense, quick ones (thief, wolf, dark elf, goblin) on Evasion. The thief, rangers,
 archers, monk, wolves and dark elf crit most often (12 to 20%), the thief and the orc hardest (175%).
 
-`src/data/units.ts` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
-with no file, such as a custom character from the maker, plays with the defaults. The registry holds each unit as
-a `Character` or an `Enemy`, both a `Unit`, so it knows its group and the side it fights on. `src/battle/actions.ts`
-holds the formulas and the two kinds of action, `StrikeAction` and `HealAction`; `src/battle/abilities.ts` has the
-plain Attack and turns each skill into the action it plays. Adding a number means adding a line to `FIELDS`; adding an
-ability, a file in `data/skills/` (or **New skill…** in the skill editor).
+`src/data/classes.ts` defines the fields, their ranges and defaults, and normalizes and validates a class;
+`src/data/units.ts` does the same for a unit and lays its overrides over its class. A sprite with no unit file, such
+as a custom character from the maker, plays with the defaults, and so does a unit whose class has no file. The
+registry holds each unit as a `Character` or an `Enemy`, both a `Unit` carrying its class's numbers with its own on
+top, so the battle never has to look at classes. `src/battle/actions.ts` holds the formulas and the two kinds of
+action, `StrikeAction` and `HealAction`; `src/battle/abilities.ts` has the plain Attack and turns each skill into the
+action it plays. Adding a number means adding a line to `FIELDS` in `classes.ts`; adding an ability, a file in
+`data/skills/` (or **New skill…** in the skill editor).
 
-**Unit data** in the module rail opens `units.html`, an editor for these files:
+**Classes** in the module rail opens `classes.html`, the class editor:
 
-- **Cards:** the list of units down the side, filterable, and a card for the picked one: its sprite walking (turn
-  it with ⟲ ⟳), name and group, and every number listed on the right, each with a bar against the strongest unit.
-  Below them the attack pattern, and the ability: pick one, see its MP cost, what it does, how many uses the unit's
-  MP holds, and how the unit's blows fare against the other side on average (damage dealt and taken, chance to hit
-  and to dodge). Changed values are outlined in brass.
-- **Table:** everyone in one sortable grid for balancing numbers side by side, every cell editable.
-- **Saving:** changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes the
-  files through the Hexwright bridge: `PUT` and `DELETE /__hexwright/units/<group>/<id>`, `GET /__hexwright/units`.
-  Every write is normalized, so the files keep one shape. A tactical view open in another tab picks the new
-  numbers up straight away. **New unit…** gives a sprite without a unit its own file, starting from the defaults
-  or a copy of another unit; moving a unit to the other group moves its file. The built site (GitHub Pages)
-  shows the same data read-only, with **Download** for a unit's file.
+- **Cards:** the classes down the side, grouped by the side their units fight on, and a card for the picked one:
+  the sprite it looks like walking (turn it with ⟲ ⟳), its name, every number with a bar against the strongest
+  class, the attack pattern, the abilities (each with its MP cost, what it does and how many uses the class's MP
+  holds, and how its blows fare against the other side on average), and the units that play as it, with the
+  numbers each has of its own. Changed values are outlined in brass.
+- **Table:** every class in one sortable grid for balancing numbers side by side.
+- **New class…** starts one from the defaults or a copy of another; deleting a class that units play as warns first.
 
-![The unit data editor](docs/images/unit-data.png)
+**Units** in the module rail opens `units.html`, the character and enemy page:
+
+- **Cards:** each unit's sprite walking, its name, its side, the class it plays as (with a link to edit the class),
+  and the numbers it plays with. A number follows its class (marked *class*) until it is changed, which makes it the
+  unit's own, outlined in dashes; **Own · use class** puts it back. The pattern and the abilities can be its own the
+  same way, and **Use the class for everything** clears them all.
+- **Table:** everyone's numbers side by side, their own ones marked; the side and class can be changed in place.
+- **New unit…** gives a sprite without a unit its own file and a class (the one of the same id when there is one).
+
+Both save the same way: changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes
+the files through the Hexwright bridge: `GET /__hexwright/classes`, `PUT` and `DELETE /__hexwright/classes/<id>`;
+`GET /__hexwright/units`, `PUT` and `DELETE /__hexwright/units/<group>/<id>`. Every write is normalized, so the
+files keep one shape. A tactical view open in another tab picks the change up straight away. The built site (GitHub
+Pages) shows the same data read-only, with **Download** for a file.
+
+![The class editor](docs/images/class-editor.png)
+
+![The unit page](docs/images/unit-data.png)
 
 ### Skills
 
@@ -391,14 +427,14 @@ Each ability is one JSON file in `data/skills/`, named by its id, which is what 
 | Colour | Its own colour in place of the effect's (empty keeps the effect's, or for Arcane the caster's). |
 | Size %, Particles % | Spreads the effect wider and faster or tighter and slower, and thins it out or fills it in. |
 
-**Skills** in the module rail opens `skills.html`, the skill editor, laid out like the unit data page: the skills
+**Skills** in the module rail opens `skills.html`, the skill editor, laid out like the class editor: the skills
 down the side with their cost and what they do, and a card for the picked one. The card has its name and kind, the
 numbers that matter for that kind with a line on what each comes to, and the particles: an effect to pick with its
 colours, a colour picker (or the effect's own colours), size and count. Beside them the skill plays over and over
 between two figures, its first user and a foe (or an ally, for a heal); **Miss** plays it fizzling. Under it, **Who
 has it** lists every unit carrying the skill with its MP, how many uses that holds, and its damage against the other
 side on average next to a plain attack, with the chance to hit. **New skill…** makes a skill from the defaults or a
-copy of another, and the unit data page offers it at once. Saving works as on the unit data page, through
+copy of another, and the class editor offers it at once. Saving works as in the class editor, through
 `PUT` and `DELETE /__hexwright/skills/<id>` and `GET /__hexwright/skills`; a tactical view open in another tab plays the
 new numbers and particles from the next blow. A unit naming a skill that is not there only attacks, and its card
 says so.
@@ -432,13 +468,13 @@ Fantasy Tactics, Tactics Ogre): pixel art at whole-pixel zoom (×1 to ×6, about
 with the camera gliding after the cursor and the unit on the move.
 
 - **Moving units:** click a unit (or press `Tab`) and the tiles it can reach light up in blue, by its own Move and
-  Jump from its [unit data](#unit-data) and the editor's walking rules (no more height levels a step than its Jump, around pieces, up and down stairs). The route to the tile
+  Jump from its [class](#classes-and-units) and the editor's walking rules (no more height levels a step than its Jump, around pieces, up and down stairs). The route to the tile
   under the cursor is traced in gold. Click a blue tile (or press `Enter`) and the unit walks there, hopping up
   and down ledges, one stride to a tile at 4.2 tiles a second (8.4 with the ▶▶ 2× chip or F), so the arms swing at the pace the figure moves. The
   camera sits on whole art pixels and rides along the walker's path on the ground (not its hops), holding the
   walker still on screen while the ground scrolls under it. Moves are map edits, on the editor's undo stack.
 - **Turns:** a battle runs in turns, each a **player phase** and then an **enemy phase**. The player's side is the
-  [unit data](#unit-data)'s characters, the enemy's its enemies. In a phase each unit of that side still standing
+  [units](#classes-and-units)' characters, the enemy's its enemies. In a phase each unit of that side still standing
   moves once and acts once (Attack, one of its abilities, or Wait to give up both); the phase passes on when every one of them is done, or
   at once with **End turn** (`T`). A banner names each new phase and the turn and phase stay in the top bar. In the
   enemy phase the computer plays each enemy in turn: it shows the enemy's range, walks it to where it can strike the
@@ -858,7 +894,8 @@ src/
                       them on the map, the sprite sheet layout and its pixel font
   data/               Unit and skill data: the fields and ranges of a unit's stats and of a skill, and the
                       registries the game reads
-  units/              The unit data page (units.html)
+  classes/            The class editor (classes.html)
+  units/              The unit page (units.html) and what it shares with the class editor (common.js)
   skills/             The skill editor (skills.html)
   battle/             The battle in the tactical view: sides, hit points and MP, blows and abilities, turns and the player and enemy phases
                       (state.ts), the actions and what a blow does (actions.ts), and how the computer plays an
@@ -869,9 +906,10 @@ src/
                       front-on pieces, townsfolk's lines and the walking screen
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
-tools/                Vite plugin that relays HTTP calls to the editor page and saves unit and skill data (dev server only),
+tools/                Vite plugin that relays HTTP calls to the editor page and saves class, unit and skill data (dev server only),
                       the character sheet writer and a minimal PNG and APNG encoder
-data/units/           One JSON file per character and enemy: HP, Attack, Range, Move, Jump
+data/classes/         One JSON file per class: HP, Attack, Range, abilities, Move, Jump
+data/units/           One JSON file per character and enemy: its name, its class and any numbers of its own
 data/skills/          One JSON file per ability: its kind, MP cost, power, Defense ignored, heal and particles
 mcp/                  MCP server, backend launcher and end-to-end test
   ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view, the module
