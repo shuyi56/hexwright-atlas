@@ -1,7 +1,7 @@
 {
   "id": "slime",
   "name": "Slime",
-  "sprite": "slime",
+  "outfit": null,
   "stats": {
     "hp": 44,
     "mp": 0,

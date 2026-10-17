@@ -1,7 +1,37 @@
 {
   "id": "knight",
   "name": "Knight",
-  "sprite": "knight",
+  "outfit": {
+    "clothes": "plate",
+    "sleeves": "second",
+    "cut": "plain",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "kettle",
+    "cape": "cape",
+    "satchel": "none",
+    "held": "sword",
+    "shield": "kite",
+    "colours": {
+      "cloth": "#5f7c9c",
+      "shirt": "#efe3c4",
+      "second": "#858a8c",
+      "trim": "#c9a24f",
+      "belt": "#5c4231",
+      "gold": "#c9a24f",
+      "legs": "#aeb0aa",
+      "boots": "#6d747a",
+      "hat": "#c8c8c0",
+      "accent": "#b0503c",
+      "steel": "#c8c8c0",
+      "bag": "#b89a70",
+      "shield": "#5f7c9c",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#536d8c"
+    }
+  },
   "stats": {
     "hp": 58,
     "mp": 8,

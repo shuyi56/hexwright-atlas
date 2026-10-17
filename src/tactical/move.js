@@ -2,7 +2,7 @@ import { MAX_LEVEL, levelOf } from '../editor/model.ts';
 import { neighbours } from '../editor/walk.js';
 
 /* ================= tactical view: how far a unit moves =================
-   A unit's turn reaches every place within its move (MOVE unless its class or its own data says otherwise), by the
+   A unit's turn reaches every place within its move (MOVE unless its class says otherwise), by the
    editor's walking rules (editor/walk.js: up or down as many height levels a step as its jump, around pieces and
    other figures, up and down stairs). Pure, so tests and the view share it. Places are [x, y, level] in model
    tiles. */

@@ -1,7 +1,7 @@
 {
   "id": "wolf",
   "name": "Wolf",
-  "sprite": "wolf",
+  "outfit": null,
   "stats": {
     "hp": 32,
     "mp": 0,

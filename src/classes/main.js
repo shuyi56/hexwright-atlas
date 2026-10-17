@@ -1,22 +1,24 @@
 import '../styles/main.css';
-import '../units/units.css';
+import './classes.css';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
 import { onSkillsChange } from '../data/skills.ts';
-import { DEFAULT_CLASS, FIELDS, MAX_ABILITIES, PATTERNS, SECTIONS, classPath, classText, listClasses, normalizeClass, onClassesChange, validateClass } from '../data/classes.ts';
+import { DEFAULT_CLASS, DEFAULT_OUTFIT, FIELDS, MAX_ABILITIES, PATTERNS, SECTIONS, classPath, classText, listClasses, normalizeClass, onClassesChange, validateClass } from '../data/classes.ts';
 import { listUnits, onUnitsChange } from '../data/units.ts';
 import { DEF_SCALE, MP_REGEN, abilityOf, damageOf, healOf, hitChance, listAbilities } from '../battle/abilities.ts';
-import { list as customCharacters } from '../characters/library.js';
-import { ROSTER } from '../characters/roster.js';
+import { characterById, list as customCharacters, onChange as onLibraryChange } from '../characters/library.js';
+import { APPLIES, CHOICES, COLOURS, OUTFIT_COLOURS, OUTFIT_KEYS, cleanSpec, fromSpec } from '../characters/custom.js';
+import { FRAMES, VIEWS, frame } from '../characters/roster.js';
 import { goFromDataPage, mountRail } from '../ui/rail.js';
-import { $, MENU_LABEL, PATTERN_NOTE, WRITABLE, abilityLabel, downloadText, esc, namesOf, patternGrid, patternLabel, patternOptions, request, same, spriteOf, stageHtml, startPreview, stopPreview, thumb, toast } from '../units/common.js';
+import { $, MENU_LABEL, PATTERN_NOTE, WRITABLE, abilityLabel, downloadText, esc, namesOf, patternGrid, patternLabel, patternOptions, request, same, stageHtml, startPreview, stopPreview, thumb, toast } from './common.js';
 
 /* ================= the class editor =================
    Every class in data/classes/ (src/data/classes.ts) to read and change: a list down the side, a card per class with
-   the sprite it looks like walking, its HP, MP, Attack, Defense, Accuracy, Evasion, Range, Move and Jump, a picture
-   of its attack pattern, its abilities and what its blows come to against the other side, the units that play as
-   it, and a table of every class for balancing numbers side by side. Which person plays which class, and the
-   numbers a person has of their own, are on the unit page (units.html). Changes are drafts until saved. On the dev
+   its outfit walking on a body, the outfit's clothes, hat, gear and colours (the character maker's choices), its
+   HP, MP, Attack, Defense, Accuracy, Evasion, Range, Move and Jump, a picture of its attack pattern, its abilities
+   and what its blows come to against the other side, who plays it (playable characters, which wear the outfit, and
+   NPCs, which keep their own look), and a table of every class for balancing numbers side by side. A playable
+   character picks its class in the character maker. Changes are drafts until saved. On the dev
    server Save writes the files through the Hexwright bridge (tools/vite-hexwright.js), and the tactical view in any
    open tab picks the new numbers up at once; a built copy of the site can read the classes and download a class's
    file, but not save. */
@@ -25,13 +27,13 @@ const SAVE_URL = id => `/__hexwright/classes/${id}`;
 
 /* id -> { draft, saved }: saved is null for a class not yet written */
 const E = new Map();
-const V = { sel: null, view: 'cards', filter: '', sort: { key: 'name', dir: 1 } };
+const V = { sel: null, view: 'cards', filter: '', sort: { key: 'name', dir: 1 }, body: 'plain' };
 
 /* ---------- who plays each class ---------- */
 const usersOf = id => listUnits().filter(u => u.class === id);
 /* the list's groups: the side a class's units fight on, or unused */
-const SIDES = [['characters', 'Character classes'], ['enemies', 'Enemy classes'], ['unused', 'Unused']];
-const sideOf = id => { const us = usersOf(id); return !us.length ? 'unused' : us.some(u => u.group === 'characters') ? 'characters' : 'enemies'; };
+const SIDES = [['allies', 'Ally classes'], ['enemies', 'Enemy classes'], ['unused', 'Unused']];
+const sideOf = id => { const us = usersOf(id); return !us.length ? 'unused' : us.some(u => u.group === 'allies') ? 'allies' : 'enemies'; };
 
 /* ---------- drafts ---------- */
 const isDirty = e => !e.saved || !same(normalizeClass(e.draft), e.saved);
@@ -71,9 +73,9 @@ function renderList() {
     const h = document.createElement('h3'); h.className = 'ub-group'; h.textContent = `${label} · ${rows.length}`; box.append(h);
     for (const { id, e } of rows) {
       const b = document.createElement('button'); b.className = 'ub-row'; b.dataset.id = id; b.setAttribute('aria-current', String(id === V.sel));
-      b.append(thumb(e.draft.sprite));
+      b.append(thumb(lookOf(e.draft)));
       const d = e.draft, n = usersOf(id).length, info = document.createElement('span'); info.className = 'ub-row-text';
-      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>HP ${d.stats.hp} · Atk ${d.stats.attack} · Def ${d.stats.defense} · ${patternLabel(d.stats.pattern)} · ${n} unit${n === 1 ? '' : 's'}</span>`;
+      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>HP ${d.stats.hp} · Atk ${d.stats.attack} · Def ${d.stats.defense} · ${patternLabel(d.stats.pattern)} · ${n ? `${n} playing` : 'unused'}</span>`;
       b.append(info); b.addEventListener('click', () => { V.sel = id; renderAll(); if (V.view === 'table') setView('cards'); });
       box.append(b);
     }
@@ -109,7 +111,7 @@ const addOptions = have => `<option value="">Add an ability…</option>${listAbi
    attack's damage and chance to hit) */
 function abilitySection(e, side) {
   const st = e.draft.stats, have = st.abilities, saved = e.saved?.stats?.abilities, changed = e.saved && !same(saved, have);
-  const foe = side === 'enemies' ? 'characters' : 'enemies', others = listUnits().filter(u => u.group === foe).map(u => u.stats);
+  const foe = side === 'enemies' ? 'allies' : 'enemies', others = listUnits().filter(u => u.group === foe).map(u => u.stats);
   const avg = f => (others.length ? Math.round(others.reduce((n, o) => n + f(o), 0) / others.length) : null);
   const dmg = avg(o => damageOf(st.attack, o.defense)), hit = avg(o => hitChance(st.accuracy, o.evasion)), taken = avg(o => damageOf(o.attack, st.defense)), dodge = avg(o => 100 - hitChance(o.accuracy, st.evasion));
   const row = (id, i) => {
@@ -131,17 +133,48 @@ function abilitySection(e, side) {
     </div>
   </section>`;
 }
-/* the units that play as this class, each a link to its card on the unit page, with the numbers it has of its own */
+/* who plays this class: the playable characters, which wear its outfit, and the NPCs, which keep their own look */
 function usersSection(id) {
-  const us = usersOf(id);
-  const own = u => SECTIONS.flatMap(sec => Object.keys(u.overrides?.[sec] || {})).map(k => FIELDS.stats.concat(FIELDS.movement).find(f => f[0] === k)?.[1] || k);
-  return `<section class="ub-users" aria-label="Units of this class">
+  const us = usersOf(id), kind = u => (u.playable ? 'playable, wears the outfit' : `NPC, ${u.group === 'enemies' ? 'enemy' : 'ally'}, its own look`);
+  return `<section class="ub-users" aria-label="Who plays this class">
     <h3 class="ub-section">Played by</h3>
-    ${us.length ? `<ul class="ub-user-list">${us.map(u => { const o = own(u); return `<li><a class="ub-link" href="./units.html?unit=${encodeURIComponent(u.id)}">${esc(u.name)}</a> <span class="ub-dim">${u.group === 'enemies' ? 'enemy' : 'character'}${o.length ? ` · its own ${esc(o.join(', '))}` : ''}</span></li>`; }).join('')}</ul>` : '<p class="ub-dim">No unit plays as this class yet. Pick it for one on the <a class="ub-link" href="./units.html">unit page</a>.</p>'}
+    ${us.length ? `<ul class="ub-user-list">${us.map(u => `<li><b>${esc(u.name)}</b> <span class="ub-dim">${kind(u)}</span></li>`).join('')}</ul>` : '<p class="ub-dim">No one plays this class yet. Give it to a playable character in the character maker.</p>'}
   </section>`;
 }
-/* every sprite to look like: the roster, then the character library */
-const spriteOptions = v => `<option value=""${v ? '' : ' selected'}>No sprite</option>${[...ROSTER, ...customCharacters()].map(c => `<option value="${esc(c.id)}"${c.id === v ? ' selected' : ''}>${esc(c.name)}${c.id.startsWith('custom-') ? ' (custom)' : ''}</option>`).join('')}`;
+
+/* ---------- the outfit ---------- */
+/* the body the outfit is shown on: a plain one, or one of the playable characters of this class */
+const PLAIN_BODY = cleanSpec({ id: 'plain', name: 'Plain body' });
+const bodiesOf = id => [PLAIN_BODY, ...customCharacters().filter(c => c.spec.class === id).map(c => c.spec)];
+const bodyFor = d => bodiesOf(d.id).find(b => b.id === V.body) || PLAIN_BODY;
+/* how a class looks: its outfit on a body, or for a class only NPCs play, the first NPC of it in its own look */
+function lookOf(d, body = PLAIN_BODY) {
+  if (d.outfit) return fromSpec({ ...body, class: '', ...d.outfit, colours: { ...body.colours, ...d.outfit.colours } }, { id: `class-${d.id}` });
+  const npc = usersOf(d.id).find(u => !u.playable); return npc ? characterById(npc.id) : null;
+}
+const CHOICE_LABEL = { clothes: 'clothes', sleeves: 'sleeves', cut: 'sleeve cut', neckline: 'neckline', rope: 'belt', hat: 'hat', cape: 'cape', satchel: 'satchel', held: 'in hand', shield: 'shield' };
+/* the outfit materials the outfit shows (an arrow's head and fletching too), as the character maker finds them */
+function usedOutfitColours(d) {
+  const c = lookOf(d), seen = new Set();
+  for (const v of VIEWS) for (let k = 0; k < FRAMES; k++) for (const m of frame(c, v, k).mat) if (m) seen.add(m);
+  return COLOURS.filter(([key, letter]) => OUTFIT_COLOURS.includes(key) && seen.has(letter) && !(key === 'legs' && d.outfit.clothes === 'overalls'));
+}
+/* the outfit, a section of its own: a row of chips for each choice that applies, then the colours it shows; or for
+   a class with none, the way to give it one */
+function outfitSection(e) {
+  const o = e.draft.outfit, changed = e.saved && !same(e.saved.outfit, o);
+  const head = `<h3 class="ub-section">Outfit${changed ? ' <span class="ub-tag">changed</span>' : ''}</h3>`;
+  if (!o) return `<section class="ub-outfit" aria-label="Outfit">${head}
+    <p class="ub-dim">No outfit: only NPCs play this class, each in its own look. Give it one to let playable characters take it.</p>
+    <div><button class="chip" id="addOutfit">Give it an outfit</button></div></section>`;
+  const rows = OUTFIT_KEYS.filter(k => !APPLIES[k] || APPLIES[k](o)).map(k => `<div class="ub-choice"><span class="ub-value-name">${CHOICE_LABEL[k]}</span><div class="ub-chips" role="group" aria-label="${CHOICE_LABEL[k]}">${CHOICES[k].map(([v, t]) => `<button class="chip" data-choice="${k}" data-v="${v}" aria-pressed="${o[k] === v}">${esc(t)}</button>`).join('')}</div></div>`).join('');
+  const colours = usedOutfitColours(e.draft).map(([key, , text]) => `<label class="ub-colour"><input type="color" value="${o.colours[key]}" data-colour="${key}" aria-label="${esc(text)}"><span>${esc(text)}</span></label>`).join('');
+  return `<section class="ub-outfit${changed ? ' changed' : ''}" aria-label="Outfit">${head}
+    <p class="ub-dim">Playable characters of this class wear it over their own build, hair and skin. NPCs keep their own look.</p>
+    ${rows}<div class="ub-colours">${colours}</div>
+    <div><button class="chip" id="dropOutfit" title="Only NPCs will be able to play it">No outfit</button></div>
+  </section>`;
+}
 function renderDetail() {
   const box = $('detail'); stopPreview();
   const e = E.get(V.sel);
@@ -152,10 +185,11 @@ function renderDetail() {
       <div class="ub-body">
         <div class="ub-head">
           <input class="ub-name" id="name" value="${esc(d.name)}" maxlength="40" spellcheck="false" aria-label="Name">
-          <label class="ub-field"><span>looks like</span><select id="sprite" aria-label="Sprite">${spriteOptions(d.sprite)}</select></label>
+          ${d.outfit ? `<label class="ub-field"><span>shown on</span><select id="body" aria-label="Shown on">${bodiesOf(d.id).map(b => `<option value="${esc(b.id)}"${b.id === bodyFor(d).id ? ' selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
         </div>
         <p class="ub-file"><code>${esc(classPath(d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}</p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
+        ${outfitSection(e)}
         <div class="ub-values">${SECTIONS.flatMap(sec => FIELDS[sec].map(f => tile(sec, f, e))).join('')}</div>
         ${patternSection(e)}
         ${abilitySection(e, sideOf(d.id))}
@@ -172,16 +206,25 @@ function renderDetail() {
   $('ability')?.addEventListener('change', () => { const id = $('ability').value; if (id) { e.draft.stats.abilities = [...e.draft.stats.abilities, id]; commit(e); } });
   box.querySelectorAll('[data-drop]').forEach(b => b.addEventListener('click', () => { e.draft.stats.abilities = e.draft.stats.abilities.filter((x, i) => i !== +b.dataset.drop); commit(e); }));
   $('name').addEventListener('change', () => { e.draft.name = $('name').value; commit(e); });
-  $('sprite').addEventListener('change', () => { e.draft.sprite = $('sprite').value; commit(e); });
+  $('body')?.addEventListener('change', () => { V.body = $('body').value; renderDetail(); });
+  $('addOutfit')?.addEventListener('click', () => { e.draft.outfit = DEFAULT_OUTFIT(); commit(e); });
+  $('dropOutfit')?.addEventListener('click', () => { e.draft.outfit = null; commit(e); });
+  box.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => { e.draft.outfit = { ...e.draft.outfit, [b.dataset.choice]: b.dataset.v }; commit(e); }));
+  /* dragging a colour picker redraws the walking figure only; letting go redraws the card */
+  box.querySelectorAll('[data-colour]').forEach(inp => {
+    const set = () => { e.draft.outfit = { ...e.draft.outfit, colours: { ...e.draft.outfit.colours, [inp.dataset.colour]: inp.value } }; };
+    inp.addEventListener('input', () => { set(); stopPreview(); startPreview(lookOf(e.draft, bodyFor(e.draft)), true); });
+    inp.addEventListener('change', () => { set(); commit(e); });
+  });
   $('revertOne').addEventListener('click', () => revert(e));
   $('deleteOne').addEventListener('click', () => remove(V.sel));
-  startPreview(spriteOf(d.sprite));
+  startPreview(lookOf(d, bodyFor(d)));
 }
 /* clamp what was typed into range, then redraw everything that shows it */
 function commit(e) { e.draft = normalizeClass(e.draft); renderAll(); }
 
 /* ---------- the table ---------- */
-const COLS = [['name', 'Name'], ['users', 'Units'], ...SECTIONS.flatMap(sec => [...FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]), ...(sec === 'stats' ? [['stats.pattern', 'Pattern'], ['stats.abilities', 'Abilities']] : [])])];
+const COLS = [['name', 'Name'], ['users', 'Played by'], ...SECTIONS.flatMap(sec => [...FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]), ...(sec === 'stats' ? [['stats.pattern', 'Pattern'], ['stats.abilities', 'Abilities']] : [])])];
 const TEXT_COLS = ['name', 'stats.pattern', 'stats.abilities'];
 const LIMITS = Object.fromEntries(SECTIONS.flatMap(sec => FIELDS[sec].map(([k, , lo, hi]) => [`${sec}.${k}`, [lo, hi]])));
 const read = (rec, key) => { if (key === 'name') return rec.name || rec.id; if (key === 'stats.abilities') return namesOf(rec.stats.abilities); const [a, b] = key.split('.'); return rec[a]?.[b]; };
@@ -248,7 +291,6 @@ function download() { const e = E.get(V.sel); if (e) downloadText(`${e.draft.id}
 function openNew() {
   $('newId').value = ''; $('newName').value = '';
   $('newFrom').innerHTML = `<option value="">Default numbers</option>${ordered().map(({ id, e }) => `<option value="${id}">${esc(nameOf(e))}</option>`).join('')}`;
-  $('newSprite').innerHTML = spriteOptions('');
   $('newDialog').showModal();
 }
 /* the id typed for a new class, or one made from its name */
@@ -261,7 +303,7 @@ $('newDialog').addEventListener('close', () => {
   if ($('newDialog').returnValue !== 'ok') return;
   const id = idFrom($('newId').value || $('newName').value), from = E.get($('newFrom').value);
   const base = from ? structuredClone(from.draft) : structuredClone(DEFAULT_CLASS);
-  const draft = normalizeClass({ ...base, id, name: $('newName').value || id, sprite: $('newSprite').value || base.sprite || '' });
+  const draft = normalizeClass({ ...base, id, name: $('newName').value || id, outfit: base.outfit || DEFAULT_OUTFIT() });
   E.set(id, { draft, saved: null }); V.sel = id; setView('cards');
 });
 
@@ -291,6 +333,8 @@ addEventListener('beforeunload', ev => { if (dirtyList().length) { ev.preventDef
    a unit file changing moves classes between the list's groups */
 onClassesChange(() => { syncFromRegistry(); renderAll(); });
 onUnitsChange(() => renderAll());
+/* a playable character made or changed in the character maker: who plays each class, and the bodies to show it on */
+onLibraryChange(() => renderAll());
 /* a skill saved in the skill editor: its name, cost and numbers change on every card */
 onSkillsChange(() => renderAll());
 /* ?class=<id> opens that class's card */

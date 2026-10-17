@@ -7,9 +7,10 @@ import { figureThumb } from '../characters/draw.js';
 import { BASE } from '../characters/body.js';
 import { H as FH, W as FW } from '../characters/pixels.js';
 
-/* ================= what the class editor and the unit page share =================
+/* ================= the class editor's parts =================
    The toast, the bridge requests, a sprite's thumbnail and its walking preview, the attack pattern drawn from above,
-   and how abilities are named. Both pages are built from the same ub- parts (units.css). */
+   and how abilities are named, for the class editor; the skill editor is built from the same ub- parts
+   (classes.css). */
 const $ = id => document.getElementById(id);
 const WRITABLE = import.meta.env.DEV;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -31,9 +32,10 @@ function downloadText(name, text) {
 /* ---------- sprites ---------- */
 const spriteOf = id => (id ? characterById(id) : null);
 const thumbs = new Map();
-/* a 40-pixel thumbnail of a sprite, or a dashed box with a question mark when there is none */
-function thumb(id) {
-  const c = spriteOf(id);
+/* a 40-pixel thumbnail of a character (or of the sprite with this id), or a dashed box with a question mark when
+   there is none */
+function thumb(who) {
+  const c = typeof who === 'string' ? spriteOf(who) : who;
   if (!c) { const s = document.createElement('span'); s.className = 'ub-thumb ub-nosprite'; s.textContent = '?'; return s; }
   let t = thumbs.get(c.look || c.id); if (!t) { t = figureThumb(c, 40); thumbs.set(c.look || c.id, t); }
   const out = document.createElement('canvas'); out.width = t.width; out.height = t.height; out.className = 'ub-thumb'; out.getContext('2d').drawImage(t, 0, 0); return out;
@@ -50,10 +52,9 @@ const stageHtml = label => `<div class="ub-stage">
   </div>`;
 const FACING = [['front', false], ['front', true], ['back', false], ['back', true]];
 let anim = 0;
-function startPreview(c) {
-  $('faceL').addEventListener('click', () => { P.face = (P.face + 3) % 4; });
-  $('faceR').addEventListener('click', () => { P.face = (P.face + 1) % 4; });
-  $('play').addEventListener('click', () => { P.playing = !P.playing; $('play').setAttribute('aria-pressed', String(P.playing)); });
+/* again: the stage is already showing and its chips already work, so only the figure changes */
+function startPreview(c, again = false) {
+  if (!again) bindStage();
   if (!c) { $('preview').classList.add('ub-blank'); return; }
   const can = $('preview'), g = can.getContext('2d'), frames = render(c), px = 8, one = document.createElement('canvas'), og = one.getContext('2d');
   one.width = FW; one.height = FH;
@@ -67,6 +68,11 @@ function startPreview(c) {
     g.save(); g.translate(can.width / 2, 0); if (flip) g.scale(-1, 1); g.drawImage(one, -FW / 2 * px, fy - (BASE + 1) * px, FW * px, FH * px); g.restore();
   };
   anim = requestAnimationFrame(step);
+}
+function bindStage() {
+  $('faceL').addEventListener('click', () => { P.face = (P.face + 3) % 4; });
+  $('faceR').addEventListener('click', () => { P.face = (P.face + 1) % 4; });
+  $('play').addEventListener('click', () => { P.playing = !P.playing; $('play').setAttribute('aria-pressed', String(P.playing)); });
 }
 function stopPreview() { if (anim) cancelAnimationFrame(anim); anim = 0; }
 

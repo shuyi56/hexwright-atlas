@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ID_RE, classPath, classText, normalizeClass, validateClass } from '../src/data/classes.ts';
-import { ROOT } from './units-store.mjs';
+import { ROOT } from './npcs-store.mjs';
 
 /* ================= class data: the files, on disk =================
    Reads and writes data/classes/<id>.json for Node: the dev server's bridge (tools/vite-hexwright.js), which the

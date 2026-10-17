@@ -1,7 +1,37 @@
 {
   "id": "squire",
   "name": "Squire",
-  "sprite": "squire",
+  "outfit": {
+    "clothes": "tunic",
+    "sleeves": "cloth",
+    "cut": "plain",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "none",
+    "cape": "none",
+    "satchel": "none",
+    "held": "sword",
+    "shield": "none",
+    "colours": {
+      "cloth": "#bb8d5c",
+      "shirt": "#ece0c6",
+      "second": "#8fa462",
+      "trim": "#93653d",
+      "belt": "#6b4a30",
+      "gold": "#c9a24f",
+      "legs": "#7b6c55",
+      "boots": "#5c4231",
+      "hat": "#dfc070",
+      "accent": "#b8664a",
+      "steel": "#c8c9c2",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#a6533b"
+    }
+  },
   "stats": {
     "hp": 36,
     "mp": 6,

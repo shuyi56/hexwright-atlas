@@ -1,7 +1,6 @@
 import { METHODS } from '../src/editor/api-spec.js';
 import { deleteClass, readClasses, writeClass } from './classes-store.mjs';
 import { deleteSkill, readSkills, writeSkill } from './skills-store.mjs';
-import { deleteUnit, readUnits, writeUnit } from './units-store.mjs';
 
 /* ================= Hexwright bridge: Vite plugin (server side) =================
    Lets anything that can speak HTTP drive the tile editor open in a real browser:
@@ -13,18 +12,14 @@ import { deleteUnit, readUnits, writeUnit } from './units-store.mjs';
      GET    /__hexwright/classes              every class data file (data/classes/), normalized
      PUT    /__hexwright/classes/<id>         body = the class; writes data/classes/<id>.json
      DELETE /__hexwright/classes/<id>         removes that file
-     GET    /__hexwright/units                every unit data file (data/units/), normalized
-     PUT    /__hexwright/units/<group>/<id>   body = the unit; writes data/units/<group>/<id>.json
-     DELETE /__hexwright/units/<group>/<id>   removes that file
      GET    /__hexwright/skills               every skill data file (data/skills/), normalized
      PUT    /__hexwright/skills/<id>          body = the skill; writes data/skills/<id>.json
      DELETE /__hexwright/skills/<id>          removes that file
 
    Calls travel over Vite's HMR websocket to src/editor/bridge.js in the page, which runs them on
    window.hexwright. The MCP server in mcp/ is a thin client of these endpoints. The classes endpoints are how the
-   class editor (classes.html) saves; they touch only files under data/classes/ (tools/classes-store.mjs). The units
-   endpoints are the same for the unit page (units.html) and data/units/ (tools/units-store.mjs), and the skills
-   endpoints for the skill editor (skills.html) and data/skills/ (tools/skills-store.mjs). Dev server
+   class editor (classes.html) saves; they touch only files under data/classes/ (tools/classes-store.mjs). The skills
+   endpoints are the same for the skill editor (skills.html) and data/skills/ (tools/skills-store.mjs). Dev server
    only. */
 export default function hexwrightBridge() {
   return {
@@ -65,13 +60,6 @@ export default function hexwrightBridge() {
             try { return send(res, 200, { ok: true, ...writeClass(raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
           }
           if (cm && req.method === 'DELETE') return send(res, 200, { ok: true, deleted: deleteClass(cm[1], server.config.root) });
-          if (path === '/units' && req.method === 'GET') return send(res, 200, { ok: true, units: readUnits(server.config.root).map(({ group, file, unit }) => ({ group, file, unit })) });
-          const um = path.match(/^\/units\/([a-z]+)\/([a-z0-9-]+)$/);
-          if (um && req.method === 'PUT') {
-            const raw = await body(req); if (raw.id !== um[2]) return send(res, 400, { ok: false, error: { message: `the body's id "${raw.id}" does not match the path's "${um[2]}"` } });
-            try { return send(res, 200, { ok: true, ...writeUnit(um[1], raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
-          }
-          if (um && req.method === 'DELETE') return send(res, 200, { ok: true, deleted: deleteUnit(um[1], um[2], server.config.root) });
           if (path === '/skills' && req.method === 'GET') return send(res, 200, { ok: true, skills: readSkills(server.config.root).map(({ file, skill }) => ({ file, skill })) });
           const sm = path.match(/^\/skills\/([a-z0-9-]+)$/);
           if (sm && req.method === 'PUT') {

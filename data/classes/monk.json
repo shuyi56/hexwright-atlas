@@ -1,7 +1,37 @@
 {
   "id": "monk",
   "name": "Monk",
-  "sprite": "monk",
+  "outfit": {
+    "clothes": "gown",
+    "sleeves": "cloth",
+    "cut": "bell",
+    "neckline": "high",
+    "rope": "rope",
+    "hat": "cowl",
+    "cape": "none",
+    "satchel": "none",
+    "held": "none",
+    "shield": "none",
+    "colours": {
+      "cloth": "#b49872",
+      "shirt": "#efe3c4",
+      "second": "#8fa462",
+      "trim": "#9e8360",
+      "belt": "#e6dcc0",
+      "gold": "#e6dcc0",
+      "legs": "#a68a62",
+      "boots": "#7a5a3a",
+      "hat": "#a88a64",
+      "accent": "#b8664a",
+      "steel": "#c4c8c6",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#a6533b"
+    }
+  },
   "stats": {
     "hp": 34,
     "mp": 10,

@@ -3,17 +3,16 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GROUPS, ID_RE, normalizeUnit, unitPath, unitText, validateUnit } from '../src/data/units.ts';
 
-/* ================= unit data: the files, on disk =================
-   Reads and writes data/units/<group>/<id>.json for Node: the dev server's bridge (tools/vite-hexwright.js), which
-   the unit page saves through, and the tests. Every write is normalized (src/data/units.ts), so the files
-   stay in one canonical shape however they were edited. A unit lives in exactly one group: saving it under one
-   removes it from the other. */
+/* ================= NPC data: the files, on disk =================
+   Reads and writes data/npcs/<group>/<id>.json for Node tools and the tests. Every write is normalized
+   (src/data/units.ts), so the files stay in one canonical shape however they were edited. An NPC lives in exactly
+   one group: saving it under one removes it from the other. */
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function readUnits(root = ROOT) {
   const out = [];
   for (const group of GROUPS) {
-    const dir = join(root, 'data/units', group); if (!existsSync(dir)) continue;
+    const dir = join(root, 'data/npcs', group); if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir).filter(f => f.endsWith('.json')).sort()) {
       const raw = JSON.parse(readFileSync(join(dir, f), 'utf8'));
       out.push({ group, file: unitPath(group, f.slice(0, -5)), raw, unit: normalizeUnit(raw) });

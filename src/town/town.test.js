@@ -86,8 +86,8 @@ test('buildings fill their footprint across, wider than they are tall at the wal
 });
 
 test('people have something to say, and things something to show', () => {
-  assert.match(lineFor('villager', 'characters', 'Ember', 1), /Ember/);
-  assert.notEqual(lineFor('farmer', 'characters', 'X', 1), lineFor('farmer', 'characters', 'X', 2));
+  assert.match(lineFor('villager', 'allies', 'Ember', 1), /Ember/);
+  assert.notEqual(lineFor('farmer', 'allies', 'X', 1), lineFor('farmer', 'allies', 'X', 2));
   assert.ok(lineFor('someone-made', 'enemies', 'X', 1));
   assert.equal(sightFor({ id: 'signpost', label: 'Signpost', group: 'Props' }, null, 'Ember'), 'The sign reads: Ember.');
   assert.equal(sightFor(null, { water: true }, 'X'), 'The water is cool and clear.');

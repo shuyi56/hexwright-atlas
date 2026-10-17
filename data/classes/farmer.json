@@ -1,7 +1,37 @@
 {
   "id": "farmer",
   "name": "Farmer",
-  "sprite": "farmer",
+  "outfit": {
+    "clothes": "overalls",
+    "sleeves": "cloth",
+    "cut": "plain",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "none",
+    "cape": "none",
+    "satchel": "none",
+    "held": "none",
+    "shield": "none",
+    "colours": {
+      "cloth": "#77905a",
+      "shirt": "#efe3c4",
+      "second": "#5a7090",
+      "trim": "#c2a274",
+      "belt": "#5c4231",
+      "gold": "#c9a24f",
+      "legs": "#a68a62",
+      "boots": "#6a4e34",
+      "hat": "#dfc070",
+      "accent": "#b8664a",
+      "steel": "#c4c8c6",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#a6533b"
+    }
+  },
   "stats": {
     "hp": 28,
     "mp": 0,

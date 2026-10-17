@@ -1,7 +1,37 @@
 {
   "id": "summoner",
   "name": "Summoner",
-  "sprite": "summoner",
+  "outfit": {
+    "clothes": "robe",
+    "sleeves": "cloth",
+    "cut": "plain",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "cowl",
+    "cape": "none",
+    "satchel": "none",
+    "held": "staff",
+    "shield": "none",
+    "colours": {
+      "cloth": "#738f5a",
+      "shirt": "#efe3c4",
+      "second": "#5f7c49",
+      "trim": "#c9a24f",
+      "belt": "#8a6238",
+      "gold": "#c9a24f",
+      "legs": "#a68a62",
+      "boots": "#5c4231",
+      "hat": "#5f7c49",
+      "accent": "#b8664a",
+      "steel": "#c4c8c6",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#6fb0b4",
+      "cape": "#a6533b"
+    }
+  },
   "stats": {
     "hp": 30,
     "mp": 32,

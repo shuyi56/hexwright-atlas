@@ -25,11 +25,11 @@ const SAYS = {
   darkelf: ['The light here burns my eyes. You will do instead.', 'Your kin cast us out. I have come to return the favour.']
 };
 const GROUP = {
-  characters: ['Fine day for a walk around {place}.', 'Have you seen the market? Busy as ever.', 'Stay out of trouble, now.'],
+  allies: ['Fine day for a walk around {place}.', 'Have you seen the market? Busy as ever.', 'Stay out of trouble, now.'],
   enemies: ['Grrr...', 'You should not be here.']
 };
 function lineFor(sprite, group, place, n = 0) {
-  const lines = SAYS[sprite] || GROUP[group] || GROUP.characters;
+  const lines = SAYS[sprite] || GROUP[group] || GROUP.allies;
   return lines[(n - 1 + lines.length) % lines.length].replace('{place}', place || 'this town');
 }
 const SIGHTS = {

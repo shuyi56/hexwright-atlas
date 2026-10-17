@@ -1,7 +1,7 @@
 {
   "id": "darkelf",
   "name": "Dark Elf",
-  "sprite": "darkelf",
+  "outfit": null,
   "stats": {
     "hp": 34,
     "mp": 12,

@@ -1,7 +1,7 @@
 {
   "id": "bandit",
   "name": "Bandit",
-  "sprite": "bandit",
+  "outfit": null,
   "stats": {
     "hp": 38,
     "mp": 6,

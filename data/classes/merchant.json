@@ -1,7 +1,37 @@
 {
   "id": "merchant",
   "name": "Merchant",
-  "sprite": "merchant",
+  "outfit": {
+    "clothes": "robe",
+    "sleeves": "cloth",
+    "cut": "bell",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "none",
+    "cape": "none",
+    "satchel": "satchel",
+    "held": "none",
+    "shield": "none",
+    "colours": {
+      "cloth": "#536c8c",
+      "shirt": "#efe3c4",
+      "second": "#8a4436",
+      "trim": "#c09a4a",
+      "belt": "#6b4c32",
+      "gold": "#c09a4a",
+      "legs": "#a68a62",
+      "boots": "#6a4e34",
+      "hat": "#dfc070",
+      "accent": "#b8664a",
+      "steel": "#c4c8c6",
+      "bag": "#9a7e58",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#a6533b"
+    }
+  },
   "stats": {
     "hp": 26,
     "mp": 0,

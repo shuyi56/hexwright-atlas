@@ -1,4 +1,4 @@
-/* ================= the unit page and the class editor =================
+/* ================= the class editor (and the skill editor, which borrows its parts) =================
    The tile editor's dark table and brass rims (main.css supplies the colours, buttons and chips). */
 .ub{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px;padding:12px 16px 16px}
 .ub-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
@@ -50,7 +50,7 @@
 .ub-tag{font:500 11.5px var(--ui-sc);letter-spacing:.08em;color:#1b150c;background:var(--brass);border-radius:2px;padding:0 6px}
 .ub-errors{margin:0;color:#f0b2a8;font-size:13.5px}
 .ub-values{display:flex;flex-direction:column;border-top:1px solid var(--line)}
-.ub-value{display:grid;grid-template-columns:90px 96px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line)}
+.ub-value{display:grid;grid-template-columns:90px 96px minmax(0,1fr);gap:14px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line)}
 .ub-value-name{font:500 14px var(--ui-sc);letter-spacing:.1em;color:var(--muted)}
 .ub .ub-value input[type=number]{width:100%;font:500 22px/1.1 var(--ui);padding:5px 10px}
 .ub-value.changed input{border-color:var(--brass);color:var(--brass-2)}
@@ -140,18 +140,15 @@
 /* the dialogs sit outside .ub, so their fields are styled here too */
 .ub-dialog select,.ub-dialog input{background:var(--table);border:1px solid var(--line);color:var(--vellum);font:500 14px var(--ui);padding:5px 8px;border-radius:3px}
 .ub-dialog input:invalid{border-color:var(--wax)}
-/* the unit page: a number of its own, not its class's, and the way back */
-.ub-value.own input{border-color:var(--brass-2);border-style:dashed}
-.ub-from{font:500 12px var(--ui-sc);letter-spacing:.08em;color:var(--muted);opacity:.7}
-.ub-own{white-space:nowrap}
-.ub-class{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
-.ub-class .ub-link{margin-left:0;padding-bottom:6px}
-.ub-check{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
-.ub-check input{accent-color:var(--brass)}
-.ub-pattern.own .ub-section,.ub-ability.own .ub-section{color:var(--brass-2)}
-.ub-table td.own input{border-color:var(--brass-2);border-style:dashed}
-.ub-table td.own .ub-open{color:var(--brass-2)}
-.ub-table-note{padding:8px 12px;font-size:13px}
+/* the class editor: the outfit, as the character maker's chips and colours */
+.ub-outfit{display:flex;flex-direction:column;gap:8px}
+.ub-outfit.changed .ub-section{color:var(--brass-2)}
+.ub-choice{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;align-items:start}
+.ub-choice .ub-value-name{padding-top:5px;font-size:12.5px}
+.ub-chips{display:flex;flex-wrap:wrap;gap:5px}
+.ub-colours{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin-top:4px}
+.ub-colour{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
+.ub-colour input{width:34px;height:24px;padding:0;border:1px solid var(--line);border-radius:3px;background:none;cursor:pointer}
 /* the class editor: who plays the class */
 .ub-users{display:flex;flex-direction:column;gap:6px}
 .ub-user-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}

@@ -4,6 +4,6 @@ import hexwrightBridge from './tools/vite-hexwright.js';
 
 export default defineConfig({
   base: './',
-  build: { target: 'es2022', rollupOptions: { input: { main: resolve(import.meta.dirname, 'index.html'), classes: resolve(import.meta.dirname, 'classes.html'), units: resolve(import.meta.dirname, 'units.html'), skills: resolve(import.meta.dirname, 'skills.html') } } },
+  build: { target: 'es2022', rollupOptions: { input: { main: resolve(import.meta.dirname, 'index.html'), classes: resolve(import.meta.dirname, 'classes.html'), skills: resolve(import.meta.dirname, 'skills.html') } } },
   plugins: [hexwrightBridge()],
 });

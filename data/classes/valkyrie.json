@@ -1,7 +1,37 @@
 {
   "id": "valkyrie",
   "name": "Valkyrie",
-  "sprite": "valkyrie",
+  "outfit": {
+    "clothes": "plate",
+    "sleeves": "cloth",
+    "cut": "plain",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "circlet",
+    "cape": "none",
+    "satchel": "none",
+    "held": "spear",
+    "shield": "buckler",
+    "colours": {
+      "cloth": "#a84a3c",
+      "shirt": "#efe3c4",
+      "second": "#8fa462",
+      "trim": "#c9a24f",
+      "belt": "#5c4231",
+      "gold": "#c9a24f",
+      "legs": "#aeb0aa",
+      "boots": "#6b4a34",
+      "hat": "#dfc070",
+      "accent": "#b8664a",
+      "steel": "#ccccc4",
+      "bag": "#b89a70",
+      "shield": "#a84a3c",
+      "wood": "#7a5434",
+      "string": "#efe6d2",
+      "jewel": "#6f8faa",
+      "cape": "#a6533b"
+    }
+  },
   "stats": {
     "hp": 48,
     "mp": 12,

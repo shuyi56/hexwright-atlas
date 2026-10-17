@@ -1,7 +1,37 @@
 {
   "id": "elflady",
   "name": "Elf Lady",
-  "sprite": "elflady",
+  "outfit": {
+    "clothes": "gown",
+    "sleeves": "second",
+    "cut": "bell",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "circlet",
+    "cape": "none",
+    "satchel": "none",
+    "held": "none",
+    "shield": "none",
+    "colours": {
+      "cloth": "#a9bcd0",
+      "shirt": "#efe3c4",
+      "second": "#c9d6e2",
+      "trim": "#e2c262",
+      "belt": "#7a5a3a",
+      "gold": "#e2c262",
+      "legs": "#a68a62",
+      "boots": "#6a5a6a",
+      "hat": "#dfc070",
+      "accent": "#e2c262",
+      "steel": "#c4c8c6",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#7fb8c0",
+      "cape": "#a6533b"
+    }
+  },
   "stats": {
     "hp": 28,
     "mp": 18,

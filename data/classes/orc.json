@@ -1,7 +1,7 @@
 {
   "id": "orc",
   "name": "Orc",
-  "sprite": "orc",
+  "outfit": null,
   "stats": {
     "hp": 66,
     "mp": 8,

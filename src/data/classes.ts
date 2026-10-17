@@ -3,11 +3,14 @@
    Defense turns aside, how surely it hits (Accuracy) and dodges (Evasion), how often its blows are critical (Crit,
    in percent) and for how much (Crit Damage, a percent of the damage), the MP its abilities spend, how many tiles
    away it can strike and in what pattern, the abilities it has, how far it moves and how high it jumps, and the
-   sprite it looks like in the class editor. Characters and enemies (data/units.ts) are people: each names the class
-   it plays as and may change a few of its numbers. Each class is one JSON file under data/classes/, named by its id:
+   outfit it wears: the clothes, hat and gear, and their colours, out of the character maker's choices
+   (characters/choices.js). A playable character, made in the character maker, wears its class's outfit over its own
+   body and fights with its numbers; an NPC (data/units.ts) keeps its own hand-drawn look and fights with its class's
+   numbers. A class only NPCs play, such as Goblin or Wolf, has no outfit (null). Each class is one JSON file under
+   data/classes/, named by its id:
 
      data/classes/goblin.json
-     { "id": "goblin", "name": "Goblin", "sprite": "goblin",
+     { "id": "goblin", "name": "Goblin", "outfit": null,
        "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "abilities": [] },
        "movement": { "move": 5, "jump": 2 } }
 
@@ -22,14 +25,17 @@
    the files into the registry below; on the dev server the class editor (classes.html) writes them back through
    the Hexwright bridge (tools/classes-store.mjs). */
 import { NO_SKILL } from './skills.ts';
+import { OUTFIT_KEYS, cleanOutfit } from '../characters/choices.js';
 
 type AttackPattern = 'melee' | 'line' | 'ranged';
 /* the numbers a unit fights with, as a blow (battle/actions.ts) reads them */
 interface CombatStats { attack: number; defense: number; accuracy: number; evasion: number; crit: number; critDamage: number }
 interface UnitStats extends CombatStats { hp: number; mp: number; range: number; pattern: AttackPattern; abilities: string[] }
 interface UnitMovement { move: number; jump: number }
-/* a class as its file holds it, in canonical form: sprite is the roster or library sprite it looks like, or '' */
-interface ClassData { id: string; name: string; sprite: string; stats: UnitStats; movement: UnitMovement }
+/* what a class wears: a choice for each outfit key of the character maker, and a colour for each outfit material */
+type Outfit = Record<string, string> & { colours: Record<string, string> };
+/* a class as its file holds it, in canonical form; outfit is null for a class only NPCs play */
+interface ClassData { id: string; name: string; outfit: Outfit | null; stats: UnitStats; movement: UnitMovement }
 type Section = 'stats' | 'movement';
 type NumberKey = Exclude<keyof UnitStats, 'pattern' | 'abilities'> | keyof UnitMovement;
 type Field<K> = readonly [key: K, label: string, min: number, max: number, def: number];
@@ -71,7 +77,9 @@ const fieldOf = (sec: Section, k: string): Field<string> | undefined => (FIELDS[
 const objectOf = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v : {}) as Record<string, unknown>;
 const DEFAULT_STATS: Readonly<UnitStats> = Object.freeze({ ...numbers('stats', {}), pattern: DEFAULT_PATTERN, abilities: Object.freeze([]) as unknown as string[] } as UnitStats);
 const DEFAULT_MOVEMENT: Readonly<UnitMovement> = Object.freeze(numbers('movement', {}) as unknown as UnitMovement);
-const DEFAULT_CLASS: Readonly<ClassData> = Object.freeze({ id: '', name: '', sprite: '', stats: DEFAULT_STATS, movement: DEFAULT_MOVEMENT });
+const DEFAULT_CLASS: Readonly<ClassData> = Object.freeze({ id: '', name: '', outfit: null, stats: DEFAULT_STATS, movement: DEFAULT_MOVEMENT });
+/* the outfit a new one starts from: the character maker's defaults */
+const DEFAULT_OUTFIT = (): Outfit => cleanOutfit({}) as Outfit;
 
 /* a class's stats and movement in canonical form, from raw sections: shared with the per-character changes
    (data/units.ts), which are checked number by number the same way */
@@ -82,20 +90,18 @@ const movementOf = (mv: Record<string, unknown>): UnitMovement => numbers('movem
 class UnitClass implements ClassData {
   id: string;
   name: string;
-  sprite: string;
+  outfit: Outfit | null;
   stats: UnitStats;
   movement: UnitMovement;
-  constructor({ id, name, sprite, stats, movement }: ClassData) { this.id = id; this.name = name; this.sprite = sprite; this.stats = stats; this.movement = movement; }
-  toJSON(): ClassData { return { id: this.id, name: this.name, sprite: this.sprite, stats: { ...this.stats, abilities: [...this.stats.abilities] }, movement: { ...this.movement } }; }
+  constructor({ id, name, outfit, stats, movement }: ClassData) { this.id = id; this.name = name; this.outfit = outfit; this.stats = stats; this.movement = movement; }
+  toJSON(): ClassData { return { id: this.id, name: this.name, outfit: this.outfit && structuredClone(this.outfit), stats: { ...this.stats, abilities: [...this.stats.abilities] }, movement: { ...this.movement } }; }
 }
 
 /* a class in canonical form: known fields only, in a fixed order, every number a whole number within its range and
-   anything missing filled from the defaults. A unit file from before classes (stats and movement, no class) reads
-   as a class of the same id that looks like its sprite. */
+   anything missing filled from the defaults; an outfit is cleaned the way the character maker cleans a spec. */
 function normalizeClass(raw: unknown): ClassData {
   const J = objectOf(raw), id = String(J.id ?? '').trim().toLowerCase();
-  const sprite = J.sprite == null ? id : String(J.sprite).trim().toLowerCase();
-  return { id, name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''), sprite: ID_RE.test(sprite) ? sprite : '',
+  return { id, name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''), outfit: J.outfit && typeof J.outfit === 'object' ? cleanOutfit(J.outfit) as Outfit : null,
     stats: statsOf(objectOf(J.stats)), movement: movementOf(objectOf(J.movement)) };
 }
 /* what is wrong with one number, or with the pattern or abilities, of a stats or movement section, as sentences */
@@ -123,7 +129,8 @@ function validateClass(raw: unknown): string[] {
   const J = raw as Record<string, unknown>, errs: string[] = [];
   if (typeof J.id !== 'string' || !ID_RE.test(J.id)) errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit');
   if (J.name != null && typeof J.name !== 'string') errs.push('name must be text');
-  if (J.sprite != null && J.sprite !== '' && (typeof J.sprite !== 'string' || !ID_RE.test(J.sprite))) errs.push('sprite must be a sprite id');
+  if (J.outfit != null && (typeof J.outfit !== 'object' || Array.isArray(J.outfit))) errs.push('outfit must be an object, or null');
+  else if (J.outfit) for (const k of Object.keys(J.outfit)) if (k !== 'colours' && !OUTFIT_KEYS.includes(k)) errs.push(`the outfit has no choice called “${k}”`);
   for (const s of SECTIONS) errs.push(...sectionErrors(s, objectOf(J[s])));
   return errs;
 }
@@ -144,5 +151,5 @@ const onClassesChange = (f: () => void): (() => boolean) => { listeners.add(f); 
 const listClasses = (): UnitClass[] => [...CLASSES.values()].sort((a, b) => a.name.localeCompare(b.name));
 const getClass = (id: string): UnitClass | null => CLASSES.get(id) || null;
 
-export { DEFAULT_CLASS, DEFAULT_MOVEMENT, DEFAULT_PATTERN, DEFAULT_STATS, FIELDS, ID_RE, MAX_ABILITIES, PATTERNS, SECTIONS, UnitClass, classPath, classText, clampInt, fieldOf, getClass, listClasses, movementOf, normalizeClass, objectOf, onClassesChange, patternOf, abilitiesOf, sectionErrors, setClasses, statsOf, validateClass };
-export type { AttackPattern, ClassData, CombatStats, NumberKey, Section, UnitMovement, UnitStats };
+export { DEFAULT_OUTFIT, DEFAULT_CLASS, DEFAULT_MOVEMENT, DEFAULT_PATTERN, DEFAULT_STATS, FIELDS, ID_RE, MAX_ABILITIES, PATTERNS, SECTIONS, UnitClass, classPath, classText, clampInt, fieldOf, getClass, listClasses, movementOf, normalizeClass, objectOf, onClassesChange, patternOf, abilitiesOf, sectionErrors, setClasses, statsOf, validateClass };
+export type { Outfit, AttackPattern, ClassData, CombatStats, NumberKey, Section, UnitMovement, UnitStats };

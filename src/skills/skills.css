@@ -1,5 +1,5 @@
 /* ================= the skill editor =================
-   The unit data page's layout and parts (units/units.css), and what only skills have: a swatch of each skill's
+   The class editor's layout and parts (classes/classes.css), and what only skills have: a swatch of each skill's
    colour in the list, the effect picker with each effect's colours, the Never misses switch, the colour picker and the
    table of who has the skill. */
 .sk-row{padding:7px 8px}

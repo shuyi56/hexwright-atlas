@@ -490,8 +490,9 @@ function buildPalette() {
   if (!sections.length) { const p = document.createElement('p'); p.className = 'ed-none'; p.textContent = `Nothing called “${$('edFind').value.trim()}”.`; box.appendChild(p); }
   syncPalette();
 }
-/* The Characters tab lists everyone who can stand on the map, each on a grass block: the townsfolk, the jobs
-   (characters/roster.js), the enemies (characters/enemies.js) and the characters made in the character maker.
+/* The Characters tab lists everyone who can stand on the map, each on a grass block, in two kinds: the playable
+   characters, made in the character maker (each in its class's outfit), and the NPCs: the townsfolk, the jobs
+   (characters/roster.js), the elves and the enemies (characters/enemies.js), drawn by hand.
    Clicking one arms the Person tool. New character… opens the maker on a new character; Edit… opens it on a made
    one, or on a copy of one of the townsfolk (the jobs and enemies are drawn by hand, so the maker cannot make
    them). */
@@ -511,9 +512,13 @@ function buildCharacters(box) {
   for (const [text, tip, fn, ok] of [['New character…', 'Make a character in the character maker', () => maker('new'), true], [label, title, () => maker(ED.char), editable]]) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = text; b.title = tip; b.disabled = !ok; b.addEventListener('click', fn); row.appendChild(b);
   }
-  const mine = customList();
-  for (const [gn, list] of [['Townsfolk', TOWNSFOLK], ['Jobs', JOBS], ['Elves', ELVES], ['Enemies', ENEMIES], ...(mine.length ? [['Made here', mine]] : [])]) {
-    const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h);
+  const mine = customList(), kind = t => { const h = document.createElement('h3'); h.className = 'ed-group ed-kind'; h.textContent = t; box.appendChild(h); };
+  for (const [gn, list] of [['Playable', mine], ['NPC', null], ['Townsfolk', TOWNSFOLK], ['Jobs', JOBS], ['Elves', ELVES], ['Enemies', ENEMIES]]) {
+    if (!list) { kind(gn); continue; }
+    if (gn === 'Playable') {
+      kind(gn);
+      if (!list.length) { const p = document.createElement('p'); p.className = 'ed-none'; p.textContent = 'No playable characters yet: make one with New character… and give it a class.'; box.appendChild(p); continue; }
+    } else { const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = gn; box.appendChild(h); }
     const grid = document.createElement('div'); grid.className = 'ed-grid'; box.appendChild(grid);
     for (const s of list) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'ed-item'; b.dataset.kind = 'char'; b.dataset.id = s.id; b.title = `${s.name}: ${s.blurb}`;
