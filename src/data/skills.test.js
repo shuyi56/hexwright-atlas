@@ -20,7 +20,7 @@ test('the skill files are canonical, are the stock five, and every unit names on
 
 test('a skill is normalized into one shape and its mistakes are told', () => {
   const s = normalizeSkill({ id: 'Bolt', kind: 'zap', cost: 120, power: 2.5, sure: 'yes', fx: { preset: 'Spell', tint: '#ABCDEF', scale: 1000 } });
-  assert.deepEqual(Object.keys(s), ['id', 'label', 'kind', 'cost', 'cooldown', 'power', 'pierce', 'sure', 'healBase', 'healScale', 'fx']);
+  assert.deepEqual(Object.keys(s), ['id', 'label', 'kind', 'cost', 'cooldown', 'power', 'pierce', 'sure', 'healBase', 'healScale', 'effects', 'fx']);
   assert.deepEqual([s.id, s.label, s.kind, s.cost, s.power, s.sure], ['bolt', 'bolt', 'damage', 99, 10, false]);
   assert.deepEqual(s.fx, { preset: 'spell', tint: '#abcdef', scale: 300, density: 100 });
   assert.equal(normalizeSkill({ id: 'x', fx: { tint: 'red' } }).fx.tint, '', 'a tint must be #rrggbb');

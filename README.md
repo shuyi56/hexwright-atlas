@@ -373,7 +373,7 @@ Each ability is one JSON file in `data/skills/`, named by its id, which is what 
 
 ```json
 { "id": "spell", "label": "Spell", "kind": "damage", "cost": 8, "cooldown": 2, "power": 200, "pierce": 50, "sure": false,
-  "healBase": 8, "healScale": 200, "fx": { "preset": "spell", "tint": "", "scale": 100, "density": 100 } }
+  "healBase": 8, "healScale": 200, "effects": [], "fx": { "preset": "spell", "tint": "", "scale": 100, "density": 100 } }
 ```
 
 | Field | What it does |
@@ -385,6 +385,7 @@ Each ability is one JSON file in `data/skills/`, named by its id, which is what 
 | Ignores Def % | How much of the target's Defense a blow goes through (100: all of it). |
 | Never misses | A blow that always lands, whatever the target's Evasion. |
 | Heal base, Heal / Atk % | A heal restores the base plus this percent of the healer's Attack (8 and 200: 8 + 2 × Attack). |
+| Special effects | What it does beyond its numbers, worked out from the battle as it stands (`src/battle/effects.ts`): Execute (half as hard again on a foe below half its HP), Last stand (harder the more HP the user has lost), Rally (a tenth harder per other ally standing), Drain (the user gets back half the damage dealt) for damage skills; Refresh (the ally gets 4 MP back too) for heals. |
 | Effect | The particles it plays: Embers, Glints, Shards, Arcane, Spiral or None. |
 | Colour | Its own colour in place of the effect's (empty keeps the effect's, or for Arcane the caster's). |
 | Size %, Particles % | Spreads the effect wider and faster or tighter and slower, and thins it out or fills it in. |
@@ -404,6 +405,10 @@ says so.
 `src/data/skills.ts` reads each file as `SkillData` and holds it as a `DamageSkill` or a `HealSkill`, both a
 `Skill`: each kind says in a few words what it does and makes its own action for the battle. A file keeps the
 other kind's numbers too, so a skill switched between kinds keeps them.
+
+Every action carries `effects`, its special effects: each can `modify` the blow from the battle's state before it is
+rolled (so the tactical view's preview shows it) and `apply` changes to the battle after it is struck. A new effect is
+one entry in `EFFECTS` in `src/battle/effects.ts`, and the skill editor lists it at once.
 
 ![The skill editor](docs/images/skill-editor.png)
 

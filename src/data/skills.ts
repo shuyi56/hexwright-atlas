@@ -17,6 +17,8 @@
    sure        a damage skill that never misses
    healBase    a heal's hit points before the user's Attack is counted
    healScale   what a heal adds for each point of Attack, in percent (200: two hit points a point)
+   effects     its special effects by id (battle/effects.ts): what it does beyond its numbers, worked out from the
+               state of the battle, such as hitting harder on a wounded foe or draining hit points back
    fx          its particles (tactical/particles.js): which effect plays, its colour (empty for the effect's own,
                or the caster's for an arcane burst), its size and how many particles, each in percent
 
@@ -31,6 +33,8 @@
 
 import { HealAction, StrikeAction } from '../battle/actions.ts';
 import type { Action } from '../battle/actions.ts';
+import { EFFECTS, effectOf } from '../battle/effects.ts';
+import type { SpecialEffect } from '../battle/effects.ts';
 
 type SkillKind = 'damage' | 'heal';
 type FxPreset = 'power' | 'true' | 'pierce' | 'spell' | 'heal' | 'none';
@@ -38,7 +42,7 @@ interface SkillFx { preset: FxPreset; tint: string; scale: number; density: numb
 /* a skill as its file holds it, in canonical form */
 interface SkillData {
   id: string; label: string; kind: SkillKind; cost: number; cooldown: number; power: number; pierce: number; sure: boolean;
-  healBase: number; healScale: number; fx: SkillFx;
+  healBase: number; healScale: number; effects: string[]; fx: SkillFx;
 }
 type SkillNumber = 'cost' | 'cooldown' | 'power' | 'pierce' | 'healBase' | 'healScale';
 type FxNumber = 'scale' | 'density';
@@ -74,7 +78,7 @@ const clampInt = (v: unknown, lo: number, hi: number, def: number): number => { 
 const numbers = <K extends string>(fields: readonly (readonly [K, string, number, number, number, ...unknown[]])[], src: Record<string, unknown>) =>
   Object.fromEntries(fields.map(([k, , lo, hi, d]) => [k, clampInt(src[k], lo, hi, d)])) as Record<K, number>;
 const DEFAULT_SKILL: Readonly<SkillData> = Object.freeze({
-  id: '', label: '', kind: 'damage', ...numbers(FIELDS, {}), sure: false,
+  id: '', label: '', kind: 'damage', ...numbers(FIELDS, {}), sure: false, effects: [],
   fx: Object.freeze({ preset: 'none', tint: '', ...numbers(FX_FIELDS, {}) }) });
 
 /* ---------- the skills, by kind ---------- */
@@ -84,20 +88,25 @@ abstract class Skill {
   readonly cost: number;
   readonly cooldown: number;
   readonly fx: Readonly<SkillFx>;
+  readonly effects: readonly string[];
   abstract readonly kind: SkillKind;
   /* the whole record, the other kind's numbers too */
   readonly #data: Readonly<SkillData>;
   #action: Action | null = null;
   constructor(data: Readonly<SkillData>) {
     this.#data = data;
-    this.id = data.id; this.label = data.label; this.cost = data.cost; this.cooldown = data.cooldown; this.fx = data.fx;
+    this.id = data.id; this.label = data.label; this.cost = data.cost; this.cooldown = data.cooldown; this.fx = data.fx; this.effects = data.effects;
   }
   /* a few words on what it does, made from its numbers: "2× damage, half Defense" */
   abstract describe(): string;
   protected abstract createAction(): Action;
   /* the skill as the battle plays it; made once for each version of the skill */
   toAction(): Action { return (this.#action ??= Object.freeze(this.createAction())); }
-  toJSON(): SkillData { return { ...this.#data, fx: { ...this.#data.fx } }; }
+  /* the effects it names that work on its kind */
+  protected specialEffects(): SpecialEffect[] { return this.effects.map(effectOf).filter((e): e is SpecialEffect => !!e && e.kinds.includes(this.kind)); }
+  /* its effects' names, for describe */
+  protected effectLabels(): string[] { return this.specialEffects().map(e => e.label.toLowerCase()); }
+  toJSON(): SkillData { return { ...this.#data, effects: [...this.#data.effects], fx: { ...this.#data.fx } }; }
 }
 
 /* strikes a foe for power % of the user's Attack, ignoring pierce % of its Defense */
@@ -115,10 +124,11 @@ class DamageSkill extends Skill {
     if (this.power !== 100) parts.push(`${+(this.power / 100).toFixed(2)}× damage`);
     if (this.pierce >= 100) parts.push('ignores Defense'); else if (this.pierce === 50) parts.push('half Defense'); else if (this.pierce > 0) parts.push(`ignores ${this.pierce}% of Defense`);
     if (this.sure) parts.push('never misses');
+    parts.push(...this.effectLabels());
     return parts.join(', ') || 'a plain blow';
   }
   protected createAction(): StrikeAction {
-    return new StrikeAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), power: this.power / 100, pierce: this.pierce / 100, sure: this.sure });
+    return new StrikeAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), effects: this.specialEffects(), power: this.power / 100, pierce: this.pierce / 100, sure: this.sure });
   }
 }
 
@@ -131,9 +141,9 @@ class HealSkill extends Skill {
     super(data);
     this.healBase = data.healBase; this.healScale = data.healScale;
   }
-  describe(): string { return 'restores HP to an ally'; }
+  describe(): string { return ['restores HP to an ally', ...this.effectLabels()].join(', '); }
   protected createAction(): HealAction {
-    return new HealAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), healBase: this.healBase, healScale: this.healScale / 100 });
+    return new HealAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), effects: this.specialEffects(), healBase: this.healBase, healScale: this.healScale / 100 });
   }
 }
 
@@ -146,16 +156,17 @@ function normalizeSkill(raw: unknown): SkillData {
   const f = (J.fx && typeof J.fx === 'object' ? J.fx : {}) as Record<string, unknown>;
   const id = String(J.id ?? '').trim().toLowerCase(), kind = (KIND_IDS.includes(J.kind as string) ? J.kind : DEFAULT_SKILL.kind) as SkillKind;
   const tint = String(f.tint ?? '').trim().toLowerCase(), preset = String(f.preset ?? '').trim().toLowerCase();
-  const n = numbers(FIELDS, J);
+  const n = numbers(FIELDS, J), named = Array.isArray(J.effects) ? J.effects.map(e => String(e).trim().toLowerCase()) : [];
   return {
     id, label: String(J.label ?? '').trim().slice(0, 32) || id, kind,
     cost: n.cost, cooldown: n.cooldown, power: n.power, pierce: n.pierce, sure: J.sure === true, healBase: n.healBase, healScale: n.healScale,
+    effects: EFFECTS.map(e => e.id).filter(id => named.includes(id)),
     fx: { preset: (FX_IDS.includes(preset) ? preset : DEFAULT_SKILL.fx.preset) as FxPreset, tint: TINT_RE.test(tint) ? tint : '', ...numbers(FX_FIELDS, f) } };
 }
 /* a raw skill, normalized, as a Skill of its kind */
 function skillFrom(raw: unknown): Skill {
   const data = normalizeSkill(raw);
-  Object.freeze(data.fx);
+  Object.freeze(data.fx); Object.freeze(data.effects);
   const skill = new SKILL_CLASS[data.kind](Object.freeze(data));
   Object.freeze(skill); return skill;
 }
@@ -171,6 +182,10 @@ function validateSkill(raw: unknown): string[] {
   const check = (v: unknown, label: string, lo: number, hi: number) => { if (v == null) return; if (typeof v !== 'number' || !Number.isInteger(v)) errs.push(`${label} must be a whole number`); else if (v < lo || v > hi) errs.push(`${label} must be between ${lo} and ${hi}`); };
   for (const [k, label, lo, hi] of FIELDS) check(J[k], label, lo, hi);
   if (J.sure != null && typeof J.sure !== 'boolean') errs.push('Never misses must be true or false');
+  if (J.effects != null) {
+    if (!Array.isArray(J.effects)) errs.push('effects must be a list of effect ids');
+    else for (const id of J.effects) if (!effectOf(String(id))) errs.push(`there is no effect called "${id}" (${EFFECTS.map(e => e.id).join(', ')})`);
+  }
   const f = J.fx as Record<string, unknown> | null | undefined;
   if (f != null) {
     if (typeof f !== 'object') errs.push('fx must be an object');

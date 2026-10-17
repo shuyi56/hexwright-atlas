@@ -9,6 +9,7 @@
   "sure": false,
   "healBase": 8,
   "healScale": 200,
+  "effects": [],
   "fx": {
     "preset": "heal",
     "tint": "",

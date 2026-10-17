@@ -3,7 +3,8 @@ import test from 'node:test';
 import { blankModel } from '../editor/model.ts';
 import { placeChar } from '../editor/walk.js';
 import { planTurn } from './ai.js';
-import { MP_REGEN, critOf, damageOf, hitChance } from './abilities.ts';
+import { MP_REGEN, abilityOf, critOf, damageOf, hitChance } from './abilities.ts';
+import { DEFAULT_SKILLS, setSkills, validateSkill } from '../data/skills.ts';
 import { actionOf, canAct, canAfford, canMove, canTarget, canUse, cooldownLeft, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.ts';
 
 const P = 'player', E = 'enemy';
@@ -166,4 +167,22 @@ test('the computer strikes what it can reach, the weakest first, and otherwise c
   assert.equal(fy, 6, `heads down to the end of the wall, not along it (${fx}, ${fy})`);
   /* no one to fight: it stays */
   assert.deepEqual(planTurn(W, 0, { ...opts, isFoe: () => false }), { path: [], target: -1 });
+});
+
+test('special effects work from the state of the battle: the forecast counts them and the strike applies them', () => {
+  try {
+    setSkills([...DEFAULT_SKILLS,
+      { id: 'reap', label: 'Reap', cost: 0, effects: ['execute', 'drain'] },
+      { id: 'stand', label: 'Stand', cost: 0, effects: ['last-stand'] },
+      { id: 'mend', label: 'Mend', kind: 'heal', cost: 0, effects: ['refresh', 'execute'] }]);
+    assert.equal(abilityOf('reap').note, 'execute, drain'); assert.equal(abilityOf('mend').effects.length, 1, 'a damage effect does nothing on a heal');
+    const B = createBattle([{ side: P, hp: 40, attack: 10, accuracy: 100, ability: 'reap' }, { side: E, hp: 40 }, { side: P, hp: 40, mp: 6, attack: 10, accuracy: 100, ability: 'stand' }, { side: P, hp: 20, mp: 10, attack: 1, ability: 'mend' }]);
+    assert.equal(forecast(B, 0, 1, 'reap').amount, 10, 'a healthy foe takes the plain blow');
+    B.units[1].hp = 19; assert.equal(forecast(B, 0, 1, 'reap').amount, 15, 'below half its HP it takes half as much again');
+    B.units[0].hp = 20; const r = strike(B, 0, 1, 'reap', () => 0);
+    assert.equal(r.to, 4); assert.equal(B.units[0].hp, 27, 'drain gives back half the 15 dealt');
+    assert.equal(forecast(B, 2, 1, 'stand').amount, 10); B.units[2].hp = 10; assert.equal(forecast(B, 2, 1, 'stand').amount, 18, 'three quarters of its HP lost: 1.75 times');
+    B.units[2].mp = 1; strike(B, 3, 2, 'mend'); assert.equal(B.units[2].mp, 5, 'refresh gives the ally 4 MP'); assert.equal(B.units[3].mp, 10, 'and not the healer');
+    assert.ok(validateSkill({ id: 'x', effects: ['meteor'] }).length, 'an unknown effect is named');
+  } finally { setSkills(DEFAULT_SKILLS); }
 });

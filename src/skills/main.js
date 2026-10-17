@@ -6,6 +6,7 @@ import '../data/skill-files.js';
 import { DEFAULT_SKILL, FIELDS, FX_FIELDS, FX_PRESETS, ID_RE, KINDS, listSkills, normalizeSkill, onSkillsChange, skillFrom, skillPath, skillText, validateSkill } from '../data/skills.ts';
 import { listUnits, onUnitsChange } from '../data/units.ts';
 import { ATTACK, DEF_SCALE, MP_REGEN, blowOf, describe, healOf } from '../battle/abilities.ts';
+import { EFFECTS } from '../battle/effects.ts';
 import { abilityFx, createFx, drawFx, emit, stepFx, tintRamp } from '../tactical/particles.js';
 import { characterById } from '../characters/library.js';
 import { attackOf, render } from '../characters/roster.js';
@@ -116,6 +117,15 @@ function valuesSection(e) {
     <span class="sk-hint">${d.sure ? 'always lands, whatever the Evasion' : 'rolls the attack\'s chance to hit'}</span></div>` : '';
   return `<div class="ub-values">${rows}${sure}</div>`;
 }
+/* its special effects: the ones for its kind, each on or off */
+function effectsSection(e) {
+  const d = e.draft, s = e.saved, list = EFFECTS.filter(f => f.kinds.includes(d.kind)), changed = s && !same(s.effects, d.effects);
+  return `<section class="sk-effects${changed ? ' changed' : ''}" aria-label="Special effects">
+    <h3 class="ub-section">Special effects${changed ? ' <span class="ub-tag">changed</span>' : ''}</h3>
+    <div class="sk-presets">${list.map(f => `<button role="switch" aria-checked="${d.effects.includes(f.id)}" data-effect="${f.id}" title="${esc(cap(f.note))}"><span>${esc(f.label)}</span><span class="sk-hint">${esc(f.note)}</span></button>`).join('')}</div>
+    <p class="ub-dim">Worked out from the battle as it stands when the skill is used; the tactical view's preview counts them.</p>
+  </section>`;
+}
 /* the effect: one to pick, its colour (or its own), its size and how many particles */
 function fxSection(e) {
   const d = e.draft, f = d.fx, s = e.saved?.fx, changed = s && !same(s, f);
@@ -166,6 +176,7 @@ function renderDetail() {
         <p class="ub-file"><code>${esc(skillPath(d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}<span class="sk-note">${esc(cap(describe(d)))}</span></p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
         ${valuesSection(e)}
+        ${effectsSection(e)}
         ${fxSection(e)}
         ${usersSection(e)}
         <div class="ub-card-actions">
@@ -187,6 +198,7 @@ function renderDetail() {
   }));
   box.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { e.draft.fx.preset = b.dataset.preset; commit(e); }));
   $('sure')?.addEventListener('click', () => { e.draft.sure = !e.draft.sure; commit(e); });
+  box.querySelectorAll('[data-effect]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.effect, on = e.draft.effects.includes(id); e.draft.effects = on ? e.draft.effects.filter(x => x !== id) : [...e.draft.effects, id]; commit(e); }));
   /* the colour follows the picker live, and is kept on change */
   $('tint').addEventListener('input', () => { e.draft.fx.tint = $('tint').value; $('ownTint').checked = false; restartPreview(e); });
   $('tint').addEventListener('change', () => { e.draft.fx.tint = $('tint').value; commit(e); });

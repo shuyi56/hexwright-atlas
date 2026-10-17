@@ -22,6 +22,7 @@
    view share it. */
 import { ATTACK, MP_REGEN, abilityOf } from './abilities.ts';
 import type { Action, Blow } from './actions.ts';
+import type { EffectContext } from './effects.ts';
 import type { CombatStats, Side } from '../data/units.ts';
 
 type Outcome = 'victory' | 'defeat';
@@ -105,11 +106,14 @@ function strike(B: Battle, a: number, d: number, act = 'attack', roll: () => num
   const r = forecast(B, a, d, act); if (!r) return null;
   const landed = r.chance >= 100 || roll() * 100 < r.chance, critical = landed && r.crit > 0 && roll() * 100 < r.crit;
   B.units[a].mp -= r.cost; B.units[a].acted = true;
-  const cd = actionOf(B, a, act)?.cooldown ?? 0; if (cd > 0) B.units[a].readyOn = B.turn + cd + 1;
+  const A = actionOf(B, a, act) as Action; if (A.cooldown > 0) B.units[a].readyOn = B.turn + A.cooldown + 1;
   const to = !landed ? r.from : critical ? r.critTo : r.to;
   B.units[d].hp = to;
+  const result = { ...r, landed, critical, amount: critical ? r.critAmount : r.amount, to, fell: landed && to === 0 };
+  /* its special effects, on the battle as the blow left it */
+  for (const e of A.effects) e.apply?.(result, { battle: B, user: a, target: d });
   B.outcome = outcomeOf(B);
-  return { ...r, landed, critical, amount: critical ? r.critAmount : r.amount, to, fell: landed && to === 0 };
+  return result;
 }
 /* what unit a using action `act` on unit d would come to, without doing it: { act, heal, amount, chance, crit,
    critAmount, critTo, cost, from, to, max, fell }, amount the hit points it takes (or restores) if it lands, chance
@@ -119,7 +123,8 @@ function strike(B: Battle, a: number, d: number, act = 'attack', roll: () => num
    the blow is struck. */
 function forecast(B: Battle, a: number, d: number, act = 'attack'): Forecast | null {
   const A = actionOf(B, a, act); if (!A || !canTarget(B, a, d, act) || !canUse(B, a, act)) return null;
-  const t = B.units[d], from = t.hp, { amount, chance, crit, critAmount } = A.blow(B.units[a].stats, t.stats);
+  const ctx: EffectContext = { battle: B, user: a, target: d };
+  const t = B.units[d], from = t.hp, { amount, chance, crit, critAmount } = A.effects.reduce((b: Blow, e) => (e.modify ? e.modify(b, ctx) : b), A.blow(B.units[a].stats, t.stats));
   const to = A.heal ? Math.min(t.max, from + amount) : Math.max(0, from - amount), critTo = A.heal ? to : Math.max(0, from - critAmount);
   return { act, heal: A.heal, amount: A.heal ? to - from : amount, chance, crit, critAmount: A.heal ? to - from : critAmount, critTo, cost: A.cost, from, to, max: t.max, fell: to === 0 };
 }
