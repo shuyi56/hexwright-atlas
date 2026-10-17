@@ -413,6 +413,16 @@ with the camera gliding after the cursor and the unit on the move.
     shaking as it lands under a CRITICAL label with a ring of sparks; a heal bursts in green over its ally and the healing rises in green as the bar
     fills.
 
+  - **Abilities:** each ability brings its own particles (`tactical/particles.js`). They gather on the user as it
+    winds up and burst where the blow lands. Every mote is a whole art pixel with a faint glow.
+    - **Power Strike:** embers drawn into the attacker, then a shockwave ring of fire and grit thrown up that falls back.
+    - **True Strike:** gold glints, then a thread of light along the shot and a star where it lands.
+    - **Pierce:** a cold blue thread drawn taut, then shards bursting out of the target's far side.
+    - **Spell:** motes circling up the caster in its colour, then a burst with embers rising.
+    - **Heal:** green motes and little crosses rising round the healer, then a spiral winding up the ally.
+
+    A miss only fizzles.
+
   Units keep facing the way they last struck until they walk again. The ▶▶ 2× chip plays attacks at double speed.
 - **Camera:** the arrow keys or `WASD` step the cursor along the grid and the camera keeps it in view. Drag to
   pan, scroll or `+`/`-` to zoom, `Q`/`E` to turn the view, `PgUp`/`PgDn` to change storey, `Esc` to go back

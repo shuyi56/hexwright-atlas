@@ -11,6 +11,7 @@ import '../data/unit-files.js';
 import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
 import { attackReach } from './attack.js';
 import { blowAt, blowPlan, faceToward } from './blow.js';
+import { abilityFx, createFx, emit, lookOf, stepFx } from './particles.js';
 import { planTurn } from '../battle/ai.js';
 import { abilityOf } from '../battle/abilities.js';
 import * as battle from '../battle/state.js';
@@ -37,7 +38,8 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
    (characters/roster.js), lunging in for a blow, loosing an arrow or casting a spell, and the target flashes and
    reels when it lands, then shows its health bar over its head for a moment, draining; a unit felled fades to a
    ghost; a blow that misses shows Miss, and the target sways out of its way; a critical hit's damage rises larger,
-   in gold. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.js: a turn is
+   in gold. An ability brings its own particles (tactical/particles.js): they gather on the user as it winds up and
+   burst over the target as the blow lands. Units keep facing the way they last struck until they walk again. The fight is kept by battle/state.js: a turn is
    the player's phase and then the enemy's, each unit of the side in play moves once and acts once, and the phase
    passes when every one of them is done or End turn (T) is pressed, with a banner for each new phase. In the enemy
    phase the computer plays each enemy in turn (battle/ai.js), showing its range, walking and striking, while the
@@ -47,7 +49,7 @@ import { P, bounds, buildScene, pickTile, viewOf, viewPoint } from './scene.js';
 const root = $('tactical'), cv = $('tcCanvas'), g = cv.getContext('2d');
 /* TC.debug: drawing options passed straight to drawScene (e.g. { depth: false } or { xray: false }), for checking
    what an overlay changes */
-const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, aim: -1, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, note: '', walk: null, blow: null, turned: new Map(), fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
+const TC = { open: false, sc: null, rot: 0, top: 0, zoom: 3, cam: { x: 0, y: 0 }, goal: null, cursor: null, sel: -1, mode: null, menu: false, aim: -1, from: null, range: null, reach: null, battle: null, ai: null, banner: null, rewind: null, start: null, armed: 0, pop: null, fx: createFx(), note: '', walk: null, blow: null, turned: new Map(), fast: false, cw: 0, ch: 0, dirty: true, drag: null, lastT: 0, tick: 0 };
 /* WALK_SPEED tiles a second (doubled while TC.fast, the 2× chip or F); STRIDES beats of the walk (WALK: stride, upright, stride, upright) to a tile, so a step
    covers one tile, as it would on foot, and the arms swing at the pace the figure moves */
 const ZOOMS = [1, 2, 3, 4, 5, 6], WALK_SPEED = 4.2, STRIDES = 2, POP_TIME = 1.6;
@@ -262,7 +264,7 @@ function restart() {
   if (!TC.start) return;
   if (!TC.battle.outcome && !TC.armed) { TC.armed = setTimeout(disarm, RESTART_ARM * 1000); panels(); return; }
   disarm();
-  TC.ai = null; TC.walk = null; TC.blow = null; TC.turned.clear(); TC.locked = false; TC.free = false; TC.pop = null; TC.from = null; TC.rewind = null; TC.note = '';
+  TC.ai = null; TC.walk = null; TC.blow = null; TC.fx = createFx(); TC.turned.clear(); TC.locked = false; TC.free = false; TC.pop = null; TC.from = null; TC.rewind = null; TC.note = '';
   const chars = structuredClone(TC.start);
   mutate(M => { const same = JSON.stringify(M.chars || []) === JSON.stringify(chars); M.chars = chars; return { changed: same ? 0 : 1 }; });
   rebuild(); TC.battle = battle.createBattle(rosterOf()); select(-1);
@@ -283,15 +285,25 @@ function attack(a, d, act = 'attack') {
   const how = r.heal ? { ...own, kind: 'cast', ranged: 'spell', tint: HEAL_TINT } : own, name = battle.actionOf(TC.battle, a, act).label;
   TC.from = null; TC.rewind = null; TC.pop = null; TC.menu = false; TC.note = act === 'attack' ? `${nameOf(a)} attacks ${nameOf(d)}` : `${nameOf(a)} uses ${name} on ${nameOf(d)}`; setMode(null);
   TC.turned.set(a, faceToward([A.x, A.y], [D.x, D.y]));
-  TC.blow = { a, d, r, how, plan: blowPlan(how, Math.hypot(D.x - A.x, D.y - A.y), r.fell, !r.landed), t: 0, hit: false };
+  TC.blow = { a, d, r, how, act, plan: blowPlan(how, Math.hypot(D.x - A.x, D.y - A.y), r.fell, !r.landed), t: 0, hit: false };
+  /* an ability gathers itself on the user as it winds up (tactical/particles.js) */
+  if (act !== 'attack') { const ends = fxEnds(a, d); if (ends) { TC.blow.ends = ends; emit(TC.fx, abilityFx(act, 'charge', ends[0], ends[1], { tint: how.tint })); } }
   /* both in sight: the camera eases over to take in the target as well */
   const [ax, ay] = tileArt(A.x, A.y, levelOf(A)), [dx, dy] = tileArt(D.x, D.y, levelOf(D)); keepInView((ax + dx) / 2, (ay + dy) / 2 - 16);
   panels();
 }
+/* the chests of units a and d in art pixels, where an ability's particles start and land; null if either is not
+   drawn */
+function fxEnds(a, d) {
+  const fa = (TC.figs || []).find(f => f.k === a), fd = (TC.figs || []).find(f => f.k === d); if (!fa || !fd) return null;
+  const chest = f => { const [x, y] = P(f.X, f.Y, f.z); return [x, y - 13]; };
+  return [chest(fa), chest(fd)];
+}
 /* the blow lands: the damage rises over the target and its health bar drains, the healing rises in green and the
-   bar fills, or Miss rises and the bar stays */
+   bar fills, or Miss rises and the bar stays; an ability bursts over the target (or fizzles, missing) */
 function land(b) {
   const { a, d, r } = b; b.hit = true;
+  if (b.ends) emit(TC.fx, abilityFx(b.act, r.landed ? 'impact' : 'fizzle', b.ends[0], b.ends[1], { tint: b.how.tint }));
   TC.pop = { k: d, text: !r.landed ? 'Miss' : r.heal ? `+${r.amount}` : r.critical ? `${r.amount}!` : String(r.amount), kind: !r.landed ? 'miss' : r.heal ? 'heal' : r.critical ? 'crit' : 'hurt', share: r.landed ? r.amount / r.max : 0, t: 0, from: r.from / r.max, to: r.to / r.max };
   TC.note = !r.landed ? `${nameOf(a)} misses ${nameOf(d)}` : r.heal ? `${nameOf(a)} heals ${nameOf(d)} for ${r.amount}`
     : `${r.critical ? 'Critical! ' : ''}${nameOf(a)} hits ${nameOf(d)} for ${r.amount}${r.fell ? `. ${nameOf(d)} falls` : ''}`;
@@ -515,6 +527,8 @@ function loop(now) {
   }
   /* the damage number over a struck unit rises and fades over a second; its health bar stays a little longer */
   if (TC.pop) { TC.pop.t += dt; if (TC.pop.t >= POP_TIME) TC.pop = null; TC.dirty = true; }
+  /* an ability's particles fly on, at the attack's speed */
+  if (TC.fx.parts.length) { stepFx(TC.fx, dt * (TC.fast ? 2 : 1)); TC.dirty = true; }
   /* water ripples and the cursor's bob tick over a few times a second */
   const tick = Math.floor(now / 220); if (tick !== TC.tick) { TC.tick = tick; TC.dirty = true; }
   if (TC.dirty) { TC.dirty = false; paint(); }
@@ -545,6 +559,7 @@ function paint() {
   TC.view = { k, tx, ty };
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (TC.blow) drawBlow(TC.blow, k, tx, ty);
+  if (TC.fx.parts.length) drawFx(k, tx, ty);
   const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);
   if (pf) {
     /* a struck unit's health bar shows only while it is hit: it drains from the old HP to the new, then fades */
@@ -636,6 +651,26 @@ function drawBlow(b, k, tx, ty) {
   }
   g.globalAlpha = 1;
 }
+/* the abilities' particles, as whole art pixels: a dot is a square of its size, a plus a little cross, and a streak
+   a short line trailing back along its flight, longer the faster it goes. Each glows: a faint square a pixel wider
+   all round is laid under it first, added to the light of the scene so the bursts read as light, not paint. */
+function drawFx(k, tx, ty) {
+  const px = (x, y, s = 1) => g.fillRect(Math.round(x) * k + tx, Math.round(y) * k + ty, s * k, s * k);
+  g.globalCompositeOperation = 'lighter';
+  for (const p of TC.fx.parts) { const look = lookOf(p); if (!look) continue; g.globalAlpha = look.alpha * 0.22; g.fillStyle = look.colour; px(p.x - 1, p.y - 1, p.size + 2); }
+  g.globalCompositeOperation = 'source-over';
+  for (const p of TC.fx.parts) {
+    const look = lookOf(p); if (!look) continue;
+    g.globalAlpha = look.alpha; g.fillStyle = look.colour;
+    if (p.shape === 'plus') { const r = p.size; px(p.x, p.y); for (let i = 1; i <= r; i++) { px(p.x + i, p.y); px(p.x - i, p.y); px(p.x, p.y + i); px(p.x, p.y - i); } }
+    else if (p.shape === 'streak') {
+      const v = Math.hypot(p.vx, p.vy) || 1, n = Math.max(1, Math.min(4, Math.round(v / 18)));
+      for (let i = 0; i < n; i++) { g.globalAlpha = look.alpha * (1 - i / (n + 1)); px(p.x - (p.vx / v) * i, p.y - (p.vy / v) * i, p.size); }
+    }
+    else px(p.x, p.y, p.size);
+  }
+  g.globalAlpha = 1;
+}
 const req = () => { TC.dirty = true; if (!raf && TC.open) raf = requestAnimationFrame(loop); };
 
 /* ---------- input ---------- */
@@ -702,7 +737,7 @@ function openTactical(opts = {}) {
   if (!ED.M) return;
   TC.open = true; root.hidden = false; TC.rot = ED.rot; TC.top = ED.level; TC.sel = -1; TC.walk = null; TC.range = null; TC.reach = null; TC.mode = null; TC.lastT = 0;
   TC.start = structuredClone(ED.M.chars || []); if (TC.armed) clearTimeout(TC.armed); TC.armed = 0;
-  TC.battle = battle.createBattle(rosterOf()); TC.ai = null; TC.blow = null; TC.turned.clear(); TC.rewind = null; TC.pop = null; TC.note = ''; TC.banner = null; $('tcPhase').hidden = true;
+  TC.battle = battle.createBattle(rosterOf()); TC.ai = null; TC.blow = null; TC.fx = createFx(); TC.turned.clear(); TC.rewind = null; TC.pop = null; TC.note = ''; TC.banner = null; $('tcPhase').hidden = true;
   $('tcName').textContent = ED.M.name;
   size(); rebuild();
   /* a comfortable close-up: about a dozen tiles across */
