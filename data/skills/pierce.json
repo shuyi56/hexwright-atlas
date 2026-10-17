@@ -1,6 +1,7 @@
 {
   "id": "pierce",
   "label": "Pierce",
+  "menu": "actions",
   "kind": "damage",
   "cost": 5,
   "cooldown": 1,

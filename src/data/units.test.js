@@ -33,7 +33,7 @@ test('the unit files are valid and in canonical form', () => {
 test('a unit is clamped and filled out, and its faults are named', () => {
   const u = normalizeUnit({ id: 'Imp', level: 400, stats: { hp: -3, attack: 7.6, mp: 9 }, movement: { jump: 9 }, extra: 1 });
   assert.equal(u.id, 'imp'); assert.equal(u.name, 'Imp');
-  assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'mp', 'attack', 'defense', 'accuracy', 'evasion', 'crit', 'critDamage', 'range', 'pattern', 'ability']); assert.equal(u.stats.mp, 9); assert.equal(u.stats.ability, 'none'); assert.equal(u.stats.range, 1); assert.equal(u.stats.pattern, 'melee');
+  assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'mp', 'attack', 'defense', 'accuracy', 'evasion', 'crit', 'critDamage', 'range', 'pattern', 'abilities']); assert.equal(u.stats.mp, 9); assert.deepEqual(u.stats.abilities, []); assert.equal(u.stats.range, 1); assert.equal(u.stats.pattern, 'melee');
   assert.equal(normalizeUnit({ id: 'imp', stats: { pattern: 'Line' } }).stats.pattern, 'line');
   assert.equal(u.movement.jump, 6); assert.equal(u.movement.move, DEFAULT_UNIT.movement.move);
   assert.equal(u.level, undefined); assert.equal(u.extra, undefined);
@@ -42,9 +42,11 @@ test('a unit is clamped and filled out, and its faults are named', () => {
   assert.equal(errs.length, 4, errs.join(' | '));
   assert.ok(validateUnit({ id: 'a' }, 'bosses').length, 'an unknown group');
   assert.deepEqual(validateUnit({ id: 'a', stats: { pattern: 'diagonal' } }), ['Pattern must be one of melee, line, ranged']);
-  assert.equal(normalizeUnit({ id: 'imp', stats: { ability: 'Heal' } }).stats.ability, 'heal');
-  assert.equal(normalizeUnit({ id: 'imp', stats: { ability: 'meteor' } }).stats.ability, 'meteor', 'any skill id, known or not');
-  assert.equal(normalizeUnit({ id: 'imp', stats: { ability: 'not an id!' } }).stats.ability, 'none');
+  assert.deepEqual(normalizeUnit({ id: 'imp', stats: { ability: 'Heal' } }).stats.abilities, ['heal'], 'a file with one ability reads as a list of one');
+  assert.deepEqual(normalizeUnit({ id: 'imp', stats: { ability: 'none' } }).stats.abilities, []);
+  assert.deepEqual(normalizeUnit({ id: 'imp', stats: { abilities: ['Power', 'meteor', 'power', 'not an id!', 'none'] } }).stats.abilities, ['power', 'meteor'], 'any skill id, known or not, each once');
+  assert.equal(normalizeUnit({ id: 'imp', stats: { abilities: Array.from({ length: 12 }, (_, i) => `s${i}`) } }).stats.abilities.length, 8, 'up to eight');
+  assert.equal(validateUnit({ id: 'a', stats: { abilities: 'power' } }).length, 1, 'abilities are a list');
   assert.deepEqual(validateUnit({ id: 'a', stats: { ability: 'not an id!', accuracy: 300 } }).length, 2);
 });
 

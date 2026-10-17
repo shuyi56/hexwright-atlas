@@ -5,7 +5,7 @@ import { placeChar } from '../editor/walk.js';
 import { planTurn } from './ai.js';
 import { MP_REGEN, abilityOf, critOf, damageOf, hitChance } from './abilities.ts';
 import { DEFAULT_SKILLS, setSkills, validateSkill } from '../data/skills.ts';
-import { actionOf, canAct, canAfford, canMove, canTarget, canUse, cooldownLeft, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.ts';
+import { actionOf, actionsOf, canAct, canAfford, canMove, canTarget, canUse, cooldownLeft, createBattle, endPhase, forecast, phaseOver, ready, refresh, sideOfGroup, spend, standing, strike, unspend, wait } from './state.ts';
 
 const P = 'player', E = 'enemy';
 
@@ -81,12 +81,12 @@ test('an ability rests for its cooldown after it is used, and the plain attack n
   /* Spell has a cooldown of 2: used on turn 1, it is back on turn 4 */
   const B = createBattle([{ side: P, hp: 30, mp: 40, attack: 10, accuracy: 100, ability: 'spell' }, { side: E, hp: 999 }]);
   const round = () => { endPhase(B); wait(B, 1); endPhase(B); };
-  assert.ok(canUse(B, 0, 'spell')); assert.ok(strike(B, 0, 1, 'spell', () => 0)); assert.equal(cooldownLeft(B, 0), 3, 'back on turn 4');
-  round(); assert.equal(B.turn, 2); assert.equal(cooldownLeft(B, 0), 2);
+  assert.ok(canUse(B, 0, 'spell')); assert.ok(strike(B, 0, 1, 'spell', () => 0)); assert.equal(cooldownLeft(B, 0, 'spell'), 3, 'back on turn 4');
+  round(); assert.equal(B.turn, 2); assert.equal(cooldownLeft(B, 0, 'spell'), 2);
   assert.ok(!canUse(B, 0, 'spell') && canAfford(B, 0, 'spell'), 'it has the MP but is resting'); assert.equal(forecast(B, 0, 1, 'spell'), null); assert.equal(strike(B, 0, 1, 'spell'), null);
   assert.ok(canUse(B, 0) && forecast(B, 0, 1), 'the attack is always there'); wait(B, 0);
-  round(); assert.equal(B.turn, 3); assert.equal(cooldownLeft(B, 0), 1); wait(B, 0);
-  round(); assert.equal(B.turn, 4); assert.equal(cooldownLeft(B, 0), 0); assert.ok(canUse(B, 0, 'spell'));
+  round(); assert.equal(B.turn, 3); assert.equal(cooldownLeft(B, 0, 'spell'), 1); wait(B, 0);
+  round(); assert.equal(B.turn, 4); assert.equal(cooldownLeft(B, 0, 'spell'), 0); assert.ok(canUse(B, 0, 'spell'));
 });
 
 test('abilities spend MP, which comes back a little each phase', () => {
@@ -138,7 +138,7 @@ test('new unit data keeps the damage taken and the MP spent, against the new ful
   strike(B, 0, 1);
   assert.equal(B.units[1].hp, 15); B.units[0].mp = 4;
   refresh(B, [{ side: P, hp: 40, mp: 20, attack: 9, defense: 3, ability: 'spell' }, { side: E, hp: 10 }]);
-  assert.deepEqual([B.units[0].hp, B.units[0].max, B.units[0].mp, B.units[0].mpMax, B.units[0].stats.attack, B.units[0].stats.defense, B.units[0].ability], [40, 40, 14, 20, 9, 3, 'spell']);
+  assert.deepEqual([B.units[0].hp, B.units[0].max, B.units[0].mp, B.units[0].mpMax, B.units[0].stats.attack, B.units[0].stats.defense, B.units[0].abilities], [40, 40, 14, 20, 9, 3, ['spell']]);
   assert.deepEqual([B.units[1].hp, B.units[1].max], [5, 10]);
   assert.equal(sideOfGroup('enemies'), E); assert.equal(sideOfGroup('characters'), P);
 });
@@ -208,4 +208,14 @@ test('the lifecycle hooks fire as the battle goes: phases, moves, waits, blows, 
     const r = strike(C, 0, 1, 'attack', () => 0); assert.ok(r.landed && !r.fell);
     assert.equal(C.units[0].hp, 0, 'thorns fell the attacker'); assert.equal(C.outcome, 'defeat', 'and the battle settles after the hooks');
   } finally { setSkills(DEFAULT_SKILLS); }
+});
+
+test('a unit can carry several abilities, each with its own cooldown, listed under Actions or Spells', () => {
+  const B = createBattle([{ side: P, hp: 30, mp: 40, attack: 10, accuracy: 100, abilities: ['power', 'spell', 'heal'] }, { side: E, hp: 999 }, { side: P, hp: 10 }]);
+  assert.deepEqual(actionsOf(B, 0).map(a => [a.id, a.menu]), [['attack', 'actions'], ['power', 'actions'], ['spell', 'spells'], ['heal', 'spells']]);
+  assert.ok(strike(B, 0, 1, 'power', () => 0));
+  assert.equal(cooldownLeft(B, 0, 'power'), 2); assert.equal(cooldownLeft(B, 0, 'spell'), 0, 'the others are not resting');
+  endPhase(B); wait(B, 1); endPhase(B);
+  assert.ok(!canUse(B, 0, 'power') && canUse(B, 0, 'spell') && canUse(B, 0, 'heal'));
+  assert.equal(forecast(B, 0, 2, 'heal').to, 10, 'a heal of its own reaches its allies'); assert.equal(actionOf(B, 0, 'pierce'), null, 'not one it lacks');
 });

@@ -1,6 +1,7 @@
 {
   "id": "spell",
   "label": "Spell",
+  "menu": "spells",
   "kind": "damage",
   "cost": 8,
   "cooldown": 2,

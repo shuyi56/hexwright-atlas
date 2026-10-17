@@ -15,15 +15,17 @@ test('the skill files are canonical, are the stock five, and every unit names on
   for (const { file, raw } of files) assert.equal(readFileSync(join(ROOT, file), 'utf8'), skillText(raw), `${file} is canonical`);
   assert.deepEqual(files.map(f => f.skill).sort((a, b) => a.id.localeCompare(b.id)), [...DEFAULT_SKILLS].sort((a, b) => a.id.localeCompare(b.id)));
   const ids = new Set(files.map(f => f.skill.id));
-  for (const { unit } of readUnits(ROOT)) assert.ok(unit.stats.ability === 'none' || ids.has(unit.stats.ability), `${unit.id}'s ability is a skill`);
+  for (const { unit } of readUnits(ROOT)) for (const id of unit.stats.abilities) assert.ok(ids.has(id), `${unit.id}'s ${id} is a skill`);
 });
 
 test('a skill is normalized into one shape and its mistakes are told', () => {
   const s = normalizeSkill({ id: 'Bolt', kind: 'zap', cost: 120, power: 2.5, sure: 'yes', fx: { preset: 'Spell', tint: '#ABCDEF', scale: 1000 } });
-  assert.deepEqual(Object.keys(s), ['id', 'label', 'kind', 'cost', 'cooldown', 'power', 'pierce', 'sure', 'healBase', 'healScale', 'effects', 'fx']);
+  assert.deepEqual(Object.keys(s), ['id', 'label', 'menu', 'kind', 'cost', 'cooldown', 'power', 'pierce', 'sure', 'healBase', 'healScale', 'effects', 'fx']);
   assert.deepEqual([s.id, s.label, s.kind, s.cost, s.power, s.sure], ['bolt', 'bolt', 'damage', 99, 10, false]);
   assert.deepEqual(s.fx, { preset: 'spell', tint: '#abcdef', scale: 300, density: 100 });
   assert.equal(normalizeSkill({ id: 'x', fx: { tint: 'red' } }).fx.tint, '', 'a tint must be #rrggbb');
+  assert.deepEqual([normalizeSkill({ id: 'x' }).menu, normalizeSkill({ id: 'x', kind: 'heal' }).menu, normalizeSkill({ id: 'x', menu: 'spells' }).menu], ['actions', 'spells', 'spells'], 'heals go to Spells unless the file says');
+  assert.equal(validateSkill({ id: 'x', menu: 'items' }).length, 1);
   assert.deepEqual(validateSkill({ id: 'bolt', cost: 6, power: 150 }), []);
   assert.equal(validateSkill({ id: 'none' }).length, 1, '"none" is kept for no ability');
   assert.equal(validateSkill({ id: 'bolt', kind: 'zap', cost: 2.5, sure: 1, fx: { preset: 'lightning', tint: 'red', density: -1 } }).length, 6);

@@ -1,6 +1,7 @@
 {
   "id": "heal",
   "label": "Heal",
+  "menu": "spells",
   "kind": "heal",
   "cost": 6,
   "cooldown": 1,

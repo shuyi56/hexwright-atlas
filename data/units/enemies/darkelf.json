@@ -12,7 +12,9 @@
     "critDamage": 170,
     "range": 1,
     "pattern": "melee",
-    "ability": "pierce"
+    "abilities": [
+      "pierce"
+    ]
   },
   "movement": {
     "move": 6,

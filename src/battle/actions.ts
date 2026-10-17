@@ -17,7 +17,7 @@
 
    Pure (no DOM), so the battle state, the editors, the tests and the view share it. */
 import type { CombatStats } from '../data/units.ts';
-import type { SkillFx } from '../data/skills.ts';
+import type { SkillFx, SkillMenu } from '../data/skills.ts';
 import type { SpecialEffect } from './effects.ts';
 
 const DEF_SCALE = 20, MIN_HIT = 5, MAX_HIT = 100;
@@ -26,7 +26,7 @@ const DEF_SCALE = 20, MIN_HIT = 5, MAX_HIT = 100;
    lands, crit the percent of hits that are critical and critAmount what a critical hit takes */
 interface Blow { amount: number; chance: number; crit: number; critAmount: number }
 /* what every action is made from */
-interface ActionSpec { id: string; label: string; cost: number; cooldown: number; fx: Readonly<SkillFx>; note: string; effects?: readonly SpecialEffect[] }
+interface ActionSpec { id: string; label: string; menu?: SkillMenu; cost: number; cooldown: number; fx: Readonly<SkillFx>; note: string; effects?: readonly SpecialEffect[] }
 /* a strike's power is × Attack and its pierce the share of Defense it ignores, both as fractions */
 interface StrikeSpec extends ActionSpec { power: number; pierce: number; sure: boolean }
 /* a heal restores healBase + healScale × Attack */
@@ -43,6 +43,8 @@ const healOf = (attack: number, act: HealNumbers = PLAIN_HEAL): number => act.he
 abstract class Action {
   readonly id: string;
   readonly label: string;
+  /* the battle menu it is listed in */
+  readonly menu: SkillMenu;
   readonly cost: number;
   /* the turns its user waits after using it before it can again */
   readonly cooldown: number;
@@ -52,8 +54,8 @@ abstract class Action {
   readonly effects: readonly SpecialEffect[];
   /* aimed at an ally's hit points instead of a foe's */
   abstract readonly heal: boolean;
-  constructor({ id, label, cost, cooldown, fx, note, effects = [] }: ActionSpec) {
-    this.id = id; this.label = label; this.cost = cost; this.cooldown = cooldown; this.fx = fx; this.note = note; this.effects = effects;
+  constructor({ id, label, menu = 'actions', cost, cooldown, fx, note, effects = [] }: ActionSpec) {
+    this.id = id; this.label = label; this.menu = menu; this.cost = cost; this.cooldown = cooldown; this.fx = fx; this.note = note; this.effects = effects;
   }
   /* what this action by a unit with stats `a` does to one with stats `d` */
   abstract blow(a: CombatStats, d: CombatStats): Blow;

@@ -3,7 +3,7 @@ import '../units/units.css';
 import './skills.css';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
-import { DEFAULT_SKILL, FIELDS, FX_FIELDS, FX_PRESETS, ID_RE, KINDS, listSkills, normalizeSkill, onSkillsChange, skillFrom, skillPath, skillText, validateSkill } from '../data/skills.ts';
+import { DEFAULT_SKILL, FIELDS, FX_FIELDS, FX_PRESETS, ID_RE, KINDS, MENUS, listSkills, normalizeSkill, onSkillsChange, skillFrom, skillPath, skillText, validateSkill } from '../data/skills.ts';
 import { listUnits, onUnitsChange } from '../data/units.ts';
 import { ATTACK, DEF_SCALE, MP_REGEN, blowOf, describe, healOf } from '../battle/abilities.ts';
 import { EFFECTS } from '../battle/effects.ts';
@@ -54,7 +54,7 @@ const visible = () => { const f = V.filter.trim().toLowerCase(); return ordered(
 /* the skill as the battle would play it, draft numbers and all */
 const asAbility = d => skillFrom(d).toAction();
 /* the units whose data names this skill */
-const usersOf = id => listUnits().filter(u => u.stats.ability === id);
+const usersOf = id => listUnits().filter(u => u.stats.abilities.includes(id));
 /* the colour a skill shows as in the list: its tint, or the middle of its effect's own colours */
 const PRESET_COLOUR = { power: '#ff9a3c', true: '#ffe27a', pierce: '#9fd2f0', spell: '#b896f0', heal: '#8fe39a', none: '#6d7676' };
 const colourOf = d => d.fx.tint || PRESET_COLOUR[d.fx.preset];
@@ -165,13 +165,14 @@ function renderDetail() {
   const box = $('detail'); stopPreview();
   const e = E.get(V.sel);
   if (!e) { box.innerHTML = '<p class="ub-dim ub-empty">No skills yet. Make one with New skill.</p>'; return; }
-  const d = e.draft, errs = validateSkill(d), kindChanged = e.saved && e.saved.kind !== d.kind;
+  const d = e.draft, errs = validateSkill(d), kindChanged = e.saved && e.saved.kind !== d.kind, menuChanged = e.saved && e.saved.menu !== d.menu;
   box.innerHTML = `
     <div class="ub-card">
       <div class="ub-body">
         <div class="ub-head">
           <input class="ub-name" id="label" value="${esc(d.label)}" maxlength="32" spellcheck="false" aria-label="Name">
           <select id="kind" aria-label="Kind"${kindChanged ? ' class="changed"' : ''}>${KINDS.map(([k, l]) => `<option value="${k}"${k === d.kind ? ' selected' : ''}>${l}</option>`).join('')}</select>
+          <select id="menu" aria-label="Battle menu" title="The battle menu it is listed in"${menuChanged ? ' class="changed"' : ''}>${MENUS.map(([k, l]) => `<option value="${k}"${k === d.menu ? ' selected' : ''}>In ${l}</option>`).join('')}</select>
         </div>
         <p class="ub-file"><code>${esc(skillPath(d.id))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}<span class="sk-note">${esc(cap(describe(d)))}</span></p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
@@ -205,6 +206,7 @@ function renderDetail() {
   $('ownTint').addEventListener('change', () => { e.draft.fx.tint = $('ownTint').checked ? '' : $('tint').value; commit(e); });
   $('label').addEventListener('change', () => { e.draft.label = $('label').value; commit(e); });
   $('kind').addEventListener('change', () => { e.draft.kind = $('kind').value; commit(e); });
+  $('menu').addEventListener('change', () => { e.draft.menu = $('menu').value; commit(e); });
   $('replay').addEventListener('click', () => restartPreview(e));
   $('missed').addEventListener('click', () => { V.missed = !V.missed; $('missed').setAttribute('aria-pressed', String(V.missed)); restartPreview(e); });
   $('revertOne').addEventListener('click', () => revert(e));

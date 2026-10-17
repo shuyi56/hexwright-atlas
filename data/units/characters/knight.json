@@ -12,7 +12,9 @@
     "critDamage": 150,
     "range": 1,
     "pattern": "melee",
-    "ability": "power"
+    "abilities": [
+      "power"
+    ]
   },
   "movement": {
     "move": 3,

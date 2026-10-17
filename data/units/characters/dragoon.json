@@ -12,7 +12,9 @@
     "critDamage": 160,
     "range": 2,
     "pattern": "line",
-    "ability": "pierce"
+    "abilities": [
+      "pierce"
+    ]
   },
   "movement": {
     "move": 4,

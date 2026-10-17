@@ -1,6 +1,7 @@
 {
   "id": "power",
   "label": "Power Strike",
+  "menu": "actions",
   "kind": "damage",
   "cost": 6,
   "cooldown": 1,

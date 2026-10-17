@@ -4,10 +4,11 @@
    data/skills/, named by its id:
 
      data/skills/power.json
-     { "id": "power", "label": "Power Strike", "kind": "damage", "cost": 6, "cooldown": 1, "power": 150, "pierce": 0,
+     { "id": "power", "label": "Power Strike", "menu": "actions", "kind": "damage", "cost": 6, "cooldown": 1, "power": 150, "pierce": 0,
        "sure": false, "healBase": 8, "healScale": 200,
        "fx": { "preset": "power", "tint": "", "scale": 100, "density": 100 } }
 
+   menu        the battle menu it is listed in: actions (a technique) or spells (magic)
    kind        damage (strikes a foe) or heal (restores an ally's hit points, and never misses); each kind is a
                subclass of Skill, DamageSkill or HealSkill, which says what the skill does and makes its action
    cost        the MP it spends
@@ -37,11 +38,12 @@ import { EFFECTS, effectOf } from '../battle/effects.ts';
 import type { SpecialEffect } from '../battle/effects.ts';
 
 type SkillKind = 'damage' | 'heal';
+type SkillMenu = 'actions' | 'spells';
 type FxPreset = 'power' | 'true' | 'pierce' | 'spell' | 'heal' | 'none';
 interface SkillFx { preset: FxPreset; tint: string; scale: number; density: number }
 /* a skill as its file holds it, in canonical form */
 interface SkillData {
-  id: string; label: string; kind: SkillKind; cost: number; cooldown: number; power: number; pierce: number; sure: boolean;
+  id: string; label: string; menu: SkillMenu; kind: SkillKind; cost: number; cooldown: number; power: number; pierce: number; sure: boolean;
   healBase: number; healScale: number; effects: string[]; fx: SkillFx;
 }
 type SkillNumber = 'cost' | 'cooldown' | 'power' | 'pierce' | 'healBase' | 'healScale';
@@ -51,6 +53,9 @@ const NO_SKILL = 'none';
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
 const KINDS: readonly (readonly [SkillKind, string])[] = [['damage', 'Damage'], ['heal', 'Heal']];
 const KIND_IDS: readonly string[] = KINDS.map(([id]) => id);
+/* the battle menus a skill can be listed in */
+const MENUS: readonly (readonly [SkillMenu, string])[] = [['actions', 'Actions'], ['spells', 'Spells']];
+const MENU_IDS: readonly string[] = MENUS.map(([id]) => id);
 /* every number a skill has: [key, label, min, max, default, the kind it matters for (null for both)] */
 const FIELDS: readonly (readonly [SkillNumber, string, number, number, number, SkillKind | null])[] = [
   ['cost', 'MP cost', 0, 99, 6, null],
@@ -78,13 +83,14 @@ const clampInt = (v: unknown, lo: number, hi: number, def: number): number => { 
 const numbers = <K extends string>(fields: readonly (readonly [K, string, number, number, number, ...unknown[]])[], src: Record<string, unknown>) =>
   Object.fromEntries(fields.map(([k, , lo, hi, d]) => [k, clampInt(src[k], lo, hi, d)])) as Record<K, number>;
 const DEFAULT_SKILL: Readonly<SkillData> = Object.freeze({
-  id: '', label: '', kind: 'damage', ...numbers(FIELDS, {}), sure: false, effects: [],
+  id: '', label: '', menu: 'actions', kind: 'damage', ...numbers(FIELDS, {}), sure: false, effects: [],
   fx: Object.freeze({ preset: 'none', tint: '', ...numbers(FX_FIELDS, {}) }) });
 
 /* ---------- the skills, by kind ---------- */
 abstract class Skill {
   readonly id: string;
   readonly label: string;
+  readonly menu: SkillMenu;
   readonly cost: number;
   readonly cooldown: number;
   readonly fx: Readonly<SkillFx>;
@@ -95,7 +101,7 @@ abstract class Skill {
   #action: Action | null = null;
   constructor(data: Readonly<SkillData>) {
     this.#data = data;
-    this.id = data.id; this.label = data.label; this.cost = data.cost; this.cooldown = data.cooldown; this.fx = data.fx; this.effects = data.effects;
+    this.id = data.id; this.label = data.label; this.menu = data.menu; this.cost = data.cost; this.cooldown = data.cooldown; this.fx = data.fx; this.effects = data.effects;
   }
   /* a few words on what it does, made from its numbers: "2× damage, half Defense" */
   abstract describe(): string;
@@ -128,7 +134,7 @@ class DamageSkill extends Skill {
     return parts.join(', ') || 'a plain blow';
   }
   protected createAction(): StrikeAction {
-    return new StrikeAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), effects: this.specialEffects(), power: this.power / 100, pierce: this.pierce / 100, sure: this.sure });
+    return new StrikeAction({ id: this.id, label: this.label, menu: this.menu, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), effects: this.specialEffects(), power: this.power / 100, pierce: this.pierce / 100, sure: this.sure });
   }
 }
 
@@ -143,7 +149,7 @@ class HealSkill extends Skill {
   }
   describe(): string { return ['restores HP to an ally', ...this.effectLabels()].join(', '); }
   protected createAction(): HealAction {
-    return new HealAction({ id: this.id, label: this.label, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), effects: this.specialEffects(), healBase: this.healBase, healScale: this.healScale / 100 });
+    return new HealAction({ id: this.id, label: this.label, menu: this.menu, cost: this.cost, cooldown: this.cooldown, fx: this.fx, note: this.describe(), effects: this.specialEffects(), healBase: this.healBase, healScale: this.healScale / 100 });
   }
 }
 
@@ -158,7 +164,7 @@ function normalizeSkill(raw: unknown): SkillData {
   const tint = String(f.tint ?? '').trim().toLowerCase(), preset = String(f.preset ?? '').trim().toLowerCase();
   const n = numbers(FIELDS, J), named = Array.isArray(J.effects) ? J.effects.map(e => String(e).trim().toLowerCase()) : [];
   return {
-    id, label: String(J.label ?? '').trim().slice(0, 32) || id, kind,
+    id, label: String(J.label ?? '').trim().slice(0, 32) || id, menu: (MENU_IDS.includes(J.menu as string) ? J.menu : kind === 'heal' ? 'spells' : 'actions') as SkillMenu, kind,
     cost: n.cost, cooldown: n.cooldown, power: n.power, pierce: n.pierce, sure: J.sure === true, healBase: n.healBase, healScale: n.healScale,
     effects: EFFECTS.map(e => e.id).filter(id => named.includes(id)),
     fx: { preset: (FX_IDS.includes(preset) ? preset : DEFAULT_SKILL.fx.preset) as FxPreset, tint: TINT_RE.test(tint) ? tint : '', ...numbers(FX_FIELDS, f) } };
@@ -179,6 +185,7 @@ function validateSkill(raw: unknown): string[] {
   if (typeof J.id !== 'string' || !ID_RE.test(J.id) || J.id === NO_SKILL || J.id === 'attack') errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit, and not "none" or "attack"');
   if (J.label != null && typeof J.label !== 'string') errs.push('label must be text');
   if (J.kind != null && !KIND_IDS.includes(J.kind as string)) errs.push(`Kind must be one of ${KIND_IDS.join(', ')}`);
+  if (J.menu != null && !MENU_IDS.includes(J.menu as string)) errs.push(`Menu must be one of ${MENU_IDS.join(', ')}`);
   const check = (v: unknown, label: string, lo: number, hi: number) => { if (v == null) return; if (typeof v !== 'number' || !Number.isInteger(v)) errs.push(`${label} must be a whole number`); else if (v < lo || v > hi) errs.push(`${label} must be between ${lo} and ${hi}`); };
   for (const [k, label, lo, hi] of FIELDS) check(J[k], label, lo, hi);
   if (J.sure != null && typeof J.sure !== 'boolean') errs.push('Never misses must be true or false');
@@ -206,7 +213,7 @@ const DEFAULT_SKILLS: readonly Readonly<SkillData>[] = [
   { id: 'power', label: 'Power Strike', cost: 6, cooldown: 1, power: 150, fx: { preset: 'power' } },
   { id: 'true', label: 'True Strike', cost: 4, sure: true, fx: { preset: 'true' } },
   { id: 'pierce', label: 'Pierce', cost: 5, cooldown: 1, pierce: 100, fx: { preset: 'pierce' } },
-  { id: 'spell', label: 'Spell', cost: 8, cooldown: 2, power: 200, pierce: 50, fx: { preset: 'spell' } },
+  { id: 'spell', label: 'Spell', menu: 'spells', cost: 8, cooldown: 2, power: 200, pierce: 50, fx: { preset: 'spell' } },
   { id: 'heal', label: 'Heal', kind: 'heal', cost: 6, cooldown: 1, fx: { preset: 'heal' } }
 ].map(s => Object.freeze(normalizeSkill(s)));
 const STOCK_ORDER = DEFAULT_SKILLS.map(s => s.id);
@@ -226,5 +233,5 @@ const listSkills = (): Skill[] => [...SKILLS.values()].sort((a, b) => rank(a.id)
 const getSkill = (id: string): Skill | null => SKILLS.get(id) || null;
 setSkills(DEFAULT_SKILLS);
 
-export { DEFAULT_SKILL, DEFAULT_SKILLS, DamageSkill, FIELDS, FX_FIELDS, FX_PRESETS, HealSkill, ID_RE, KINDS, NO_SKILL, Skill, getSkill, listSkills, normalizeSkill, onSkillsChange, setSkills, skillFrom, skillPath, skillText, validateSkill };
-export type { FxPreset, SkillData, SkillFx, SkillKind };
+export { DEFAULT_SKILL, DEFAULT_SKILLS, DamageSkill, FIELDS, FX_FIELDS, FX_PRESETS, HealSkill, ID_RE, KINDS, MENUS, NO_SKILL, Skill, getSkill, listSkills, normalizeSkill, onSkillsChange, setSkills, skillFrom, skillPath, skillText, validateSkill };
+export type { FxPreset, SkillData, SkillFx, SkillKind, SkillMenu };

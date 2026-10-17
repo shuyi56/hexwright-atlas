@@ -3,7 +3,7 @@ import './units.css';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
 import { onSkillsChange } from '../data/skills.ts';
-import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, PATTERNS, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.ts';
+import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, MAX_ABILITIES, PATTERNS, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.ts';
 import { patternOffsets } from '../tactical/attack.js';
 import { DEF_SCALE, MP_REGEN, abilityOf, damageOf, healOf, hitChance, listAbilities } from '../battle/abilities.ts';
 import { characterById, list as customCharacters } from '../characters/library.js';
@@ -82,7 +82,7 @@ function renderList() {
       const b = document.createElement('button'); b.className = 'ub-row'; b.dataset.id = id; b.setAttribute('aria-current', String(id === V.sel));
       const t = thumb(id); if (t) { t.className = 'ub-thumb'; b.append(t); } else { const s = document.createElement('span'); s.className = 'ub-thumb ub-nosprite'; s.textContent = '?'; b.append(s); }
       const d = e.draft, info = document.createElement('span'); info.className = 'ub-row-text';
-      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>HP ${d.stats.hp} · MP ${d.stats.mp} · Atk ${d.stats.attack} · Def ${d.stats.defense} · ${patternLabel(d.stats.pattern)}${abilityOf(d.stats.ability) ? ` · ${abilityOf(d.stats.ability).label}` : ''}</span>`;
+      info.innerHTML = `<b>${esc(nameOf(e))}${isDirty(e) ? '<i class="ub-dot" title="unsaved changes"></i>' : ''}</b><span>HP ${d.stats.hp} · MP ${d.stats.mp} · Atk ${d.stats.attack} · Def ${d.stats.defense} · ${patternLabel(d.stats.pattern)}${d.stats.abilities.length ? ` · ${esc(d.stats.abilities.map(abilityLabel).join(', '))}` : ''}</span>`;
       b.append(info); b.addEventListener('click', () => { V.sel = id; renderAll(); if (V.view === 'table') setView('cards'); });
       box.append(b);
     }
@@ -122,22 +122,32 @@ function patternSection(e) {
     </div>
   </section>`;
 }
-const abilityLabel = id => abilityOf(id)?.label || (id === 'none' ? 'None' : `${id} (no such skill)`);
-/* None, every skill in data/skills/, and the unit's own if it names one that is not there */
-const abilityOptions = v => [['none', 'None'], ...listAbilities().map(a => [a.id, a.label]), ...(v !== 'none' && !abilityOf(v) ? [[v, abilityLabel(v)]] : [])].map(([id, label]) => `<option value="${esc(id)}"${id === v ? ' selected' : ''}>${esc(label)}</option>`).join('');
-/* the ability, a section of its own: one to pick, what it costs and does, whether the unit has the MP for it, and
-   how its blows play against the roster on average (an attack's damage and chance to hit) */
+const abilityLabel = id => abilityOf(id)?.label || `${id} (no such skill)`;
+const MENU_LABEL = { actions: 'Actions', spells: 'Spells' };
+/* the skills in data/skills/ the unit does not have yet, to add */
+const addOptions = have => `<option value="">Add an ability…</option>${listAbilities().filter(a => !have.includes(a.id)).map(a => `<option value="${esc(a.id)}">${esc(a.label)} (${MENU_LABEL[a.menu]})</option>`).join('')}`;
+/* the abilities, a section of their own: each one it has with the battle menu it is listed in, what it costs and
+   does and how many uses its MP holds, one to add, and how its blows play against the roster on average (an
+   attack's damage and chance to hit) */
 function abilitySection(e) {
-  const st = e.draft.stats, v = st.ability, a = abilityOf(v), saved = e.saved?.stats?.ability, changed = e.saved && saved !== v;
+  const st = e.draft.stats, have = st.abilities, saved = e.saved?.stats?.abilities, changed = e.saved && !same(saved, have);
   const others = [...E.values()].filter(o => o.group !== e.group).map(o => o.draft.stats), avg = f => (others.length ? Math.round(others.reduce((n, o) => n + f(o), 0) / others.length) : null);
   const dmg = avg(o => damageOf(st.attack, o.defense)), hit = avg(o => hitChance(st.accuracy, o.evasion)), taken = avg(o => damageOf(o.attack, st.defense)), dodge = avg(o => 100 - hitChance(o.accuracy, st.evasion));
-  const what = !a ? (v === 'none' ? 'No ability: it only attacks.' : `There is no skill called “${v}” in data/skills/, so it only attacks.`) : a.heal ? `Restores ${healOf(st.attack, a)} HP to an ally in reach.` : `${a.note[0].toUpperCase()}${a.note.slice(1)}${a.sure ? '' : ', at the attack\'s chance to hit'}.`;
-  const uses = a && a.cost ? Math.floor(st.mp / a.cost) : null;
-  return `<section class="ub-ability${changed ? ' changed' : ''}" aria-label="Ability">
-    <h3 class="ub-section">Ability${changed ? ` <span class="ub-tag" title="saved: ${abilityLabel(saved)}">changed</span>` : ''}</h3>
+  const row = (id, i) => {
+    const a = abilityOf(id), uses = a && a.cost ? Math.floor(st.mp / a.cost) : null;
+    const what = !a ? `There is no skill called “${id}” in data/skills/, so it is left out of the menus.` : a.heal ? `Restores ${healOf(st.attack, a)} HP to an ally in reach.` : `${a.note[0].toUpperCase()}${a.note.slice(1)}${a.sure ? '' : ', at the attack\'s chance to hit'}.`;
+    return `<li class="ub-ability-row">
+      <div class="ub-ability-pick"><b>${esc(abilityLabel(id))}</b>${a ? `<span class="ub-tag">${MENU_LABEL[a.menu]}</span><span class="ub-cost">${a.cost} MP${a.cooldown ? ` · ${a.cooldown}-turn cooldown` : ''}</span><a class="ub-link" href="./skills.html?skill=${encodeURIComponent(a.id)}">Edit skill</a>` : ''}
+        <button class="chip" data-drop="${i}" aria-label="Take ${esc(abilityLabel(id))} away">Remove</button></div>
+      <p>${esc(what)}${a ? ` ${uses == null ? 'Free to use' : uses ? `${uses} use${uses === 1 ? '' : 's'} from full MP` : '<b class="ub-warn">Not enough MP to use it</b>'}.` : ''}</p>
+    </li>`;
+  };
+  return `<section class="ub-ability${changed ? ' changed' : ''}" aria-label="Abilities">
+    <h3 class="ub-section">Abilities${changed ? ` <span class="ub-tag" title="saved: ${esc((saved || []).map(abilityLabel).join(', ') || 'none')}">changed</span>` : ''}</h3>
     <div class="ub-ability-body">
-      <label class="ub-ability-pick"><select id="ability" aria-label="Ability">${abilityOptions(v)}</select>${a ? `<span class="ub-cost">${a.cost} MP${a.cooldown ? ` · ${a.cooldown}-turn cooldown` : ''}</span><a class="ub-link" href="./skills.html?skill=${encodeURIComponent(a.id)}">Edit skill</a>` : ''}</label>
-      <p>${esc(what)}${a ? ` ${uses ? `${uses} use${uses === 1 ? '' : 's'} from full MP` : '<b class="ub-warn">Not enough MP to use it</b>'}, and ${MP_REGEN} MP back each turn.` : ''}</p>
+      ${have.length ? `<ul class="ub-ability-list">${have.map(row).join('')}</ul>` : '<p>No abilities: it only attacks.</p>'}
+      ${have.length < MAX_ABILITIES ? `<label class="ub-ability-pick"><select id="ability" aria-label="Add an ability">${addOptions(have)}</select></label>` : ''}
+      <p class="ub-dim">In battle each one is listed under Actions or Spells, as its skill says, and every unit gets ${MP_REGEN} MP back each turn.</p>
       ${others.length ? `<p class="ub-dim">Against the ${e.group === 'enemies' ? 'characters' : 'enemies'} on average: deals ${dmg} a hit, lands ${hit}% of the time; takes ${taken} a hit, dodges ${dodge}%. Every ${DEF_SCALE} Defense halves the damage taken.</p>` : ''}
     </div>
   </section>`;
@@ -179,7 +189,8 @@ function renderDetail() {
     commit(e);
   }));
   box.querySelectorAll('[data-pattern]').forEach(b => b.addEventListener('click', () => { e.draft.stats.pattern = b.dataset.pattern; commit(e); }));
-  $('ability').addEventListener('change', () => { e.draft.stats.ability = $('ability').value; commit(e); });
+  $('ability')?.addEventListener('change', () => { const id = $('ability').value; if (id) { e.draft.stats.abilities = [...e.draft.stats.abilities, id]; commit(e); } });
+  box.querySelectorAll('[data-drop]').forEach(b => b.addEventListener('click', () => { e.draft.stats.abilities = e.draft.stats.abilities.filter((x, i) => i !== +b.dataset.drop); commit(e); }));
   $('name').addEventListener('change', () => { e.draft.name = $('name').value; commit(e); });
   $('group').addEventListener('change', () => { e.group = $('group').value; commit(e); });
   $('faceL').addEventListener('click', () => { V.face = (V.face + 3) % 4; });
@@ -211,10 +222,12 @@ function startPreview(c) {
 }
 function stopPreview() { if (anim) cancelAnimationFrame(anim); anim = 0; }
 /* ---------- the table ---------- */
-const COLS = [['name', 'Name'], ['group', 'Group'], ...SECTIONS.flatMap(sec => [...FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]), ...(sec === 'stats' ? [['stats.pattern', 'Pattern'], ['stats.ability', 'Ability']] : [])])];
+const COLS = [['name', 'Name'], ['group', 'Group'], ...SECTIONS.flatMap(sec => [...FIELDS[sec].map(([k, l]) => [`${sec}.${k}`, l]), ...(sec === 'stats' ? [['stats.pattern', 'Pattern'], ['stats.abilities', 'Abilities']] : [])])];
 const LIMITS = Object.fromEntries(SECTIONS.flatMap(sec => FIELDS[sec].map(([k, , lo, hi]) => [`${sec}.${k}`, [lo, hi]])));
-const cellOf = (e, key) => { if (key === 'group') return e.group; if (key === 'name') return nameOf(e); const [a, b] = key.split('.'); return b ? e.draft[a]?.[b] : e.draft[a]; };
-const savedCell = (e, key) => { if (!e.saved) return undefined; if (key === 'group') return e.savedGroup; if (key === 'name') return e.saved.name; const [a, b] = key.split('.'); return b ? e.saved[a]?.[b] : e.saved[a]; };
+/* the abilities show as their names, one line of text to read and sort by (they are edited on the card) */
+const namesOf = list => (list || []).map(abilityLabel).join(', ');
+const cellOf = (e, key) => { if (key === 'group') return e.group; if (key === 'name') return nameOf(e); if (key === 'stats.abilities') return namesOf(e.draft.stats.abilities); const [a, b] = key.split('.'); return b ? e.draft[a]?.[b] : e.draft[a]; };
+const savedCell = (e, key) => { if (!e.saved) return undefined; if (key === 'group') return e.savedGroup; if (key === 'name') return e.saved.name; if (key === 'stats.abilities') return namesOf(e.saved.stats.abilities); const [a, b] = key.split('.'); return b ? e.saved[a]?.[b] : e.saved[a]; };
 function renderTable() {
   const box = $('table');
   const rows = visible().sort((a, b) => {
@@ -222,13 +235,13 @@ function renderTable() {
     const c = key === 'group' ? GROUPS.indexOf(x) - GROUPS.indexOf(y) || nameOf(a.e).localeCompare(nameOf(b.e)) : typeof x === 'string' ? x.localeCompare(y) : (x ?? -1) - (y ?? -1);
     return c * dir;
   });
-  const head = COLS.map(([k, l]) => `<th scope="col"${['name', 'group', 'stats.pattern', 'stats.ability'].includes(k) ? ' class="txt"' : ''}><button data-sort="${k}" aria-sort="${V.sort.key === k ? (V.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}">${esc(l)}${V.sort.key === k ? (V.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('');
+  const head = COLS.map(([k, l]) => `<th scope="col"${['name', 'group', 'stats.pattern', 'stats.abilities'].includes(k) ? ' class="txt"' : ''}><button data-sort="${k}" aria-sort="${V.sort.key === k ? (V.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}">${esc(l)}${V.sort.key === k ? (V.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('');
   const body = rows.map(({ id, e }) => `<tr data-id="${id}"${id === V.sel ? ' class="sel"' : ''}>${COLS.map(([k]) => {
     const v = cellOf(e, k), changed = e.saved && savedCell(e, k) !== v ? ' changed' : '';
     if (k === 'name') return `<th scope="row" class="txt${changed}"><button class="ub-open" data-open="${id}">${esc(v)}</button>${isDirty(e) ? '<i class="ub-dot"></i>' : ''}</th>`;
     if (k === 'group') return `<td class="txt${changed}"><select data-k="group" aria-label="Group of ${esc(nameOf(e))}">${GROUPS.map(g => `<option value="${g}"${g === v ? ' selected' : ''}>${GROUP_LABEL[g]}</option>`).join('')}</select></td>`;
     if (k === 'stats.pattern') return `<td class="txt${changed}"><select data-k="${k}" aria-label="Attack pattern of ${esc(nameOf(e))}">${patternOptions(v)}</select></td>`;
-    if (k === 'stats.ability') return `<td class="txt${changed}"><select data-k="${k}" aria-label="Ability of ${esc(nameOf(e))}">${abilityOptions(v)}</select></td>`;
+    if (k === 'stats.abilities') return `<td class="txt${changed}"><button class="ub-open" data-open="${id}" title="Edit on the card">${esc(v || 'none')}</button></td>`;
     if (v === undefined) return '<td class="na">·</td>';
     const [lo, hi] = LIMITS[k];
     return `<td class="${changed.trim()}"><input type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${v}" data-k="${k}" aria-label="${esc(k)} of ${esc(nameOf(e))}"></td>`;
@@ -241,7 +254,6 @@ function renderTable() {
     const e = E.get(inp.closest('tr').dataset.id), k = inp.dataset.k;
     if (k === 'group') e.group = inp.value;
     else if (k === 'stats.pattern') e.draft.stats.pattern = inp.value;
-    else if (k === 'stats.ability') e.draft.stats.ability = inp.value;
     else { const [a, b] = k.split('.'), n = Math.round(Number(inp.value)); if (b) e.draft[a][b] = n; else e.draft[a] = n; }
     commit(e);
   }));

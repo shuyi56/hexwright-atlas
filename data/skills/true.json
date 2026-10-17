@@ -1,6 +1,7 @@
 {
   "id": "true",
   "label": "True Strike",
+  "menu": "actions",
   "kind": "damage",
   "cost": 4,
   "cooldown": 0,
