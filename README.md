@@ -11,11 +11,11 @@ A rail down the left edge (along the bottom on phones) holds every part of the a
 - **View:** **Atlas** (the realm map and its cities), **Scenes** (the bundled maps, each ready to open), **Tactical**
   and **Town** (the two play views, on the map editor's current map).
 - **Make:** **Map editor** (the tile editor) and **Characters** (the character maker).
-- **Data:** **Unit data** (`units.html`).
+- **Data:** **Unit data** (`units.html`) and **Skills** (`skills.html`).
 
-`Alt+1` to `Alt+7` jump straight to each. The module showing is kept in the address (`index.html#editor`,
-`#tactical`, `#town`, `#characters`, `#scenes`), so a reload or a bookmark lands on it, and the rail on the unit
-data page goes back to the atlas page with the module in the address. The back buttons inside each module still
+`Alt+1` to `Alt+8` jump straight to each. The module showing is kept in the address (`index.html#editor`,
+`#tactical`, `#town`, `#characters`, `#scenes`), so a reload or a bookmark lands on it, and the rail on the two
+data pages goes back to the atlas page with the module in the address. The back buttons inside each module still
 step down one layer (tactical view to editor to atlas) and the rail follows them.
 
 **Scenes** lists the maps in `scenes/` and the editor's walking-test fixture as cards, each with a picture drawn by
@@ -333,6 +333,9 @@ movement (Move: tiles a turn; Jump: height levels a step can climb or drop). The
 | Spell | 8 | 2× the Attack, through half the target's Defense. |
 | Heal | 6 | Restores 8 + 2 × Attack HP to an ally in reach, up to its full HP; never misses. |
 
+Those are the stock skills. Each is a file in `data/skills/` that the skill editor (below) changes, so the numbers
+above are where they start, not where they have to stay.
+
 An ability reaches the same tiles as the unit's attack. Knights, squires, guards, monks and the smith carry Power
 Strike; dragoons, valkyries and elven wardens Pierce; archers, rangers and the thief True Strike; the black mage,
 summoner and elven sage Spell; the white mage, healer, alchemist and elven lady Heal. Of the enemies, bandits and the
@@ -342,8 +345,8 @@ archers, monk, wolves and dark elf crit most often (12 to 20%), the thief and th
 
 `src/data/units.js` defines the fields, their ranges and defaults, and normalizes and validates a unit; a sprite
 with no file, such as a custom character from the maker, plays with the defaults. `src/battle/abilities.js` holds
-the formulas and the abilities. Adding a number means adding a line to `FIELDS`; adding an ability, a line to
-`ABILITIES`.
+the formulas and turns each skill into the blow it plays. Adding a number means adding a line to `FIELDS`; adding an
+ability, a file in `data/skills/` (or **New skill…** in the skill editor).
 
 **Unit data** in the module rail opens `units.html`, an editor for these files:
 
@@ -361,6 +364,41 @@ the formulas and the abilities. Adding a number means adding a line to `FIELDS`;
   shows the same data read-only, with **Download** for a unit's file.
 
 ![The unit data editor](docs/images/unit-data.png)
+
+### Skills
+
+Each ability is one JSON file in `data/skills/`, named by its id, which is what a unit's `stats.ability` names:
+
+```json
+{ "id": "spell", "label": "Spell", "kind": "damage", "cost": 8, "power": 200, "pierce": 50, "sure": false,
+  "healBase": 8, "healScale": 200, "fx": { "preset": "spell", "tint": "", "scale": 100, "density": 100 } }
+```
+
+| Field | What it does |
+| --- | --- |
+| Kind | `damage` strikes a foe; `heal` restores an ally's HP, never misses and is never critical. |
+| MP cost | What it spends. |
+| Power % | A blow's power as a percent of the user's Attack (150: half as hard again). |
+| Ignores Def % | How much of the target's Defense a blow goes through (100: all of it). |
+| Never misses | A blow that always lands, whatever the target's Evasion. |
+| Heal base, Heal / Atk % | A heal restores the base plus this percent of the healer's Attack (8 and 200: 8 + 2 × Attack). |
+| Effect | The particles it plays: Embers, Glints, Shards, Arcane, Spiral or None. |
+| Colour | Its own colour in place of the effect's (empty keeps the effect's, or for Arcane the caster's). |
+| Size %, Particles % | Spreads the effect wider and faster or tighter and slower, and thins it out or fills it in. |
+
+**Skills** in the module rail opens `skills.html`, the skill editor, laid out like the unit data page: the skills
+down the side with their cost and what they do, and a card for the picked one. The card has its name and kind, the
+numbers that matter for that kind with a line on what each comes to, and the particles: an effect to pick with its
+colours, a colour picker (or the effect's own colours), size and count. Beside them the skill plays over and over
+between two figures, its first user and a foe (or an ally, for a heal); **Miss** plays it fizzling. Under it, **Who
+has it** lists every unit carrying the skill with its MP, how many uses that holds, and its damage against the other
+side on average next to a plain attack, with the chance to hit. **New skill…** makes a skill from the defaults or a
+copy of another, and the unit data page offers it at once. Saving works as on the unit data page, through
+`PUT` and `DELETE /__hexwright/skills/<id>` and `GET /__hexwright/skills`; a tactical view open in another tab plays the
+new numbers and particles from the next blow. A unit naming a skill that is not there only attacks, and its card
+says so.
+
+![The skill editor](docs/images/skill-editor.png)
 
 ### Tactical view
 
@@ -413,8 +451,9 @@ with the camera gliding after the cursor and the unit on the move.
     shaking as it lands under a CRITICAL label with a ring of sparks; a heal bursts in green over its ally and the healing rises in green as the bar
     fills.
 
-  - **Abilities:** each ability brings its own particles (`tactical/particles.js`). They gather on the user as it
-    winds up and burst where the blow lands. Every mote is a whole art pixel with a faint glow.
+  - **Abilities:** each ability brings its own particles (`tactical/particles.js`), picked, coloured and sized in its
+    skill file. They gather on the user as it winds up and burst where the blow lands. Every mote is a whole art
+    pixel with a faint glow. The stock effects:
     - **Power Strike:** embers drawn into the attacker, then a shockwave ring of fire and grit thrown up that falls back.
     - **True Strike:** gold glints, then a thread of light along the shot and a star where it lands.
     - **Pierce:** a cold blue thread drawn taut, then shards bursting out of the target's far side.
@@ -789,8 +828,10 @@ src/
                       drawn procedurally with a small iso kit (used by the city view and the editor)
   characters/         Characters: pixel engine, body builds, shared parts, the townsfolk and the jobs, drawing
                       them on the map, the sprite sheet layout and its pixel font
-  data/               Unit data: the fields and ranges of a unit's stats, and the registry the game reads
+  data/               Unit and skill data: the fields and ranges of a unit's stats and of a skill, and the
+                      registries the game reads
   units/              The unit data page (units.html)
+  skills/             The skill editor (skills.html)
   battle/             The battle in the tactical view: sides, hit points and MP, blows and abilities, turns and the player and enemy phases
                       (state.js), and how the computer plays an enemy (ai.js); pure, no DOM
   tactical/           Tactical view: the pixel tile sheet, the scene as a depth-sorted sprite list, the
@@ -799,9 +840,10 @@ src/
                       front-on pieces, townsfolk's lines and the walking screen
   editor/             Tile editor: map model, pure ops, renderer, scene generator, city and hex import, UI,
                       automation API (api-spec, api, bridge)
-tools/                Vite plugin that relays HTTP calls to the editor page and saves unit data (dev server only),
+tools/                Vite plugin that relays HTTP calls to the editor page and saves unit and skill data (dev server only),
                       the character sheet writer and a minimal PNG and APNG encoder
 data/units/           One JSON file per character and enemy: HP, Attack, Range, Move, Jump
+data/skills/          One JSON file per ability: its kind, MP cost, power, Defense ignored, heal and particles
 mcp/                  MCP server, backend launcher and end-to-end test
   ui/                 Shared state, map drawing, view/pan/zoom, input, ledger panel, city view, the module
                       rail (rail.js) and the shell that moves between modules and lists the scenes (shell.js)

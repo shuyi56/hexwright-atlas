@@ -4,8 +4,8 @@ import { TI, blankModel } from '../editor/model.js';
 import { FACE_DELTA, placeChar } from '../editor/walk.js';
 import { STRIKE, WINDUP } from '../characters/body.js';
 import { ARROW_SPEED, GHOST, LUNGE, blowAt, blowPlan, faceToward } from './blow.js';
-import { abilityFx, createFx, emit, lookOf, seeded, stepFx } from './particles.js';
-import { ABILITIES } from '../battle/abilities.js';
+import { abilityFx, createFx, emit, lookOf, seeded, stepFx, tintRamp } from './particles.js';
+import { listAbilities } from '../battle/abilities.js';
 import { TERRAIN } from '../tiles/terrain.js';
 import { MOVE, moveRange, placeId, routeTo } from './move.js';
 import { P, buildScene, liftOf, pickTile, withFigures } from './scene.js';
@@ -249,8 +249,8 @@ test('a unit turns to face its target the way a walk would face it', () => {
 
 /* ---------- the abilities' particles (particles.js) ---------- */
 test('every ability charges up on its user and bursts where it lands, and its particles die away', () => {
-  for (const { id } of ABILITIES) {
-    const rnd = seeded(3), charge = abilityFx(id, 'charge', [0, 0], [40, 10], { rnd }), impact = abilityFx(id, 'impact', [0, 0], [40, 10], { rnd });
+  for (const { id, fx: effect } of listAbilities()) {
+    const rnd = seeded(3), charge = abilityFx(effect, 'charge', [0, 0], [40, 10], { rnd }), impact = abilityFx(effect, 'impact', [0, 0], [40, 10], { rnd });
     assert.ok(charge.length >= 8 && impact.length >= 8, `${id} has both beats`);
     const fx = emit(createFx(), [...charge, ...impact]);
     for (let i = 0; i < 40; i++) stepFx(fx, 0.05);
@@ -258,6 +258,20 @@ test('every ability charges up on its user and bursts where it lands, and its pa
   }
   assert.ok(abilityFx('power', 'fizzle', [0, 0], [40, 10], { rnd: seeded(1) }).length, 'a miss fizzles');
   assert.deepEqual(abilityFx('attack', 'impact', [0, 0], [1, 1]), [], 'a plain attack has none');
+  assert.deepEqual(abilityFx({ preset: 'none' }, 'impact', [0, 0], [1, 1]), [], 'nor does the None effect');
+});
+test('a skill\'s effect takes its colour, size and particle count', () => {
+  const base = abilityFx({ preset: 'power' }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  const more = abilityFx({ preset: 'power', density: 200 }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  const fewer = abilityFx({ preset: 'power', density: 50 }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  assert.deepEqual([more.length, fewer.length], [base.length * 2, Math.round(base.length / 2)]);
+  assert.equal(abilityFx({ preset: 'power', density: 0 }, 'impact', [0, 0], [40, 10]).length, 0);
+  const big = abilityFx({ preset: 'power', scale: 200 }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  assert.equal(big[0].vx, base[0].vx * 2, 'twice the size flies twice as fast'); assert.deepEqual([big[0].x, big[0].y], [40, 10], 'from the same place');
+  const blue = abilityFx({ preset: 'pierce', tint: '#3060ff' }, 'impact', [0, 0], [40, 10], { rnd: seeded(5) });
+  assert.deepEqual(blue[0].colors, tintRamp('#3060ff', 4)); assert.equal(tintRamp('#3060ff', 5)[0], '#ffffff');
+  const own = abilityFx({ preset: 'spell' }, 'impact', [0, 0], [40, 10], { tint: '#ff00ff', rnd: seeded(5) });
+  assert.ok(own[0].colors.includes('#ff00ff'), 'an arcane burst with no colour of its own takes the caster\'s');
 });
 test('a particle waits out its delay, moves under its pull and drag, and fades over its last third', () => {
   const fx = emit(createFx(), [{ x: 0, y: 0, vx: 10, vy: 0, ay: 20, drag: 1, life: 1, delay: 0.5 }, { x: 0, y: 0, life: 1 }]);

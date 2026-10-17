@@ -43,8 +43,9 @@ test('a unit is clamped and filled out, and its faults are named', () => {
   assert.ok(validateUnit({ id: 'a' }, 'bosses').length, 'an unknown group');
   assert.deepEqual(validateUnit({ id: 'a', stats: { pattern: 'diagonal' } }), ['Pattern must be one of melee, line, ranged']);
   assert.equal(normalizeUnit({ id: 'imp', stats: { ability: 'Heal' } }).stats.ability, 'heal');
-  assert.equal(normalizeUnit({ id: 'imp', stats: { ability: 'meteor' } }).stats.ability, 'none');
-  assert.deepEqual(validateUnit({ id: 'a', stats: { ability: 'meteor', accuracy: 300 } }).length, 2);
+  assert.equal(normalizeUnit({ id: 'imp', stats: { ability: 'meteor' } }).stats.ability, 'meteor', 'any skill id, known or not');
+  assert.equal(normalizeUnit({ id: 'imp', stats: { ability: 'not an id!' } }).stats.ability, 'none');
+  assert.deepEqual(validateUnit({ id: 'a', stats: { ability: 'not an id!', accuracy: 300 } }).length, 2);
 });
 
 test('the registry looks units up by sprite and falls back to the defaults', () => {

@@ -8,10 +8,12 @@ import { ASSET_BY_ID, TERRAIN } from '../tiles/index.js';
 import { $, state } from '../ui/state.js';
 import { moveRange, placeId, routeTo } from './move.js';
 import '../data/unit-files.js';
+import '../data/skill-files.js';
+import { onSkillsChange } from '../data/skills.js';
 import { PATTERNS, onUnitsChange, unitFor } from '../data/units.js';
 import { attackReach } from './attack.js';
 import { blowAt, blowPlan, faceToward } from './blow.js';
-import { abilityFx, createFx, emit, lookOf, stepFx } from './particles.js';
+import { abilityFx, createFx, drawFx, emit, stepFx } from './particles.js';
 import { planTurn } from '../battle/ai.js';
 import { abilityOf } from '../battle/abilities.js';
 import * as battle from '../battle/state.js';
@@ -206,11 +208,14 @@ function back() {
 function rangeOf(k) { const { move, jump } = unitFor(ED.M.chars[k].sprite).movement; return moveRange(ED.M, k, move, jump); }
 function reachOf(k, act = 'attack') { const { range, pattern } = statsOf(k); return attackReach(ED.M, k, range, pattern, j => battle.canTarget(TC.battle, k, j, act)); }
 /* new numbers for the units (a save from the unit data page) redraw the picked unit's range and the panels */
-onUnitsChange(() => {
+function retune() {
   if (!TC.open) return;
   if (TC.battle) battle.refresh(TC.battle, rosterOf());
   if (TC.sel >= 0 && !busy()) setMode(TC.mode); panels();
-});
+}
+onUnitsChange(retune);
+/* and new numbers for a skill (a save from the skill editor) the same way: the battle looks abilities up as it goes */
+onSkillsChange(retune);
 const unitAt = (x, y, L) => (ED.M.chars || []).findIndex(c => c.x === x && c.y === y && levelOf(c) === L);
 
 /* ---------- the battle (battle/state.js): sides, hit points, the turn and whose phase it is ---------- */
@@ -282,12 +287,14 @@ const HEAL_TINT = '#8fe39a';
 function attack(a, d, act = 'attack') {
   const r = battle.strike(TC.battle, a, d, act); if (!r) return;
   const A = ED.M.chars[a], D = ED.M.chars[d], own = attackOf(characterById(A.sprite) || characterById('villager'));
-  const how = r.heal ? { ...own, kind: 'cast', ranged: 'spell', tint: HEAL_TINT } : own, name = battle.actionOf(TC.battle, a, act).label;
+  const ab = battle.actionOf(TC.battle, a, act), base = r.heal ? { ...own, kind: 'cast', ranged: 'spell', tint: HEAL_TINT } : own;
+  /* a skill with a colour of its own (data/skills/) lends it to the blow as well as to its particles */
+  const how = ab.fx.tint ? { ...base, tint: ab.fx.tint } : base, name = ab.label;
   TC.from = null; TC.rewind = null; TC.pop = null; TC.menu = false; TC.note = act === 'attack' ? `${nameOf(a)} attacks ${nameOf(d)}` : `${nameOf(a)} uses ${name} on ${nameOf(d)}`; setMode(null);
   TC.turned.set(a, faceToward([A.x, A.y], [D.x, D.y]));
-  TC.blow = { a, d, r, how, act, plan: blowPlan(how, Math.hypot(D.x - A.x, D.y - A.y), r.fell, !r.landed), t: 0, hit: false };
+  TC.blow = { a, d, r, how, act, fx: ab.fx, plan: blowPlan(how, Math.hypot(D.x - A.x, D.y - A.y), r.fell, !r.landed), t: 0, hit: false };
   /* an ability gathers itself on the user as it winds up (tactical/particles.js) */
-  if (act !== 'attack') { const ends = fxEnds(a, d); if (ends) { TC.blow.ends = ends; emit(TC.fx, abilityFx(act, 'charge', ends[0], ends[1], { tint: how.tint })); } }
+  if (act !== 'attack') { const ends = fxEnds(a, d); if (ends) { TC.blow.ends = ends; emit(TC.fx, abilityFx(ab.fx, 'charge', ends[0], ends[1], { tint: how.tint })); } }
   /* both in sight: the camera eases over to take in the target as well */
   const [ax, ay] = tileArt(A.x, A.y, levelOf(A)), [dx, dy] = tileArt(D.x, D.y, levelOf(D)); keepInView((ax + dx) / 2, (ay + dy) / 2 - 16);
   panels();
@@ -303,7 +310,7 @@ function fxEnds(a, d) {
    bar fills, or Miss rises and the bar stays; an ability bursts over the target (or fizzles, missing) */
 function land(b) {
   const { a, d, r } = b; b.hit = true;
-  if (b.ends) emit(TC.fx, abilityFx(b.act, r.landed ? 'impact' : 'fizzle', b.ends[0], b.ends[1], { tint: b.how.tint }));
+  if (b.ends) emit(TC.fx, abilityFx(b.fx, r.landed ? 'impact' : 'fizzle', b.ends[0], b.ends[1], { tint: b.how.tint }));
   TC.pop = { k: d, text: !r.landed ? 'Miss' : r.heal ? `+${r.amount}` : r.critical ? `${r.amount}!` : String(r.amount), kind: !r.landed ? 'miss' : r.heal ? 'heal' : r.critical ? 'crit' : 'hurt', share: r.landed ? r.amount / r.max : 0, t: 0, from: r.from / r.max, to: r.to / r.max };
   TC.note = !r.landed ? `${nameOf(a)} misses ${nameOf(d)}` : r.heal ? `${nameOf(a)} heals ${nameOf(d)} for ${r.amount}`
     : `${r.critical ? 'Critical! ' : ''}${nameOf(a)} hits ${nameOf(d)} for ${r.amount}${r.fell ? `. ${nameOf(d)} falls` : ''}`;
@@ -559,7 +566,7 @@ function paint() {
   TC.view = { k, tx, ty };
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (TC.blow) drawBlow(TC.blow, k, tx, ty);
-  if (TC.fx.parts.length) drawFx(k, tx, ty);
+  if (TC.fx.parts.length) drawFx(g, TC.fx, k, tx, ty);
   const pf = TC.pop && TC.figs.find(f => f.k === TC.pop.k);
   if (pf) {
     /* a struck unit's health bar shows only while it is hit: it drains from the old HP to the new, then fades */
@@ -648,26 +655,6 @@ function drawBlow(b, k, tx, ty) {
     dot(cx, cy, '#fffaf0', a);
     for (let i = 1; i <= L; i++) for (const [ox, oy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) dot(cx + ox * i, cy + oy * i, i === L ? '#ffd2a0' : '#fffaf0', a);
     for (let i = 1; i < L; i++) for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) dot(cx + ox * (i + 1), cy + oy * (i + 1), '#fffaf0', a * 0.8);
-  }
-  g.globalAlpha = 1;
-}
-/* the abilities' particles, as whole art pixels: a dot is a square of its size, a plus a little cross, and a streak
-   a short line trailing back along its flight, longer the faster it goes. Each glows: a faint square a pixel wider
-   all round is laid under it first, added to the light of the scene so the bursts read as light, not paint. */
-function drawFx(k, tx, ty) {
-  const px = (x, y, s = 1) => g.fillRect(Math.round(x) * k + tx, Math.round(y) * k + ty, s * k, s * k);
-  g.globalCompositeOperation = 'lighter';
-  for (const p of TC.fx.parts) { const look = lookOf(p); if (!look) continue; g.globalAlpha = look.alpha * 0.22; g.fillStyle = look.colour; px(p.x - 1, p.y - 1, p.size + 2); }
-  g.globalCompositeOperation = 'source-over';
-  for (const p of TC.fx.parts) {
-    const look = lookOf(p); if (!look) continue;
-    g.globalAlpha = look.alpha; g.fillStyle = look.colour;
-    if (p.shape === 'plus') { const r = p.size; px(p.x, p.y); for (let i = 1; i <= r; i++) { px(p.x + i, p.y); px(p.x - i, p.y); px(p.x, p.y + i); px(p.x, p.y - i); } }
-    else if (p.shape === 'streak') {
-      const v = Math.hypot(p.vx, p.vy) || 1, n = Math.max(1, Math.min(4, Math.round(v / 18)));
-      for (let i = 0; i < n; i++) { g.globalAlpha = look.alpha * (1 - i / (n + 1)); px(p.x - (p.vx / v) * i, p.y - (p.vy / v) * i, p.size); }
-    }
-    else px(p.x, p.y, p.size);
   }
   g.globalAlpha = 1;
 }

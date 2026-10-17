@@ -10,7 +10,8 @@
        "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "ability": "none" },
        "movement": { "move": 5, "jump": 2 } }
 
-   How the numbers play in a fight, and what each ability does, is in src/battle/abilities.js.
+   How the numbers play in a fight is in src/battle/abilities.js; what each ability does is in data/skills/
+   (src/data/skills.js).
 
    The attack pattern says which tiles an attack reaches (src/tactical/attack.js): melee, the four tiles beside the
    unit and not the diagonals, whatever its range; line, straight out along the grid in the four directions up to
@@ -20,7 +21,7 @@
    the files into the registry below; on the dev server the unit data page (units.html) writes them back through
    the Hexwright bridge (tools/units-store.mjs). A sprite with no file (a custom character, say) plays with
    DEFAULT_UNIT. */
-import { ABILITY_IDS, NO_ABILITY } from '../battle/abilities.js';
+import { NO_SKILL } from './skills.js';
 
 const GROUPS = ['characters', 'enemies'];
 const GROUP_LABEL = { characters: 'Characters', enemies: 'Enemies' };
@@ -43,8 +44,9 @@ const SECTIONS = Object.keys(FIELDS);
 /* the attack pattern, kept in stats after range: [id, label] */
 const PATTERNS = [['melee', 'Melee'], ['line', 'Line'], ['ranged', 'Ranged']];
 const PATTERN_IDS = PATTERNS.map(([id]) => id), DEFAULT_PATTERN = 'melee';
-/* the ability that spends MP, kept in stats after the pattern: 'none' or an id from battle/abilities.js */
-const DEFAULT_ABILITY = NO_ABILITY;
+/* the ability that spends MP, kept in stats after the pattern: 'none' or the id of a skill in data/skills/
+   (data/skills.js). One that names no skill there plays as none; the unit data page says so. */
+const DEFAULT_ABILITY = NO_SKILL;
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
 
 const clampInt = (v, lo, hi, def) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
@@ -63,7 +65,7 @@ function normalizeUnit(raw) {
   const pat = String(J.stats?.pattern ?? '').trim().toLowerCase();
   out.stats.pattern = PATTERN_IDS.includes(pat) ? pat : DEFAULT_PATTERN;
   const ab = String(J.stats?.ability ?? '').trim().toLowerCase();
-  out.stats.ability = ABILITY_IDS.includes(ab) ? ab : DEFAULT_ABILITY;
+  out.stats.ability = ID_RE.test(ab) ? ab : DEFAULT_ABILITY;
   return out;
 }
 /* what is wrong with a raw unit, as sentences; empty when it is fine. Values out of range are reported here,
@@ -77,7 +79,7 @@ function validateUnit(raw, group = 'characters') {
   const check = (v, label, lo, hi) => { if (v == null) return; if (typeof v !== 'number' || !Number.isInteger(v)) errs.push(`${label} must be a whole number`); else if (v < lo || v > hi) errs.push(`${label} must be between ${lo} and ${hi}`); };
   for (const sec of SECTIONS) for (const [k, label, lo, hi] of FIELDS[sec]) check(raw[sec]?.[k], label, lo, hi);
   const pat = raw.stats?.pattern; if (pat != null && !PATTERN_IDS.includes(pat)) errs.push(`Pattern must be one of ${PATTERN_IDS.join(', ')}`);
-  const ab = raw.stats?.ability; if (ab != null && !ABILITY_IDS.includes(ab)) errs.push(`Ability must be one of ${ABILITY_IDS.join(', ')}`);
+  const ab = raw.stats?.ability; if (ab != null && (typeof ab !== 'string' || !ID_RE.test(ab))) errs.push('Ability must be "none" or a skill id');
   return errs;
 }
 /* the file a unit lives in, relative to the project root, and its text: two-space JSON with a final newline */

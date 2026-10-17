@@ -1,9 +1,11 @@
 import '../styles/main.css';
 import './units.css';
 import '../data/unit-files.js';
+import '../data/skill-files.js';
+import { onSkillsChange } from '../data/skills.js';
 import { DEFAULT_UNIT, FIELDS, GROUPS, GROUP_LABEL, PATTERNS, SECTIONS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.js';
 import { patternOffsets } from '../tactical/attack.js';
-import { ABILITIES, DEF_SCALE, MP_REGEN, abilityOf, damageOf, healOf, hitChance } from '../battle/abilities.js';
+import { DEF_SCALE, MP_REGEN, abilityOf, damageOf, healOf, hitChance, listAbilities } from '../battle/abilities.js';
 import { characterById, list as customCharacters } from '../characters/library.js';
 import { ROSTER, WALK, render } from '../characters/roster.js';
 import { figureThumb } from '../characters/draw.js';
@@ -21,7 +23,7 @@ import { mountRail } from '../ui/rail.js';
 const $ = id => document.getElementById(id);
 const WRITABLE = import.meta.env.DEV;
 /* the module rail: every other module lives on the atlas page */
-mountRail(id => { if (id !== 'units') location.href = id === 'atlas' ? './index.html' : `./index.html#${id}`; }, 'units');
+mountRail(id => { if (id === 'skills') location.href = './skills.html'; else if (id !== 'units') location.href = id === 'atlas' ? './index.html' : `./index.html#${id}`; }, 'units');
 const SAVE_URL = (group, id) => `/__hexwright/units/${group}/${id}`;
 
 /* id -> { group, draft, saved, savedGroup }: saved is null for a unit not yet written */
@@ -120,20 +122,21 @@ function patternSection(e) {
     </div>
   </section>`;
 }
-const abilityLabel = id => abilityOf(id)?.label || 'None';
-const abilityOptions = v => [['none', 'None'], ...ABILITIES.map(a => [a.id, a.label])].map(([id, label]) => `<option value="${id}"${id === v ? ' selected' : ''}>${label}</option>`).join('');
+const abilityLabel = id => abilityOf(id)?.label || (id === 'none' ? 'None' : `${id} (no such skill)`);
+/* None, every skill in data/skills/, and the unit's own if it names one that is not there */
+const abilityOptions = v => [['none', 'None'], ...listAbilities().map(a => [a.id, a.label]), ...(v !== 'none' && !abilityOf(v) ? [[v, abilityLabel(v)]] : [])].map(([id, label]) => `<option value="${esc(id)}"${id === v ? ' selected' : ''}>${esc(label)}</option>`).join('');
 /* the ability, a section of its own: one to pick, what it costs and does, whether the unit has the MP for it, and
    how its blows play against the roster on average (an attack's damage and chance to hit) */
 function abilitySection(e) {
   const st = e.draft.stats, v = st.ability, a = abilityOf(v), saved = e.saved?.stats?.ability, changed = e.saved && saved !== v;
   const others = [...E.values()].filter(o => o.group !== e.group).map(o => o.draft.stats), avg = f => (others.length ? Math.round(others.reduce((n, o) => n + f(o), 0) / others.length) : null);
   const dmg = avg(o => damageOf(st.attack, o.defense)), hit = avg(o => hitChance(st.accuracy, o.evasion)), taken = avg(o => damageOf(o.attack, st.defense)), dodge = avg(o => 100 - hitChance(o.accuracy, st.evasion));
-  const what = !a ? 'No ability: it only attacks.' : a.heal ? `Restores ${healOf(st.attack)} HP to an ally in reach.` : `${a.note[0].toUpperCase()}${a.note.slice(1)}${a.sure ? '' : ', at the attack\'s chance to hit'}.`;
+  const what = !a ? (v === 'none' ? 'No ability: it only attacks.' : `There is no skill called “${v}” in data/skills/, so it only attacks.`) : a.heal ? `Restores ${healOf(st.attack, a)} HP to an ally in reach.` : `${a.note[0].toUpperCase()}${a.note.slice(1)}${a.sure ? '' : ', at the attack\'s chance to hit'}.`;
   const uses = a && a.cost ? Math.floor(st.mp / a.cost) : null;
   return `<section class="ub-ability${changed ? ' changed' : ''}" aria-label="Ability">
     <h3 class="ub-section">Ability${changed ? ` <span class="ub-tag" title="saved: ${abilityLabel(saved)}">changed</span>` : ''}</h3>
     <div class="ub-ability-body">
-      <label class="ub-ability-pick"><select id="ability" aria-label="Ability">${abilityOptions(v)}</select>${a ? `<span class="ub-cost">${a.cost} MP</span>` : ''}</label>
+      <label class="ub-ability-pick"><select id="ability" aria-label="Ability">${abilityOptions(v)}</select>${a ? `<span class="ub-cost">${a.cost} MP</span><a class="ub-link" href="./skills.html?skill=${encodeURIComponent(a.id)}">Edit skill</a>` : ''}</label>
       <p>${esc(what)}${a ? ` ${uses ? `${uses} use${uses === 1 ? '' : 's'} from full MP` : '<b class="ub-warn">Not enough MP to use it</b>'}, and ${MP_REGEN} MP back each turn.` : ''}</p>
       ${others.length ? `<p class="ub-dim">Against the ${e.group === 'enemies' ? 'characters' : 'enemies'} on average: deals ${dmg} a hit, lands ${hit}% of the time; takes ${taken} a hit, dodges ${dodge}%. Every ${DEF_SCALE} Defense halves the damage taken.</p>` : ''}
     </div>
@@ -331,6 +334,8 @@ addEventListener('keydown', ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toL
 addEventListener('beforeunload', ev => { if (dirtyList().length) { ev.preventDefault(); ev.returnValue = ''; } });
 /* a save from here, another tab or a hand edit of a file: take the new numbers for every unit not being changed */
 onUnitsChange(() => { syncFromRegistry(); renderAll(); });
+/* a skill saved in the skill editor: its name, cost and numbers change on every card */
+onSkillsChange(() => renderAll());
 /* ?unit=<id> opens that unit's card */
 const asked = new URLSearchParams(location.search).get('unit');
 syncFromRegistry(); if (asked && E.has(asked)) V.sel = asked;
