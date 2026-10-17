@@ -1,0 +1,54 @@
+{
+  "id": "elfranger",
+  "name": "Elf Ranger",
+  "outfit": {
+    "clothes": "tunic",
+    "sleeves": "cloth",
+    "cut": "plain",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "none",
+    "cape": "cape",
+    "satchel": "none",
+    "held": "bow",
+    "shield": "none",
+    "colours": {
+      "cloth": "#7f9a5a",
+      "shirt": "#e8e4d0",
+      "second": "#8fa462",
+      "trim": "#c9a24f",
+      "belt": "#7a5a3a",
+      "gold": "#c9a24f",
+      "legs": "#6c7458",
+      "boots": "#5c4a36",
+      "hat": "#dfc070",
+      "accent": "#d9b44a",
+      "steel": "#c4c8c6",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#e2d6b6",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#7d8f7a"
+    }
+  },
+  "stats": {
+    "hp": 38,
+    "mp": 12,
+    "attack": 12,
+    "defense": 3,
+    "accuracy": 105,
+    "evasion": 14,
+    "crit": 15,
+    "critDamage": 160,
+    "range": 5,
+    "pattern": "ranged",
+    "abilities": [
+      "true"
+    ]
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  }
+}

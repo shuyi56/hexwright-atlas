@@ -1,0 +1,54 @@
+{
+  "id": "dragoon",
+  "name": "Dragoon",
+  "outfit": {
+    "clothes": "plate",
+    "sleeves": "second",
+    "cut": "plain",
+    "neckline": "high",
+    "rope": "none",
+    "hat": "kettle",
+    "cape": "dagged",
+    "satchel": "none",
+    "held": "spear",
+    "shield": "none",
+    "colours": {
+      "cloth": "#5d5a62",
+      "shirt": "#efe3c4",
+      "second": "#3f3a3d",
+      "trim": "#c9a24f",
+      "belt": "#4a3526",
+      "gold": "#c9a24f",
+      "legs": "#5d5a62",
+      "boots": "#8c4a3d",
+      "hat": "#a0503f",
+      "accent": "#b8664a",
+      "steel": "#a0503f",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#34303a"
+    }
+  },
+  "stats": {
+    "hp": 50,
+    "mp": 10,
+    "attack": 14,
+    "defense": 6,
+    "accuracy": 92,
+    "evasion": 8,
+    "crit": 10,
+    "critDamage": 160,
+    "range": 2,
+    "pattern": "line",
+    "abilities": [
+      "pierce"
+    ]
+  },
+  "movement": {
+    "move": 4,
+    "jump": 3
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "noble",
+  "name": "Noble Lady",
+  "outfit": {
+    "clothes": "gown",
+    "sleeves": "second",
+    "cut": "bell",
+    "neckline": "square",
+    "rope": "none",
+    "hat": "circlet",
+    "cape": "none",
+    "satchel": "none",
+    "held": "none",
+    "shield": "none",
+    "colours": {
+      "cloth": "#356a52",
+      "shirt": "#efe3c4",
+      "second": "#3f7a5e",
+      "trim": "#dfc070",
+      "belt": "#7a5a3a",
+      "gold": "#e2c262",
+      "legs": "#a68a62",
+      "boots": "#5a3a2a",
+      "hat": "#dfc070",
+      "accent": "#dfc070",
+      "steel": "#c4c8c6",
+      "bag": "#b89a70",
+      "shield": "#6f8faa",
+      "wood": "#8a6238",
+      "string": "#efe6d2",
+      "jewel": "#b8443a",
+      "cape": "#a6533b"
+    }
+  },
+  "stats": {
+    "hp": 26,
+    "mp": 0,
+    "attack": 3,
+    "defense": 2,
+    "accuracy": 82,
+    "evasion": 6,
+    "crit": 2,
+    "critDamage": 150,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": []
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
+}

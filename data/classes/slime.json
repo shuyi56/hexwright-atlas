@@ -1,0 +1,22 @@
+{
+  "id": "slime",
+  "name": "Slime",
+  "outfit": null,
+  "stats": {
+    "hp": 44,
+    "mp": 0,
+    "attack": 6,
+    "defense": 10,
+    "accuracy": 80,
+    "evasion": 0,
+    "crit": 0,
+    "critDamage": 150,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": []
+  },
+  "movement": {
+    "move": 3,
+    "jump": 0
+  }
+}

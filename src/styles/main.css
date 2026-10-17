@@ -436,3 +436,6 @@ body.has-rail{--rail-w:84px}
 .tc-sub[hidden]{display:none}
 .tc-sub button[data-kind=heal] .tc-ico{color:#8fe39a}
 .tc-sub kbd{margin-left:auto;font:500 .55em var(--ui);color:var(--tc-off);border:1px solid currentColor;border-radius:2px;padding:.1em .35em}
+.cm-note{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+.cm-note a{color:var(--brass-2)}
+.ed-group.ed-kind{margin:16px 0 2px;font:400 19px var(--display);letter-spacing:.02em;color:var(--vellum);border-bottom:1px solid var(--line);padding-bottom:3px}

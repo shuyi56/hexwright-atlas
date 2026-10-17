@@ -1,46 +1,18 @@
 import { BANDANA, BEARD, CAPELET, CIRCLET, COWL, COWL_POINT, FEATHER_CAP, KETTLE_HELM, STRAW_HAT, WIZARD_HAT } from './hats.js';
 import { ELF_EARS, ELF_HAIR } from './elves.js';
-import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, KITE, SKIN, SWORD, recolor, staff } from './parts.js';
+import { BOW, BUCKLER, DAGGER, HAIR_BRAID, HAIR_BUN, HAIR_LONG, HAIR_PONYTAIL, HAIR_SHORT, HAIR_TOUSLED, KITE, SWORD, recolor, staff } from './parts.js';
+import { APPLIES, BODY_COLOURS, BODY_KEYS, CHOICES, COLOURS, DEFAULT_COLOURS, OUTFIT_COLOURS, OUTFIT_KEYS, cleanOutfit } from './choices.js';
+import { getClass } from '../data/classes.ts';
 
 /* ================= character sprites: characters made from choices =================
    A spec is a character described by a handful of choices (a build, clothes, sleeves, hair, a hat, a beard, a
-   cape, a satchel, what is held, a shield) and a colour for each material. fromSpec turns it into a character
-   drawn exactly like the jobs in roster.js: the clothes become an outfit cut by body.js, the hats and gear are the
-   hand-drawn parts in hats.js and parts.js, the colours its palette. The townsfolk are specs (townsfolk.js), and
-   the character maker builds new ones. Specs are plain JSON, so a map can carry the ones it uses. */
+   cape, a satchel, what is held, a shield) and a colour for each material (choices.js). fromSpec turns it into a
+   character drawn exactly like the jobs in roster.js: the clothes become an outfit cut by body.js, the hats and
+   gear are the hand-drawn parts in hats.js and parts.js, the colours its palette. The townsfolk are specs
+   (townsfolk.js), and the character maker builds new ones: the playable characters. A playable character may name
+   a class (data/classes.ts); it then wears its class's outfit over its own body, and fights with its class's
+   numbers. Specs are plain JSON, so a map can carry the ones it uses. */
 
-/* each choice: its options as [value, label], the first being the default */
-const CHOICES = {
-  build: [['standard', 'Standard'], ['slim', 'Slim'], ['stocky', 'Stocky'], ['tall', 'Tall'], ['small', 'Small']],
-  clothes: [['vest', 'Shirt and vest'], ['tunic', 'Tunic'], ['overalls', 'Overalls'], ['plate', 'Breastplate'], ['robe', 'Long coat and sash'], ['gown', 'Gown to the floor']],
-  sleeves: [['cloth', 'Same cloth'], ['second', 'Second colour']],
-  cut: [['plain', 'Plain'], ['bell', 'Bell']],
-  neckline: [['high', 'High'], ['square', 'Square']],
-  rope: [['none', 'None'], ['rope', 'Rope belt']],
-  hair: [['short', 'Short'], ['tousled', 'Tousled'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['bun', 'Low bun'], ['braid', 'Braid'], ['flowing', 'Flowing (elven)']],
-  ears: [['round', 'Round'], ['pointed', 'Pointed (elven)']],
-  hat: [['none', 'None'], ['straw', 'Straw hat'], ['kettle', 'Kettle helm'], ['circlet', 'Circlet'], ['cowl', 'Cowl'], ['cap', 'Feathered cap'], ['bandana', 'Bandana'], ['wizard', 'Wizard hat']],
-  beard: [['none', 'None'], ['full', 'Full beard']],
-  cape: [['none', 'None'], ['cape', 'Cape'], ['dagged', 'Dagged cape']],
-  satchel: [['none', 'None'], ['satchel', 'Satchel'], ['cross', 'Satchel with a cross']],
-  held: [['none', 'Nothing'], ['sword', 'Sword'], ['dagger', 'Dagger'], ['daggers', 'Two daggers'], ['spear', 'Spear'], ['staff', 'Staff'], ['bow', 'Bow']],
-  shield: [['none', 'None'], ['kite', 'Kite shield'], ['buckler', 'Buckler']] };
-/* the choices that only mean something with some clothes or gear: the neckline and the rope belt on a gown, a
-   shield in the hand a second dagger would take */
-const APPLIES = {
-  neckline: s => s.clothes === 'gown',
-  rope: s => s.clothes === 'gown',
-  shield: s => s.held !== 'daggers' };
-/* every colour a spec sets: [key, the material letter it paints, label] */
-const COLOURS = [
-  ['skin', 'K', 'Skin'], ['hair', 'H', 'Hair'], ['cloth', 'A', 'Cloth'], ['shirt', 'B', 'Shirt'], ['second', 'D', 'Second cloth'],
-  ['trim', 'C', 'Trim and cuffs'], ['belt', 'L', 'Belt, straps and rope'], ['gold', 'G', 'Buckles and gold'], ['legs', 'P', 'Legs'],
-  ['boots', 'O', 'Boots and shoes'], ['hat', 'X', 'Hat or hood'], ['accent', 'R', 'Band, feather and cross'], ['steel', 'S', 'Steel'],
-  ['bag', 'U', 'Bag'], ['shield', 'N', 'Shield'], ['wood', 'T', 'Wood'], ['string', 'F', 'Bowstring'], ['jewel', 'J', 'Jewel'], ['cape', 'V', 'Cape']];
-const DEFAULT_COLOURS = {
-  skin: SKIN, hair: '#8a6a48', cloth: '#e6d8b6', shirt: '#efe3c4', second: '#8fa462', trim: '#d3c199', belt: '#7a5a3a', gold: '#c9a24f',
-  legs: '#a68a62', boots: '#7a5a3a', hat: '#dfc070', accent: '#b8664a', steel: '#c4c8c6', bag: '#b89a70', shield: '#6f8faa',
-  wood: '#8a6238', string: '#efe6d2', jewel: '#b8443a', cape: '#a6533b' };
 /* colours the character maker offers as swatches: the tile set's own (render/palette.js, tiles/terrain.js) and the
    roster's skins and hair */
 const SWATCHES = [
@@ -67,12 +39,13 @@ const HELD = { sword: SWORD, dagger: DAGGER, daggers: DAGGER, spear: SPEAR, staf
 const SHIELDS = { kite: recolor2(KITE, { U: 'N' }), buckler: recolor2(BUCKLER, { U: 'N' }) };
 function recolor2(pair, map) { return { front: recolor(pair.front, map), back: recolor(pair.back, map) }; }
 
-const HEX = /^#[0-9a-f]{6}$/i, ID = /^[a-z0-9-]{1,40}$/;
+const HEX = /^#[0-9a-f]{6}$/i, ID = /^[a-z0-9-]{1,40}$/, CLASS_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
 const newId = () => 'custom-' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
 /* a spec from anything (a saved library, a map, the API): every choice one of its options, every colour #rrggbb,
    anything missing or wrong taken from the defaults */
 function cleanSpec(J) {
   const src = J && typeof J === 'object' ? J : {}, s = { id: typeof src.id === 'string' && ID.test(src.id) ? src.id : newId(), name: String(src.name || 'New character').trim().slice(0, 40) || 'New character' };
+  s.class = typeof src.class === 'string' && CLASS_ID.test(src.class) ? src.class : '';
   for (const [k, opts] of Object.entries(CHOICES)) s[k] = opts.some(([v]) => v === src[k]) ? src[k] : opts[0][0];
   s.colours = {};
   for (const [key] of COLOURS) { const c = src.colours && src.colours[key]; s.colours[key] = typeof c === 'string' && HEX.test(c) ? c.toLowerCase() : DEFAULT_COLOURS[key]; }
@@ -89,9 +62,14 @@ function describe(s) {
   return t.charAt(0).toUpperCase() + t.slice(1) + '.';
 }
 
-/* the character a spec describes */
+/* what a spec wears: its own choices, or with a class that has an outfit, its body in that outfit */
+function wornSpec(spec) {
+  const s = cleanSpec(spec), outfit = s.class ? getClass(s.class)?.outfit : null;
+  return outfit ? { ...s, ...outfit, colours: { ...s.colours, ...outfit.colours } } : s;
+}
+/* the character a spec describes, in its class's outfit when it has one */
 function fromSpec(spec, extra = {}) {
-  const s = cleanSpec(spec), o = {}, front = {}, back = {}, pal = {};
+  const own = cleanSpec(spec), s = wornSpec(own), o = {}, front = {}, back = {}, pal = {};
   if (s.clothes === 'vest') o.garment = 'vest';
   else if (s.clothes === 'tunic') o.torso = 'tunic';
   else if (s.clothes === 'overalls') o.garment = 'overalls';
@@ -119,7 +97,7 @@ function fromSpec(spec, extra = {}) {
   if (s.ears === 'pointed') { front.hat = [].concat(front.hat || [], ELF_EARS.front); back.hat = [].concat(back.hat || [], ELF_EARS.back); }
   for (const [key, letter] of COLOURS) pal[letter] = s.colours[key];
   if (s.clothes === 'overalls') pal.P = s.colours.second;                       /* the overalls run down the legs */
-  return { id: s.id, name: s.name, blurb: describe(s), body: s.build, outfit: o, hair: HAIRS[s.hair], weapon, shield, pal, parts: { front, back }, spec: s, look: JSON.stringify(s), ...extra };
+  return { id: s.id, name: s.name, blurb: describe(s), body: s.build, outfit: o, hair: HAIRS[s.hair], weapon, shield, pal, parts: { front, back }, spec: own, look: JSON.stringify({ ...s, class: '' }), ...extra };
 }
 
-export { APPLIES, CHOICES, COLOURS, DEFAULT_COLOURS, SWATCHES, cleanSpec, describe, fromSpec, newId };
+export { APPLIES, BODY_COLOURS, BODY_KEYS, CHOICES, COLOURS, DEFAULT_COLOURS, OUTFIT_COLOURS, OUTFIT_KEYS, SWATCHES, cleanOutfit, cleanSpec, describe, fromSpec, newId, wornSpec };

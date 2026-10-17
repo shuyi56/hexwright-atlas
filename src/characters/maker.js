@@ -1,6 +1,7 @@
 import { TERRAIN_BY_ID } from '../tiles/terrain.js';
 import { $ } from '../ui/state.js';
-import { APPLIES, CHOICES, COLOURS, SWATCHES, cleanSpec, describe, fromSpec, newId } from './custom.js';
+import { APPLIES, BODY_COLOURS, CHOICES, COLOURS, OUTFIT_KEYS, SWATCHES, cleanSpec, describe, fromSpec, newId } from './custom.js';
+import { getClass, listClasses, onClassesChange } from '../data/classes.ts';
 import { BASE } from './body.js';
 import * as library from './library.js';
 import { H, W, hexRgb } from './pixels.js';
@@ -9,9 +10,11 @@ import { ATTACK_BEATS } from './sheet.js';
 import { TOWNSFOLK } from './townsfolk.js';
 
 /* ================= character sprites: the character maker =================
-   A screen over the tile editor for making characters in this style. Each one is a spec (custom.js): a choice for
-   each of build, clothes, sleeves, hair, hat, beard, what is held, shield, cape and satchel, and a colour for each
-   material it shows. Choices are chips; colours are rows (only those the character uses), set from the tile set's
+   A screen over the tile editor for making the playable characters, in this style. Each one is a spec (custom.js):
+   a choice for each of build, clothes, sleeves, hair, hat, beard, what is held, shield, cape and satchel, and a
+   colour for each material it shows. A character can take a class (data/classes.ts): it then wears the class's
+   outfit (clothes, hat, gear and their colours, set in the class editor) over its own build, hair, ears, beard and
+   skin, which are all the maker shows, and fights with the class's numbers. Choices are chips; colours are rows (only those the character uses), set from the tile set's
    swatches or any colour. A character can start from any of the townsfolk. The preview shows it in all four
    facings on grass, standing, walking or attacking (winding up and striking with whatever it holds, over and over),
    exactly as the map draws it. Every change saves to the character library (library.js) at once, with its own undo. */
@@ -61,19 +64,44 @@ function chips(key) {
   }
   row.appendChild(box); return row;
 }
+/* the class whose outfit the character wears, if it has one that has an outfit */
+const wearing = () => { const c = MK.spec.class ? getClass(MK.spec.class) : null; return c && c.outfit ? c : null; };
+/* the class: none (the character's own outfit), or any class with an outfit, as chips */
+function classRow() {
+  const row = document.createElement('div'); row.className = 'cm-choice';
+  const box = document.createElement('div'); box.className = 'cm-chips'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Class');
+  const missing = MK.spec.class && !wearing() ? [[MK.spec.class, `${MK.spec.class} (no outfit)`]] : [];
+  for (const [v, text] of [['', 'None'], ...listClasses().filter(c => c.outfit).map(c => [c.id, c.name]), ...missing]) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = text; b.setAttribute('aria-pressed', String(MK.spec.class === v));
+    b.addEventListener('click', () => { if (MK.spec.class !== v) { commit({ ...MK.spec, class: v }); say(v ? `A ${text.toLowerCase()}: wears the class's outfit and fights with its numbers.` : 'No class: wears an outfit of its own, and fights with the default numbers.'); } });
+    box.appendChild(b);
+  }
+  row.appendChild(box); return row;
+}
 /* the colours a character shows: those of the materials in its frames, its attack's too (an arrow's head and
-   fletching) */
+   fletching); in a class's outfit, only its own skin and hair */
 function usedColours() {
-  const c = fromSpec(MK.spec), seen = new Set();
+  const c = fromSpec(MK.spec), seen = new Set(), cls = wearing();
   for (const v of VIEWS) for (let k = 0; k < FRAMES; k++) for (const m of frame(c, v, k).mat) if (m) seen.add(m);
   if (seen.has('P') && MK.spec.clothes === 'overalls') seen.delete('P');           /* the overalls' colour runs down the legs */
-  return COLOURS.filter(([, letter]) => seen.has(letter));
+  return COLOURS.filter(([key, letter]) => seen.has(letter) && (!cls || BODY_COLOURS.includes(key)));
 }
 function build() {
   const top = panel.scrollTop; panel.textContent = '';
+  const ch = document.createElement('h3'); ch.className = 'ed-group'; ch.textContent = 'Class'; panel.appendChild(ch);
+  panel.appendChild(classRow());
+  const cls = wearing();
+  if (cls) {
+    const p = document.createElement('p'); p.className = 'cm-note';
+    p.innerHTML = 'Wears the <b></b> outfit. <a href="">Change it in the class editor</a>.';
+    p.querySelector('b').textContent = cls.name; p.querySelector('a').href = `./classes.html?class=${encodeURIComponent(cls.id)}`;
+    panel.appendChild(p);
+  }
   for (const [name, keys] of GROUPS) {
+    const shown = keys.filter(k => (!cls || !OUTFIT_KEYS.includes(k)) && (!APPLIES[k] || APPLIES[k](MK.spec)));
+    if (!shown.length) continue;
     const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = name; panel.appendChild(h);
-    for (const k of keys) if (!APPLIES[k] || APPLIES[k](MK.spec)) panel.appendChild(chips(k));
+    for (const k of shown) panel.appendChild(chips(k));
   }
   const h = document.createElement('h3'); h.className = 'ed-group'; h.textContent = 'Colours'; panel.appendChild(h);
   const used = usedColours(); if (!used.some(([k]) => k === MK.colour)) MK.colour = (used.find(([k]) => k === 'cloth') || used[0] || ['cloth'])[0];
@@ -198,5 +226,7 @@ root.addEventListener('keydown', e => {
   else if (e.key === 'Escape') close();
 });
 new ResizeObserver(() => draw()).observe(cv.parentElement);
+/* a class saved in the class editor: the outfit on show changes, and so do the classes to pick from */
+onClassesChange(() => { if (MK.open && MK.spec) { MK.frames = null; MK.crisp.clear(); build(); draw(); } });
 
 export { makerOpen, openMaker };

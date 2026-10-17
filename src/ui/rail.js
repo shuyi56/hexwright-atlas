@@ -1,8 +1,9 @@
 /* ================= the module rail =================
    One strip down the left edge (along the bottom on phones) that every page shares: it names each part of the
-   app and moves between them. The atlas page (ui/shell.js), the unit data page (units/main.js) and the skill editor
-   (skills/main.js) mount it and say what a click does: the atlas page opens the module in place, the data pages go
-   to each other or back to the atlas page with the module in the address (index.html#editor). */
+   app and moves between them. The atlas page (ui/shell.js) and the data pages (DATA_PAGES: the class editor,
+   classes/main.js, and the skill editor, skills/main.js) mount it and say what a click
+   does: the atlas page opens the module in place, the data pages go to each other or back to the atlas page with
+   the module in the address (index.html#editor), as goFromDataPage does. */
 
 /* [id, label, longer title, group, glyph] */
 const MODULES = [
@@ -12,7 +13,7 @@ const MODULES = [
   ['town', 'Town', 'Town view: walk the editor’s map from above', 'view', '<path d="M4 20V11l5-4 5 4v9"/><path d="M14 20v-6l3-2.5 3 2.5v6"/><path d="M8 20v-4h2v4"/><path d="M3 20h18"/>'],
   ['editor', 'Map editor', 'Map editor: paint ground, place buildings and characters', 'make', '<path d="M4 20l1.2-4.4L15.6 5.2a2 2 0 012.8 0l.4.4a2 2 0 010 2.8L8.4 18.8z"/><path d="M13.5 7.3l3.2 3.2"/>'],
   ['characters', 'Characters', 'Character maker: build a figure from clothes, hair and gear', 'make', '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 20c.6-4 3.4-6.5 7-6.5s6.4 2.5 7 6.5"/>'],
-  ['units', 'Unit data', 'Unit data: stats for every character and enemy', 'data', '<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9.5h16M4 14.5h16M10 4v16"/>'],
+  ['classes', 'Classes', 'Class editor: the stats, abilities and movement of every class', 'data', '<path d="M12 3l7 3v5.5c0 4.4-3 8-7 9.5-4-1.5-7-5.1-7-9.5V6z"/><path d="M12 7.5v9M8.5 11h7"/>'],
   ['skills', 'Skills', 'Skill editor: what each ability costs and does, and its particles', 'data', '<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>'],
 ];
 const GROUPS = { view: 'view', make: 'make', data: 'data' };
@@ -49,4 +50,11 @@ function mountRail(go, active = 'atlas', { skip = [] } = {}) {
 }
 
 const MODULE_IDS = MODULES.map(m => m[0]);
-export { MODULE_IDS, mountRail };
+/* the modules that are pages of their own (classes.html, skills.html) rather than views on the atlas page */
+const DATA_PAGES = ['classes', 'skills'];
+/* what a rail click does on the data page `here`: another data page, or the atlas page with that module open */
+const goFromDataPage = here => id => {
+  if (id === here) return;
+  location.href = DATA_PAGES.includes(id) ? `./${id}.html` : id === 'atlas' ? './index.html' : `./index.html#${id}`;
+};
+export { DATA_PAGES, MODULE_IDS, goFromDataPage, mountRail };

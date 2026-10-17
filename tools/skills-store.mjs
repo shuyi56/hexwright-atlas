@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ID_RE, normalizeSkill, skillPath, skillText, validateSkill } from '../src/data/skills.ts';
-import { ROOT } from './units-store.mjs';
+import { ROOT } from './npcs-store.mjs';
 
 /* ================= skill data: the files, on disk =================
    Reads and writes data/skills/<id>.json for Node: the dev server's bridge (tools/vite-hexwright.js), which the skill

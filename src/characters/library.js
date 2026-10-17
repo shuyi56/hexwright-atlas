@@ -1,11 +1,16 @@
 import { cleanSpec, fromSpec, newId } from './custom.js';
 import { byId } from './roster.js';
+import { onClassesChange } from '../data/classes.ts';
+import { playablesChanged, usePlayables } from '../data/units.ts';
 
 /* ================= character sprites: the custom character library =================
    The characters made in the character maker, kept in the browser as specs (custom.js) and shared by the maker,
    the tile editor and the automation API. A map carries the specs of the custom characters standing on it
    (editor/model.ts), so a saved map opens anywhere. Without storage (Node, or storage blocked) the library lives
-   in memory. Custom ids always start with 'custom-', so they never shadow anyone in the roster. */
+   in memory. Custom ids always start with 'custom-', so they never shadow anyone in the roster. These are the
+   playable characters: each may name a class (data/classes.ts), whose outfit it wears and whose numbers it fights
+   with, so the library hands them to the unit registry (data/units.ts) and draws them again when a class changes.
+   Everyone else who can stand on a map is an NPC of the roster. */
 const KEY = 'hexwright.characters.v1', LIB = new Map(), listeners = new Set();
 let ready = false;
 const store = () => { try { return globalThis.localStorage || null; } catch { return null; } };
@@ -17,7 +22,7 @@ function init() {
   let raw = null; try { raw = store()?.getItem(KEY); } catch { /* storage unavailable */ }
   try { if (raw) for (const J of JSON.parse(raw)) { const c = make(J); LIB.set(c.id, c); } } catch { /* unreadable: start empty */ }
 }
-const notify = () => { for (const f of listeners) f(); };
+const notify = () => { for (const f of listeners) f(); playablesChanged(); };
 const onChange = f => { listeners.add(f); return () => listeners.delete(f); };
 const list = () => { init(); return [...LIB.values()]; };
 const get = id => { init(); return LIB.get(id) || null; };
@@ -31,6 +36,10 @@ function merge(specs) {
   if (n) { persist(); notify(); }
   return n;
 }
+/* a class changed: everyone wearing one is drawn again in its outfit as it is now */
+onClassesChange(() => { if (!ready) return; for (const [id, c] of LIB) if (c.spec.class) LIB.set(id, make(c.spec)); for (const f of listeners) f(); });
+const asPlayable = c => ({ id: c.id, name: c.name, class: c.spec.class });
+usePlayables({ get: id => { const c = get(id); return c ? asPlayable(c) : null; }, list: () => list().map(asPlayable) });
 /* anyone who can stand on a map: the roster, then the library */
 const characterById = id => byId(id) || get(id);
 

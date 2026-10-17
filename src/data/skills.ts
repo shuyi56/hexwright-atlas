@@ -1,6 +1,6 @@
 /* ================= skill data: the abilities that spend MP =================
-   What each ability does in a fight and how it looks doing it. A unit names one in its data (stats.ability, see
-   data/units.ts); battle/abilities.ts turns the numbers here into blows. Each skill is one JSON file under
+   What each ability does in a fight and how it looks doing it. A class names the ones it has (stats.abilities, see
+   data/classes.ts); battle/abilities.ts turns the numbers here into blows. Each skill is one JSON file under
    data/skills/, named by its id:
 
      data/skills/power.json
