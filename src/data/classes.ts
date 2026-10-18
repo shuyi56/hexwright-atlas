@@ -1,18 +1,18 @@
-/* ================= class data: how a kind of fighter plays =================
-   A class is a job, such as Knight, Archer or Goblin: how much damage it takes and deals, how much of it its
-   Defense turns aside, how surely it hits (Accuracy) and dodges (Evasion), how often its blows are critical (Crit,
-   in percent) and for how much (Crit Damage, a percent of the damage), the MP its abilities spend, how many tiles
-   away it can strike and in what pattern, the abilities it has, how far it moves and how high it jumps, and the
-   outfit it wears: the clothes, hat and gear, and their colours, out of the character maker's choices
-   (characters/choices.js). A playable character, made in the character maker, wears its class's outfit over its own
-   body and fights with its numbers; an NPC (data/units.ts) keeps its own hand-drawn look and fights with its class's
-   numbers. A class only NPCs play, such as Goblin or Wolf, has no outfit (null). Each class is one JSON file under
-   data/classes/, named by its id:
+/* ================= class data: a job a playable character takes =================
+   A class is a job a character made in the character maker can take: Knight, Archer, Dragoon, Black Mage, White
+   Mage, Summoner or Valkyrie. It is the outfit the character wears over its own body (the clothes, hat and gear,
+   and their colours, out of the character maker's choices in characters/choices.js) and the numbers it fights
+   with: how much damage it takes and deals, how much of it its Defense turns aside, how surely it hits (Accuracy)
+   and dodges (Evasion), how often its blows are critical (Crit, in percent) and for how much (Crit Damage, a
+   percent of the damage), the MP its abilities spend, how many tiles away it can strike and in what pattern, the
+   abilities it has, how far it moves and how high it jumps. The NPCs of the roster (data/units.ts) carry the same
+   stats and movement sections of their own and take no class. Each class is one JSON file under data/classes/,
+   named by its id:
 
-     data/classes/goblin.json
-     { "id": "goblin", "name": "Goblin", "outfit": null,
-       "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "abilities": [] },
-       "movement": { "move": 5, "jump": 2 } }
+     data/classes/knight.json
+     { "id": "knight", "name": "Knight", "outfit": { "top": "plate", …, "colours": { … } },
+       "stats": { "hp": 38, "mp": 6, "attack": 9, "defense": 6, "accuracy": 90, "evasion": 5, "crit": 5, "critDamage": 150, "range": 1, "pattern": "melee", "abilities": ["power"] },
+       "movement": { "move": 3, "jump": 1 } }
 
    How the numbers play in a fight is in src/battle/actions.ts; what each ability does is in data/skills/
    (src/data/skills.ts).
@@ -34,8 +34,8 @@ interface UnitStats extends CombatStats { hp: number; mp: number; range: number;
 interface UnitMovement { move: number; jump: number }
 /* what a class wears: a choice for each outfit key of the character maker, and a colour for each outfit material */
 type Outfit = Record<string, string> & { colours: Record<string, string> };
-/* a class as its file holds it, in canonical form; outfit is null for a class only NPCs play */
-interface ClassData { id: string; name: string; outfit: Outfit | null; stats: UnitStats; movement: UnitMovement }
+/* a class as its file holds it, in canonical form */
+interface ClassData { id: string; name: string; outfit: Outfit; stats: UnitStats; movement: UnitMovement }
 type Section = 'stats' | 'movement';
 type NumberKey = Exclude<keyof UnitStats, 'pattern' | 'abilities'> | keyof UnitMovement;
 type Field<K> = readonly [key: K, label: string, min: number, max: number, def: number];
@@ -77,9 +77,9 @@ const fieldOf = (sec: Section, k: string): Field<string> | undefined => (FIELDS[
 const objectOf = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v : {}) as Record<string, unknown>;
 const DEFAULT_STATS: Readonly<UnitStats> = Object.freeze({ ...numbers('stats', {}), pattern: DEFAULT_PATTERN, abilities: Object.freeze([]) as unknown as string[] } as UnitStats);
 const DEFAULT_MOVEMENT: Readonly<UnitMovement> = Object.freeze(numbers('movement', {}) as unknown as UnitMovement);
-const DEFAULT_CLASS: Readonly<ClassData> = Object.freeze({ id: '', name: '', outfit: null, stats: DEFAULT_STATS, movement: DEFAULT_MOVEMENT });
-/* the outfit a new one starts from: the character maker's defaults */
+/* the outfit a new one starts from, and one whose file has none wears: the character maker's defaults */
 const DEFAULT_OUTFIT = (): Outfit => cleanOutfit({}) as Outfit;
+const DEFAULT_CLASS: Readonly<ClassData> = Object.freeze({ id: '', name: '', outfit: Object.freeze(DEFAULT_OUTFIT()), stats: DEFAULT_STATS, movement: DEFAULT_MOVEMENT });
 
 /* a class's stats and movement in canonical form, from raw sections: shared with the per-character changes
    (data/units.ts), which are checked number by number the same way */
@@ -90,18 +90,18 @@ const movementOf = (mv: Record<string, unknown>): UnitMovement => numbers('movem
 class UnitClass implements ClassData {
   id: string;
   name: string;
-  outfit: Outfit | null;
+  outfit: Outfit;
   stats: UnitStats;
   movement: UnitMovement;
   constructor({ id, name, outfit, stats, movement }: ClassData) { this.id = id; this.name = name; this.outfit = outfit; this.stats = stats; this.movement = movement; }
-  toJSON(): ClassData { return { id: this.id, name: this.name, outfit: this.outfit && structuredClone(this.outfit), stats: { ...this.stats, abilities: [...this.stats.abilities] }, movement: { ...this.movement } }; }
+  toJSON(): ClassData { return { id: this.id, name: this.name, outfit: structuredClone(this.outfit), stats: { ...this.stats, abilities: [...this.stats.abilities] }, movement: { ...this.movement } }; }
 }
 
 /* a class in canonical form: known fields only, in a fixed order, every number a whole number within its range and
-   anything missing filled from the defaults; an outfit is cleaned the way the character maker cleans a spec. */
+   anything missing filled from the defaults, the outfit too; an outfit is cleaned the way the character maker cleans a spec. */
 function normalizeClass(raw: unknown): ClassData {
   const J = objectOf(raw), id = String(J.id ?? '').trim().toLowerCase();
-  return { id, name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''), outfit: J.outfit && typeof J.outfit === 'object' ? cleanOutfit(J.outfit) as Outfit : null,
+  return { id, name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''), outfit: cleanOutfit(J.outfit && typeof J.outfit === 'object' ? J.outfit : {}) as Outfit,
     stats: statsOf(objectOf(J.stats)), movement: movementOf(objectOf(J.movement)) };
 }
 /* what is wrong with one number, or with the pattern or abilities, of a stats or movement section, as sentences */
@@ -129,7 +129,7 @@ function validateClass(raw: unknown): string[] {
   const J = raw as Record<string, unknown>, errs: string[] = [];
   if (typeof J.id !== 'string' || !ID_RE.test(J.id)) errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit');
   if (J.name != null && typeof J.name !== 'string') errs.push('name must be text');
-  if (J.outfit != null && (typeof J.outfit !== 'object' || Array.isArray(J.outfit))) errs.push('outfit must be an object, or null');
+  if (J.outfit != null && (typeof J.outfit !== 'object' || Array.isArray(J.outfit))) errs.push('outfit must be an object');
   else if (J.outfit) for (const k of Object.keys(J.outfit)) if (k !== 'colours' && !OUTFIT_KEYS.includes(k)) errs.push(`the outfit has no choice called “${k}”`);
   for (const s of SECTIONS) errs.push(...sectionErrors(s, objectOf(J[s])));
   return errs;

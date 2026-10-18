@@ -1,5 +1,23 @@
 {
   "id": "blackmage",
   "name": "Black Mage",
-  "class": "blackmage"
+  "stats": {
+    "hp": 30,
+    "mp": 30,
+    "attack": 4,
+    "defense": 1,
+    "accuracy": 95,
+    "evasion": 4,
+    "crit": 5,
+    "critDamage": 150,
+    "range": 3,
+    "pattern": "ranged",
+    "abilities": [
+      "spell"
+    ]
+  },
+  "movement": {
+    "move": 3,
+    "jump": 1
+  }
 }

@@ -1,7 +1,7 @@
 import { levelOf } from '../editor/model.ts';
 
 /* ================= tactical view: what a unit can strike =================
-   A unit's attack reaches tiles by its pattern (its class in data/classes/; src/data/units.ts) and its range, on the map's grid:
+   A unit's attack reaches tiles by its pattern (its own numbers, or its class's; src/data/units.ts) and its range, on the map's grid:
      melee   the four tiles beside it, never the diagonals, whatever its range
      line    straight out along the grid in the four directions, up to its range
      ranged  every tile up to its range steps along the grid (no diagonal steps), not its own

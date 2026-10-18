@@ -225,7 +225,7 @@ function back() {
   else if (!(TC.menu && undoMove())) select(-1);
   return true;
 }
-/* how far unit k moves and climbs, and how far and in what pattern it strikes, come from its class (data/units.ts), looked up by its sprite */
+/* how far unit k moves and climbs, and how far and in what pattern it strikes, come from its numbers (data/units.ts), looked up by its sprite */
 function rangeOf(k) { const { move, jump } = unitFor(ED.M.chars[k].sprite).movement; return moveRange(ED.M, k, move, jump); }
 function reachOf(k, act = 'attack') { const { range, pattern } = statsOf(k); return attackReach(ED.M, k, range, pattern, j => battle.canTarget(TC.battle, k, j, act)); }
 /* new numbers for the units (a save from the unit data page) redraw the picked unit's range and the panels */

@@ -1,5 +1,21 @@
 {
   "id": "villager",
   "name": "Villager",
-  "class": "villager"
+  "stats": {
+    "hp": 24,
+    "mp": 0,
+    "attack": 4,
+    "defense": 1,
+    "accuracy": 80,
+    "evasion": 5,
+    "crit": 2,
+    "critDamage": 150,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": []
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  }
 }

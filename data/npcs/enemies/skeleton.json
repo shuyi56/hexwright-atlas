@@ -1,5 +1,21 @@
 {
   "id": "skeleton",
   "name": "Skeleton",
-  "class": "skeleton"
+  "stats": {
+    "hp": 40,
+    "mp": 0,
+    "attack": 10,
+    "defense": 5,
+    "accuracy": 88,
+    "evasion": 4,
+    "crit": 5,
+    "critDamage": 150,
+    "range": 1,
+    "pattern": "melee",
+    "abilities": []
+  },
+  "movement": {
+    "move": 4,
+    "jump": 1
+  }
 }

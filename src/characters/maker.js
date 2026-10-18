@@ -71,7 +71,7 @@ function classRow() {
   const row = document.createElement('div'); row.className = 'cm-choice';
   const box = document.createElement('div'); box.className = 'cm-chips'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Class');
   const missing = MK.spec.class && !wearing() ? [[MK.spec.class, `${MK.spec.class} (no outfit)`]] : [];
-  for (const [v, text] of [['', 'None'], ...listClasses().filter(c => c.outfit).map(c => [c.id, c.name]), ...missing]) {
+  for (const [v, text] of [['', 'None'], ...listClasses().map(c => [c.id, c.name]), ...missing]) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = text; b.setAttribute('aria-pressed', String(MK.spec.class === v));
     b.addEventListener('click', () => { if (MK.spec.class !== v) { commit({ ...MK.spec, class: v }); say(v ? `A ${text.toLowerCase()}: wears the class's outfit and fights with its numbers.` : 'No class: wears an outfit of its own, and fights with the default numbers.'); } });
     box.appendChild(b);

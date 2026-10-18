@@ -25,33 +25,32 @@ test('every roster sprite is an NPC with a file on its side, and every NPC file 
   for (const f of files) assert.ok(ROSTER.some(c => c.id === f.unit.id), `${f.file} names a roster sprite`);
 });
 
-test('the NPC files are valid, in canonical form, and each names a class that has a file', () => {
-  const classes = new Set(readClasses().map(c => c.cls.id));
+test('the NPC files are valid, in canonical form, and hold numbers of their own', () => {
   for (const f of readUnits()) {
     assert.deepEqual(validateUnit(f.raw, f.group), [], f.file);
     assert.equal(f.file, `data/npcs/${f.group}/${f.unit.id}.json`, 'named by its id');
     assert.equal(readFileSync(join(ROOT, f.file), 'utf8'), unitText(f.raw), `${f.file} is as a save would write it`);
-    assert.deepEqual(Object.keys(f.raw), ['id', 'name', 'class'], `${f.file} holds who it is and its class, not stats`);
-    assert.ok(classes.has(f.unit.class), `${f.file} plays as the ${f.unit.class} class, which has a file`);
+    assert.deepEqual(Object.keys(f.raw), ['id', 'name', 'stats', 'movement'], `${f.file} holds who it is and its numbers, no class`);
   }
 });
 
-test('the class files are valid and canonical; the jobs and townsfolk have outfits, the beasts and foes none', () => {
-  const files = readClasses(); assert.ok(files.length);
+test('the classes are the seven jobs, each with an outfit, in valid and canonical files', () => {
+  const files = readClasses();
+  assert.deepEqual(files.map(f => f.cls.id), ['archer', 'blackmage', 'dragoon', 'knight', 'summoner', 'valkyrie', 'whitemage']);
   for (const f of files) {
     assert.deepEqual(validateClass(f.raw), [], f.file);
     assert.equal(f.file, `data/classes/${f.cls.id}.json`, 'named by its id');
     assert.equal(readFileSync(join(ROOT, f.file), 'utf8'), classText(f.raw), `${f.file} is as a save would write it`);
     assert.deepEqual(Object.keys(f.raw), ['id', 'name', 'outfit', 'stats', 'movement']);
+    assert.ok(f.raw.outfit && typeof f.raw.outfit === 'object', `${f.file} has an outfit`);
   }
   const outfit = id => files.find(f => f.cls.id === id).cls.outfit;
-  assert.equal(outfit('knight').clothes, 'plate'); assert.equal(outfit('archer').held, 'bow'); assert.equal(outfit('farmer').clothes, 'overalls');
-  for (const id of ['goblin', 'wolf', 'slime', 'skeleton', 'orc', 'bandit', 'darkelf']) assert.equal(outfit(id), null, `${id} is a class only NPCs play`);
+  assert.equal(outfit('knight').clothes, 'plate'); assert.equal(outfit('archer').held, 'bow');
 });
 
 test('a class is clamped and filled out, its outfit cleaned, and its faults are named', () => {
   const u = normalizeClass({ id: 'Imp', level: 400, sprite: 'goblin', stats: { hp: -3, attack: 7.6, mp: 9 }, movement: { jump: 9 }, extra: 1 });
-  assert.equal(u.id, 'imp'); assert.equal(u.name, 'Imp'); assert.equal(u.outfit, null, 'no outfit unless it has one'); assert.equal(u.sprite, undefined);
+  assert.equal(u.id, 'imp'); assert.equal(u.name, 'Imp'); assert.deepEqual(u.outfit, DEFAULT_CLASS.outfit, 'the default outfit unless it has one'); assert.equal(u.sprite, undefined);
   assert.equal(u.stats.hp, 1); assert.equal(u.stats.attack, 8); assert.deepEqual(Object.keys(u.stats), ['hp', 'mp', 'attack', 'defense', 'accuracy', 'evasion', 'crit', 'critDamage', 'range', 'pattern', 'abilities']); assert.equal(u.stats.mp, 9); assert.deepEqual(u.stats.abilities, []); assert.equal(u.stats.range, 1); assert.equal(u.stats.pattern, 'melee');
   assert.equal(normalizeClass({ id: 'imp', stats: { pattern: 'Line' } }).stats.pattern, 'line');
   const o = normalizeClass({ id: 'imp', outfit: { clothes: 'plate', held: 'laser', build: 'tall', colours: { cloth: '#ABCDEF', skin: '#000000', steel: 'grey' } } }).outfit;
@@ -70,33 +69,36 @@ test('a class is clamped and filled out, its outfit cleaned, and its faults are 
   assert.equal(validateClass({ id: 'a', stats: { abilities: 'power' } }).length, 1, 'abilities are a list');
 });
 
-test('an NPC is who it is and its class', () => {
-  assert.deepEqual(normalizeUnit({ id: 'Captain', class: 'Knight', stats: { hp: 3 }, overrides: { stats: { hp: 900 } } }), { id: 'captain', name: 'Captain', class: 'knight' });
-  assert.deepEqual(normalizeUnit({ id: 'wolf', name: 'Wolf', stats: { hp: 32 }, movement: { move: 7 } }), { id: 'wolf', name: 'Wolf', class: 'wolf' }, 'a file from before classes plays as the class of its id');
-  assert.deepEqual(validateUnit({ id: 'a', class: 'knight' }), []);
-  assert.equal(validateUnit({ id: 'a' }).length, 1, 'an NPC names its class');
-  assert.equal(validateUnit({ id: 'a', class: 'knight' }, 'bosses').length, 1, 'an unknown group');
+test('an NPC is who it is and its own numbers, clamped and filled out like a class', () => {
+  const n = normalizeUnit({ id: 'Captain', class: 'Knight', stats: { hp: -3, attack: 7.6, pattern: 'Line' }, movement: { jump: 9 } });
+  assert.deepEqual(Object.keys(n), ['id', 'name', 'stats', 'movement']); assert.equal(n.id, 'captain'); assert.equal(n.name, 'Captain');
+  assert.equal(n.stats.hp, 1); assert.equal(n.stats.attack, 8); assert.equal(n.stats.pattern, 'line'); assert.equal(n.movement.jump, 6);
+  assert.deepEqual(normalizeUnit({ id: 'a' }).stats, DEFAULT_UNIT.stats, 'anything missing from the defaults');
+  assert.deepEqual(validateUnit({ id: 'a', stats: { hp: 30 } }), []);
+  assert.equal(validateUnit({ id: 'a', stats: { hp: 2.5 }, movement: { move: 40 } }).length, 2, 'its numbers are checked like a class\'s');
+  assert.equal(validateUnit({ id: 'a' }, 'bosses').length, 1, 'an unknown group');
 });
 
-test('NPCs and playable characters fight with their class\'s numbers; the rest with the defaults', () => {
+test('NPCs fight with their own numbers, playable characters with their class\'s; the rest with the defaults', () => {
   let heard = 0; const off = onUnitsChange(() => heard++);
   setClasses([{ id: 'beast', name: 'Beast', stats: { hp: 30, attack: 9, abilities: ['power'] }, movement: { move: 7, jump: 2 } }]);
-  setUnits([{ group: 'enemies', unit: { id: 'wolf', name: 'Wolf', class: 'beast' } }, { group: 'allies', unit: { id: 'lost', name: 'Lost', class: 'nobody' } }]);
-  const mine = [{ id: 'custom-a', name: 'Ada', class: 'beast' }, { id: 'custom-b', name: 'Bo', class: '' }];
+  setUnits([{ group: 'enemies', unit: { id: 'wolf', name: 'Wolf', stats: { hp: 32, abilities: ['power'] }, movement: { move: 6 } } }, { group: 'allies', unit: { id: 'beast', name: 'Beast NPC', stats: { hp: 5 } } }]);
+  const mine = [{ id: 'custom-a', name: 'Ada', class: 'beast' }, { id: 'custom-b', name: 'Bo', class: '' }, { id: 'custom-c', name: 'Cy', class: 'nobody' }];
   usePlayables({ get: id => mine.find(p => p.id === id) || null, list: () => mine });
-  assert.equal(getUnit('wolf').group, 'enemies'); assert.equal(unitFor('wolf').movement.move, 7); assert.equal(unitFor('wolf').stats.hp, 30); assert.deepEqual(unitFor('wolf').stats.abilities, ['power']);
-  const ada = unitFor('custom-a'); assert.ok(ada.playable && ada instanceof Character && !ada.fallback); assert.equal(ada.stats.attack, 9); assert.equal(ada.name, 'Ada');
+  assert.equal(getUnit('wolf').group, 'enemies'); assert.equal(unitFor('wolf').movement.move, 6); assert.equal(unitFor('wolf').stats.hp, 32); assert.deepEqual(unitFor('wolf').stats.abilities, ['power']);
+  assert.equal(unitFor('wolf').class, '', 'an NPC takes no class'); assert.equal(unitFor('beast').stats.hp, 5, 'an NPC sharing a class\'s id keeps its own numbers');
+  const ada = unitFor('custom-a'); assert.ok(ada.playable && ada instanceof Character && !ada.fallback); assert.equal(ada.stats.attack, 9); assert.equal(ada.name, 'Ada'); assert.equal(ada.class, 'beast');
   const bo = unitFor('custom-b'); assert.ok(bo.playable && bo.fallback); assert.deepEqual(bo.stats, DEFAULT_UNIT.stats);
+  const cy = unitFor('custom-c'); assert.ok(cy.classMissing && !cy.fallback); assert.deepEqual(cy.stats, DEFAULT_UNIT.stats);
   assert.ok(getClass('beast') instanceof UnitClass);
   setClasses([{ id: 'beast', name: 'Beast', stats: { hp: 40 }, movement: { move: 4 } }]);
-  assert.equal(unitFor('wolf').stats.hp, 40, 'a change to the class reaches its NPCs'); assert.equal(unitFor('custom-a').stats.hp, 40, 'and its playable characters');
+  assert.equal(unitFor('custom-a').stats.hp, 40, 'a change to the class reaches its playable characters'); assert.equal(unitFor('wolf').stats.hp, 32, 'and no NPC');
   assert.ok(heard >= 4, 'a class change is a unit change');
-  const lost = unitFor('lost'); assert.ok(lost.classMissing && !lost.fallback); assert.deepEqual(lost.stats, DEFAULT_UNIT.stats);
   const f = unitFor('nobody-at-all'); assert.ok(f.fallback && !f.playable); assert.deepEqual(f.movement, DEFAULT_UNIT.movement);
   assert.ok(getUnit('wolf') instanceof Enemy && getUnit('wolf') instanceof Unit); assert.equal(getUnit('wolf').side, 'enemy');
   assert.equal(f.side, 'player'); assert.equal(f.group, 'allies');
-  assert.equal(unitText(getUnit('wolf')), unitText(getUnit('wolf').toJSON()), 'a Unit writes as its file, not its class numbers');
-  assert.deepEqual(listUnits().map(u => u.id), ['custom-a', 'lost', 'wolf'], 'the NPCs, and the playable characters that have a class');
+  assert.equal(unitText(getUnit('wolf')), unitText({ id: 'wolf', name: 'Wolf', stats: { hp: 32, abilities: ['power'] }, movement: { move: 6 } }), 'a Unit writes as its file');
+  assert.deepEqual(listUnits().map(u => u.id), ['custom-a', 'beast', 'custom-c', 'wolf'], 'the NPCs, and the playable characters that have a class');
   off(); usePlayables({ get: () => null, list: () => [] }); setUnits([]); setClasses([]);
 });
 
@@ -108,18 +110,18 @@ test('a playable character wears its class\'s outfit over its own body', () => {
   assert.equal(worn.outfit.torso, 'plate', 'the class\'s clothes'); assert.equal(worn.pal.A, '#112233', 'in the class\'s colours'); assert.ok(worn.weapon, 'with the class\'s spear');
   assert.equal(worn.spec.clothes, 'gown', 'its own spec is kept, so it can leave the class'); assert.equal(worn.spec.class, 'sentry');
   assert.notEqual(worn.look, own.look, 'a different look to draw');
-  assert.equal(bare.look, own.look, 'a class with no outfit leaves its own');
+  assert.equal(bare.outfit.torso, fromSpec({ ...body, clothes: 'vest', colours: {} }).outfit.torso, 'a class whose file has no outfit dresses in the default one');
   setClasses([]);
 });
 
 test('the stores write canonical files, move an NPC between sides and delete them', () => {
   const root = mkdtempSync(join(tmpdir(), 'hexwright-units-'));
   try {
-    const { file } = writeUnit('allies', { id: 'imp', name: 'Imp', class: 'goblin' }, root);
+    const { file } = writeUnit('allies', { id: 'imp', name: 'Imp', stats: { hp: 9 } }, root);
     assert.equal(file, 'data/npcs/allies/imp.json');
-    writeUnit('enemies', { id: 'imp', name: 'Imp', class: 'orc' }, root);
-    const all = readUnits(root); assert.equal(all.length, 1); assert.equal(all[0].group, 'enemies'); assert.equal(all[0].unit.class, 'orc');
-    assert.throws(() => writeUnit('enemies', { id: '../../evil', class: 'goblin' }, root), /id must be/);
+    writeUnit('enemies', { id: 'imp', name: 'Imp', stats: { hp: 12 } }, root);
+    const all = readUnits(root); assert.equal(all.length, 1); assert.equal(all[0].group, 'enemies'); assert.equal(all[0].unit.stats.hp, 12);
+    assert.throws(() => writeUnit('enemies', { id: '../../evil' }, root), /id must be/);
     assert.equal(deleteUnit('enemies', 'imp', root), true); assert.equal(deleteUnit('enemies', 'imp', root), false);
     assert.throws(() => deleteUnit('enemies', '../x', root));
     assert.equal(writeClass({ id: 'goblin', name: 'Goblin', stats: { hp: 22 } }, root).file, 'data/classes/goblin.json');

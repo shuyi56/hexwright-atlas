@@ -1,5 +1,23 @@
 {
   "id": "elfranger",
   "name": "Elf Ranger",
-  "class": "elfranger"
+  "stats": {
+    "hp": 38,
+    "mp": 12,
+    "attack": 12,
+    "defense": 3,
+    "accuracy": 105,
+    "evasion": 14,
+    "crit": 15,
+    "critDamage": 160,
+    "range": 5,
+    "pattern": "ranged",
+    "abilities": [
+      "true"
+    ]
+  },
+  "movement": {
+    "move": 5,
+    "jump": 2
+  }
 }

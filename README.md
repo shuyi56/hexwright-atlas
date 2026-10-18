@@ -302,26 +302,25 @@ wind-up, strike).
 
 ### Classes, playable characters and NPCs
 
-How everyone plays is kept apart from how they look. A **class** is a kind of fighter, such as Knight, Archer or
-Goblin: its stats, abilities and movement, and the **outfit** it wears (clothes, hat, gear and their colours, the
-character maker's own choices). Everyone who can stand on a map is one of two kinds:
+Everyone who can stand on a map is one of two kinds:
 
-- **Playable characters** are the ones made in the character maker. Each picks a class there and wears its outfit
-  over its own build, hair, ears, beard and skin, and fights with the class's numbers. Change a class's outfit and
-  every playable character of it is dressed again.
+- **Playable characters** are the ones made in the character maker. Each can take a **class**, one of seven jobs:
+  Knight, Archer, Dragoon, Black Mage, White Mage, Summoner or Valkyrie. A class is an **outfit** (clothes, hat,
+  gear and their colours, the character maker's own choices) and the numbers that go with it: stats, abilities and
+  movement. A playable character wears its class's outfit over its own build, hair, ears, beard and skin, and fights
+  with the class's numbers. Change a class and every playable character of it changes with it.
 - **NPCs** are the roster's hand-drawn figures: the townsfolk, the jobs, the elves and the enemies. Each keeps its
-  own look and names the class whose numbers it fights with. Classes only NPCs play, such as Goblin or Wolf, have no
-  outfit.
+  own look and its own numbers, and takes no class.
 
 ```
-data/classes/  alchemist.json  archer.json  bandit.json  ...  knight.json  ...  wolf.json   (one per class)
+data/classes/  archer.json  blackmage.json  dragoon.json  knight.json  summoner.json  valkyrie.json  whitemage.json
 data/npcs/
-  allies/      archer.json  blackmage.json  dragoon.json  ...  (the townsfolk, the jobs and the elves)
+  allies/      alchemist.json  archer.json  blackmage.json  ...  (the townsfolk, the jobs and the elves)
   enemies/     bandit.json  darkelf.json  goblin.json  orc.json  skeleton.json  slime.json  wolf.json
 ```
 
-A class file is named by the class's id and holds its name, its outfit (or `null`), its stats and its movement
-(Move: tiles a turn; Jump: height levels a step can climb or drop):
+A class file is named by the class's id and holds its name, its outfit, its stats and its movement (Move: tiles a
+turn; Jump: height levels a step can climb or drop):
 
 ```json
 { "id": "knight", "name": "Knight",
@@ -332,13 +331,11 @@ A class file is named by the class's id and holds its name, its outfit (or `null
   "movement": { "move": 3, "jump": 1 } }
 ```
 
-An NPC file is named by the NPC's id, which is the id of its sprite, and names its class:
-`{ "id": "goblin", "name": "Goblin", "class": "goblin" }`. A playable character's class is kept with it in the
-character library (and in any map it stands on), as `"class": "knight"` in its spec.
-
-Every NPC started with a class of its own id holding the numbers it had before classes, so every map plays as it
-did. The jobs and townsfolk classes got outfits matching their figures, so a playable character can be a Knight or a
-Farmer too. The stats:
+An NPC file is named by the NPC's id, which is the id of its sprite, and holds its name and the same stats and
+movement sections: `{ "id": "goblin", "name": "Goblin", "stats": { "hp": 22, ... }, "movement": { "move": 5, "jump": 2 } }`.
+The Knight NPC and the Knight class are separate files, so tuning one leaves the other alone. A playable
+character's class is kept with it in the character library (and in any map it stands on), as `"class": "knight"` in
+its spec. The stats:
 
 | Stat | What it does |
 | --- | --- |
@@ -373,27 +370,31 @@ archers, monk, wolves and dark elf crit most often (12 to 20%), the thief and th
 `src/data/classes.ts` defines the fields, their ranges and defaults, and normalizes and validates a class and its
 outfit (`src/characters/choices.js` splits the maker's choices into body and outfit); `src/data/units.ts` does the
 same for an NPC, and is told about the playable characters by the character library. A playable character with no
-class plays with the defaults, and so does an NPC whose class has no file. The registry holds each unit as a
-`Character` or an `Enemy`, both a `Unit` carrying its class's numbers, so the battle never has to look at classes. `src/battle/actions.ts` holds the formulas and the two kinds of
+class plays with the defaults, and so does one whose class has no file. The registry holds each unit as a
+`Character` or an `Enemy`, both a `Unit` carrying its numbers, its own or its class's, so the battle never has to
+look at classes. `src/battle/actions.ts` holds the formulas and the two kinds of
 action, `StrikeAction` and `HealAction`; `src/battle/abilities.ts` has the plain Attack and turns each skill into the
 action it plays. Adding a number means adding a line to `FIELDS` in `classes.ts`; adding an ability, a file in
 `data/skills/` (or **New skill…** in the skill editor).
 
-**Classes** in the module rail opens `classes.html`, the class editor:
+**Classes** in the module rail opens `classes.html`, the class editor, which holds the NPCs too:
 
-- **Cards:** the classes down the side, grouped by the side their players fight on, and a card for the picked one:
-  its outfit walking (turn it with ⟲ ⟳) on a plain body or on any playable character of the class, its name, the
-  outfit's choices and colours as chips and colour pickers (or **Give it an outfit** for a class only NPCs play),
-  every number with a bar against the strongest class, the attack pattern, the abilities (each with its MP cost,
-  what it does and how many uses the class's MP holds, and how its blows fare against the other side on average),
-  and who plays it, playable characters and NPCs. Changed values are outlined in brass.
-- **Table:** every class in one sortable grid for balancing numbers side by side.
-- **New class…** starts one from the defaults or a copy of another; deleting a class that someone plays warns first.
+- **Cards:** the classes, the NPC allies and the NPC enemies down the side, and a card for the picked one. A class's
+  card has its outfit walking (turn it with ⟲ ⟳) on a plain body or on any playable character of the class, the
+  outfit's choices and colours as chips and colour pickers, and who plays it. An NPC's card has its own figure
+  walking and the side it fights for. Both have every number with a bar against the strongest, the attack pattern,
+  and the abilities (each with its MP cost, what it does and how many uses the MP holds, and how its blows fare
+  against the other side on average). Changed values are outlined in brass.
+- **Table:** every class and NPC in one sortable grid for balancing numbers side by side.
+- **New class…** starts one from the defaults or a copy of another class or NPC's numbers; deleting a class that
+  someone plays warns first.
 
 Changes are drafts until **Save** (`Ctrl+S`), which on the dev server (`npm run dev`) writes the files through the
-Hexwright bridge: `GET /__hexwright/classes`, `PUT` and `DELETE /__hexwright/classes/<id>`. Every write is
-normalized, so the files keep one shape. A tactical view, map editor or character maker open in another tab picks the
-change up straight away. The built site (GitHub Pages) shows the same data read-only, with **Download** for a file.
+Hexwright bridge: `GET /__hexwright/classes`, `PUT` and `DELETE /__hexwright/classes/<id>`, and
+`GET /__hexwright/npcs`, `PUT` and `DELETE /__hexwright/npcs/<group>/<id>` (moving an NPC to the other side moves its
+file). Every write is normalized, so the files keep one shape. A tactical view, map editor or character maker open in
+another tab picks the change up straight away. The built site (GitHub Pages) shows the same data read-only, with
+**Download** for a file.
 
 The character maker has a **Class** row at the top: pick one and the character is dressed in its outfit, and the
 maker shows only what stays the character's own (build, hair, ears, beard, skin and hair colour); **None** gives it

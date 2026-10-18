@@ -11,7 +11,7 @@
 <body>
 <div class="ub">
   <header class="ub-bar">
-    <div class="ub-title"><span class="eyebrow">class data</span><h1>Classes</h1></div>
+    <div class="ub-title"><span class="eyebrow">classes and NPCs</span><h1>Classes</h1></div>
     <div class="ub-views" role="tablist" aria-label="View">
       <button class="chip" role="tab" id="viewCards" aria-pressed="true" aria-selected="true">Cards</button>
       <button class="chip" role="tab" id="viewTable" aria-pressed="false" aria-selected="false">Table</button>
@@ -19,14 +19,14 @@
     <div class="ub-actions">
       <span class="ub-mode" id="mode"></span>
       <button class="btn" id="newClass">New class…</button>
-      <button class="btn" id="download" title="Download the selected class's JSON file">Download</button>
+      <button class="btn" id="download" title="Download the selected file">Download</button>
       <button class="btn" id="revertAll">Revert all</button>
-      <button class="btn btn-brass" id="saveAll" title="Save every changed class (Ctrl+S)">Save</button>
+      <button class="btn btn-brass" id="saveAll" title="Save every changed file (Ctrl+S)">Save</button>
     </div>
   </header>
   <main class="ub-main" id="main">
-    <aside class="ub-list" aria-label="Classes">
-      <input class="ub-search" id="search" type="search" placeholder="Filter by name or id" aria-label="Filter classes" spellcheck="false" autocomplete="off">
+    <aside class="ub-list" aria-label="Classes and NPCs">
+      <input class="ub-search" id="search" type="search" placeholder="Filter by name or id" aria-label="Filter classes and NPCs" spellcheck="false" autocomplete="off">
       <div class="ub-rows" id="rows"></div>
     </aside>
     <section class="ub-detail" id="detail" aria-live="polite"></section>
