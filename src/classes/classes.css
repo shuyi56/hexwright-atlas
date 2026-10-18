@@ -1,4 +1,4 @@
-/* ================= the unit data page =================
+/* ================= the class editor (and the skill editor, which borrows its parts) =================
    The tile editor's dark table and brass rims (main.css supplies the colours, buttons and chips). */
 .ub{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px;padding:12px 16px 16px}
 .ub-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
@@ -136,3 +136,20 @@
 .ub-ability-row{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--table)}
 .ub-ability-row .ub-ability-pick b{font:600 14px var(--ui);color:var(--vellum)}
 .ub-ability-row .chip{margin-left:auto}
+
+/* the dialogs sit outside .ub, so their fields are styled here too */
+.ub-dialog select,.ub-dialog input{background:var(--table);border:1px solid var(--line);color:var(--vellum);font:500 14px var(--ui);padding:5px 8px;border-radius:3px}
+.ub-dialog input:invalid{border-color:var(--wax)}
+/* the class editor: the outfit, as the character maker's chips and colours */
+.ub-outfit{display:flex;flex-direction:column;gap:8px}
+.ub-outfit.changed .ub-section{color:var(--brass-2)}
+.ub-choice{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;align-items:start}
+.ub-choice .ub-value-name{padding-top:5px;font-size:12.5px}
+.ub-chips{display:flex;flex-wrap:wrap;gap:5px}
+.ub-colours{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin-top:4px}
+.ub-colour{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
+.ub-colour input{width:34px;height:24px;padding:0;border:1px solid var(--line);border-radius:3px;background:none;cursor:pointer}
+/* the class editor: who plays the class */
+.ub-users{display:flex;flex-direction:column;gap:6px}
+.ub-user-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.ub-user-list .ub-link{margin-left:0;font-size:15px}

@@ -1,5 +1,5 @@
 import '../styles/main.css';
-import '../units/units.css';
+import '../classes/classes.css';
 import './skills.css';
 import '../data/unit-files.js';
 import '../data/skill-files.js';
@@ -11,20 +11,20 @@ import { abilityFx, createFx, drawFx, emit, stepFx, tintRamp } from '../tactical
 import { characterById } from '../characters/library.js';
 import { attackOf, render } from '../characters/roster.js';
 import { H as FH, W as FW } from '../characters/pixels.js';
-import { mountRail } from '../ui/rail.js';
+import { goFromDataPage, mountRail } from '../ui/rail.js';
 
 /* ================= the skill editor =================
    Every skill in data/skills/ (src/data/skills.ts) to read and change: a list down the side, and a card per skill
    with its name and kind, its MP cost and numbers (power and how much Defense it ignores for a blow, the base and
    the share of Attack for a heal, whether it never misses), its particles (the effect, its colour, size and count)
    playing between two figures, and who in the unit data has it with what it comes to for them. Changes are drafts
-   until saved, as on the unit data page: on the dev server Save writes the files through the Hexwright bridge
-   (tools/vite-hexwright.js), and the tactical view and unit data page in any open tab pick the new numbers up at
+   until saved, as in the class editor: on the dev server Save writes the files through the Hexwright bridge
+   (tools/vite-hexwright.js), and the tactical view and class editor in any open tab pick the new numbers up at
    once; a built copy of the site can read the skills and download a skill's file, but not save. */
 const $ = id => document.getElementById(id);
 const WRITABLE = import.meta.env.DEV;
-/* the module rail: the unit data page is a page of its own, every other module lives on the atlas page */
-mountRail(id => { if (id === 'units') location.href = './units.html'; else if (id !== 'skills') location.href = id === 'atlas' ? './index.html' : `./index.html#${id}`; }, 'skills');
+/* the module rail: the class editor is a page of its own, every other module lives on the atlas page */
+mountRail(goFromDataPage('skills'), 'skills');
 const SAVE_URL = id => `/__hexwright/skills/${id}`;
 
 /* id -> { draft, saved }: saved is null for a skill not yet written */
@@ -148,13 +148,13 @@ const rampOf = (id, tint) => (id === 'none' ? [] : tint ? tintRamp(tint, OWN_RAM
 /* who has it, and what it comes to for each against the other side on average next to a plain attack */
 function usersSection(e) {
   const d = e.draft, a = asAbility(d), users = usersOf(d.id);
-  if (!users.length) return `<section class="sk-users"><h3 class="ub-section">Who has it</h3><p class="ub-dim">No unit has it yet. Give it to one on the <a class="ub-link" href="./units.html">unit data page</a>.</p></section>`;
+  if (!users.length) return `<section class="sk-users"><h3 class="ub-section">Who has it</h3><p class="ub-dim">No unit has it yet. Give it to a class or an NPC in the <a class="ub-link" href="./classes.html">class editor</a>.</p></section>`;
   const all = listUnits(), avg = (list, f) => (list.length ? Math.round(list.reduce((n, o) => n + f(o), 0) / list.length) : 0);
   const rows = users.map(u => {
     const st = u.stats, foes = all.filter(o => o.group !== u.group).map(o => o.stats), uses = d.cost ? Math.floor(st.mp / d.cost) : null;
     const plain = avg(foes, o => blowOf(ATTACK, st, o).amount), with_ = avg(foes, o => blowOf(a, st, o).amount), hit = a.sure ? 100 : avg(foes, o => blowOf(a, st, o).chance);
     const what = a.heal ? `<td colspan="3">heals ${healOf(st.attack, a)}</td>` : `<td>${plain}</td><td><b>${with_}</b></td><td>${hit}%</td>`;
-    return `<tr><th scope="row"><a href="./units.html?unit=${encodeURIComponent(u.id)}">${esc(u.name)}</a></th><td>${st.attack}</td><td>${st.mp}</td><td${uses === 0 ? ' class="ub-warn"' : ''}>${uses ?? '∞'}</td>${what}</tr>`;
+    return `<tr><th scope="row"><a href="./classes.html?${u.playable ? `class=${encodeURIComponent(u.class)}` : `npc=${encodeURIComponent(u.id)}`}" title="${esc(u.playable ? `playable, ${u.class} class` : 'NPC')}">${esc(u.name)}</a></th><td>${st.attack}</td><td>${st.mp}</td><td${uses === 0 ? ' class="ub-warn"' : ''}>${uses ?? '∞'}</td>${what}</tr>`;
   }).join('');
   return `<section class="sk-users"><h3 class="ub-section">Who has it</h3>
     <div class="ub-table-scroll"><table class="sk-table"><thead><tr><th scope="col">Unit</th><th scope="col">Atk</th><th scope="col">MP</th><th scope="col">Uses</th>${a.heal ? '<th scope="col" colspan="3">Restores</th>' : '<th scope="col" title="a plain attack against the other side, on average">Attack</th><th scope="col" title="this skill against the other side, on average">Skill</th><th scope="col">Hit</th>'}</tr></thead><tbody>${rows}</tbody></table></div>
@@ -226,7 +226,7 @@ let anim = 0, P = null;
 /* the sprites to show: the first unit with the skill (else a knight), and a foe or an ally of its side */
 function castOf(d) {
   const units = listUnits(), user = usersOf(d.id)[0] || units.find(u => u.id === 'knight') || units[0];
-  const side = user?.group || 'characters', heal = d.kind === 'heal';
+  const side = user?.group || 'allies', heal = d.kind === 'heal';
   const target = units.find(u => u.id !== user?.id && (heal ? u.group === side : u.group !== side)) || user;
   return [user, target].map(u => characterById(u?.id || 'villager') || characterById('villager'));
 }

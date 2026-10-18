@@ -1,6 +1,7 @@
 import { METHODS } from '../src/editor/api-spec.js';
+import { deleteClass, readClasses, writeClass } from './classes-store.mjs';
+import { deleteUnit, readUnits, writeUnit } from './npcs-store.mjs';
 import { deleteSkill, readSkills, writeSkill } from './skills-store.mjs';
-import { deleteUnit, readUnits, writeUnit } from './units-store.mjs';
 
 /* ================= Hexwright bridge: Vite plugin (server side) =================
    Lets anything that can speak HTTP drive the tile editor open in a real browser:
@@ -9,16 +10,21 @@ import { deleteUnit, readUnits, writeUnit } from './units-store.mjs';
      GET  /__hexwright/spec             the method list with JSON schemas
      POST /__hexwright/api/<method>     body = params, answer = { ok, result } or { ok: false, error }
      POST /__hexwright/call             { method, params, page?, timeoutMs? }
-     GET    /__hexwright/units                every unit data file (data/units/), normalized
-     PUT    /__hexwright/units/<group>/<id>   body = the unit; writes data/units/<group>/<id>.json
-     DELETE /__hexwright/units/<group>/<id>   removes that file
+     GET    /__hexwright/classes              every class data file (data/classes/), normalized
+     PUT    /__hexwright/classes/<id>         body = the class; writes data/classes/<id>.json
+     DELETE /__hexwright/classes/<id>         removes that file
+     GET    /__hexwright/npcs                 every NPC data file (data/npcs/), normalized, with its group
+     PUT    /__hexwright/npcs/<group>/<id>    body = the NPC; writes data/npcs/<group>/<id>.json, and drops it from
+                                              the other group
+     DELETE /__hexwright/npcs/<group>/<id>    removes that file
      GET    /__hexwright/skills               every skill data file (data/skills/), normalized
      PUT    /__hexwright/skills/<id>          body = the skill; writes data/skills/<id>.json
      DELETE /__hexwright/skills/<id>          removes that file
 
    Calls travel over Vite's HMR websocket to src/editor/bridge.js in the page, which runs them on
-   window.hexwright. The MCP server in mcp/ is a thin client of these endpoints. The units endpoints are how the
-   unit data page (units.html) saves; they touch only files under data/units/ (tools/units-store.mjs). The skills
+   window.hexwright. The MCP server in mcp/ is a thin client of these endpoints. The classes and npcs endpoints are
+   how the class editor (classes.html) saves; they touch only files under data/classes/ (tools/classes-store.mjs)
+   and data/npcs/ (tools/npcs-store.mjs). The skills
    endpoints are the same for the skill editor (skills.html) and data/skills/ (tools/skills-store.mjs). Dev server
    only. */
 export default function hexwrightBridge() {
@@ -53,13 +59,20 @@ export default function hexwrightBridge() {
           const path = (req.url || '/').split('?')[0].replace(/\/+$/, '');
           if (path === '/pages' && req.method === 'GET') { live().forEach(p => p.client.send('hexwright:ping', {})); return send(res, 200, { root: server.config.root, pages: live().map(pub) }); }
           if (path === '/spec' && req.method === 'GET') return send(res, 200, { methods: METHODS });
-          if (path === '/units' && req.method === 'GET') return send(res, 200, { ok: true, units: readUnits(server.config.root).map(({ group, file, unit }) => ({ group, file, unit })) });
-          const um = path.match(/^\/units\/([a-z]+)\/([a-z0-9-]+)$/);
-          if (um && req.method === 'PUT') {
-            const raw = await body(req); if (raw.id !== um[2]) return send(res, 400, { ok: false, error: { message: `the body's id "${raw.id}" does not match the path's "${um[2]}"` } });
-            try { return send(res, 200, { ok: true, ...writeUnit(um[1], raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
+          if (path === '/classes' && req.method === 'GET') return send(res, 200, { ok: true, classes: readClasses(server.config.root).map(({ file, cls }) => ({ file, cls })) });
+          const cm = path.match(/^\/classes\/([a-z0-9-]+)$/);
+          if (cm && req.method === 'PUT') {
+            const raw = await body(req); if (raw.id !== cm[1]) return send(res, 400, { ok: false, error: { message: `the body's id "${raw.id}" does not match the path's "${cm[1]}"` } });
+            try { return send(res, 200, { ok: true, ...writeClass(raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
           }
-          if (um && req.method === 'DELETE') return send(res, 200, { ok: true, deleted: deleteUnit(um[1], um[2], server.config.root) });
+          if (cm && req.method === 'DELETE') return send(res, 200, { ok: true, deleted: deleteClass(cm[1], server.config.root) });
+          if (path === '/npcs' && req.method === 'GET') return send(res, 200, { ok: true, npcs: readUnits(server.config.root).map(({ group, file, unit }) => ({ group, file, unit })) });
+          const nm = path.match(/^\/npcs\/([a-z]+)\/([a-z0-9-]+)$/);
+          if (nm && req.method === 'PUT') {
+            const raw = await body(req); if (raw.id !== nm[2]) return send(res, 400, { ok: false, error: { message: `the body's id "${raw.id}" does not match the path's "${nm[2]}"` } });
+            try { return send(res, 200, { ok: true, ...writeUnit(nm[1], raw, server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); }
+          }
+          if (nm && req.method === 'DELETE') { try { return send(res, 200, { ok: true, deleted: deleteUnit(nm[1], nm[2], server.config.root) }); } catch (err) { return send(res, 422, { ok: false, error: { message: err.message } }); } }
           if (path === '/skills' && req.method === 'GET') return send(res, 200, { ok: true, skills: readSkills(server.config.root).map(({ file, skill }) => ({ file, skill })) });
           const sm = path.match(/^\/skills\/([a-z0-9-]+)$/);
           if (sm && req.method === 'PUT') {

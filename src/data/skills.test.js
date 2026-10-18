@@ -5,17 +5,20 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { ATTACK, abilityOf, blowOf, describe, healOf, listAbilities } from '../battle/abilities.ts';
 import { createBattle, strike } from '../battle/state.ts';
-import { ROOT, readUnits } from '../../tools/units-store.mjs';
+import { ROOT } from '../../tools/npcs-store.mjs';
+import { readClasses } from '../../tools/classes-store.mjs';
+import { readUnits } from '../../tools/npcs-store.mjs';
 import { deleteSkill, readSkills, writeSkill } from '../../tools/skills-store.mjs';
 import { HealAction, StrikeAction } from '../battle/actions.ts';
 import { DEFAULT_SKILLS, DamageSkill, HealSkill, Skill, getSkill, listSkills, normalizeSkill, setSkills, skillFrom, skillText, validateSkill } from './skills.ts';
 
-test('the skill files are canonical, are the stock five, and every unit names one of them or none', () => {
+test('the skill files are canonical, are the stock five, and every class and NPC names one of them or none', () => {
   const files = readSkills(ROOT);
   for (const { file, raw } of files) assert.equal(readFileSync(join(ROOT, file), 'utf8'), skillText(raw), `${file} is canonical`);
   assert.deepEqual(files.map(f => f.skill).sort((a, b) => a.id.localeCompare(b.id)), [...DEFAULT_SKILLS].sort((a, b) => a.id.localeCompare(b.id)));
   const ids = new Set(files.map(f => f.skill.id));
-  for (const { unit } of readUnits(ROOT)) for (const id of unit.stats.abilities) assert.ok(ids.has(id), `${unit.id}'s ${id} is a skill`);
+  for (const { cls } of readClasses(ROOT)) for (const id of cls.stats.abilities) assert.ok(ids.has(id), `the ${cls.id} class's ${id} is a skill`);
+  for (const { unit } of readUnits(ROOT)) for (const id of unit.stats.abilities) assert.ok(ids.has(id), `the ${unit.id} NPC's ${id} is a skill`);
 });
 
 test('a skill is normalized into one shape and its mistakes are told', () => {

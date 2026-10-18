@@ -4,14 +4,14 @@ import { closeTown, openTown } from '../town/view.js';
 import { makerOpen } from '../characters/maker.js';
 import { fromJSON } from '../editor/model.ts';
 import { layout, renderTiles } from '../editor/render.js';
-import { MODULE_IDS, mountRail } from './rail.js';
+import { DATA_PAGES, MODULE_IDS, mountRail } from './rail.js';
 import { $ } from './state.js';
 
 /* ================= the app shell =================
    The atlas page holds every module as a layer over the realm map: the map editor, and over it the tactical view,
    the town view and the character maker. The rail (ui/rail.js) moves between them: picking one closes the layers
    above the editor and opens the one asked for, and the module showing is kept in the address (#editor,
-   #tactical…), so a reload or a link from the unit data page lands on it. The back buttons inside each module
+   #tactical…), so a reload or a link from the class editor lands on it. The back buttons inside each module
    still step down one layer, and the rail follows. The Scenes layer lists the bundled maps (scenes/ and the
    editor's test fixture) and opens each in the view it was laid out for, with the editor under it. */
 
@@ -41,7 +41,7 @@ function ensureEditor() {
 }
 
 function go(id) {
-  if (id === 'units' || id === 'skills') { location.href = `./${id}.html`; return; }
+  if (DATA_PAGES.includes(id)) { location.href = `./${id}.html`; return; }
   if (!MODULE_IDS.includes(id) || id === showing()) return;
   if (id === 'atlas') { closeAbove(false); scenesEl.hidden = true; $('map').focus({ preventScroll: true }); }
   else if (id === 'scenes') { closeAbove(false); showScenes(); }
@@ -53,7 +53,7 @@ function go(id) {
   }
 }
 
-const setActive = mountRail(go, 'atlas', { skip: ON_SCENE_PAGE ? ['units', 'skills'] : [] });
+const setActive = mountRail(go, 'atlas', { skip: ON_SCENE_PAGE ? DATA_PAGES : [] });
 function sync() {
   const id = showing(); setActive(id);
   if (ON_SCENE_PAGE) return;

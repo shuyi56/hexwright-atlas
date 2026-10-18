@@ -1,159 +1,134 @@
-/* ================= unit data: what a character or enemy can do =================
-   The roster (characters/) says how everyone looks; this says how they play: how much damage they take and deal,
-   how much of it their Defense turns aside, how surely they hit (Accuracy) and dodge (Evasion), how often their blows
-   are critical (Crit, in percent) and for how much (Crit Damage, a percent of the damage), the MP their abilities
-   spend, how many tiles away they can strike, how far they move and how high they jump. Each unit is one JSON file
-   under data/units/, in characters/ or enemies/, named by its id, which is the id of the sprite it plays as:
+/* ================= units: who fights, and with what numbers =================
+   Everyone who can stand on a map is one of two kinds:
 
-     data/units/enemies/goblin.json
-     { "id": "goblin", "name": "Goblin",
-       "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "abilities": [] },
-       "movement": { "move": 5, "jump": 2 } }
+   - A playable character, made in the character maker (characters/library.js). It names a class
+     (data/classes.ts): one of the jobs, such as Knight or Black Mage. It wears that class's outfit over its own
+     body and fights with the class's numbers. The library hands them to the registry below with usePlayables.
+   - An NPC: a figure of the roster (characters/), drawn by hand: the townsfolk, the elves, the jobs and the
+     enemies. It keeps its own look and its own numbers, in the same stats and movement sections a class has. Each
+     is one JSON file under data/npcs/, in allies/ or enemies/ by the side it fights on, named by its id, which is
+     the id of its sprite:
 
-   How the numbers play in a fight is in src/battle/actions.ts; what each ability does is in data/skills/
-   (src/data/skills.ts).
+       data/npcs/enemies/goblin.json
+       { "id": "goblin", "name": "Goblin",
+         "stats": { "hp": 22, "mp": 0, "attack": 7, "defense": 2, "accuracy": 85, "evasion": 15, "crit": 8, "critDamage": 150, "range": 1, "pattern": "melee", "abilities": [] },
+         "movement": { "move": 5, "jump": 2 } }
 
-   The attack pattern says which tiles an attack reaches (src/tactical/attack.js): melee, the four tiles beside the
-   unit and not the diagonals, whatever its range; line, straight out along the grid in the four directions up to
-   its range; ranged, every tile within its range in steps along the grid.
-
-   A file is read as UnitData (normalizeUnit puts it in canonical form). Characters and enemies have the same fields,
-   so both are a Unit; the registry holds each as a Character or an Enemy by its group, which also says the side it
-   fights on.
+   A class change reaches every playable character of that class. The registry holds each unit as a Character (the
+   player's side) or an Enemy, both a Unit carrying its numbers, so the battle reads stats and movement from it
+   without knowing about classes.
 
    Pure (no DOM, no Vite), so Node tools, tests and the browser share it. In the browser data/unit-files.js loads
-   the files into the registry below; on the dev server the unit data page (units.html) writes them back through
-   the Hexwright bridge (tools/units-store.mjs). A sprite with no file (a custom character, say) plays with
-   DEFAULT_UNIT. */
-import { NO_SKILL } from './skills.ts';
+   the NPC files into the registry; on the dev server the class editor (classes.html) writes them back through the
+   Hexwright bridge (tools/npcs-store.mjs). A sprite that is neither (a made character with no class, say) plays
+   with DEFAULT_UNIT, and so does a playable character whose class has no file. */
+import { DEFAULT_MOVEMENT, DEFAULT_STATS, ID_RE, SECTIONS, getClass, movementOf, objectOf, onClassesChange, sectionErrors, statsOf } from './classes.ts';
+import type { AttackPattern, CombatStats, UnitMovement, UnitStats } from './classes.ts';
 
-type UnitGroup = 'characters' | 'enemies';
+type UnitGroup = 'allies' | 'enemies';
 type Side = 'player' | 'enemy';
-type AttackPattern = 'melee' | 'line' | 'ranged';
-/* the numbers a unit fights with, as a blow (battle/actions.ts) reads them */
-interface CombatStats { attack: number; defense: number; accuracy: number; evasion: number; crit: number; critDamage: number }
-interface UnitStats extends CombatStats { hp: number; mp: number; range: number; pattern: AttackPattern; abilities: string[] }
-interface UnitMovement { move: number; jump: number }
-/* a unit as its file holds it, in canonical form */
+/* an NPC as its file holds it, in canonical form */
 interface UnitData { id: string; name: string; stats: UnitStats; movement: UnitMovement }
-type Section = keyof Pick<UnitData, 'stats' | 'movement'>;
-type Field<K> = readonly [key: K, label: string, min: number, max: number, def: number];
 
-const GROUPS: readonly UnitGroup[] = ['characters', 'enemies'];
-const GROUP_LABEL: Readonly<Record<UnitGroup, string>> = { characters: 'Characters', enemies: 'Enemies' };
-/* every number a unit has, by section: [key, label, min, max, default] */
-const FIELDS: { readonly stats: readonly Field<Exclude<keyof UnitStats, 'pattern' | 'abilities'>>[]; readonly movement: readonly Field<keyof UnitMovement>[] } = {
-  stats: [
-    ['hp', 'HP', 1, 999, 30],
-    ['mp', 'MP', 0, 999, 0],
-    ['attack', 'Attack', 0, 99, 8],
-    ['defense', 'Defense', 0, 99, 2],
-    ['accuracy', 'Accuracy', 0, 200, 90],
-    ['evasion', 'Evasion', 0, 99, 5],
-    ['crit', 'Crit %', 0, 100, 5],
-    ['critDamage', 'Crit Damage %', 100, 400, 150],
-    ['range', 'Range', 1, 8, 1]],
-  movement: [
-    ['move', 'Move', 1, 12, 5],
-    ['jump', 'Jump', 0, 6, 1]] };
-const SECTIONS = Object.keys(FIELDS) as Section[];
-/* the attack pattern, kept in stats after range: [id, label] */
-const PATTERNS: readonly (readonly [AttackPattern, string])[] = [['melee', 'Melee'], ['line', 'Line'], ['ranged', 'Ranged']];
-const PATTERN_IDS: readonly string[] = PATTERNS.map(([id]) => id), DEFAULT_PATTERN: AttackPattern = 'melee';
-/* the abilities that spend MP, kept in stats after the pattern: the ids of skills in data/skills/ (data/skills.ts),
-   up to MAX_ABILITIES, in the order its menus list them. One that names no skill there is left out of its menus; the
-   unit data page says so. A file from before units had several holds one as "ability" (or "none"). */
-const MAX_ABILITIES = 8;
-const abilitiesOf = (stats: Record<string, unknown>): string[] => {
-  const raw = Array.isArray(stats.abilities) ? stats.abilities : stats.ability != null ? [stats.ability] : [];
-  return [...new Set(raw.map(a => String(a ?? '').trim().toLowerCase()).filter(a => ID_RE.test(a) && a !== NO_SKILL))].slice(0, MAX_ABILITIES);
-};
-const ID_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
+const GROUPS: readonly UnitGroup[] = ['allies', 'enemies'];
+const GROUP_LABEL: Readonly<Record<UnitGroup, string>> = { allies: 'Allies', enemies: 'Enemies' };
+const DEFAULT_UNIT: Readonly<{ stats: UnitStats; movement: UnitMovement }> = Object.freeze({ stats: DEFAULT_STATS, movement: DEFAULT_MOVEMENT });
 
-const clampInt = (v: unknown, lo: number, hi: number, def: number): number => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
-const numbers = (sec: Section, src: Record<string, unknown>) => Object.fromEntries((FIELDS[sec] as readonly Field<string>[]).map(([k, , lo, hi, d]) => [k, clampInt(src[k], lo, hi, d)]));
-const DEFAULT_UNIT: Readonly<UnitData> = Object.freeze({ id: '', name: '', stats: Object.freeze({ ...numbers('stats', {}), pattern: DEFAULT_PATTERN, abilities: Object.freeze([]) as unknown as string[] } as UnitStats), movement: Object.freeze(numbers('movement', {}) as unknown as UnitMovement) });
+/* an NPC in canonical form: id, name, stats and movement, every number a whole number within its range and anything
+   missing filled from the defaults, the way a class is */
+function normalizeUnit(raw: unknown): UnitData {
+  const J = objectOf(raw), id = String(J.id ?? '').trim().toLowerCase();
+  return { id, name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''), stats: statsOf(objectOf(J.stats)), movement: movementOf(objectOf(J.movement)) };
+}
+/* what is wrong with a raw NPC, as sentences; empty when it is fine */
+function validateUnit(raw: unknown, group: string = 'allies'): string[] {
+  if (!raw || typeof raw !== 'object') return ['a unit must be an object'];
+  const J = raw as Record<string, unknown>, errs: string[] = [];
+  if (!(GROUPS as readonly string[]).includes(group)) errs.push(`group must be one of ${GROUPS.join(', ')}`);
+  if (typeof J.id !== 'string' || !ID_RE.test(J.id)) errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit');
+  if (J.name != null && typeof J.name !== 'string') errs.push('name must be text');
+  for (const s of SECTIONS) errs.push(...sectionErrors(s, objectOf(J[s])));
+  return errs;
+}
+/* the file an NPC lives in, relative to the project root, and its text: two-space JSON with a final newline */
+const unitPath = (group: string, id: string): string => `data/npcs/${group}/${id}.json`;
+const unitText = (unit: unknown): string => JSON.stringify(normalizeUnit(unit), null, 2) + '\n';
 
-/* ---------- the units, by group ---------- */
-abstract class Unit implements UnitData {
+/* ---------- the units, by side ---------- */
+abstract class Unit {
   id: string;
   name: string;
+  /* the id of the class a playable character plays as; '' for an NPC, which has numbers of its own */
+  class: string;
   stats: UnitStats;
   movement: UnitMovement;
-  /* a sprite with no unit file, playing with the defaults */
+  /* made in the character maker, rather than an NPC of the roster */
+  readonly playable: boolean;
+  /* a sprite with neither an NPC file nor a class, playing with the defaults */
   readonly fallback: boolean;
+  /* a playable character whose class has no file, so it plays with the defaults */
+  readonly classMissing: boolean;
   abstract readonly group: UnitGroup;
   /* the side it fights on in a battle (battle/state.ts) */
   abstract readonly side: Side;
-  constructor({ id, name, stats, movement }: UnitData, fallback = false) {
-    this.id = id; this.name = name; this.stats = stats; this.movement = movement; this.fallback = fallback;
+  constructor({ id, name, class: cls = '', stats, movement }: { id: string; name: string; class?: string; stats?: UnitStats; movement?: UnitMovement },
+    { playable = false, fallback = false } = {}) {
+    const found = cls ? getClass(cls) : null, base = stats && movement ? { stats, movement } : found || DEFAULT_UNIT;
+    this.id = id; this.name = name; this.class = cls;
+    this.stats = { ...base.stats, abilities: [...base.stats.abilities] }; this.movement = { ...base.movement };
+    this.playable = playable; this.fallback = fallback; this.classMissing = !!cls && !found;
   }
-  toJSON(): UnitData { return { id: this.id, name: this.name, stats: { ...this.stats, abilities: [...this.stats.abilities] }, movement: { ...this.movement } }; }
+  /* an NPC as its file holds it */
+  toJSON(): UnitData { return normalizeUnit({ id: this.id, name: this.name, stats: this.stats, movement: this.movement }); }
 }
-/* one of the player's people, from data/units/characters/ */
+/* one who fights on the player's side: an allied NPC, or a playable character */
 class Character extends Unit {
-  readonly group = 'characters' as const;
+  readonly group = 'allies' as const;
   readonly side = 'player' as const;
 }
-/* a foe, from data/units/enemies/ */
+/* a foe, from data/npcs/enemies/ */
 class Enemy extends Unit {
   readonly group = 'enemies' as const;
   readonly side = 'enemy' as const;
 }
-const UNIT_CLASS: Record<UnitGroup, new (data: UnitData, fallback?: boolean) => Unit> = { characters: Character, enemies: Enemy };
+const UNIT_CLASS: Record<UnitGroup, typeof Character | typeof Enemy> = { allies: Character, enemies: Enemy };
 
-/* a unit in canonical form: known fields only, in a fixed order, every number a whole number within its range
-   and anything missing filled from the defaults. Characters and enemies have the same fields. */
-function normalizeUnit(raw: unknown): UnitData {
-  const J = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const section = (sec: Section) => (J[sec] && typeof J[sec] === 'object' ? J[sec] : {}) as Record<string, unknown>;
-  const stats = section('stats');
-  const pat = String(stats.pattern ?? '').trim().toLowerCase();
-  return {
-    id: String(J.id ?? '').trim().toLowerCase(), name: String(J.name ?? '').trim().slice(0, 40) || String(J.id ?? ''),
-    stats: { ...numbers('stats', stats), pattern: (PATTERN_IDS.includes(pat) ? pat : DEFAULT_PATTERN) as AttackPattern, abilities: abilitiesOf(stats) } as UnitStats,
-    movement: numbers('movement', section('movement')) as unknown as UnitMovement };
-}
-/* a raw unit of this group, normalized, as a Character or an Enemy */
+/* a raw NPC of this group, normalized, as a Character or an Enemy */
 const unitFrom = (group: UnitGroup, raw: unknown): Unit => new UNIT_CLASS[group](normalizeUnit(raw));
-/* what is wrong with a raw unit, as sentences; empty when it is fine. Values out of range are reported here,
-   though normalizeUnit would clamp them, so an editor can say why a number changed. */
-function validateUnit(raw: unknown, group: string = 'characters'): string[] {
-  const errs: string[] = [];
-  if (!raw || typeof raw !== 'object') return ['a unit must be an object'];
-  const J = raw as Record<string, unknown>, sec = (s: Section) => (J[s] ?? {}) as Record<string, unknown>;
-  if (!(GROUPS as readonly string[]).includes(group)) errs.push(`group must be one of ${GROUPS.join(', ')}`);
-  if (typeof J.id !== 'string' || !ID_RE.test(J.id)) errs.push('id must be lower-case letters, digits and dashes (up to 48), starting with a letter or digit');
-  if (J.name != null && typeof J.name !== 'string') errs.push('name must be text');
-  const check = (v: unknown, label: string, lo: number, hi: number) => { if (v == null) return; if (typeof v !== 'number' || !Number.isInteger(v)) errs.push(`${label} must be a whole number`); else if (v < lo || v > hi) errs.push(`${label} must be between ${lo} and ${hi}`); };
-  for (const s of SECTIONS) for (const [k, label, lo, hi] of FIELDS[s] as readonly Field<string>[]) check(sec(s)[k], label, lo, hi);
-  const pat = sec('stats').pattern; if (pat != null && !PATTERN_IDS.includes(pat as string)) errs.push(`Pattern must be one of ${PATTERN_IDS.join(', ')}`);
-  const ab = sec('stats').ability; if (ab != null && (typeof ab !== 'string' || !ID_RE.test(ab))) errs.push('Ability must be "none" or a skill id');
-  const abs = sec('stats').abilities;
-  if (abs != null) {
-    if (!Array.isArray(abs)) errs.push('Abilities must be a list of skill ids');
-    else { if (abs.some(a => typeof a !== 'string' || !ID_RE.test(a) || a === NO_SKILL)) errs.push('Abilities must be skill ids'); if (abs.length > MAX_ABILITIES) errs.push(`A unit has up to ${MAX_ABILITIES} abilities`); }
-  }
-  return errs;
-}
-/* the file a unit lives in, relative to the project root, and its text: two-space JSON with a final newline */
-const unitPath = (group: string, id: string): string => `data/units/${group}/${id}.json`;
-const unitText = (unit: unknown): string => JSON.stringify(normalizeUnit(unit), null, 2) + '\n';
 
 /* ---------- the registry: the units the game plays with ---------- */
-const UNITS = new Map<string, Unit>(), listeners = new Set<() => void>();
-/* replace every unit with these: [{ group, unit }] */
+/* NPC id -> its file, by group; each lookup builds the Unit afresh, so a change to one never reaches the file */
+const UNITS = new Map<string, { group: UnitGroup; data: UnitData }>(), listeners = new Set<() => void>();
+const notify = () => { for (const f of listeners) f(); };
+/* replace every NPC with these: [{ group, unit }] */
 function setUnits(entries: Iterable<{ group: UnitGroup; unit: unknown }>): void {
   UNITS.clear();
-  for (const { group, unit } of entries) { const u = unitFrom(group, unit); if (u.id) UNITS.set(u.id, u); }
-  for (const f of listeners) f();
+  for (const { group, unit } of entries) { const data = normalizeUnit(unit); if (data.id && UNIT_CLASS[group]) UNITS.set(data.id, { group, data }); }
+  notify();
 }
+/* the playable characters, as the character library hands them over: each one's id, name and class ('' for none) */
+type Playable = { id: string; name: string; class: string };
+interface PlayableSource { get(id: string): Playable | null; list(): Playable[] }
+let playables: PlayableSource = { get: () => null, list: () => [] };
+const usePlayables = (src: PlayableSource): void => { playables = src; notify(); };
+/* tell the registry the playable characters changed (the library does, on a save or a delete) */
+const playablesChanged = notify;
+const playableUnit = (p: Playable): Unit => new Character({ id: p.id, name: p.name, class: p.class }, { playable: true, fallback: !p.class });
+/* a change to an NPC file, to the playable characters, or to any class: each can change how a unit plays */
 const onUnitsChange = (f: () => void): (() => boolean) => { listeners.add(f); return () => listeners.delete(f); };
-/* every unit, characters first, each group in name order */
-const listUnits = (): Unit[] => [...UNITS.values()].sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.name.localeCompare(b.name));
-const getUnit = (id: string): Unit | null => UNITS.get(id) || null;
-/* how the figure with this sprite plays: its own unit, or the defaults under its sprite id */
-const unitFor = (sprite: string): Unit => UNITS.get(sprite) || new Character({ ...DEFAULT_UNIT, id: sprite, name: sprite }, true);
+onClassesChange(notify);
+const build = (e: { group: UnitGroup; data: UnitData }): Unit => new UNIT_CLASS[e.group](e.data);
+/* every unit that fights with numbers of its own or of a class: the NPCs and the playable characters with a class, allies first, each group in name order */
+const listUnits = (): Unit[] => [...[...UNITS.values()].map(build), ...playables.list().filter(p => p.class).map(playableUnit)]
+  .sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.name.localeCompare(b.name));
+const getUnit = (id: string): Unit | null => { const e = UNITS.get(id); return e ? build(e) : null; };
+/* how the figure with this sprite plays: an NPC's own numbers, a playable character's class, or the defaults */
+function unitFor(sprite: string): Unit {
+  const npc = getUnit(sprite); if (npc) return npc;
+  const p = playables.get(sprite);
+  return p ? playableUnit(p) : new Character({ id: sprite, name: sprite }, { fallback: true });
+}
 
-export { Character, DEFAULT_PATTERN, MAX_ABILITIES, DEFAULT_UNIT, Enemy, FIELDS, PATTERNS, GROUPS, GROUP_LABEL, ID_RE, SECTIONS, Unit, getUnit, listUnits, normalizeUnit, onUnitsChange, setUnits, unitFor, unitFrom, unitPath, unitText, validateUnit };
-export type { AttackPattern, CombatStats, Side, UnitData, UnitGroup, UnitMovement, UnitStats };
+export { PATTERNS, FIELDS, SECTIONS, MAX_ABILITIES, DEFAULT_PATTERN, ID_RE } from './classes.ts';
+export { Character, DEFAULT_UNIT, Enemy, GROUPS, GROUP_LABEL, Unit, getUnit, listUnits, normalizeUnit, onUnitsChange, playablesChanged, setUnits, unitFor, unitFrom, unitPath, unitText, usePlayables, validateUnit };
+export type { AttackPattern, CombatStats, Playable, PlayableSource, Side, UnitData, UnitGroup, UnitMovement, UnitStats };
