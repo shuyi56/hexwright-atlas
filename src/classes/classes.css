@@ -140,15 +140,8 @@
 /* the dialogs sit outside .ub, so their fields are styled here too */
 .ub-dialog select,.ub-dialog input{background:var(--table);border:1px solid var(--line);color:var(--vellum);font:500 14px var(--ui);padding:5px 8px;border-radius:3px}
 .ub-dialog input:invalid{border-color:var(--wax)}
-/* the class editor: the outfit, as the character maker's chips and colours */
-.ub-outfit{display:flex;flex-direction:column;gap:8px}
-.ub-outfit.changed .ub-section{color:var(--brass-2)}
-.ub-choice{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;align-items:start}
-.ub-choice .ub-value-name{padding-top:5px;font-size:12.5px}
+/* the class editor: a row of chips, such as the side an NPC fights for */
 .ub-chips{display:flex;flex-wrap:wrap;gap:5px}
-.ub-colours{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin-top:4px}
-.ub-colour{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
-.ub-colour input{width:34px;height:24px;padding:0;border:1px solid var(--line);border-radius:3px;background:none;cursor:pointer}
 /* the class editor: who plays the class */
 .ub-users{display:flex;flex-direction:column;gap:6px}
 .ub-user-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
