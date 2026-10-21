@@ -379,12 +379,12 @@ action it plays. Adding a number means adding a line to `FIELDS` in `classes.ts`
 
 **Classes** in the module rail opens `classes.html`, the class editor, which holds the NPCs too:
 
-- **Cards:** the classes, the NPC allies and the NPC enemies down the side, and a card for the picked one. A class's
-  card has its outfit walking (turn it with ⟲ ⟳) on a plain body or on any playable character of the class, the
-  outfit's choices and colours as chips and colour pickers, and who plays it. An NPC's card has its own figure
-  walking and the side it fights for. Both have every number with a bar against the strongest, the attack pattern,
-  and the abilities (each with its MP cost, what it does and how many uses the MP holds, and how its blows fare
-  against the other side on average). Changed values are outlined in brass.
+- **Cards:** the classes, the NPC allies and the NPC enemies down the side, and a card for the picked one, with its
+  figure walking (turn it with ⟲ ⟳): a class in its outfit on a plain body, an NPC in its own look. The page edits
+  numbers only. A class's card also lists who plays it, and an NPC's card has the side it fights for. Both have
+  every number with a bar against the strongest, the attack pattern, and the abilities (each with its MP cost, what
+  it does and how many uses the MP holds, and how its blows fare against the other side on average). A class's
+  outfit is kept in its file. Changed values are outlined in brass.
 - **Table:** every class and NPC in one sortable grid for balancing numbers side by side.
 - **New class…** starts one from the defaults or a copy of another class or NPC's numbers; deleting a class that
   someone plays warns first.

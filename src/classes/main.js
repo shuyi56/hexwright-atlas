@@ -6,17 +6,16 @@ import { onSkillsChange } from '../data/skills.ts';
 import { DEFAULT_CLASS, FIELDS, MAX_ABILITIES, PATTERNS, SECTIONS, classPath, classText, listClasses, normalizeClass, onClassesChange, validateClass } from '../data/classes.ts';
 import { GROUPS, listUnits, normalizeUnit, onUnitsChange, unitPath, unitText, validateUnit } from '../data/units.ts';
 import { DEF_SCALE, MP_REGEN, abilityOf, damageOf, healOf, hitChance, listAbilities } from '../battle/abilities.ts';
-import { characterById, list as customCharacters, onChange as onLibraryChange } from '../characters/library.js';
-import { APPLIES, CHOICES, COLOURS, OUTFIT_COLOURS, OUTFIT_KEYS, cleanSpec, fromSpec } from '../characters/custom.js';
-import { FRAMES, VIEWS, frame } from '../characters/roster.js';
+import { characterById, onChange as onLibraryChange } from '../characters/library.js';
+import { cleanSpec, fromSpec } from '../characters/custom.js';
 import { goFromDataPage, mountRail } from '../ui/rail.js';
 import { $, MENU_LABEL, PATTERN_NOTE, WRITABLE, abilityLabel, downloadText, esc, namesOf, patternGrid, patternLabel, patternOptions, request, same, stageHtml, startPreview, stopPreview, thumb, toast } from './common.js';
 
 /* ================= the class editor =================
    Every class in data/classes/ (src/data/classes.ts) and every NPC in data/npcs/ (src/data/units.ts) to read and
    change: a list down the side, a card for each with its figure walking, and a table of them all for balancing
-   numbers side by side. A class's card has its outfit, which the playable characters of that class wear over
-   their own body, with the clothes, hat, gear and colours of the character maker, and who plays it. An NPC keeps
+   numbers side by side. A class's card shows its outfit, which the playable characters of that class wear over
+   their own body, on a plain body, and who plays it; the outfit itself is kept in the class's file. An NPC keeps
    its own hand-drawn look; its card has the side it fights on. Both have HP, MP, Attack, Defense, Accuracy,
    Evasion, Range, Move and Jump, a picture of the attack pattern, the abilities and what their blows come to
    against the other side. A playable character picks its class in the character maker. Changes are drafts until
@@ -31,7 +30,7 @@ const NPC_URL = (group, id) => `/__hexwright/npcs/${group}/${id}`;
    class (the Knight NPC and the Knight class); an NPC's draft carries its group too. saved is null for one not yet
    written */
 const E = new Map();
-const V = { sel: null, view: 'cards', filter: '', sort: { key: 'name', dir: 1 }, body: 'plain' };
+const V = { sel: null, view: 'cards', filter: '', sort: { key: 'name', dir: 1 } };
 const keyOf = (kind, id) => `${kind === 'class' ? 'c' : 'n'}:${id}`;
 
 /* ---------- who plays each class ---------- */
@@ -164,33 +163,13 @@ function sideSection(e) {
   </section>`;
 }
 
-/* ---------- the outfit ---------- */
-/* the body the outfit is shown on: a plain one, or one of the playable characters of this class */
+/* ---------- the figure ---------- */
+/* how one looks: a class's outfit on a plain body, or an NPC's own sprite. The outfit is kept in the class's file and
+   is not edited here: this page is for the numbers */
 const PLAIN_BODY = cleanSpec({ id: 'plain', name: 'Plain body' });
-const bodiesOf = id => [PLAIN_BODY, ...customCharacters().filter(c => c.spec.class === id).map(c => c.spec)];
-const bodyFor = d => bodiesOf(d.id).find(b => b.id === V.body) || PLAIN_BODY;
-/* how one looks: a class's outfit on a body, or an NPC's own sprite */
-function lookOf(e, body = PLAIN_BODY) {
+function lookOf(e) {
   const d = e.draft; if (e.kind !== 'class') return characterById(d.id);
-  return fromSpec({ ...body, class: '', ...d.outfit, colours: { ...body.colours, ...d.outfit.colours } }, { id: `class-${d.id}` });
-}
-const CHOICE_LABEL = { clothes: 'clothes', sleeves: 'sleeves', cut: 'sleeve cut', neckline: 'neckline', rope: 'belt', hat: 'hat', cape: 'cape', satchel: 'satchel', held: 'in hand', shield: 'shield' };
-/* the outfit materials the outfit shows (an arrow's head and fletching too), as the character maker finds them */
-function usedOutfitColours(d) {
-  const c = lookOf({ kind: 'class', draft: d }), seen = new Set();
-  for (const v of VIEWS) for (let k = 0; k < FRAMES; k++) for (const m of frame(c, v, k).mat) if (m) seen.add(m);
-  return COLOURS.filter(([key, letter]) => OUTFIT_COLOURS.includes(key) && seen.has(letter) && !(key === 'legs' && d.outfit.clothes === 'overalls'));
-}
-/* the outfit, a section of its own: a row of chips for each choice that applies, then the colours it shows */
-function outfitSection(e) {
-  const o = e.draft.outfit, changed = e.saved && !same(e.saved.outfit, o);
-  const rows = OUTFIT_KEYS.filter(k => !APPLIES[k] || APPLIES[k](o)).map(k => `<div class="ub-choice"><span class="ub-value-name">${CHOICE_LABEL[k]}</span><div class="ub-chips" role="group" aria-label="${CHOICE_LABEL[k]}">${CHOICES[k].map(([v, t]) => `<button class="chip" data-choice="${k}" data-v="${v}" aria-pressed="${o[k] === v}">${esc(t)}</button>`).join('')}</div></div>`).join('');
-  const colours = usedOutfitColours(e.draft).map(([key, , text]) => `<label class="ub-colour"><input type="color" value="${o.colours[key]}" data-colour="${key}" aria-label="${esc(text)}"><span>${esc(text)}</span></label>`).join('');
-  return `<section class="ub-outfit${changed ? ' changed' : ''}" aria-label="Outfit">
-    <h3 class="ub-section">Outfit${changed ? ' <span class="ub-tag">changed</span>' : ''}</h3>
-    <p class="ub-dim">Playable characters of this class wear it over their own build, hair and skin.</p>
-    ${rows}<div class="ub-colours">${colours}</div>
-  </section>`;
+  return fromSpec({ ...PLAIN_BODY, class: '', ...d.outfit, colours: { ...PLAIN_BODY.colours, ...d.outfit.colours } }, { id: `class-${d.id}` });
 }
 function renderDetail() {
   const box = $('detail'); stopPreview();
@@ -203,11 +182,10 @@ function renderDetail() {
         <div class="ub-head">
           <input class="ub-name" id="name" value="${esc(d.name)}" maxlength="40" spellcheck="false" aria-label="Name">
           <span class="ub-tag">${kindLabel(e)}</span>
-          ${cls ? `<label class="ub-field"><span>shown on</span><select id="body" aria-label="Shown on">${bodiesOf(d.id).map(b => `<option value="${esc(b.id)}"${b.id === bodyFor(d).id ? ' selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
         </div>
         <p class="ub-file"><code>${esc(pathOf(e))}</code>${!e.saved ? ' <span class="ub-tag">new</span>' : isDirty(e) ? ' <span class="ub-tag">unsaved</span>' : ''}</p>
         ${errs.length ? `<p class="ub-errors">${errs.map(esc).join('<br>')}</p>` : ''}
-        ${cls ? outfitSection(e) : sideSection(e)}
+        ${cls ? '' : sideSection(e)}
         <div class="ub-values">${SECTIONS.flatMap(sec => FIELDS[sec].map(f => tile(sec, f, e))).join('')}</div>
         ${patternSection(e)}
         ${abilitySection(e, cls ? 'allies' : d.group)}
@@ -224,18 +202,10 @@ function renderDetail() {
   $('ability')?.addEventListener('change', () => { const id = $('ability').value; if (id) { e.draft.stats.abilities = [...e.draft.stats.abilities, id]; commit(e); } });
   box.querySelectorAll('[data-drop]').forEach(b => b.addEventListener('click', () => { e.draft.stats.abilities = e.draft.stats.abilities.filter((x, i) => i !== +b.dataset.drop); commit(e); }));
   $('name').addEventListener('change', () => { e.draft.name = $('name').value; commit(e); });
-  $('body')?.addEventListener('change', () => { V.body = $('body').value; renderDetail(); });
   box.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => { e.draft.group = b.dataset.group; commit(e); }));
-  box.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => { e.draft.outfit = { ...e.draft.outfit, [b.dataset.choice]: b.dataset.v }; commit(e); }));
-  /* dragging a colour picker redraws the walking figure only; letting go redraws the card */
-  box.querySelectorAll('[data-colour]').forEach(inp => {
-    const set = () => { e.draft.outfit = { ...e.draft.outfit, colours: { ...e.draft.outfit.colours, [inp.dataset.colour]: inp.value } }; };
-    inp.addEventListener('input', () => { set(); stopPreview(); startPreview(lookOf(e, bodyFor(e.draft)), true); });
-    inp.addEventListener('change', () => { set(); commit(e); });
-  });
   $('revertOne').addEventListener('click', () => revert(e));
   $('deleteOne').addEventListener('click', () => remove(V.sel));
-  startPreview(lookOf(e, bodyFor(d)));
+  startPreview(lookOf(e));
 }
 /* clamp what was typed into range, then redraw everything that shows it */
 function commit(e) { e.draft = normalize(e.kind, e.draft); renderAll(); }
